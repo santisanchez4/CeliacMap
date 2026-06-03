@@ -1,0 +1,39 @@
+# CeliacMap — data-driven search scope.
+# Scaling across Latin America = adding entries here, not changing code.
+
+# Terms the Search agent queries against the Google Places API.
+search_terms:
+  - "sin TACC"
+  - "gluten free"
+  - "celíaco"
+  - "apto celíacos"
+  - "panadería sin gluten"
+
+# Maps our three frontend/DB categories to Google Places types.
+# The Search agent uses these to assign a category to each candidate.
+categories:
+  restaurant:
+    - restaurant
+    - meal_takeaway
+  cafe:
+    - cafe
+    - bakery
+  shop:
+    - grocery_or_supermarket
+    - store
+    - health
+
+# Phase 1: Uruguay + Argentina. Each city defines a search center + radius.
+countries:
+  - name: Uruguay
+    cities:
+      - name: Montevideo
+        lat: -34.9011
+        lng: -56.1645
+        radius_m: 12000
+  - name: Argentina
+    cities:
+      - name: Buenos Aires
+        lat: -34.6037
+        lng: -58.3816
+        radius_m: 15000
