@@ -17,17 +17,130 @@ Create a high-quality landing page that communicates:
 - The future vision of the product.
 - The growth roadmap.
 
+## Architecture
+
+> **Status:** CeliacMap is evolving from a static portfolio landing page into a
+> real functional product. The landing page (HTML/CSS/JS) remains the frontend
+> shell; the sections below define the backend, data, and agent layers being
+> added. This supersedes the "no backend / no real AI" rules in the original
+> Technical Scope (kept below for historical context).
+
+### Overview
+
+```txt
+FRONTEND
+- HTML/CSS/JS (current) + Leaflet.js for a real interactive map
+- Filters by category (Restaurants, Cafés, Shops) connected to the DB
+- Data loaded from Supabase via REST API (anon key, read-only)
+
+DATABASE
+- Supabase (PostgreSQL + REST API + Auth)
+- Tables:
+    places   (id, name, lat, lng, category, country, city,
+              safety_level, verified, status, address, source,
+              external_id, validation_confidence, validation_notes,
+              created_at, updated_at)
+    reviews  (id, place_id, text, rating, user_id, source, created_at)
+    agent_log(id, agent, action, result, status, place_id, created_at)
+
+AGENTS (Python)
+- Search agent:
+    Uses the Google Places API to find new gluten-free / sin TACC places.
+    Searches by country and city (data-driven via config/targets.yaml).
+    Deduplicates by external_id and proposes candidates to Supabase
+    with status "pending". Deterministic (no LLM by default).
+- Validator agent:
+    Uses the Anthropic Claude API (claude-sonnet-4-6).
+    Analyzes each pending candidate, verifies category, safety level
+    and legitimacy, and approves or discards before publishing.
+- Updater agent:
+    Periodically reviews already published (approved) places.
+    Detects closures, relocations or category/menu changes and
+    updates Supabase accordingly. Deterministic diff (no LLM by default).
+
+AUTOMATION
+- GitHub Actions cron job (free tier): runs all agents once per day.
+- Manual workflow_dispatch is used to validate the pipeline before
+  enabling the daily cron.
+
+GEOGRAPHIC SCOPE
+- Phase 1: Uruguay and Argentina.
+- Designed to scale to all of Latin America (add entries in targets.yaml).
+```
+
+### Schema refinements (beyond the original spec)
+
+- **`places.status`** (`pending` | `approved` | `discarded`) is the spine of the
+  agent flow: Search inserts `pending`, Validator sets `approved`/`discarded`, and
+  the frontend shows **only `approved`** places.
+- **`places.source` / `external_id`** record provenance and enable deduplication
+  (unique on `(source, external_id)`); `external_id` stores the Google `place_id`.
+- **`places.validation_confidence` / `validation_notes`** persist the Validator's
+  output for auditing and future escalation.
+- **`reviews.user_id`** is **nullable** (auth deferred); **`source`** distinguishes
+  seed / agent / user reviews. `rating` is constrained to 1–5.
+- **`agent_log`** gains `agent`, `status`, `place_id` and a `jsonb result` for
+  traceability; `timestamp` is named `created_at` for consistency.
+- **Row Level Security (RLS)** is enabled on all tables: the public **anon** key may
+  only `SELECT` `approved` places (and read reviews); it has **no** write access and
+  **no** access to `agent_log`. Agents use the **service_role** key server-side only.
+
+### AI model decisions
+
+- **Validator → `claude-sonnet-4-6`.** Strong judgment at the one true quality
+  gate, with the best cost/quality balance for a recurring daily batch. Emits a
+  structured JSON verdict `{verdict, category, safety_level, confidence, reason}`.
+- **Search / Updater → deterministic first**, with `claude-haiku-4-5` used only
+  where free-text interpretation is genuinely needed (ambiguous category,
+  "no longer offers GF" signals). Keeps CI fast and cheap.
+- **Provider strategy:** standardize on Anthropic behind a thin
+  `agents/clients/llm.py` wrapper so OpenAI / DeepSeek can be swapped if cost
+  demands, without touching agent logic.
+- **Future optimization — tiered validation:** validate everything with Sonnet 4.6,
+  then escalate only **low-confidence** candidates (e.g. `confidence < ~0.7`) to
+  `claude-opus-4-8` for a second opinion. Best accuracy-per-dollar; deferred until
+  logs show false approvals warrant it.
+
+### Phase 1 scope decisions (revisitable)
+
+- **Auth deferred.** Phase 1 is public read-only via the anon key; reviews are
+  seed/agent-sourced and display-only. Supabase Auth + user-submitted reviews
+  come in a later phase.
+- **Manual seed.** A small hand-curated set (~10–20 approved places in UY/AR) seeds
+  the map so it is alive immediately; agents grow it over time.
+
+### Key risks to keep in mind
+
+- **Secrets boundary:** never ship the `service_role` key or any API key to the
+  browser — only the anon key, made safe by correct RLS.
+- **Google Places** requires billing enabled and has caching/storage ToS limits;
+  cap calls per run.
+- **Health-sensitive false approvals:** `verified` stays `false` until confirmed;
+  `status` + `agent_log` act as a human review queue; surface a UI disclaimer that
+  `safety_level` is a community/AI estimate, not a medical guarantee.
+
 ## Technical Scope
+
+> **Note:** This section describes the original landing-page scope. As of the
+> product evolution (see **## Architecture**), a backend (Supabase), a real map
+> (Leaflet), and Python agents (real AI) are now explicitly in scope. The bullets
+> below are retained as the frontend baseline and historical context.
 
 - Use HTML and CSS as the main foundation.
 - Keep the project simple and easy to run.
-- Do not add frameworks or external libraries without a clear reason.
+- Do not add frameworks or external libraries without a clear reason. *(Leaflet.js
+  and the Supabase JS access are the approved, clearly-justified exceptions.)*
 - A lightweight JavaScript file (`js/main.js`) is allowed for minor interactions such as smooth scrolling, mobile menu toggling, or simple animations — only if it adds real value.
-- Do not add backend, database, or authentication unless explicitly requested.
-- Do not implement real AI if there is no explicit decision to do so. AI must be presented as part of the roadmap or future vision.
+- ~~Do not add backend, database, or authentication unless explicitly requested.~~
+  Backend + database are now in scope (Supabase); authentication remains deferred
+  to a later phase.
+- ~~Do not implement real AI if there is no explicit decision to do so.~~ Real AI
+  is now an explicit decision: Python agents use the Claude API (see Architecture).
 - Prioritize clean, semantic, responsive, and accessible code.
 
 ## File Structure
+
+Current (landing page):
 
 ```txt
 /
@@ -43,6 +156,38 @@ Create a high-quality landing page that communicates:
 │   └── styles.css
 └── js/
     └── main.js
+```
+
+Target (functional product — see **## Architecture**):
+
+```txt
+/
+├── index.html                  # frontend shell + real Leaflet map
+├── css/styles.css
+├── js/
+│   ├── main.js                 # i18n, nav, reveal
+│   ├── config.js               # Supabase URL + anon key (public)
+│   └── map.js                  # Leaflet init, fetch approved places, filters
+├── assets/{images,icons}/
+├── agents/                     # Python agents
+│   ├── base.py
+│   ├── search_agent.py
+│   ├── validator_agent.py
+│   ├── updater_agent.py
+│   └── clients/{supabase_client,google_places,llm}.py
+├── config/
+│   ├── settings.py             # env-driven config (python-dotenv)
+│   └── targets.yaml            # countries/cities + search terms
+├── scripts/
+│   ├── run_agents.py           # CI entrypoint: search → validator → updater
+│   └── load_seed.py
+├── db/
+│   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
+│   └── seed.sql                # manual seed (UY/AR)
+├── .github/workflows/agents-daily.yml
+├── requirements.txt
+├── .env.example
+├── README.md  CLAUDE.md  prompts.md  .gitignore
 ```
 
 ## Development Rules
@@ -183,6 +328,13 @@ A full visual and content redesign was applied to `index.html` and
   "Comer afuera, sin miedo."; section leads trimmed of filler so every word
   counts. Tone is warm and community-focused rather than corporate.
 
-> **Follow-up (out of scope here):** the English strings in `js/main.js` still
-> hold the previous wording. The ES/EN toggle keeps working, but the EN
-> dictionary should be updated to match the rewritten Spanish copy.
+> **Resolved:** the English strings in `js/main.js` were updated to match the
+> rewritten Spanish copy; every `data-i18n` key has a matching EN entry.
+
+### Product evolution (landing → functional product)
+
+- **Decision — evolve to a real product.** Add a Leaflet map, a Supabase backend,
+  and three Python agents (Search, Validator, Updater) automated via GitHub Actions.
+  Full design, refined schema, model choices, deferred-auth and seed decisions, and
+  risks are documented in **## Architecture** above. Build order and verification
+  live in the approved plan file.
