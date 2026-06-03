@@ -14,6 +14,11 @@
     href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap"
     rel="stylesheet" />
 
+  <link rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin="" />
+
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 
@@ -270,25 +275,19 @@
 
         <div class="map-demo reveal">
           <div class="map-chips" role="group" aria-label="Filtros del mapa">
-            <span class="chip chip-active" data-i18n="map.chip1">Todos</span>
-            <span class="chip" data-i18n="map.chip2">Restaurantes</span>
-            <span class="chip" data-i18n="map.chip3">Cafés</span>
-            <span class="chip" data-i18n="map.chip4">Comercios</span>
+            <button type="button" class="chip chip-active" data-category="all"
+              aria-pressed="true" data-i18n="map.chip1">Todos</button>
+            <button type="button" class="chip" data-category="restaurant"
+              aria-pressed="false" data-i18n="map.chip2">Restaurantes</button>
+            <button type="button" class="chip" data-category="cafe"
+              aria-pressed="false" data-i18n="map.chip3">Cafés</button>
+            <button type="button" class="chip" data-category="shop"
+              aria-pressed="false" data-i18n="map.chip4">Comercios</button>
           </div>
 
-          <div class="map-canvas" aria-hidden="true">
-            <div class="map-grid"></div>
-            <span class="map-road map-road-h"></span>
-            <span class="map-road map-road-v"></span>
-            <span class="map-pin pin-safe" style="top:22%;left:28%"></span>
-            <span class="map-pin pin-safe" style="top:55%;left:62%"></span>
-            <span class="map-pin pin-mid" style="top:38%;left:48%"></span>
-            <span class="map-pin pin-safe" style="top:70%;left:30%"></span>
-            <span class="map-pin pin-mid" style="top:30%;left:74%"></span>
-            <div class="map-popup">
-              <strong>Bistró Verde</strong>
-              <span class="badge badge-safe" data-i18n="map.popupBadge">100% sin TACC</span>
-            </div>
+          <div class="map-wrap">
+            <div id="map" role="application" aria-label="Mapa de lugares sin TACC"></div>
+            <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
           </div>
 
           <ul class="map-legend">
@@ -551,6 +550,11 @@
     </div>
   </footer>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
   <script src="js/main.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/map.js"></script>
 </body>
 </html>
