@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="CeliacMap — plataforma para encontrar lugares seguros sin TACC: mapa interactivo, reseñas de la comunidad y validación con inteligencia artificial." />
+  <meta name="theme-color" content="#2d6a4f" />
+  <title>CeliacMap — Lugares seguros sin TACC</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+  <a class="skip-link" href="#main" data-i18n="skip">Saltar al contenido principal</a>
+
+  <!-- ============================= HEADER / NAV ============================= -->
+  <header class="site-header" id="top">
+    <div class="container header-inner">
+      <a class="brand" href="#top" aria-label="CeliacMap inicio">
+        <svg class="brand-mark" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+          <path fill="currentColor"
+            d="M12 2C7.6 2 4 5.6 4 10c0 5.2 6.5 11.2 7.4 12a1 1 0 0 0 1.3 0C13.5 21.2 20 15.2 20 10c0-4.4-3.6-8-8-8Z" />
+          <circle cx="12" cy="10" r="3" fill="#fff" />
+        </svg>
+        <span class="brand-name">Celiac<strong>Map</strong></span>
+      </a>
+
+      <nav class="main-nav" id="main-nav" aria-label="Navegación principal">
+        <ul class="nav-list">
+          <li><a href="#problem" data-i18n="nav.problem">Problema</a></li>
+          <li><a href="#solution" data-i18n="nav.solution">Solución</a></li>
+          <li><a href="#features" data-i18n="nav.features">Funciones</a></li>
+          <li><a href="#map" data-i18n="nav.map">Mapa</a></li>
+          <li><a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a></li>
+          <li><a href="#about" data-i18n="nav.about">Acerca</a></li>
+        </ul>
+      </nav>
+
+      <div class="header-actions">
+        <button class="lang-toggle" id="lang-toggle" type="button"
+          aria-label="Cambiar idioma / Change language">
+          <span class="lang-current" data-i18n="lang.current">ES</span>
+          <span class="lang-sep">/</span>
+          <span class="lang-other" data-i18n="lang.other">EN</span>
+        </button>
+        <button class="nav-toggle" id="nav-toggle" type="button"
+          aria-expanded="false" aria-controls="main-nav" aria-label="Abrir menú">
+          <span class="nav-toggle-bar"></span>
+          <span class="nav-toggle-bar"></span>
+          <span class="nav-toggle-bar"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ================================ HERO ================================ -->
+    <section class="hero" id="hero">
+      <div class="container hero-inner">
+        <div class="hero-content reveal">
+          <span class="eyebrow" data-i18n="hero.eyebrow">Comunidad sin TACC</span>
+          <h1 class="hero-title" data-i18n="hero.title">
+            Comer afuera, sin miedo.
+          </h1>
+          <p class="hero-subtitle" data-i18n="hero.subtitle">
+            El mapa de lugares sin TACC que la comunidad celíaca valida, cuida y
+            hace crecer.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-accent" href="#map" data-i18n="hero.ctaPrimary">Explorar el mapa</a>
+            <a class="btn btn-outline" href="#solution" data-i18n="hero.ctaSecondary">Cómo funciona</a>
+          </div>
+          <ul class="hero-stats">
+            <li><strong>+500</strong><span data-i18n="hero.stat1">lugares en la visión</span></li>
+            <li><strong>100%</strong><span data-i18n="hero.stat2">validado por la comunidad</span></li>
+            <li><strong>24/7</strong><span data-i18n="hero.stat3">información actualizada</span></li>
+          </ul>
+        </div>
+
+        <div class="hero-visual reveal" aria-hidden="true">
+          <div class="hero-card">
+            <div class="hero-card-pin">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor"
+                d="M12 2C7.6 2 4 5.6 4 10c0 5.2 6.5 11.2 7.4 12a1 1 0 0 0 1.3 0C13.5 21.2 20 15.2 20 10c0-4.4-3.6-8-8-8Z" /><circle
+                cx="12" cy="10" r="3" fill="#fff" /></svg>
+            </div>
+            <div class="hero-card-body">
+              <strong>Bistró Verde</strong>
+              <span class="badge badge-safe" data-i18n="hero.badge">100% sin TACC</span>
+              <div class="hero-card-stars" aria-hidden="true">★★★★★</div>
+            </div>
+          </div>
+          <div class="hero-blob"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== PROBLEMA ============================== -->
+    <section class="section" id="problem">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="problem.eyebrow">El problema</span>
+          <h2 class="section-title" data-i18n="problem.title">
+            Comer afuera no debería ser un riesgo
+          </h2>
+          <p class="section-lead" data-i18n="problem.lead">
+            Cada salida trae la misma pregunta: ¿este lugar es realmente seguro?
+          </p>
+        </header>
+
+        <div class="grid grid-3">
+          <article class="card reveal">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26"><path fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+            </div>
+            <h3 class="card-title" data-i18n="problem.c1.title">Incertidumbre constante</h3>
+            <p class="card-text" data-i18n="problem.c1.text">
+              No saber si un lugar es apto genera estrés en cada comida fuera de casa.
+            </p>
+          </article>
+
+          <article class="card reveal">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26"><path fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M3 3l18 18M10.6 5.6A7 7 0 0 1 19 12c0 1.3-.4 2.6-1 3.7M5.1 8.3A7 7 0 0 0 5 12c0 3.9 3.1 7 7 7 1.3 0 2.6-.4 3.7-1" /></svg>
+            </div>
+            <h3 class="card-title" data-i18n="problem.c2.title">Riesgo de contaminación</h3>
+            <p class="card-text" data-i18n="problem.c2.text">
+              Una contaminación cruzada puede arruinar la salud de una persona celíaca.
+            </p>
+          </article>
+
+          <article class="card reveal">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26"><path fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M4 6h16M4 12h10M4 18h7" /></svg>
+            </div>
+            <h3 class="card-title" data-i18n="problem.c3.title">Información dispersa</h3>
+            <p class="card-text" data-i18n="problem.c3.text">
+              Los datos están repartidos entre grupos, redes y recomendaciones sueltas.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== SOLUCIÓN ============================== -->
+    <section class="section section-alt" id="solution">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="solution.eyebrow">La solución</span>
+          <h2 class="section-title" data-i18n="solution.title">
+            Un solo lugar confiable para encontrarlo todo
+          </h2>
+          <p class="section-lead" data-i18n="solution.lead">
+            Todo lo apto sin TACC, reunido en un mapa claro y cuidado por la comunidad.
+          </p>
+        </header>
+
+        <div class="grid grid-3">
+          <article class="step reveal">
+            <span class="step-num">01</span>
+            <h3 class="card-title" data-i18n="solution.s1.title">Buscá</h3>
+            <p class="card-text" data-i18n="solution.s1.text">
+              Encontrá restaurantes, cafés y comercios aptos cerca tuyo en segundos.
+            </p>
+          </article>
+          <article class="step reveal">
+            <span class="step-num">02</span>
+            <h3 class="card-title" data-i18n="solution.s2.title">Confiá</h3>
+            <p class="card-text" data-i18n="solution.s2.text">
+              Cada lugar muestra su nivel de seguridad y las reseñas de la comunidad.
+            </p>
+          </article>
+          <article class="step reveal">
+            <span class="step-num">03</span>
+            <h3 class="card-title" data-i18n="solution.s3.title">Compartí</h3>
+            <p class="card-text" data-i18n="solution.s3.text">
+              Sumá nuevos lugares y ayudá a que la red crezca para todos.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== FUNCIONES ============================= -->
+    <section class="section" id="features">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="features.eyebrow">Funciones</span>
+          <h2 class="section-title" data-i18n="features.title">
+            Todo lo que necesitás, en una plataforma
+          </h2>
+          <p class="section-lead" data-i18n="features.lead">
+            Simple, clara y pensada para el día a día.
+          </p>
+        </header>
+
+        <div class="grid grid-4">
+          <article class="feature reveal">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M21 21l-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" /></svg>
+            </div>
+            <h3 class="card-title" data-i18n="features.f1.title">Búsqueda inteligente</h3>
+            <p class="card-text" data-i18n="features.f1.text">
+              Filtrá por ubicación, tipo de lugar y nivel de seguridad.
+            </p>
+          </article>
+          <article class="feature reveal">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15" /></svg>
+            </div>
+            <h3 class="card-title" data-i18n="features.f2.title">Mapa interactivo</h3>
+            <p class="card-text" data-i18n="features.f2.text">
+              Visualizá todos los lugares aptos cerca tuyo de un vistazo.
+            </p>
+          </article>
+          <article class="feature reveal">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+            </div>
+            <h3 class="card-title" data-i18n="features.f3.title">Lugares verificados</h3>
+            <p class="card-text" data-i18n="features.f3.text">
+              Etiquetas claras de seguridad respaldadas por la comunidad.
+            </p>
+          </article>
+          <article class="feature reveal">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M7 8h10M7 12h6m-9 8 3.5-3H19a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14Z" /></svg>
+            </div>
+            <h3 class="card-title" data-i18n="features.f4.title">Reseñas reales</h3>
+            <p class="card-text" data-i18n="features.f4.text">
+              Experiencias de otras personas celíacas que ya estuvieron ahí.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================== MAPA INTERACTIVO ========================= -->
+    <section class="section section-alt" id="map">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="map.eyebrow">Mapa interactivo</span>
+          <h2 class="section-title" data-i18n="map.title">El corazón de CeliacMap</h2>
+          <p class="section-lead" data-i18n="map.lead">
+            Lugares aptos, niveles de seguridad y filtros rápidos. Todo de un vistazo.
+          </p>
+        </header>
+
+        <div class="map-demo reveal">
+          <div class="map-chips" role="group" aria-label="Filtros del mapa">
+            <span class="chip chip-active" data-i18n="map.chip1">Todos</span>
+            <span class="chip" data-i18n="map.chip2">Restaurantes</span>
+            <span class="chip" data-i18n="map.chip3">Cafés</span>
+            <span class="chip" data-i18n="map.chip4">Comercios</span>
+          </div>
+
+          <div class="map-canvas" aria-hidden="true">
+            <div class="map-grid"></div>
+            <span class="map-road map-road-h"></span>
+            <span class="map-road map-road-v"></span>
+            <span class="map-pin pin-safe" style="top:22%;left:28%"></span>
+            <span class="map-pin pin-safe" style="top:55%;left:62%"></span>
+            <span class="map-pin pin-mid" style="top:38%;left:48%"></span>
+            <span class="map-pin pin-safe" style="top:70%;left:30%"></span>
+            <span class="map-pin pin-mid" style="top:30%;left:74%"></span>
+            <div class="map-popup">
+              <strong>Bistró Verde</strong>
+              <span class="badge badge-safe" data-i18n="map.popupBadge">100% sin TACC</span>
+            </div>
+          </div>
+
+          <ul class="map-legend">
+            <li><span class="dot dot-safe"></span><span data-i18n="map.legend1">100% sin TACC</span></li>
+            <li><span class="dot dot-mid"></span><span data-i18n="map.legend2">Opciones aptas</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SUGERIR LUGAR =========================== -->
+    <section class="section" id="suggest">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="suggest.eyebrow">Sumá un lugar</span>
+          <h2 class="section-title" data-i18n="suggest.title">La comunidad hace crecer el mapa</h2>
+          <p class="section-lead" data-i18n="suggest.lead">
+            ¿Conocés un lugar apto que no está en el mapa? Sumarlo será así de simple.
+          </p>
+        </header>
+
+        <div class="grid grid-3">
+          <article class="step step-line reveal">
+            <span class="step-num">1</span>
+            <h3 class="card-title" data-i18n="suggest.s1.title">Marcá el lugar</h3>
+            <p class="card-text" data-i18n="suggest.s1.text">
+              Indicá la ubicación y el tipo de comercio en el mapa.
+            </p>
+          </article>
+          <article class="step step-line reveal">
+            <span class="step-num">2</span>
+            <h3 class="card-title" data-i18n="suggest.s2.title">Contá tu experiencia</h3>
+            <p class="card-text" data-i18n="suggest.s2.text">
+              Agregá detalles de seguridad, menú apto y una breve reseña.
+            </p>
+          </article>
+          <article class="step step-line reveal">
+            <span class="step-num">3</span>
+            <h3 class="card-title" data-i18n="suggest.s3.title">Ayudá a la comunidad</h3>
+            <p class="card-text" data-i18n="suggest.s3.text">
+              Tu aporte se valida y queda disponible para todos.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================== RESEÑAS ============================== -->
+    <section class="section section-alt" id="reviews">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="reviews.eyebrow">Reseñas</span>
+          <h2 class="section-title" data-i18n="reviews.title">La voz de la comunidad</h2>
+          <p class="section-lead" data-i18n="reviews.lead">
+            Experiencias reales que generan confianza.
+          </p>
+        </header>
+
+        <div class="grid grid-3">
+          <article class="review reveal">
+            <div class="review-stars" aria-label="5 de 5 estrellas">★★★★★</div>
+            <p class="review-text" data-i18n="reviews.r1.text">
+              "Por fin puedo salir a comer sin angustia. Encontré tres lugares
+              seguros a metros de casa."
+            </p>
+            <div class="review-author">
+              <span class="avatar" aria-hidden="true">M</span>
+              <div>
+                <strong>María L.</strong>
+                <span class="muted" data-i18n="reviews.r1.role">Celíaca hace 8 años</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="review reveal">
+            <div class="review-stars" aria-label="5 de 5 estrellas">★★★★★</div>
+            <p class="review-text" data-i18n="reviews.r2.text">
+              "Las etiquetas de seguridad me dan tranquilidad. Saber que otros
+              celíacos lo validaron cambia todo."
+            </p>
+            <div class="review-author">
+              <span class="avatar" aria-hidden="true">J</span>
+              <div>
+                <strong>Joaquín R.</strong>
+                <span class="muted" data-i18n="reviews.r2.role">Papá de una nena celíaca</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="review reveal">
+            <div class="review-stars" aria-label="5 de 5 estrellas">★★★★★</div>
+            <p class="review-text" data-i18n="reviews.r3.text">
+              "Sumé mi cafetería favorita en un minuto. Me encanta ayudar a que
+              más gente la descubra."
+            </p>
+            <div class="review-author">
+              <span class="avatar" aria-hidden="true">V</span>
+              <div>
+                <strong>Valentina S.</strong>
+                <span class="muted" data-i18n="reviews.r3.role">Parte de la comunidad</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== IA & AGENTES ========================== -->
+    <section class="section" id="ai">
+      <div class="container">
+        <div class="ai-layout">
+          <div class="ai-content reveal">
+            <span class="eyebrow" data-i18n="ai.eyebrow">Visión futura · Roadmap</span>
+            <h2 class="section-title" data-i18n="ai.title">
+              Inteligencia artificial al servicio de la comunidad
+            </h2>
+            <p class="section-lead" data-i18n="ai.lead">
+              Agentes que descubren, validan y mantienen al día cada lugar. De forma
+              automática y confiable.
+            </p>
+            <ul class="check-list">
+              <li data-i18n="ai.li1">Descubrir nuevos lugares aptos automáticamente.</li>
+              <li data-i18n="ai.li2">Validar y cruzar reseñas para detectar inconsistencias.</li>
+              <li data-i18n="ai.li3">Mantener menús y datos siempre actualizados.</li>
+            </ul>
+            <p class="note" data-i18n="ai.note">
+              Nota: la IA es parte de la visión a futuro del producto, no de la versión actual.
+            </p>
+          </div>
+          <div class="ai-visual reveal" aria-hidden="true">
+            <div class="ai-orb">
+              <svg viewBox="0 0 24 24" width="40" height="40"><path fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1M7.7 16.3l-2.1 2.1M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" /></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================== ROADMAP ============================== -->
+    <section class="section section-alt" id="roadmap">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="roadmap.eyebrow">Roadmap</span>
+          <h2 class="section-title" data-i18n="roadmap.title">Cómo va a crecer el producto</h2>
+          <p class="section-lead" data-i18n="roadmap.lead">
+            Un plan por etapas, pensado para crecer junto a la comunidad.
+          </p>
+        </header>
+
+        <ol class="timeline">
+          <li class="timeline-item reveal">
+            <span class="timeline-phase" data-i18n="roadmap.p1.phase">Fase 1</span>
+            <h3 class="card-title" data-i18n="roadmap.p1.title">MVP del mapa</h3>
+            <p class="card-text" data-i18n="roadmap.p1.text">
+              Landing y mapa conceptual con lugares aptos y niveles de seguridad.
+            </p>
+          </li>
+          <li class="timeline-item reveal">
+            <span class="timeline-phase" data-i18n="roadmap.p2.phase">Fase 2</span>
+            <h3 class="card-title" data-i18n="roadmap.p2.title">Comunidad</h3>
+            <p class="card-text" data-i18n="roadmap.p2.text">
+              Sugerencias de lugares, reseñas y validación colaborativa.
+            </p>
+          </li>
+          <li class="timeline-item reveal">
+            <span class="timeline-phase" data-i18n="roadmap.p3.phase">Fase 3</span>
+            <h3 class="card-title" data-i18n="roadmap.p3.title">IA y agentes</h3>
+            <p class="card-text" data-i18n="roadmap.p3.text">
+              Descubrimiento y validación automática de información con IA.
+            </p>
+          </li>
+          <li class="timeline-item reveal">
+            <span class="timeline-phase" data-i18n="roadmap.p4.phase">Fase 4</span>
+            <h3 class="card-title" data-i18n="roadmap.p4.title">Expansión</h3>
+            <p class="card-text" data-i18n="roadmap.p4.text">
+              App móvil y crecimiento hacia nuevas ciudades y países.
+            </p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- =============================== ACERCA =============================== -->
+    <section class="section" id="about">
+      <div class="container">
+        <div class="about-layout">
+          <div class="about-content reveal">
+            <span class="eyebrow" data-i18n="about.eyebrow">Acerca del proyecto</span>
+            <h2 class="section-title" data-i18n="about.title">Una idea con propósito</h2>
+            <p class="section-lead" data-i18n="about.lead">
+              CeliacMap nace como proyecto académico y de portfolio: la base de una
+              futura app para que la comunidad celíaca coma de forma segura.
+            </p>
+            <div class="author-card">
+              <span class="avatar avatar-lg" aria-hidden="true">S</span>
+              <div>
+                <strong>Santiago Sanchez</strong>
+                <span class="muted" data-i18n="about.role">Desarrollador · Autor del proyecto</span>
+                <div class="author-links">
+                  <a href="https://www.linkedin.com/in/santisanchez4/" target="_blank" rel="noopener">LinkedIn</a>
+                  <a href="https://github.com/santisanchez4" target="_blank" rel="noopener">GitHub</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================== CALL TO ACTION =========================== -->
+    <section class="cta" id="cta">
+      <div class="container cta-inner reveal">
+        <h2 class="cta-title" data-i18n="cta.title">Sumate a una forma más segura de comer afuera</h2>
+        <p class="cta-text" data-i18n="cta.text">
+          Explorá el mapa y sumate a la comunidad que hace simple comer sin TACC.
+        </p>
+        <div class="cta-actions">
+          <a class="btn btn-accent" href="#map" data-i18n="cta.primary">Explorar el mapa</a>
+          <a class="btn btn-ghost" href="https://github.com/santisanchez4" target="_blank"
+            rel="noopener" data-i18n="cta.secondary">Ver en GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- =============================== FOOTER ================================ -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="#top" aria-label="CeliacMap inicio">
+          <svg class="brand-mark" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+            <path fill="currentColor"
+              d="M12 2C7.6 2 4 5.6 4 10c0 5.2 6.5 11.2 7.4 12a1 1 0 0 0 1.3 0C13.5 21.2 20 15.2 20 10c0-4.4-3.6-8-8-8Z" />
+            <circle cx="12" cy="10" r="3" fill="#fff" />
+          </svg>
+          <span class="brand-name">Celiac<strong>Map</strong></span>
+        </a>
+        <p class="footer-tagline" data-i18n="footer.tagline">
+          Lugares seguros sin TACC, mapeados por la comunidad.
+        </p>
+      </div>
+
+      <nav class="footer-nav" aria-label="Enlaces del pie">
+        <a href="#problem" data-i18n="nav.problem">Problema</a>
+        <a href="#solution" data-i18n="nav.solution">Solución</a>
+        <a href="#features" data-i18n="nav.features">Funciones</a>
+        <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
+        <a href="#about" data-i18n="nav.about">Acerca</a>
+      </nav>
+
+      <div class="footer-social">
+        <a href="https://github.com/santisanchez4" target="_blank" rel="noopener" aria-label="GitHub">GitHub</a>
+        <a href="https://www.linkedin.com/in/santisanchez4/" target="_blank" rel="noopener" aria-label="LinkedIn">LinkedIn</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>© <span id="year">2026</span> CeliacMap · <span data-i18n="footer.credit">Hecho por Santiago Sanchez</span></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
