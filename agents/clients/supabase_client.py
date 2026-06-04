@@ -36,6 +36,24 @@ class SupabaseClient:
         )
         return res.data[0] if res.data else None
 
+    def place_exists_by_external_id(self, external_id: str) -> bool:
+        """True if any place (any source) already has this external_id.
+
+        Lets the Social agent dedup a geocoded lead against a place the Search
+        agent already discovered, since they share the Google place_id but use
+        different ``source`` values (so the unique constraint alone won't catch it).
+        """
+        if not external_id:
+            return False
+        res = (
+            self._db.table("places")
+            .select("id")
+            .eq("external_id", external_id)
+            .limit(1)
+            .execute()
+        )
+        return bool(res.data)
+
     def fetch_places_by_status(self, status: str, limit: int = 100) -> list[dict]:
         res = (
             self._db.table("places")
@@ -78,6 +96,35 @@ class SupabaseClient:
         if safety_level is not None:
             patch["safety_level"] = safety_level
         self._db.table("places").update(patch).eq("id", place_id).execute()
+
+    # --- reviews ------------------------------------------------------
+    def insert_review(
+        self,
+        place_id: str,
+        text: str,
+        *,
+        rating: int | None = None,
+        source: str = "google",
+    ) -> dict | None:
+        """Insert a review snippet for a place (used by review enrichment)."""
+        payload: dict[str, Any] = {
+            "place_id": place_id,
+            "text": text,
+            "rating": rating,
+            "source": source,
+        }
+        res = self._db.table("reviews").insert(payload).execute()
+        return res.data[0] if res.data else None
+
+    def fetch_reviews_for_place(self, place_id: str, limit: int = 5) -> list[dict]:
+        res = (
+            self._db.table("reviews")
+            .select("text, rating, source")
+            .eq("place_id", place_id)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
 
     # --- agent_log ----------------------------------------------------
     def insert_agent_log(

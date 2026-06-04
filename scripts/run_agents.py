@@ -29,7 +29,9 @@ from typing import Any
 from agents.clients.google_places import GooglePlacesClient
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.clients.tavily_client import TavilySearchClient
 from agents.search_agent import SearchAgent
+from agents.social_agent import SocialAgent
 from agents.updater_agent import UpdaterAgent
 from agents.validator_agent import ValidatorAgent
 from config.settings import Settings, get_settings, load_targets
@@ -55,9 +57,19 @@ class DryRunSupabase:
     def fetch_places_by_status(self, status: str, limit: int = 100) -> list[dict]:
         return self._inner.fetch_places_by_status(status, limit=limit)
 
+    def fetch_reviews_for_place(self, place_id: str, limit: int = 5) -> list[dict]:
+        return self._inner.fetch_reviews_for_place(place_id, limit=limit)
+
+    def place_exists_by_external_id(self, external_id: str) -> bool:
+        return self._inner.place_exists_by_external_id(external_id)
+
     # --- writes become no-ops ----------------------------------------
     def insert_place_candidate(self, candidate: dict[str, Any]) -> None:
         logger.info("[dry-run] would insert candidate %r", candidate.get("name"))
+        return None
+
+    def insert_review(self, place_id: str, text: str, **kwargs: Any) -> None:
+        logger.info("[dry-run] would insert review for place %s", place_id)
         return None
 
     def update_place(self, place_id: str, patch: dict[str, Any]) -> None:
@@ -105,23 +117,57 @@ def run_pipeline(
 
     places = GooglePlacesClient(settings.google_maps_api_key)
     llm = LLMClient(settings.anthropic_api_key, settings.validator_model)
+    haiku = (
+        LLMClient(settings.anthropic_api_key, settings.haiku_model)
+        if settings.anthropic_api_key
+        else None
+    )
     budget = Budget(budget_total)
 
     summaries: dict[str, Any] = {}
     started = time.monotonic()
 
     # 1. Search — bounded by targets.yaml x max_results_per_query; consumes its
-    #    Google text-search queries from the combined budget.
+    #    Google text-search queries (plus any review-enrichment detail calls) from
+    #    the combined budget.
     search = SearchAgent(
         db,
         places,
         targets,
         max_results_per_query=settings.max_search_results_per_query,
+        max_review_enrichments=settings.max_review_enrichments_per_run,
     )
     summaries["search"] = search.run()
-    budget.consume(summaries["search"].get("queries", 0))
+    budget.consume(
+        summaries["search"].get("queries", 0)
+        + summaries["search"].get("reviews_enriched", 0)
+    )
 
-    # 2. Validator — one Sonnet call per pending candidate, clamped to budget.
+    # 2. Social — Tavily search + Find Place geocoding, clamped to budget and to
+    #    its own per-run query cap (stays under the Tavily 1000/month free tier).
+    soc_cap = budget.allow(settings.max_social_queries_per_run)
+    if soc_cap > 0 and settings.tavily_api_key and haiku:
+        search_client = TavilySearchClient(settings.tavily_api_key)
+        social = SocialAgent(
+            db,
+            search_client,
+            places,
+            haiku,
+            targets,
+            haiku_model=settings.haiku_model,
+            max_queries=soc_cap,
+        )
+        summaries["social"] = social.run()
+        # Consume the metered calls: Tavily searches + Google Find Place geocodes.
+        budget.consume(
+            summaries["social"].get("queries", 0)
+            + summaries["social"].get("geocoded", 0)
+        )
+    else:
+        summaries["social"] = {"skipped": "budget exhausted or social not configured"}
+
+    # 3. Validator — one Sonnet call per pending candidate (with any stored
+    #    review snippets as context), clamped to budget.
     val_cap = budget.allow(settings.max_validations_per_run)
     if val_cap > 0:
         validator = ValidatorAgent(db, llm, max_per_run=val_cap)
@@ -130,14 +176,9 @@ def run_pipeline(
     else:
         summaries["validator"] = {"skipped": "budget exhausted"}
 
-    # 3. Updater — one Google details call per approved place, clamped to budget.
+    # 4. Updater — one Google details call per approved place, clamped to budget.
     upd_cap = budget.allow(settings.max_updates_per_run)
     if upd_cap > 0:
-        haiku = (
-            LLMClient(settings.anthropic_api_key, settings.haiku_model)
-            if settings.anthropic_api_key
-            else None
-        )
         updater = UpdaterAgent(
             db,
             places,
@@ -157,6 +198,7 @@ def run_pipeline(
         "budget_remaining": budget.remaining,
         "duration_s": round(time.monotonic() - started, 1),
         "search": summaries["search"],
+        "social": summaries["social"],
         "validator": summaries["validator"],
         "updater": summaries["updater"],
     }
@@ -214,6 +256,7 @@ def main() -> int:
           f" / {overall['budget_total']} used")
     print(f"  duration_s       : {overall['duration_s']}")
     print(f"  search           : {overall['search']}")
+    print(f"  social           : {overall['social']}")
     print(f"  validator        : {overall['validator']}")
     print(f"  updater          : {overall['updater']}")
 

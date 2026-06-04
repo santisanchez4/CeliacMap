@@ -38,11 +38,16 @@ class Settings:
     supabase_service_role_key: str
     google_maps_api_key: str
     anthropic_api_key: str
+    tavily_api_key: str = ""
     validator_model: str = "claude-sonnet-4-6"
     haiku_model: str = "claude-haiku-4-5"
     max_search_results_per_query: int = 20
     max_validations_per_run: int = 50
     max_updates_per_run: int = 50
+    # Social agent caps: number of Tavily searches per run (free tier: 1000/month)
+    # and number of Search-agent review enrichments per run.
+    max_social_queries_per_run: int = 16
+    max_review_enrichments_per_run: int = 30
     # Combined cap on paid API calls for one full pipeline run (search +
     # validator + updater), enforced by scripts/run_agents.py.
     agent_daily_budget: int = 200
@@ -54,11 +59,14 @@ class Settings:
             supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
             google_maps_api_key=os.getenv("GOOGLE_MAPS_API_KEY", "").strip(),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
+            tavily_api_key=os.getenv("TAVILY_API_KEY", "").strip(),
             validator_model=os.getenv("VALIDATOR_MODEL", "claude-sonnet-4-6").strip(),
             haiku_model=os.getenv("HAIKU_MODEL", "claude-haiku-4-5").strip(),
             max_search_results_per_query=_int("MAX_SEARCH_RESULTS_PER_QUERY", 20),
             max_validations_per_run=_int("MAX_VALIDATIONS_PER_RUN", 50),
             max_updates_per_run=_int("MAX_UPDATES_PER_RUN", 50),
+            max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 16),
+            max_review_enrichments_per_run=_int("MAX_REVIEW_ENRICHMENTS_PER_RUN", 30),
             agent_daily_budget=_int("AGENT_DAILY_BUDGET", 200),
         )
 

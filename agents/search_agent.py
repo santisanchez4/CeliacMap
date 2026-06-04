@@ -34,11 +34,14 @@ class SearchAgent(BaseAgent):
         places: GooglePlacesClient,
         targets: dict,
         max_results_per_query: int = 20,
+        max_review_enrichments: int = 0,
     ):
         super().__init__(db)
         self.places = places
         self.targets = targets
         self.max_results_per_query = max_results_per_query
+        # Review enrichment is opt-in (costs one details call per new candidate).
+        self.max_review_enrichments = max_review_enrichments
         self._category_by_type = self._build_type_index(targets.get("categories", {}))
 
     @staticmethod
@@ -57,6 +60,47 @@ class SearchAgent(BaseAgent):
                 return self._category_by_type[gtype]
         return DEFAULT_CATEGORY
 
+    def _enrich_reviews(self, place_id: str, external_id: str) -> int:
+        """Fetch the place's reviews and store any with a gluten-free signal.
+
+        Returns the number of snippets stored. Failures are logged but never
+        crash the search run (enrichment is best-effort context for the Validator).
+        """
+        try:
+            details = self.places.place_details_with_reviews(external_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("review fetch failed for %s", external_id)
+            self.log(
+                "review_enrich_failed",
+                {"external_id": external_id, "error": str(exc)},
+                status="error",
+                place_id=place_id,
+            )
+            return 0
+
+        result = details.get("result") or {}
+        snippets = GooglePlacesClient.extract_gf_snippets(result.get("reviews"))
+        stored = 0
+        for snippet in snippets:
+            try:
+                self.db.insert_review(
+                    place_id,
+                    snippet["text"],
+                    rating=snippet.get("rating"),
+                    source="google",
+                )
+                stored += 1
+            except Exception:  # noqa: BLE001
+                logger.exception("storing review failed for %s", place_id)
+        if stored:
+            self.log(
+                "reviews_enriched",
+                {"external_id": external_id, "snippets": stored},
+                status="success",
+                place_id=place_id,
+            )
+        return stored
+
     def run(self) -> dict:
         search_terms = self.targets.get("search_terms", [])
         seen: set[str] = set()
@@ -65,6 +109,8 @@ class SearchAgent(BaseAgent):
         inserted = 0
         skipped = 0
         errors = 0
+        reviews_enriched = 0
+        review_snippets = 0
 
         for country in self.targets.get("countries", []):
             country_name = country.get("name")
@@ -127,6 +173,12 @@ class SearchAgent(BaseAgent):
                             continue
                         if row:
                             inserted += 1
+                            # Best-effort review enrichment, capped per run.
+                            if reviews_enriched < self.max_review_enrichments:
+                                stored = self._enrich_reviews(row.get("id"), external_id)
+                                if stored:
+                                    reviews_enriched += 1
+                                    review_snippets += stored
 
         summary = {
             "queries": queries,
@@ -135,6 +187,8 @@ class SearchAgent(BaseAgent):
             "inserted": inserted,
             "skipped": skipped,
             "errors": errors,
+            "reviews_enriched": reviews_enriched,
+            "review_snippets": review_snippets,
         }
         self.log(
             "search_run_complete",
@@ -164,6 +218,7 @@ def main() -> int:
         places,
         load_targets(),
         max_results_per_query=settings.max_search_results_per_query,
+        max_review_enrichments=settings.max_review_enrichments_per_run,
     )
 
     summary = agent.run()

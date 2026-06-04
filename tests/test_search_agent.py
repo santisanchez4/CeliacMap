@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from agents.clients.google_places import GooglePlacesClient
 from agents.search_agent import DEFAULT_CATEGORY, SearchAgent
 
 TARGETS = {
@@ -44,12 +45,14 @@ def make_result(
     }
 
 
-def make_agent(targets=TARGETS):
+def make_agent(targets=TARGETS, max_review_enrichments=0):
     db = MagicMock()
     # A truthy row means "inserted" in the agent's accounting.
     db.insert_place_candidate.return_value = {"id": "row-1"}
     places = MagicMock()
-    agent = SearchAgent(db, places, targets)
+    agent = SearchAgent(
+        db, places, targets, max_review_enrichments=max_review_enrichments
+    )
     return agent, db, places
 
 
@@ -162,3 +165,78 @@ def test_text_search_error_is_counted_and_does_not_crash():
     assert summary["errors"] == 1
     assert summary["inserted"] == 0
     db.insert_place_candidate.assert_not_called()
+
+
+# --- Gluten-free review snippet filtering ---------------------------------
+
+
+def test_extract_gf_snippets_keeps_only_matches():
+    reviews = [
+        {"text": "Great coffee and they have sin TACC options!", "rating": 5},
+        {"text": "Lovely place, nice staff", "rating": 4},
+        {"text": "Tienen menu apto celiacos", "rating": 5},
+        {"text": "", "rating": 3},
+    ]
+    snippets = GooglePlacesClient.extract_gf_snippets(reviews)
+    assert len(snippets) == 2
+    assert snippets[0]["rating"] == 5
+
+
+def test_extract_gf_snippets_is_accent_insensitive():
+    reviews = [{"text": "Excelente, totalmente libre de gluten", "rating": 5}]
+    assert len(GooglePlacesClient.extract_gf_snippets(reviews)) == 1
+
+
+def test_extract_gf_snippets_clamps_invalid_rating():
+    reviews = [{"text": "sin gluten", "rating": 9}]
+    assert GooglePlacesClient.extract_gf_snippets(reviews)[0]["rating"] is None
+
+
+def test_extract_gf_snippets_handles_none():
+    assert GooglePlacesClient.extract_gf_snippets(None) == []
+
+
+# --- Review enrichment in the run -----------------------------------------
+
+
+def test_review_enrichment_stores_matching_snippets():
+    agent, db, places = make_agent(max_review_enrichments=5)
+    places.text_search.return_value = {"results": [make_result("A")]}
+    places.place_details_with_reviews.return_value = {
+        "result": {
+            "reviews": [
+                {"text": "Has sin TACC menu", "rating": 5},
+                {"text": "unrelated", "rating": 4},
+            ]
+        }
+    }
+
+    summary = agent.run()
+
+    places.place_details_with_reviews.assert_called_once_with("A")
+    db.insert_review.assert_called_once()
+    assert summary["reviews_enriched"] == 1
+    assert summary["review_snippets"] == 1
+
+
+def test_review_enrichment_disabled_by_default():
+    agent, db, places = make_agent()  # max_review_enrichments=0
+    places.text_search.return_value = {"results": [make_result("A")]}
+
+    summary = agent.run()
+
+    places.place_details_with_reviews.assert_not_called()
+    db.insert_review.assert_not_called()
+    assert summary["reviews_enriched"] == 0
+
+
+def test_review_enrichment_error_does_not_crash_run():
+    agent, db, places = make_agent(max_review_enrichments=5)
+    places.text_search.return_value = {"results": [make_result("A")]}
+    places.place_details_with_reviews.side_effect = RuntimeError("details down")
+
+    summary = agent.run()
+
+    # The candidate is still inserted; enrichment failure is best-effort.
+    assert summary["inserted"] == 1
+    assert summary["reviews_enriched"] == 0

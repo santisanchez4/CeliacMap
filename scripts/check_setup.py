@@ -58,6 +58,12 @@ def main() -> int:
         print("[FAIL] ANTHROPIC_API_KEY missing")
         ok = False
 
+    # Tavily powers the optional Social agent — note its absence but don't fail.
+    if settings.tavily_api_key:
+        print("[ok]   TAVILY_API_KEY present (not called)")
+    else:
+        print("[note] TAVILY_API_KEY missing — Social agent will be skipped")
+
     print("\nSetup OK." if ok else "\nSetup incomplete — see [FAIL] lines above.")
     return 0 if ok else 1
 

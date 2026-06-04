@@ -35,7 +35,7 @@ create table if not exists public.places (
                           check (status in ('pending', 'approved', 'discarded')),
   address               text,
   source                text not null default 'manual'
-                          check (source in ('google_places', 'manual', 'user')),
+                          check (source in ('google_places', 'manual', 'user', 'social')),
   external_id           text,                 -- e.g. Google place_id (for dedup)
   validation_confidence numeric,              -- validator output (0..1)
   validation_notes      text,                 -- validator rationale
@@ -65,6 +65,16 @@ create index if not exists places_status_idx        on public.places (status);
 create index if not exists places_category_idx      on public.places (category);
 create index if not exists places_country_city_idx  on public.places (country, city);
 
+-- Allow places discovered by the Social agent (source='social'). On an
+-- already-created table the inline check above is a no-op, so widen it in place.
+do $$
+begin
+  alter table public.places drop constraint if exists places_source_check;
+  alter table public.places
+    add constraint places_source_check
+    check (source in ('google_places', 'manual', 'user', 'social'));
+end $$;
+
 -- ---------------------------------------------------------------------
 -- Table: reviews
 -- ---------------------------------------------------------------------
@@ -75,11 +85,21 @@ create table if not exists public.reviews (
   rating      int check (rating between 1 and 5),
   user_id     uuid references auth.users(id) on delete set null,  -- nullable: auth deferred
   source      text not null default 'seed'
-                check (source in ('seed', 'agent', 'user')),
+                check (source in ('seed', 'agent', 'user', 'google')),
   created_at  timestamptz not null default now()
 );
 
 create index if not exists reviews_place_id_idx on public.reviews (place_id);
+
+-- Allow review snippets harvested from Google Places (source='google') by the
+-- Search agent's review enrichment. Widen the inline check on existing tables.
+do $$
+begin
+  alter table public.reviews drop constraint if exists reviews_source_check;
+  alter table public.reviews
+    add constraint reviews_source_check
+    check (source in ('seed', 'agent', 'user', 'google'));
+end $$;
 
 -- ---------------------------------------------------------------------
 -- Table: agent_log
@@ -87,7 +107,7 @@ create index if not exists reviews_place_id_idx on public.reviews (place_id);
 create table if not exists public.agent_log (
   id          uuid primary key default gen_random_uuid(),
   agent       text not null
-                check (agent in ('search', 'validator', 'updater', 'pipeline')),
+                check (agent in ('search', 'validator', 'updater', 'social', 'pipeline')),
   action      text not null,
   result      jsonb,
   status      text check (status in ('success', 'error')),
@@ -98,15 +118,15 @@ create table if not exists public.agent_log (
 create index if not exists agent_log_created_at_idx on public.agent_log (created_at);
 create index if not exists agent_log_agent_idx      on public.agent_log (agent);
 
--- Allow the pipeline orchestrator (scripts/run_agents.py) to log a consolidated
--- run summary under agent='pipeline'. On an already-created table the inline
--- check above is a no-op, so widen the existing constraint in place.
+-- Allow the Social agent (agent='social') and the pipeline orchestrator
+-- (agent='pipeline') to log under agent_log. On an already-created table the
+-- inline check above is a no-op, so widen the existing constraint in place.
 do $$
 begin
   alter table public.agent_log drop constraint if exists agent_log_agent_check;
   alter table public.agent_log
     add constraint agent_log_agent_check
-    check (agent in ('search', 'validator', 'updater', 'pipeline'));
+    check (agent in ('search', 'validator', 'updater', 'social', 'pipeline'));
 end $$;
 
 -- ---------------------------------------------------------------------

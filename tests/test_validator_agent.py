@@ -125,6 +125,7 @@ def test_empty_verdict_yields_conservative_defaults():
 def test_malformed_llm_response_is_caught_in_run():
     db = MagicMock()
     db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
+    db.fetch_reviews_for_place.return_value = []
     llm = MagicMock()
     llm.complete_json.side_effect = json.JSONDecodeError("boom", "doc", 0)
 
@@ -135,3 +136,47 @@ def test_malformed_llm_response_is_caught_in_run():
     assert summary["approved"] == 0
     assert summary["discarded"] == 0
     db.update_place_validation.assert_not_called()
+
+
+# --- Review snippets as validator context ---------------------------------
+
+
+def test_user_prompt_includes_review_snippets():
+    place = {"name": "Cafe X", "city": "Montevideo"}
+    reviews = [{"text": "Tienen opciones sin TACC"}, {"text": ""}]
+    prompt = ValidatorAgent._build_user_prompt(place, reviews)
+    assert "Community review signals:" in prompt
+    assert "Tienen opciones sin TACC" in prompt
+
+
+def test_user_prompt_without_reviews_has_no_signals_section():
+    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [])
+    assert "Community review signals:" not in prompt
+
+
+def test_run_feeds_reviews_into_prompt():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
+    db.fetch_reviews_for_place.return_value = [{"text": "menu apto celiacos"}]
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "approve", "category": "cafe"}
+
+    agent = ValidatorAgent(db, llm)
+    agent.run()
+
+    db.fetch_reviews_for_place.assert_called_once_with("p1")
+    user_prompt = llm.complete_json.call_args.args[1]
+    assert "menu apto celiacos" in user_prompt
+
+
+def test_run_survives_review_fetch_failure():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
+    db.fetch_reviews_for_place.side_effect = RuntimeError("db down")
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "approve", "category": "cafe"}
+
+    agent = ValidatorAgent(db, llm)
+    summary = agent.run()
+
+    assert summary["approved"] == 1
