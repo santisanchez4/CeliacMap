@@ -28,18 +28,23 @@ See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 **Frontend**
 - HTML5 (semantic), CSS3 (mobile-first, custom properties, no frameworks)
 - JavaScript (vanilla — nav, language toggle, scroll reveal, map)
-- [Leaflet.js](https://leafletjs.com/) for the interactive map
-- [Playfair Display](https://fonts.google.com/specimen/Playfair+Display) +
-  [DM Sans](https://fonts.google.com/specimen/DM+Sans) via Google Fonts
+- [Leaflet.js](https://leafletjs.com/) — interactive map
+- Google Fonts — [Playfair Display](https://fonts.google.com/specimen/Playfair+Display)
+  + [DM Sans](https://fonts.google.com/specimen/DM+Sans)
 
-**Backend & data**
-- [Supabase](https://supabase.com/) (PostgreSQL + REST API + Auth), read via the
-  public anon key with Row Level Security
+**Backend / Database**
+- [Supabase](https://supabase.com/) — PostgreSQL + REST API + Row Level Security
+  (the browser reads only approved data via the public anon key)
 
-**Agents & automation**
-- Python agents: Search (Google Places API), Validator (Anthropic Claude —
-  `claude-sonnet-4-6`), Updater
-- [GitHub Actions](https://docs.github.com/actions) daily cron
+**Agents**
+- Python 3.14
+- [Anthropic API](https://docs.anthropic.com/) (`claude-sonnet-4-6`) — Validator
+- [Google Places API](https://developers.google.com/maps/documentation/places/web-service) — Search
+- Key libraries: `supabase` (supabase-py), `anthropic`, `googlemaps`,
+  `python-dotenv`, `PyYAML`
+
+**Automation (upcoming)**
+- [GitHub Actions](https://docs.github.com/actions) — daily cron job
 
 ## Architecture
 
