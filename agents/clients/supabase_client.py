@@ -46,6 +46,15 @@ class SupabaseClient:
         )
         return res.data or []
 
+    def update_place(self, place_id: str, patch: dict[str, Any]) -> None:
+        """Apply an arbitrary field patch to a place (used by the Updater).
+
+        The updated_at trigger keeps that column fresh; a no-op patch is skipped.
+        """
+        if not patch:
+            return
+        self._db.table("places").update(patch).eq("id", place_id).execute()
+
     def update_place_validation(
         self,
         place_id: str,

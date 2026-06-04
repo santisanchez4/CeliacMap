@@ -102,3 +102,42 @@ pending places, judges each against a fixed rubric via the cached-system-prompt
 - **Auditability:** every verdict (and a run summary) is logged to `agent_log`;
   per-candidate LLM and persistence failures are caught so one bad row never aborts
   the batch.
+
+## 6. Updater agent + pipeline orchestrator (Phase 7)
+
+**Prompt (summary):** "Proceed with Phase 7 — build the Updater agent. Pull all
+approved places, re-check each via Google Places using `external_id`, detect
+closures / name / category changes, update Supabase or flag for review, and log
+each check. Keep LLM usage minimal — deterministic first, Haiku only for ambiguous
+text signals. Cap daily API calls to stay within budget. Then build
+`scripts/run_agents.py`: run search → validator → updater, enforce a combined
+daily budget cap, log the full run summary to `agent_log`, and accept a
+`--dry-run` flag for testing without writes."
+
+**Used for:** Implementing `agents/updater_agent.py` — the third pipeline stage
+(Search → Validator → **Updater**) that keeps already-approved places current —
+plus `scripts/run_agents.py`, the CI entrypoint that runs the three agents in
+sequence. Also added a generic `SupabaseClient.update_place(place_id, patch)`, a
+`MAX_UPDATES_PER_RUN` cap, and an `AGENT_DAILY_BUDGET` setting in
+`config/settings.py`.
+
+**Key decisions made during this prompt:**
+- **Deterministic-first diffs:** permanently-closed (`CLOSED_PERMANENTLY` /
+  `permanently_closed`) → `discarded` (drops off the public map); name / address /
+  category changes are patched in place; category is recomputed from Google `types`.
+- **Haiku only for ambiguity:** `claude-haiku-4-5` is invoked **only** when the
+  Google `types` map to none of our categories, and only if an Anthropic key is
+  present — otherwise the agent is fully deterministic.
+- **Flag, don't guess:** `NOT_FOUND` / non-OK details responses are logged as
+  `flagged_for_review` and the row is left untouched (could be transient).
+- **Budget + scope:** manual/seed places (no `external_id`) are skipped; re-checks
+  per run are capped by `MAX_UPDATES_PER_RUN`. Every check and a run summary are
+  written to `agent_log`.
+- **Combined budget cap:** `run_agents.py` shares one `AGENT_DAILY_BUDGET` across
+  the run — search consumes its query count, then the validator/updater per-run
+  sizes are clamped to the remaining budget so the day's total paid calls stay
+  bounded. A stage whose budget is exhausted is skipped (recorded in the summary).
+- **`--dry-run`:** wraps the Supabase client so reads pass through (agents see real
+  data) but every write becomes a logged no-op — the whole pipeline is exercised
+  without persisting anything. A consolidated `pipeline_run_complete` summary is
+  written to `agent_log` on real runs.

@@ -42,6 +42,10 @@ class Settings:
     haiku_model: str = "claude-haiku-4-5"
     max_search_results_per_query: int = 20
     max_validations_per_run: int = 50
+    max_updates_per_run: int = 50
+    # Combined cap on paid API calls for one full pipeline run (search +
+    # validator + updater), enforced by scripts/run_agents.py.
+    agent_daily_budget: int = 200
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -54,6 +58,8 @@ class Settings:
             haiku_model=os.getenv("HAIKU_MODEL", "claude-haiku-4-5").strip(),
             max_search_results_per_query=_int("MAX_SEARCH_RESULTS_PER_QUERY", 20),
             max_validations_per_run=_int("MAX_VALIDATIONS_PER_RUN", 50),
+            max_updates_per_run=_int("MAX_UPDATES_PER_RUN", 50),
+            agent_daily_budget=_int("AGENT_DAILY_BUDGET", 200),
         )
 
     def require(self, *names: str) -> None:

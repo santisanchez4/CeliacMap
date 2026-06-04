@@ -86,7 +86,8 @@ create index if not exists reviews_place_id_idx on public.reviews (place_id);
 -- ---------------------------------------------------------------------
 create table if not exists public.agent_log (
   id          uuid primary key default gen_random_uuid(),
-  agent       text not null check (agent in ('search', 'validator', 'updater')),
+  agent       text not null
+                check (agent in ('search', 'validator', 'updater', 'pipeline')),
   action      text not null,
   result      jsonb,
   status      text check (status in ('success', 'error')),
@@ -96,6 +97,17 @@ create table if not exists public.agent_log (
 
 create index if not exists agent_log_created_at_idx on public.agent_log (created_at);
 create index if not exists agent_log_agent_idx      on public.agent_log (agent);
+
+-- Allow the pipeline orchestrator (scripts/run_agents.py) to log a consolidated
+-- run summary under agent='pipeline'. On an already-created table the inline
+-- check above is a no-op, so widen the existing constraint in place.
+do $$
+begin
+  alter table public.agent_log drop constraint if exists agent_log_agent_check;
+  alter table public.agent_log
+    add constraint agent_log_agent_check
+    check (agent in ('search', 'validator', 'updater', 'pipeline'));
+end $$;
 
 -- ---------------------------------------------------------------------
 -- Trigger: keep places.updated_at fresh on UPDATE
