@@ -338,3 +338,30 @@ A full visual and content redesign was applied to `index.html` and
   Full design, refined schema, model choices, deferred-auth and seed decisions, and
   risks are documented in **## Architecture** above. Build order and verification
   live in the approved plan file.
+- **Dedup key — full unique constraint, not a partial index.** The dedup key on
+  `places (source, external_id)` was originally a **partial** unique index
+  (`where external_id is not null`). PostgreSQL cannot use a partial index for
+  `ON CONFLICT` inference unless the same `WHERE` predicate is supplied, and
+  PostgREST / `supabase-py` only send the bare column list — so the Search agent's
+  upsert failed with *"no unique or exclusion constraint matching the ON CONFLICT
+  specification"*. Replaced it with a **full** unique constraint
+  `places_source_external_id_key (source, external_id)` (idempotent `DO` block in
+  `db/schema.sql` that drops the legacy partial index). Multiple manual rows with
+  `external_id = NULL` remain allowed, because NULLs are treated as distinct in a
+  multi-column unique key — so the partial predicate was never actually needed.
+
+### Build status (phases)
+
+- ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
+  single page.
+- ✅ **Phase 3 — Supabase backend.** `db/schema.sql` (tables, constraints, RLS,
+  triggers) + `db/seed.sql` (manual UY/AR seed).
+- ✅ **Phase 4 — Live Leaflet map + agent foundation.** Map reads approved places
+  from Supabase; `config/`, `agents/base.py`, `agents/clients/*`, and
+  `scripts/check_setup.py` in place.
+- ✅ **Phase 5 — Search agent.** `agents/search_agent.py` working end-to-end:
+  a live run found and inserted **80 candidates** as `status='pending'`.
+- 🚧 **Phase 6 — Validator agent (in progress).** `agents/validator_agent.py`
+  built; pending a live validation run over the 80 candidates.
+- 🔜 **Phase 7+ — Updater agent, `scripts/run_agents.py` orchestration, and the
+  GitHub Actions daily cron.**

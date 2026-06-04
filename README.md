@@ -13,8 +13,13 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 🚧 Evolving from a portfolio landing page into a functional product.
 
 - ✅ Landing page (single page, fully responsive, bilingual ES/EN).
-- 🔜 Real Leaflet map backed by Supabase.
-- 🔜 Python agents (Search, Validator, Updater) automated via GitHub Actions.
+- ✅ Supabase backend (`places` / `reviews` / `agent_log`, RLS, manual UY/AR seed).
+- ✅ Live Leaflet map backed by Supabase (reads approved places, category filters).
+- ✅ **Search agent** — discovers places via Google Places. A live run found and
+  inserted **80 candidates** as `pending`.
+- 🚧 **Validator agent** (in progress) — Claude `claude-sonnet-4-6` approves or
+  discards each pending candidate.
+- 🔜 Updater agent + GitHub Actions daily cron.
 
 See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 
@@ -77,19 +82,27 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── config.js               # Supabase URL + anon key (public)
 │   └── map.js                  # Leaflet + Supabase data + filters
 ├── assets/{images,icons}/
-├── agents/                     # Python agents (search, validator, updater)
-│   └── clients/                # supabase / google places / llm wrappers
-├── config/                     # settings.py + targets.yaml (geo scope)
-├── scripts/                    # run_agents.py, load_seed.py
-├── db/                         # schema.sql, seed.sql
-├── .github/workflows/          # agents-daily.yml (cron)
+├── agents/                     # Python agents
+│   ├── base.py                 # shared base + agent_log helper
+│   ├── search_agent.py         # ✅ Google Places → pending candidates
+│   ├── validator_agent.py      # 🚧 Claude approves/discards pending
+│   └── clients/                # supabase_client / google_places / llm wrappers
+├── config/
+│   ├── settings.py             # env-driven config (python-dotenv)
+│   └── targets.yaml            # countries/cities + search terms
+├── scripts/
+│   └── check_setup.py          # connectivity / config preflight
+├── db/
+│   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
+│   └── seed.sql                # manual seed (UY/AR)
 ├── requirements.txt
 ├── .env.example
 └── README.md  CLAUDE.md  prompts.md  .gitignore
 ```
 
-> Note: the `agents/`, `config/`, `scripts/`, `db/` and workflow files are part of
-> the approved architecture and are being added incrementally — see `CLAUDE.md`.
+> Note: the Updater agent, `scripts/run_agents.py` orchestration, and the
+> `.github/workflows/` daily cron are part of the approved architecture and are
+> still upcoming — see `CLAUDE.md` → **Build status**.
 
 ## How to Run
 
@@ -101,10 +114,15 @@ read-only data from Supabase using the anon key in `js/config.js`.
 ### Agents (Python)
 
 ```bash
-cp .env.example .env          # fill in Supabase service_role + API keys
+cp .env.example .env             # fill in Supabase service_role + API keys
 pip install -r requirements.txt
-python scripts/run_agents.py  # runs search → validator → updater
+python scripts/check_setup.py    # preflight: config + connectivity
+python -m agents.search_agent    # discover candidates  → pending
+python -m agents.validator_agent # approve / discard pending
 ```
+
+> A single `scripts/run_agents.py` orchestrator (search → validator → updater) and
+> the daily GitHub Actions cron are upcoming; for now the agents run individually.
 
 Secrets (Supabase `service_role`, Google Places, Anthropic) live only in `.env`
 locally and in GitHub Actions Secrets — never in the frontend. In production the
