@@ -140,6 +140,16 @@ python -m agents.validator_agent # approve / discard pending
 python -m agents.updater_agent   # re-check approved places
 ```
 
+### Tests
+
+Unit tests cover the agents and config. They run fully offline — every external
+call (Supabase, Google Places, Anthropic) is mocked, so no `.env` or network is
+needed:
+
+```bash
+python -m pytest tests/ -v
+```
+
 In production the pipeline runs automatically once per day via the
 `Agents — daily pipeline` GitHub Actions workflow
 ([`.github/workflows/agents-daily.yml`](.github/workflows/agents-daily.yml)); it

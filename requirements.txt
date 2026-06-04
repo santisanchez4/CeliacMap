@@ -7,3 +7,4 @@ anthropic>=0.39,<1      # Claude API (Validator agent)
 googlemaps>=4.10,<5     # Google Places API (Search / Updater agents)
 python-dotenv>=1.0,<2   # load .env locally (CI uses real env vars)
 PyYAML>=6.0,<7          # read config/targets.yaml
+pytest>=8,<9            # unit tests (offline, all external calls mocked)
