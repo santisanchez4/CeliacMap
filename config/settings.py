@@ -46,7 +46,7 @@ class Settings:
     max_updates_per_run: int = 50
     # Social agent caps: number of Tavily searches per run (free tier: 1000/month)
     # and number of Search-agent review enrichments per run.
-    max_social_queries_per_run: int = 16
+    max_social_queries_per_run: int = 30
     max_review_enrichments_per_run: int = 30
     # Combined cap on paid API calls for one full pipeline run (search +
     # validator + updater), enforced by scripts/run_agents.py.
@@ -65,7 +65,7 @@ class Settings:
             max_search_results_per_query=_int("MAX_SEARCH_RESULTS_PER_QUERY", 20),
             max_validations_per_run=_int("MAX_VALIDATIONS_PER_RUN", 50),
             max_updates_per_run=_int("MAX_UPDATES_PER_RUN", 50),
-            max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 16),
+            max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 30),
             max_review_enrichments_per_run=_int("MAX_REVIEW_ENRICHMENTS_PER_RUN", 30),
             agent_daily_budget=_int("AGENT_DAILY_BUDGET", 200),
         )
