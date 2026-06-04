@@ -44,10 +44,22 @@ create table if not exists public.places (
 );
 
 -- Deduplication: a given external source id appears at most once.
--- Partial index so multiple manual rows (external_id NULL) are allowed.
-create unique index if not exists places_source_external_id_key
-  on public.places (source, external_id)
-  where external_id is not null;
+-- A FULL (non-partial) unique constraint is required so the agents' upsert can
+-- use ON CONFLICT (source, external_id) — PostgreSQL cannot infer a partial
+-- index without its WHERE predicate, which PostgREST/supabase-py do not send.
+-- Multiple manual rows with external_id = NULL stay allowed, because NULLs are
+-- treated as distinct in a multi-column unique key.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'places_source_external_id_key'
+  ) then
+    -- Drop the legacy partial index if a previous schema created it.
+    drop index if exists public.places_source_external_id_key;
+    alter table public.places
+      add constraint places_source_external_id_key unique (source, external_id);
+  end if;
+end $$;
 
 create index if not exists places_status_idx        on public.places (status);
 create index if not exists places_category_idx      on public.places (category);
