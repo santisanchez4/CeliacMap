@@ -193,3 +193,81 @@ across docs.
 from `actions/checkout@v4` / `setup-python@v5` (Node 20, deprecated) to
 `checkout@v5` / `setup-python@v6` (Node 24). Commit `chore: update GitHub Actions
 to Node.js 24`.
+
+## 9. Social discovery agent + Google Reviews enrichment (Phase 10)
+
+**Prompt (summary):** "Add a social media discovery agent. Index public Instagram /
+Facebook pages via Google Custom Search (`site:instagram.com "sin TACC"
+"Montevideo"`, etc.), parse each result with `claude-haiku-4-5` into
+{name, city, category, address}, insert as `pending` with `source='social'`, and
+log to `agent_log`. Add it to the daily pipeline after the Search agent. Also add
+Google Reviews enrichment: when the Search agent finds a place, fetch its reviews,
+keep snippets mentioning sin TACC / sin gluten / gluten free / libre de gluten /
+celíaco / apto celíaco, store them in `reviews`, and pass them to the Validator as
+context. Add the new env vars, keep the daily budget cap, log everything, add
+tests, and update the docs. Plan first."
+
+**Used for:** Implementing `agents/social_agent.py` and
+`agents/clients/google_custom_search.py` (stdlib-only Custom Search client),
+extending `GooglePlacesClient` (`find_place`, reviews fetch, `extract_gf_snippets`)
+and `SupabaseClient` (`insert_review`, `fetch_reviews_for_place`,
+`place_exists_by_external_id`), wiring review enrichment into the Search agent and
+review context into the Validator, adding the **Social** stage to
+`scripts/run_agents.py`, widening the schema CHECK constraints, and adding offline
+tests (`tests/test_social_agent.py` plus search/validator additions).
+
+**Key decisions made during this prompt:**
+- **Coordinates via Find Place, not nullable columns:** social leads are geocoded
+  (`name + city`) to real coordinates + a canonical `place_id`; unresolved leads
+  are skipped, so `places.lat/lng` stay `NOT NULL` and the map only ever gets
+  mappable rows.
+- **Cross-source dedup on `place_id`:** social uses the geocoded Google `place_id`
+  as `external_id` and an explicit existence check, so a place found by both Search
+  and Social is inserted once; the profile URL is kept in `validation_notes`.
+- **Shared budget + own cap:** the Social stage draws Custom Search + Find Place
+  calls from the combined `AGENT_DAILY_BUDGET` and is also capped by
+  `MAX_SOCIAL_QUERIES_PER_RUN` to stay under the Custom Search 100/day free tier;
+  review enrichment is gated by `MAX_REVIEW_ENRICHMENTS_PER_RUN` (off by default).
+- **Haiku for parsing, Sonnet still the gate:** Haiku turns noisy result snippets
+  into structured leads; the Validator (Sonnet) judges every social candidate and
+  now weighs stored review snippets without overstating safety.
+- **Stdlib Custom Search client + idempotent schema migrations:** no new Python
+  dependency; `places.source` gains `'social'`, `reviews.source` gains `'google'`,
+  and `agent_log.agent` gains `'social'` via idempotent `DO` blocks.
+
+## 10. Social agent search provider: Google Custom Search → Tavily
+
+**Prompt:** "We are replacing Google Custom Search with Tavily API for the social
+agent. Reasons: Google PSE no longer allows 'search the entire web' for new engines
+(policy change Jan 2026); Tavily is designed for AI agents, cleaner results; free
+tier 1000 searches/month. Changes: replace `agents/clients/google_custom_search.py`
+with `agents/clients/tavily_client.py`, update `agents/social_agent.py`, add
+`TAVILY_API_KEY` to `.env.example`, update `requirements.txt`
+(`pip install tavily-python`), update tests. Present the plan first, then implement
+on approval."
+
+**Used for:** Migrating the Social agent's discovery backend off the (now
+unworkable) Google Custom Search JSON API. Added `agents/clients/tavily_client.py`
+(wraps `tavily-python`, normalizes results to the existing `{title, link, snippet}`
+shape), reworked `SocialAgent._build_queries` to emit `"<term>" "<city>"` queries
+with the platform applied via Tavily `include_domains` (Tavily ignores `site:`),
+swapped the wiring in `scripts/run_agents.py` and `social_agent.main()`, replaced
+the `GOOGLE_CUSTOM_SEARCH_API_KEY` / `GOOGLE_SEARCH_ENGINE_ID` settings with
+`TAVILY_API_KEY` (config, `.env`, `.env.example`, CI workflow, `check_setup.py`),
+added `tavily-python` to `requirements.txt`, and updated the offline tests
+(`tests/test_social_agent.py`, all 82 passing).
+
+**Key decisions made during this prompt:**
+- **Why Tavily:** a Google Programmable Search Engine must "search the entire web"
+  to discover arbitrary Instagram / Facebook pages, and Google removed that toggle
+  for new engines in January 2026 — the old approach is dead, not merely
+  misconfigured. Tavily is purpose-built for agents and has a 1000/month free tier.
+- **`include_domains`, not `site:`:** Tavily does not honor Google's `site:`
+  operator, so the platform restriction moves into Tavily's `include_domains`
+  parameter; the per-platform query matrix (and thus the budget accounting) is
+  unchanged.
+- **Normalized result shape:** the new client returns `{title, link, snippet}` so
+  the agent's parsing / geocoding / dedup logic was untouched.
+- **Full cleanup:** the dead Custom Search env vars and the stdlib client were
+  removed rather than left in place; `TAVILY_API_KEY` was also added to the daily
+  CI workflow so the Social stage can finally run in CI.

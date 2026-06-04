@@ -48,7 +48,17 @@ AGENTS (Python)
     Uses the Google Places API to find new gluten-free / sin TACC places.
     Searches by country and city (data-driven via config/targets.yaml).
     Deduplicates by external_id and proposes candidates to Supabase
-    with status "pending". Deterministic (no LLM by default).
+    with status "pending". Deterministic (no LLM by default). Optionally
+    enriches each new candidate with gluten-free review snippets pulled
+    from the Google place details (stored in reviews, source "google").
+- Social agent:
+    Uses the Tavily Search API to index public Instagram / Facebook
+    business pages ("sin TACC" "Montevideo" restricted to a platform domain via
+    Tavily include_domains, data-driven via config/targets.yaml). Parses each
+    result with claude-haiku-4-5 into {name, city, category, address}, geocodes
+    the lead via Google Find Place to obtain real coordinates + a canonical
+    place_id, deduplicates (within the run and against existing places sharing
+    the place_id), and inserts candidates with status "pending", source "social".
 - Validator agent:
     Uses the Anthropic Claude API (claude-sonnet-4-6).
     Analyzes each pending candidate, verifies category, safety level
@@ -78,7 +88,12 @@ GEOGRAPHIC SCOPE
 - **`places.validation_confidence` / `validation_notes`** persist the Validator's
   output for auditing and future escalation.
 - **`reviews.user_id`** is **nullable** (auth deferred); **`source`** distinguishes
-  seed / agent / user reviews. `rating` is constrained to 1–5.
+  seed / agent / user / **google** reviews (the last added for the Search agent's
+  review enrichment). `rating` is constrained to 1–5.
+- **`places.source`** allows `google_places` / `manual` / `user` / **`social`** —
+  the last added for the Social agent. Social leads store the originating profile
+  URL in `validation_notes` and use the geocoded Google `place_id` as `external_id`
+  so a place found by both Search and Social is not duplicated.
 - **`agent_log`** gains `agent`, `status`, `place_id` and a `jsonb result` for
   traceability; `timestamp` is named `created_at` for consistency.
 - **Row Level Security (RLS)** is enabled on all tables: the public **anon** key may
@@ -93,6 +108,10 @@ GEOGRAPHIC SCOPE
 - **Search / Updater → deterministic first**, with `claude-haiku-4-5` used only
   where free-text interpretation is genuinely needed (ambiguous category,
   "no longer offers GF" signals). Keeps CI fast and cheap.
+- **Social → `claude-haiku-4-5`.** Parsing a noisy social-media search-result
+  title/snippet into a clean `{name, city, category, address}` lead is exactly the
+  cheap, high-volume free-text task Haiku is suited to; the heavier Validator gate
+  (Sonnet) still judges every social candidate afterwards.
 - **Provider strategy:** standardize on Anthropic behind a thin
   `agents/clients/llm.py` wrapper so OpenAI / DeepSeek can be swapped if cost
   demands, without touching agent logic.
@@ -350,6 +369,39 @@ A full visual and content redesign was applied to `index.html` and
   `external_id = NULL` remain allowed, because NULLs are treated as distinct in a
   multi-column unique key — so the partial predicate was never actually needed.
 
+### Social agent design decisions
+
+- **Coordinates — geocode, don't relax NOT NULL.** A social URL has no
+  coordinates, but `places.lat/lng` are `NOT NULL` and the map needs them. Rather
+  than make the columns nullable (which would admit un-mappable rows), the Social
+  agent resolves each parsed lead via **Google Find Place** (`name + city`, biased
+  to the city center) to obtain real coordinates and a canonical Google `place_id`.
+  Leads that cannot be resolved are skipped and logged (`social_unresolved`).
+- **Dedup — across sources via the geocoded `place_id`.** Social stores the Google
+  `place_id` as `external_id`, so the `(source, external_id)` unique constraint
+  dedups across social runs, and an explicit `place_exists_by_external_id` check
+  dedups against places the Search agent already found (same `place_id`, different
+  `source`). The profile URL is preserved in `validation_notes`.
+- **Budget — shared cap plus its own per-run limit.** Social consumes its Tavily
+  searches + Find Place geocodes from the combined `AGENT_DAILY_BUDGET`, and is
+  independently bounded by `MAX_SOCIAL_QUERIES_PER_RUN` so it stays well under the
+  Tavily 1000/month free tier.
+- **Search provider — Tavily, not Google Custom Search (changed Jan 2026).** The
+  Social agent originally used the Google Custom Search JSON API, but a Programmable
+  Search Engine must be set to "search the entire web" to discover arbitrary
+  Instagram / Facebook pages — and as of January 2026 Google no longer offers that
+  toggle for new engines, making the approach unworkable. Switched to the **Tavily
+  Search API** (`agents/clients/tavily_client.py`), which is purpose-built for AI
+  agents (cleaner result text), has a 1000-searches/month free tier, and restricts
+  domains via `include_domains` (Tavily does not honor Google's `site:` operator).
+  This adds the `tavily-python` dependency — justified under "no libraries without a
+  clear reason" since it replaces a now-dead provider for the core use case. New env
+  var `TAVILY_API_KEY` replaces `GOOGLE_CUSTOM_SEARCH_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID`.
+- **Review enrichment — opt-in and best-effort.** The Search agent only enriches
+  reviews when `MAX_REVIEW_ENRICHMENTS_PER_RUN > 0`; each enrichment is one extra
+  Places details call, failures never abort the run, and only snippets matching a
+  gluten-free / celiac keyword (accent-insensitive) are stored.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
@@ -378,6 +430,30 @@ A full visual and content redesign was applied to `index.html` and
   publishes only the static frontend (`index.html`, `css/`, `js/`, `assets/`) from
   `main` via `upload-pages-artifact@v3` + `deploy-pages@v5`. Live at
   **https://santisanchez4.github.io/CeliacMap/**. See the deploy decision below.
+- ✅ **Phase 10 — Social discovery agent + Google Reviews enrichment.**
+  `agents/social_agent.py` discovers public Instagram / Facebook pages via the
+  Tavily Search API (`agents/clients/tavily_client.py`), parses each lead with
+  `claude-haiku-4-5`, geocodes it via Google Find Place, and inserts `pending`
+  candidates with `source='social'`. The Search agent now optionally enriches each
+  new candidate with gluten-free review snippets (`reviews.source='google'`), which
+  the Validator reads as extra context. The pipeline runs
+  **search → social → validator → updater** under the shared `AGENT_DAILY_BUDGET`,
+  with the Social stage additionally capped by `MAX_SOCIAL_QUERIES_PER_RUN`
+  (Tavily free tier: 1000/month). New env vars: `TAVILY_API_KEY`,
+  `MAX_SOCIAL_QUERIES_PER_RUN`, `MAX_REVIEW_ENRICHMENTS_PER_RUN`.
+  - **Search-provider migration (Jan 2026):** the Social agent's discovery backend
+    was migrated from Google Custom Search to Tavily after Google removed the
+    "search the entire web" option for new Programmable Search Engines. See the
+    *Search provider* bullet under **Social agent design decisions**.
+  - **Live run verified.** An end-to-end run discovered 114 results across 16 Tavily
+    queries, parsed 87 leads with Haiku, geocoded 67 via Find Place, and inserted
+    **30 new `pending` candidates**; the Validator then approved 23 and discarded 7
+    (0 errors). The map now shows social-sourced places.
+  - **Geocoding depends on the legacy Places API.** `find_place` (via the
+    `googlemaps` library) calls the **legacy** Places API, which must be both
+    *enabled on the project* and *allowed in the API key's restrictions* (alongside
+    Places API New). Google is sunsetting legacy APIs — a future migration to the
+    Places API (New) `searchText` endpoint is the durable fix (deferred).
 
 ### GitHub Pages deploy decision
 

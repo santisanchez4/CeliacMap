@@ -16,13 +16,19 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - ✅ Supabase backend (`places` / `reviews` / `agent_log`, RLS, manual UY/AR seed).
 - ✅ Live Leaflet map backed by Supabase (reads approved places, category filters).
 - ✅ **Search agent** — discovers places via Google Places, inserts candidates as
-  `pending`.
+  `pending`, and enriches them with gluten-free review snippets.
+- ✅ **Social agent** — discovers public Instagram / Facebook pages via the Tavily
+  Search API, parses each lead with `claude-haiku-4-5`, geocodes it via Google
+  Find Place, and inserts candidates as `pending`. _(Live: a run inserted 30 social
+  candidates; the Validator approved 23.)_
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
-  pending candidate (structured verdict + confidence/notes).
+  pending candidate (structured verdict + confidence/notes), using stored review
+  snippets as extra context.
 - ✅ **Updater agent** — re-checks approved places via Google Places; closes /
   updates / flags. Deterministic, with a narrow Haiku fallback.
-- ✅ **Pipeline orchestrator** (`scripts/run_agents.py`) — runs all three agents
-  under one combined daily budget, with a `--dry-run` mode.
+- ✅ **Pipeline orchestrator** (`scripts/run_agents.py`) — runs all four agents
+  (search → social → validator → updater) under one combined daily budget, with a
+  `--dry-run` mode.
 - ✅ **GitHub Actions daily cron** — runs the pipeline once per day (manual
   `workflow_dispatch` with a dry-run toggle for validation).
 - ✅ **Deployed to GitHub Pages** — the frontend ships automatically from `main`
@@ -45,13 +51,16 @@ See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 
 **Agents**
 - Python 3.14
-- [Anthropic API](https://docs.anthropic.com/) (`claude-sonnet-4-6`) — Validator
-- [Google Places API](https://developers.google.com/maps/documentation/places/web-service) — Search
+- [Anthropic API](https://docs.anthropic.com/) (`claude-sonnet-4-6` Validator,
+  `claude-haiku-4-5` Social/Updater)
+- [Google Places API](https://developers.google.com/maps/documentation/places/web-service) — Search / Social / Updater
+- [Tavily Search API](https://tavily.com/) — Social agent (discovers public
+  Instagram / Facebook pages)
 - Key libraries: `supabase` (supabase-py), `anthropic`, `googlemaps`,
-  `python-dotenv`, `PyYAML`
+  `tavily-python`, `python-dotenv`, `PyYAML`
 
-**Automation (upcoming)**
-- [GitHub Actions](https://docs.github.com/actions) — daily cron job
+**Automation**
+- [GitHub Actions](https://docs.github.com/actions) — daily agent cron + Pages deploy
 
 ## Architecture
 
@@ -62,8 +71,10 @@ CeliacMap has three layers:
 2. **Database** — Supabase Postgres (`places`, `reviews`, `agent_log`) with RLS so
    the browser can only read approved data.
 3. **Agents** — a daily Python pipeline: **Search** finds candidates via Google
-   Places (status `pending`) → **Validator** uses Claude to approve/discard →
-   **Updater** keeps published places current. Orchestrated by GitHub Actions.
+   Places (status `pending`, plus GF review enrichment) → **Social** discovers
+   Instagram / Facebook pages via the Tavily Search API → **Validator** uses Claude
+   to approve/discard → **Updater** keeps published places current. Orchestrated by
+   GitHub Actions.
 
 Full details, schema, and design decisions: [`CLAUDE.md`](CLAUDE.md#architecture).
 
@@ -96,25 +107,26 @@ serif display headings over a clean sans body, and generous spacing.
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
 │   ├── base.py                 # shared base + agent_log helper
-│   ├── search_agent.py         # ✅ Google Places → pending candidates
-│   ├── validator_agent.py      # 🚧 Claude approves/discards pending
-│   └── clients/                # supabase_client / google_places / llm wrappers
+│   ├── search_agent.py         # Google Places → pending candidates (+ reviews)
+│   ├── social_agent.py         # Tavily search → Haiku parse → geocode → pending
+│   ├── validator_agent.py      # Claude approves/discards pending
+│   ├── updater_agent.py        # re-checks approved places
+│   └── clients/                # supabase / google_places / tavily_client / llm
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
-│   └── targets.yaml            # countries/cities + search terms
+│   └── targets.yaml            # countries/cities + search/social terms
 ├── scripts/
-│   └── check_setup.py          # connectivity / config preflight
+│   ├── check_setup.py          # connectivity / config preflight
+│   └── run_agents.py           # pipeline: search → social → validator → updater
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
 │   └── seed.sql                # manual seed (UY/AR)
+├── tests/                      # offline unit tests (all external calls mocked)
+├── .github/workflows/          # agents-daily cron + Pages deploy
 ├── requirements.txt
 ├── .env.example
 └── README.md  CLAUDE.md  prompts.md  .gitignore
 ```
-
-> Note: the Updater agent, `scripts/run_agents.py` orchestration, and the
-> `.github/workflows/` daily cron are part of the approved architecture and are
-> still upcoming — see `CLAUDE.md` → **Build status**.
 
 ## How to Run
 
@@ -130,12 +142,13 @@ cp .env.example .env             # fill in Supabase service_role + API keys
 pip install -r requirements.txt
 python scripts/check_setup.py    # preflight: config + connectivity
 
-# Run the full pipeline (search → validator → updater) under one daily budget:
+# Run the full pipeline (search → social → validator → updater) under one budget:
 python -m scripts.run_agents --dry-run   # rehearse: no database writes
 python -m scripts.run_agents             # real run
 
 # …or run any stage on its own:
-python -m agents.search_agent    # discover candidates  → pending
+python -m agents.search_agent    # discover candidates  → pending (+ reviews)
+python -m agents.social_agent    # discover IG/FB pages → pending
 python -m agents.validator_agent # approve / discard pending
 python -m agents.updater_agent   # re-check approved places
 ```
@@ -155,8 +168,8 @@ In production the pipeline runs automatically once per day via the
 ([`.github/workflows/agents-daily.yml`](.github/workflows/agents-daily.yml)); it
 can also be triggered manually (with a dry-run toggle) from the Actions tab.
 
-Secrets (Supabase `service_role`, Google Places, Anthropic) live only in `.env`
-locally and in GitHub Actions Secrets — never in the frontend.
+Secrets (Supabase `service_role`, Google Places, Tavily, Anthropic) live only in
+`.env` locally and in GitHub Actions Secrets — never in the frontend.
 
 ## Live Demo
 
