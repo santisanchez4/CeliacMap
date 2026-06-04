@@ -90,6 +90,25 @@ def test_build_queries_respects_cap():
     assert len(agent._build_queries()) == 2
 
 
+def test_build_queries_includes_social_hashtags():
+    targets = {
+        "social": {
+            "platforms": ["instagram.com"],
+            "search_terms": ["sin TACC"],
+            "social_hashtags": ["#sintacc", "#glutenfree"],
+        },
+        "countries": [
+            {"name": "Uruguay", "cities": [{"name": "Montevideo", "lat": 0, "lng": 0}]}
+        ],
+    }
+    agent, *_ = make_agent(targets=targets)
+    qs = [q["q"] for q in agent._build_queries()]
+    # 1 platform x (1 term + 2 hashtags) x 1 city = 3 queries.
+    assert len(qs) == 3
+    assert '"#sintacc" "Montevideo"' in qs
+    assert '"#glutenfree" "Montevideo"' in qs
+
+
 # --- Lead parsing / normalization -----------------------------------------
 
 

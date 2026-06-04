@@ -103,13 +103,17 @@ class SocialAgent(BaseAgent):
     def _build_queries(self) -> list[dict]:
         """Generate "<term>" "<city>" queries, one per platform (data-driven).
 
-        The platform is applied via Tavily's ``include_domains`` (Tavily does not
-        honor Google's ``site:`` operator), keeping one query per platform so the
-        per-run cap and budget accounting stay one-call-per-query.
+        ``<term>`` spans both ``social.search_terms`` and ``social.social_hashtags``
+        (hashtags are Social-agent-only). The platform is applied via Tavily's
+        ``include_domains`` (Tavily does not honor Google's ``site:`` operator),
+        keeping one query per platform so the per-run cap and budget accounting
+        stay one-call-per-query.
         """
         social = self.targets.get("social", {}) or {}
         platforms = social.get("platforms", []) or []
-        terms = social.get("search_terms", []) or []
+        terms = (social.get("search_terms", []) or []) + (
+            social.get("social_hashtags", []) or []
+        )
 
         queries: list[dict] = []
         for country in self.targets.get("countries", []):

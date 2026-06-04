@@ -8,12 +8,18 @@ search_terms:
   - "celíaco"
   - "apto celíacos"
   - "panadería sin gluten"
+  - "libre de gluten"
+  - "sin gluten"
+  - "pizzería sin TACC"
+  - "pastelería sin TACC"
+  - "menú sin TACC"
 
 # Social discovery (Social agent): finds public Instagram / Facebook business
 # pages via the Tavily Search API. A query is generated as
 #   "<term>" "<city>"
-# for every platform x term x city, and the platform is applied as a Tavily
-# `include_domains` restriction (cities come from `countries` below).
+# for every platform x term x city, where <term> spans both `search_terms` and
+# `social_hashtags` below; the platform is applied as a Tavily `include_domains`
+# restriction (cities come from `countries` below).
 social:
   platforms:
     - instagram.com
@@ -23,6 +29,15 @@ social:
     - "gluten free"
     - "libre de gluten"
     - "sin gluten"
+  # Hashtags used only by the Social agent (not the Google Places Search agent).
+  social_hashtags:
+    - "#sintacc"
+    - "#singluten"
+    - "#glutenfree"
+    - "#celiacouruguay"
+    - "#celiacoargentina"
+    - "#aptocelíaco"
+    - "#libredegluten"
 
 # Maps our three frontend/DB categories to Google Places types.
 # The Search agent uses these to assign a category to each candidate.
