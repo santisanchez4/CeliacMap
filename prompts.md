@@ -167,3 +167,29 @@ by `config/settings.py` and the file structure) documenting every variable.
 CHECK constraint only allowed `search` / `validator` / `updater`, so the
 orchestrator's `agent='pipeline'` summary insert was rejected. The constraint was
 widened in `db/schema.sql` (idempotent migration) to also allow `pipeline`.
+
+## 8. GitHub Pages deploy (Phase 9)
+
+**Prompt (summary):** "Move to Phase 9 — deploy the frontend to GitHub Pages."
+
+**Used for:** Adding `.github/workflows/deploy-pages.yml`, which stages only the
+static frontend (`index.html` + `css/` + `js/` + `assets/`) into `_site/` and
+publishes it to GitHub Pages on push to `main` (frontend paths) and on manual
+dispatch. Also updated the README Live Demo / Repository links and the status
+across docs.
+
+**Key decisions made during this prompt:**
+- **Deploy via GitHub Actions, not "deploy from branch"** — full control over what
+  ships (frontend only; agents / `db/` / `config/` are never published). Requires
+  the repo's Pages Source to be set to "GitHub Actions".
+- **Node 24, no `configure-pages`** — the official starter's
+  `actions/configure-pages@v5` still runs on Node 20 and only matters for SSG
+  base-path detection. It was omitted so the workflow stays fully Node 24
+  (`checkout@v5`, `upload-pages-artifact@v3`, `deploy-pages@v5`).
+- **Subpath-safe** — the frontend uses relative + CDN paths only, so it works under
+  the `/CeliacMap/` project-page subpath with no `<base>` tag or rewriting.
+
+**Earlier in this prompt — CI Node runtime fix:** `agents-daily.yml` was bumped
+from `actions/checkout@v4` / `setup-python@v5` (Node 20, deprecated) to
+`checkout@v5` / `setup-python@v6` (Node 24). Commit `chore: update GitHub Actions
+to Node.js 24`.

@@ -1,0 +1,53 @@
+name: Deploy frontend to GitHub Pages
+
+# Publishes the static frontend (index.html + css/js/assets) to GitHub Pages on
+# every push to main that touches those files, and on manual dispatch. The Python
+# agents, db/ and config/ are deliberately NOT published — only the site is.
+#
+# Requires the repo's Pages source to be set to "GitHub Actions"
+# (Settings → Pages → Build and deployment → Source: GitHub Actions).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "css/**"
+      - "js/**"
+      - "assets/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; cancel a superseded in-flight deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Stage static site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r css js assets _site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -25,6 +25,8 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   under one combined daily budget, with a `--dry-run` mode.
 - ✅ **GitHub Actions daily cron** — runs the pipeline once per day (manual
   `workflow_dispatch` with a dry-run toggle for validation).
+- ✅ **Deployed to GitHub Pages** — the frontend ships automatically from `main`
+  via GitHub Actions ([live demo](https://santisanchez4.github.io/CeliacMap/)).
 
 See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 
@@ -148,11 +150,15 @@ locally and in GitHub Actions Secrets — never in the frontend.
 
 ## Live Demo
 
-Coming soon.
+**https://santisanchez4.github.io/CeliacMap/**
+
+Deployed from `main` via GitHub Actions
+([`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)) on
+every push that touches the frontend.
 
 ## Repository
 
-Coming soon.
+**https://github.com/santisanchez4/CeliacMap**
 
 ## Author
 

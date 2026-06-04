@@ -372,4 +372,31 @@ A full visual and content redesign was applied to `index.html` and
 - ✅ **Phase 8 — GitHub Actions daily cron.** `.github/workflows/agents-daily.yml`
   runs the pipeline once per day (09:00 UTC) and on manual `workflow_dispatch`
   (with a `dry_run` toggle and optional `budget` override). Secrets come from
-  GitHub Actions Secrets; `.env.example` documents every variable.
+  GitHub Actions Secrets; `.env.example` documents every variable. CI actions are
+  pinned to Node 24 majors (`checkout@v5`, `setup-python@v6`).
+- ✅ **Phase 9 — GitHub Pages deploy.** `.github/workflows/deploy-pages.yml`
+  publishes only the static frontend (`index.html`, `css/`, `js/`, `assets/`) from
+  `main` via `upload-pages-artifact@v3` + `deploy-pages@v5`. Live at
+  **https://santisanchez4.github.io/CeliacMap/**. See the deploy decision below.
+
+### GitHub Pages deploy decision
+
+- **Method — GitHub Actions, not "deploy from branch."** Pages source is set to
+  **GitHub Actions** so the workflow controls exactly what ships: only the static
+  frontend is staged into `_site/` and uploaded; the Python agents, `db/`,
+  `config/` and secrets-adjacent files are never published. Consistent with the
+  repo's existing Actions-based automation.
+- **No build step.** The site is hand-written static HTML/CSS/JS; the workflow just
+  copies `index.html` + `css/` + `js/` + `assets/` and uploads the artifact.
+- **Relative paths only.** The frontend references assets relatively (`css/...`,
+  `js/...`) and via CDNs, so it works unchanged under the project-page subpath
+  `/CeliacMap/` — no `<base>` tag or path rewriting needed.
+- **`configure-pages` omitted on purpose.** The official starter includes
+  `actions/configure-pages@v5`, but that action still runs on **Node 20** and is
+  only needed for static-site-generator base-path detection (which a hand-written
+  site doesn't need). Omitting it keeps the whole deploy workflow on **Node 24**
+  (`checkout@v5`, `upload-pages-artifact@v3` (composite), `deploy-pages@v5`) with no
+  deprecation warnings. It can be re-added if base-path injection is ever required.
+- **Triggers.** Deploys on push to `main` limited to frontend paths (so backend-only
+  commits don't redeploy), plus manual `workflow_dispatch`. A `pages` concurrency
+  group serializes deploys.
