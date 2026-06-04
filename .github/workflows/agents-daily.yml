@@ -1,8 +1,8 @@
-name: Agents — daily pipeline
+name: "Agents - daily pipeline"
 
-# Runs the CeliacMap agent pipeline (search → validator → updater) once per day.
-# Manual runs (workflow_dispatch) can be used to validate the pipeline — with the
-# dry_run toggle for a no-write rehearsal — before relying on the daily cron.
+# Runs the CeliacMap agent pipeline (search -> validator -> updater) once per day.
+# Manual runs (workflow_dispatch) can be used to validate the pipeline - with the
+# dry_run toggle for a no-write rehearsal - before relying on the daily cron.
 
 on:
   schedule:
@@ -36,8 +36,6 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # Optional override; blank falls back to the in-code default (200).
-      AGENT_DAILY_BUDGET: ${{ vars.AGENT_DAILY_BUDGET }}
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v5
@@ -50,6 +48,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Scheduled runs use the in-code default budget (AGENT_DAILY_BUDGET, 200).
+      # Manual runs can override it via the "budget" input above.
       - name: Run pipeline
         run: |
           ARGS=""
