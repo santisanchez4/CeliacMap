@@ -52,3 +52,28 @@ and structure. No implementation code yet.
 - **Schema:** added `places.status` (pending/approved/discarded), provenance/dedup
   fields, and RLS so the anon key reads only approved places.
 - **Phase 1 (revisitable):** auth deferred; small manual seed for Uruguay/Argentina.
+
+## 4. Search agent (Phase 5)
+
+**Prompt (summary):** "Proceed with Phase 5 — build `agents/search_agent.py`. Read
+targets from `targets.yaml`, search the Google Places API per city + term,
+deduplicate by `external_id`, insert new candidates as `status='pending'` into
+Supabase, and log each run to `agent_log`."
+
+**Used for:** Implementing the first agent — a deterministic (no-LLM) `SearchAgent`
+that crosses every city in `config/targets.yaml` with every search term, maps each
+Google Places result onto the `places` schema, assigns a provisional category from
+the Google place types, deduplicates by `external_id`, and inserts pending
+candidates for the Validator to judge.
+
+**Key decisions made during this prompt:**
+- **Deterministic search:** no LLM; category is derived by inverting the
+  `categories` map in `targets.yaml` (google type → our category), defaulting to
+  `restaurant` when no type matches.
+- **Provisional fields at insert:** `safety_level` defaults to the most
+  conservative `options_available`; the Validator sets the real category/safety.
+- **Deduplication:** a per-run `seen` set on `external_id` plus the DB's unique
+  `(source, external_id)` index (upsert ignores duplicates) for cross-run dedup.
+- **Cost/quality guards:** permanently-closed and malformed results are skipped;
+  results per query are capped by `MAX_SEARCH_RESULTS_PER_QUERY`. Per-query
+  failures and a final run summary are written to `agent_log`.
