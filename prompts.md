@@ -77,3 +77,28 @@ candidates for the Validator to judge.
 - **Cost/quality guards:** permanently-closed and malformed results are skipped;
   results per query are capped by `MAX_SEARCH_RESULTS_PER_QUERY`. Per-query
   failures and a final run summary are written to `agent_log`.
+
+## 5. Validator agent (Phase 6)
+
+**Prompt (summary):** "Proceed with Phase 6 — build the Validator agent. Pull all
+pending places from Supabase, send each to `claude-sonnet-4-6` with a structured
+rubric, output JSON `{verdict, category, safety_level, confidence, reason}`, set
+status to approved/discarded and save confidence/notes, and log each validation to
+`agent_log`."
+
+**Used for:** Implementing `agents/validator_agent.py` — the single quality gate
+between Search's `pending` candidates and what the public map shows. It batches
+pending places, judges each against a fixed rubric via the cached-system-prompt
+`LLMClient`, and persists the verdict with `update_place_validation`.
+
+**Key decisions made during this prompt:**
+- **Model:** `claude-sonnet-4-6` (the `LLMClient` default), with the rubric sent as
+  a cached system block reused across the batch.
+- **Health-sensitive defaults:** the rubric instructs conservative `safety_level`
+  (floor `options_available`); `verified` stays `false` pending human confirmation.
+- **Defensive normalization:** `confidence` clamped to 0–1; `category` /
+  `safety_level` validated against the schema's allowed sets, falling back to the
+  candidate's existing values; only approvals overwrite category/safety.
+- **Auditability:** every verdict (and a run summary) is logged to `agent_log`;
+  per-candidate LLM and persistence failures are caught so one bad row never aborts
+  the batch.

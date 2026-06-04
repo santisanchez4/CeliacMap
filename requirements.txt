@@ -1,5 +1,8 @@
 # CeliacMap — Python agent dependencies
-supabase>=2.4,<3        # Supabase client (service_role, server-side)
+# Pinned to the pre-2.26 window on purpose: supabase 2.26+ pins storage3>=2.26,
+# which drags in pyiceberg (needs Visual C++ Build Tools on Windows and is
+# unused by CeliacMap). 2.25.x pins storage3==2.25.0, which is clean.
+supabase>=2.23,<2.26    # Supabase client (service_role, server-side)
 anthropic>=0.39,<1      # Claude API (Validator agent)
 googlemaps>=4.10,<5     # Google Places API (Search / Updater agents)
 python-dotenv>=1.0,<2   # load .env locally (CI uses real env vars)
