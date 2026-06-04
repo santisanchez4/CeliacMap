@@ -20,7 +20,7 @@ DEFAULT_DETAIL_FIELDS = [
     "name",
     "formatted_address",
     "geometry/location",
-    "type",
+    "types",
     "business_status",
 ]
 
