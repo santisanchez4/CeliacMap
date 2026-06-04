@@ -15,11 +15,16 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - ✅ Landing page (single page, fully responsive, bilingual ES/EN).
 - ✅ Supabase backend (`places` / `reviews` / `agent_log`, RLS, manual UY/AR seed).
 - ✅ Live Leaflet map backed by Supabase (reads approved places, category filters).
-- ✅ **Search agent** — discovers places via Google Places. A live run found and
-  inserted **80 candidates** as `pending`.
-- 🚧 **Validator agent** (in progress) — Claude `claude-sonnet-4-6` approves or
-  discards each pending candidate.
-- 🔜 Updater agent + GitHub Actions daily cron.
+- ✅ **Search agent** — discovers places via Google Places, inserts candidates as
+  `pending`.
+- ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
+  pending candidate (structured verdict + confidence/notes).
+- ✅ **Updater agent** — re-checks approved places via Google Places; closes /
+  updates / flags. Deterministic, with a narrow Haiku fallback.
+- ✅ **Pipeline orchestrator** (`scripts/run_agents.py`) — runs all three agents
+  under one combined daily budget, with a `--dry-run` mode.
+- ✅ **GitHub Actions daily cron** — runs the pipeline once per day (manual
+  `workflow_dispatch` with a dry-run toggle for validation).
 
 See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 
@@ -122,16 +127,24 @@ read-only data from Supabase using the anon key in `js/config.js`.
 cp .env.example .env             # fill in Supabase service_role + API keys
 pip install -r requirements.txt
 python scripts/check_setup.py    # preflight: config + connectivity
+
+# Run the full pipeline (search → validator → updater) under one daily budget:
+python -m scripts.run_agents --dry-run   # rehearse: no database writes
+python -m scripts.run_agents             # real run
+
+# …or run any stage on its own:
 python -m agents.search_agent    # discover candidates  → pending
 python -m agents.validator_agent # approve / discard pending
+python -m agents.updater_agent   # re-check approved places
 ```
 
-> A single `scripts/run_agents.py` orchestrator (search → validator → updater) and
-> the daily GitHub Actions cron are upcoming; for now the agents run individually.
+In production the pipeline runs automatically once per day via the
+`Agents — daily pipeline` GitHub Actions workflow
+([`.github/workflows/agents-daily.yml`](.github/workflows/agents-daily.yml)); it
+can also be triggered manually (with a dry-run toggle) from the Actions tab.
 
 Secrets (Supabase `service_role`, Google Places, Anthropic) live only in `.env`
-locally and in GitHub Actions Secrets — never in the frontend. In production the
-agents run automatically once per day via GitHub Actions.
+locally and in GitHub Actions Secrets — never in the frontend.
 
 ## Live Demo
 

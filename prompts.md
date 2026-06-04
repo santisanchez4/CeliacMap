@@ -141,3 +141,29 @@ sequence. Also added a generic `SupabaseClient.update_place(place_id, patch)`, a
   data) but every write becomes a logged no-op — the whole pipeline is exercised
   without persisting anything. A consolidated `pipeline_run_complete` summary is
   written to `agent_log` on real runs.
+
+## 7. GitHub Actions daily cron (Phase 8)
+
+**Prompt (summary):** "After confirming the real pipeline run, proceed with
+Phase 8 — the GitHub Actions cron job."
+
+**Used for:** Adding `.github/workflows/agents-daily.yml`, which runs
+`python -m scripts.run_agents` on a daily schedule and on manual
+`workflow_dispatch`. Also added the previously-missing `.env.example` (referenced
+by `config/settings.py` and the file structure) documenting every variable.
+
+**Key decisions made during this prompt:**
+- **Schedule + manual:** `cron: "0 9 * * *"` (09:00 UTC, ~06:00 UY/AR) plus a
+  `workflow_dispatch` with a `dry_run` toggle and optional `budget` override, so the
+  pipeline can be validated manually before relying on the cron.
+- **Secrets in CI:** Supabase / Google / Anthropic keys are read from GitHub Actions
+  Secrets via job `env`; nothing is hard-coded. `AGENT_DAILY_BUDGET` is an optional
+  repo variable that falls back to the in-code default.
+- **Safety rails:** a `concurrency` group prevents overlapping runs (they share one
+  daily budget and database), a 30-minute timeout caps runaway runs, and
+  `permissions: contents: read` keeps the token least-privileged.
+
+**Discovered during the live run (folded into Phase 7):** the `agent_log.agent`
+CHECK constraint only allowed `search` / `validator` / `updater`, so the
+orchestrator's `agent='pipeline'` summary insert was rejected. The constraint was
+widened in `db/schema.sql` (idempotent migration) to also allow `pipeline`.

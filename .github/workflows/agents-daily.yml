@@ -1,0 +1,59 @@
+name: Agents — daily pipeline
+
+# Runs the CeliacMap agent pipeline (search → validator → updater) once per day.
+# Manual runs (workflow_dispatch) can be used to validate the pipeline — with the
+# dry_run toggle for a no-write rehearsal — before relying on the daily cron.
+
+on:
+  schedule:
+    # 09:00 UTC daily (~06:00 in Uruguay / Argentina). Cron uses the default branch.
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run the pipeline without writing to the database"
+        type: boolean
+        default: false
+      budget:
+        description: "Override the combined daily budget (paid API calls); blank = default"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# Never let two pipeline runs overlap (they share one daily budget / database).
+concurrency:
+  group: agents-daily
+  cancel-in-progress: false
+
+jobs:
+  run-agents:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Optional override; blank falls back to the in-code default (200).
+      AGENT_DAILY_BUDGET: ${{ vars.AGENT_DAILY_BUDGET }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        run: |
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ -n "${{ inputs.budget }}" ]; then ARGS="$ARGS --budget ${{ inputs.budget }}"; fi
+          echo "Running: python -m scripts.run_agents $ARGS"
+          python -m scripts.run_agents $ARGS

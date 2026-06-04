@@ -361,7 +361,15 @@ A full visual and content redesign was applied to `index.html` and
   `scripts/check_setup.py` in place.
 - ✅ **Phase 5 — Search agent.** `agents/search_agent.py` working end-to-end:
   a live run found and inserted **80 candidates** as `status='pending'`.
-- 🚧 **Phase 6 — Validator agent (in progress).** `agents/validator_agent.py`
-  built; pending a live validation run over the 80 candidates.
-- 🔜 **Phase 7+ — Updater agent, `scripts/run_agents.py` orchestration, and the
-  GitHub Actions daily cron.**
+- ✅ **Phase 6 — Validator agent.** `agents/validator_agent.py` working end-to-end:
+  a live run validated 35 pending candidates (33 approved, 2 discarded).
+- ✅ **Phase 7 — Updater agent + pipeline orchestrator.** `agents/updater_agent.py`
+  plus `scripts/run_agents.py` (search → validator → updater under one combined
+  `AGENT_DAILY_BUDGET`, `--dry-run` for no-write rehearsals, consolidated
+  `pipeline_run_complete` summary to `agent_log`). A live pipeline run completed
+  with no errors (82/200 budget used). The `agent_log.agent` CHECK constraint was
+  widened to allow `'pipeline'` so the orchestrator can persist its run summary.
+- ✅ **Phase 8 — GitHub Actions daily cron.** `.github/workflows/agents-daily.yml`
+  runs the pipeline once per day (09:00 UTC) and on manual `workflow_dispatch`
+  (with a `dry_run` toggle and optional `budget` override). Secrets come from
+  GitHub Actions Secrets; `.env.example` documents every variable.
