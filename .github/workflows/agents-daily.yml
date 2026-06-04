@@ -1,8 +1,8 @@
-name: "Agents - daily pipeline"
-
+# Agents - daily pipeline.
 # Runs the CeliacMap agent pipeline (search -> validator -> updater) once per day.
-# Manual runs (workflow_dispatch) can be used to validate the pipeline - with the
-# dry_run toggle for a no-write rehearsal - before relying on the daily cron.
+# Manual runs (workflow_dispatch) can validate the pipeline first - the dry_run
+# toggle gives a no-write rehearsal - before relying on the daily cron.
+name: Agents - daily pipeline
 
 on:
   schedule:

@@ -1,11 +1,10 @@
-name: "Deploy frontend to GitHub Pages"
-
+# Deploy frontend to GitHub Pages.
 # Publishes the static frontend (index.html + css/js/assets) to GitHub Pages on
 # every push to main that touches those files, and on manual dispatch. The Python
 # agents, db/ and config/ are deliberately NOT published - only the site is.
-#
 # Requires the repo's Pages source to be set to "GitHub Actions"
 # (Settings -> Pages -> Build and deployment -> Source: GitHub Actions).
+name: Deploy frontend to GitHub Pages
 
 on:
   push:
