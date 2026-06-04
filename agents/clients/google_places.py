@@ -15,12 +15,15 @@ from typing import Any
 import googlemaps
 
 # Fields requested for a place-details lookup (keep minimal to limit cost).
+# NOTE: the Place Details endpoint wants the field name "type" (singular); the
+# Find Place endpoint below wants "types" (plural). The googlemaps library
+# validates each against a different allow-list, so this asymmetry is required.
 DEFAULT_DETAIL_FIELDS = [
     "place_id",
     "name",
     "formatted_address",
     "geometry/location",
-    "types",
+    "type",
     "business_status",
 ]
 
@@ -32,6 +35,7 @@ REVIEW_DETAIL_FIELDS = DEFAULT_DETAIL_FIELDS + [
 ]
 
 # Fields requested from Find Place when geocoding a social lead (name + city).
+# NOTE: Find Place wants "types" (plural) — unlike Place Details above ("type").
 FIND_PLACE_FIELDS = [
     "place_id",
     "name",
