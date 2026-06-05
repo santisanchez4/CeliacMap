@@ -137,6 +137,8 @@ def run_pipeline(
         max_results_per_query=settings.max_search_results_per_query,
         max_review_enrichments=settings.max_review_enrichments_per_run,
         max_detail_lookups=settings.max_detail_lookups_per_run,
+        # Clamp the per-run query cap to whatever budget remains.
+        max_queries_per_run=budget.allow(settings.max_search_queries_per_run),
     )
     summaries["search"] = search.run()
     budget.consume(

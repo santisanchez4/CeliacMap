@@ -36,11 +36,15 @@ class SearchAgent(BaseAgent):
         max_results_per_query: int = 20,
         max_review_enrichments: int = 0,
         max_detail_lookups: int = 0,
+        max_queries_per_run: int = 0,
     ):
         super().__init__(db)
         self.places = places
         self.targets = targets
         self.max_results_per_query = max_results_per_query
+        # Cap on text-search queries per run (0 = unlimited). The city x term
+        # matrix grows with coverage; this keeps a run within the daily budget.
+        self.max_queries_per_run = max_queries_per_run
         # One Place Details call per new candidate populates the rich panel fields
         # (phone/website/hours/rating); the same call also feeds GF review
         # enrichment. Both are capped per run to stay within the API budget.
@@ -130,81 +134,89 @@ class SearchAgent(BaseAgent):
         reviews_enriched = 0
         review_snippets = 0
 
-        for country in self.targets.get("countries", []):
-            country_name = country.get("name")
-            for city in country.get("cities", []):
-                city_name = city.get("name")
-                location = (city.get("lat"), city.get("lng"))
-                radius_m = city.get("radius_m")
+        # Term-major job list: apply each search term across ALL cities before the
+        # next term, so a run capped by max_queries_per_run still spans every city
+        # with the strongest terms first (search_terms are ordered by signal).
+        jobs = [
+            (country.get("name"), city, term)
+            for term in search_terms
+            for country in self.targets.get("countries", [])
+            for city in country.get("cities", [])
+        ]
+        if self.max_queries_per_run:
+            jobs = jobs[: self.max_queries_per_run]
 
-                for term in search_terms:
-                    query = f"{term} {city_name}".strip()
-                    queries += 1
-                    try:
-                        resp = self.places.text_search(
-                            query=query, location=location, radius_m=radius_m
+        for country_name, city, term in jobs:
+            city_name = city.get("name")
+            location = (city.get("lat"), city.get("lng"))
+            radius_m = city.get("radius_m")
+            query = f"{term} {city_name}".strip()
+            queries += 1
+            try:
+                resp = self.places.text_search(
+                    query=query, location=location, radius_m=radius_m
+                )
+            except Exception as exc:  # noqa: BLE001
+                errors += 1
+                logger.exception("text_search failed for %r", query)
+                self.log(
+                    "search_query_failed",
+                    {"query": query, "error": str(exc)},
+                    status="error",
+                )
+                continue
+
+            results = (resp.get("results") or [])[: self.max_results_per_query]
+            for result in results:
+                external_id = result.get("place_id")
+                if not external_id or external_id in seen:
+                    continue
+                seen.add(external_id)
+
+                if result.get("business_status") == "CLOSED_PERMANENTLY":
+                    skipped += 1
+                    continue
+
+                candidate = GooglePlacesClient.to_candidate(
+                    result, country=country_name, city=city_name
+                )
+                if not candidate.get("name") or candidate.get("lat") is None:
+                    skipped += 1
+                    continue
+
+                candidate["category"] = self._category_for(result)
+                candidate["safety_level"] = DEFAULT_SAFETY_LEVEL
+                candidates_found += 1
+
+                try:
+                    row = self.db.insert_place_candidate(candidate)
+                except Exception as exc:  # noqa: BLE001
+                    errors += 1
+                    logger.exception(
+                        "insert failed for %r (%s)", candidate.get("name"), external_id
+                    )
+                    self.log(
+                        "candidate_insert_failed",
+                        {"external_id": external_id, "error": str(exc)},
+                        status="error",
+                    )
+                    continue
+                if row:
+                    inserted += 1
+                    # One Details call per new candidate: rich panel fields
+                    # always, GF review snippets while under their own cap.
+                    if details_fetched < self.max_detail_lookups:
+                        details_fetched += 1
+                        out = self._apply_place_details(
+                            row.get("id"),
+                            external_id,
+                            store_reviews=reviews_enriched < self.max_review_enrichments,
                         )
-                    except Exception as exc:  # noqa: BLE001
-                        errors += 1
-                        logger.exception("text_search failed for %r", query)
-                        self.log(
-                            "search_query_failed",
-                            {"query": query, "error": str(exc)},
-                            status="error",
-                        )
-                        continue
-
-                    results = (resp.get("results") or [])[: self.max_results_per_query]
-                    for result in results:
-                        external_id = result.get("place_id")
-                        if not external_id or external_id in seen:
-                            continue
-                        seen.add(external_id)
-
-                        if result.get("business_status") == "CLOSED_PERMANENTLY":
-                            skipped += 1
-                            continue
-
-                        candidate = GooglePlacesClient.to_candidate(
-                            result, country=country_name, city=city_name
-                        )
-                        if not candidate.get("name") or candidate.get("lat") is None:
-                            skipped += 1
-                            continue
-
-                        candidate["category"] = self._category_for(result)
-                        candidate["safety_level"] = DEFAULT_SAFETY_LEVEL
-                        candidates_found += 1
-
-                        try:
-                            row = self.db.insert_place_candidate(candidate)
-                        except Exception as exc:  # noqa: BLE001
-                            errors += 1
-                            logger.exception(
-                                "insert failed for %r (%s)", candidate.get("name"), external_id
-                            )
-                            self.log(
-                                "candidate_insert_failed",
-                                {"external_id": external_id, "error": str(exc)},
-                                status="error",
-                            )
-                            continue
-                        if row:
-                            inserted += 1
-                            # One Details call per new candidate: rich panel fields
-                            # always, GF review snippets while under their own cap.
-                            if details_fetched < self.max_detail_lookups:
-                                details_fetched += 1
-                                out = self._apply_place_details(
-                                    row.get("id"),
-                                    external_id,
-                                    store_reviews=reviews_enriched < self.max_review_enrichments,
-                                )
-                                if out["rich"]:
-                                    rich_updated += 1
-                                if out["snippets"]:
-                                    reviews_enriched += 1
-                                    review_snippets += out["snippets"]
+                        if out["rich"]:
+                            rich_updated += 1
+                        if out["snippets"]:
+                            reviews_enriched += 1
+                            review_snippets += out["snippets"]
 
         summary = {
             "queries": queries,
@@ -248,6 +260,7 @@ def main() -> int:
         max_results_per_query=settings.max_search_results_per_query,
         max_review_enrichments=settings.max_review_enrichments_per_run,
         max_detail_lookups=settings.max_detail_lookups_per_run,
+        max_queries_per_run=settings.max_search_queries_per_run,
     )
 
     summary = agent.run()

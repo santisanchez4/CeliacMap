@@ -42,6 +42,9 @@ class Settings:
     validator_model: str = "claude-sonnet-4-6"
     haiku_model: str = "claude-haiku-4-5"
     max_search_results_per_query: int = 20
+    # Cap on Google text-search queries per Search run (city x term matrix can be
+    # large); keeps a run within the daily API budget. 0 = unlimited.
+    max_search_queries_per_run: int = 80
     max_validations_per_run: int = 50
     max_updates_per_run: int = 50
     # Social agent caps: number of Tavily searches per run (free tier: 1000/month)
@@ -65,6 +68,7 @@ class Settings:
             validator_model=os.getenv("VALIDATOR_MODEL", "claude-sonnet-4-6").strip(),
             haiku_model=os.getenv("HAIKU_MODEL", "claude-haiku-4-5").strip(),
             max_search_results_per_query=_int("MAX_SEARCH_RESULTS_PER_QUERY", 20),
+            max_search_queries_per_run=_int("MAX_SEARCH_QUERIES_PER_RUN", 80),
             max_validations_per_run=_int("MAX_VALIDATIONS_PER_RUN", 50),
             max_updates_per_run=_int("MAX_UPDATES_PER_RUN", 50),
             max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 30),

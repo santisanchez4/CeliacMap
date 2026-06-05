@@ -45,7 +45,12 @@ def make_result(
     }
 
 
-def make_agent(targets=TARGETS, max_review_enrichments=0, max_detail_lookups=0):
+def make_agent(
+    targets=TARGETS,
+    max_review_enrichments=0,
+    max_detail_lookups=0,
+    max_queries_per_run=0,
+):
     db = MagicMock()
     # A truthy row means "inserted" in the agent's accounting.
     db.insert_place_candidate.return_value = {"id": "row-1"}
@@ -56,6 +61,7 @@ def make_agent(targets=TARGETS, max_review_enrichments=0, max_detail_lookups=0):
         targets,
         max_review_enrichments=max_review_enrichments,
         max_detail_lookups=max_detail_lookups,
+        max_queries_per_run=max_queries_per_run,
     )
     return agent, db, places
 
@@ -100,6 +106,54 @@ def test_result_without_place_id_is_skipped():
     agent.run()
 
     assert db.insert_place_candidate.call_count == 1
+
+
+# --- Per-run query cap ----------------------------------------------------
+
+CAP_TARGETS = {
+    "search_terms": ["t1", "t2", "t3"],
+    "countries": [
+        {
+            "name": "UY",
+            "cities": [
+                {"name": "A", "lat": -34.9, "lng": -56.2, "radius_m": 5000},
+                {"name": "B", "lat": -34.8, "lng": -56.1, "radius_m": 5000},
+            ],
+        }
+    ],
+    "categories": {},
+}
+
+
+def test_search_queries_capped_per_run():
+    agent, db, places = make_agent(CAP_TARGETS, max_queries_per_run=3)
+    places.text_search.return_value = {"results": []}
+
+    summary = agent.run()
+
+    # 2 cities x 3 terms = 6 jobs, capped to 3.
+    assert summary["queries"] == 3
+    assert places.text_search.call_count == 3
+
+
+def test_search_jobs_are_term_major():
+    agent, _, places = make_agent(CAP_TARGETS, max_queries_per_run=2)
+    places.text_search.return_value = {"results": []}
+
+    agent.run()
+
+    # Term-major: the first term is applied across both cities before term 2.
+    queries = [c.kwargs["query"] for c in places.text_search.call_args_list]
+    assert queries == ["t1 A", "t1 B"]
+
+
+def test_search_uncapped_when_zero():
+    agent, _, places = make_agent(CAP_TARGETS, max_queries_per_run=0)
+    places.text_search.return_value = {"results": []}
+
+    summary = agent.run()
+
+    assert summary["queries"] == 6  # all jobs run
 
 
 # --- Category mapping -----------------------------------------------------
