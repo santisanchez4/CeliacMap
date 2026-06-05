@@ -285,6 +285,54 @@
               aria-pressed="false" data-i18n="map.chip4">Comercios</button>
           </div>
 
+          <div class="map-toolbar">
+            <select id="city-select" class="map-select" aria-label="Elegir ciudad">
+              <option value="all" data-i18n="map.allCities">Todas las ciudades</option>
+              <optgroup label="Uruguay">
+                <option value="Montevideo" data-lat="-34.9011" data-lng="-56.1645" data-zoom="13">Montevideo</option>
+                <option value="Punta del Este" data-lat="-34.9667" data-lng="-54.9500" data-zoom="13">Punta del Este</option>
+                <option value="Colonia del Sacramento" data-lat="-34.4716" data-lng="-57.8444" data-zoom="14">Colonia del Sacramento</option>
+                <option value="Salto" data-lat="-31.3833" data-lng="-57.9667" data-zoom="14">Salto</option>
+                <option value="Paysandú" data-lat="-32.3171" data-lng="-58.0807" data-zoom="14">Paysandú</option>
+                <option value="Rivera" data-lat="-30.9022" data-lng="-55.5508" data-zoom="14">Rivera</option>
+                <option value="Tacuarembó" data-lat="-31.7167" data-lng="-55.9833" data-zoom="14">Tacuarembó</option>
+                <option value="Melo" data-lat="-32.3661" data-lng="-54.1675" data-zoom="14">Melo</option>
+                <option value="Treinta y Tres" data-lat="-33.2294" data-lng="-54.3836" data-zoom="14">Treinta y Tres</option>
+                <option value="Rocha" data-lat="-34.4827" data-lng="-54.3336" data-zoom="14">Rocha</option>
+                <option value="Minas" data-lat="-34.3753" data-lng="-55.2386" data-zoom="14">Minas</option>
+                <option value="Trinidad" data-lat="-33.5236" data-lng="-56.9008" data-zoom="14">Trinidad</option>
+                <option value="Durazno" data-lat="-33.3809" data-lng="-56.5231" data-zoom="14">Durazno</option>
+                <option value="Mercedes" data-lat="-33.2524" data-lng="-58.0269" data-zoom="14">Mercedes</option>
+                <option value="Artigas" data-lat="-30.4006" data-lng="-56.4644" data-zoom="14">Artigas</option>
+                <option value="Fray Bentos" data-lat="-33.1392" data-lng="-58.3008" data-zoom="14">Fray Bentos</option>
+              </optgroup>
+              <optgroup label="Argentina">
+                <option value="Buenos Aires" data-lat="-34.6037" data-lng="-58.3816" data-zoom="12">Buenos Aires</option>
+                <option value="Córdoba" data-lat="-31.4201" data-lng="-64.1888" data-zoom="13">Córdoba</option>
+                <option value="Rosario" data-lat="-32.9468" data-lng="-60.6393" data-zoom="13">Rosario</option>
+                <option value="Mendoza" data-lat="-32.8895" data-lng="-68.8458" data-zoom="13">Mendoza</option>
+                <option value="La Plata" data-lat="-34.9215" data-lng="-57.9545" data-zoom="13">La Plata</option>
+                <option value="Mar del Plata" data-lat="-38.0055" data-lng="-57.5426" data-zoom="13">Mar del Plata</option>
+                <option value="Gualeguaychú" data-lat="-33.0088" data-lng="-58.5228" data-zoom="14">Gualeguaychú</option>
+                <option value="Paraná" data-lat="-31.7333" data-lng="-60.5333" data-zoom="13">Paraná</option>
+              </optgroup>
+            </select>
+
+            <div class="map-search">
+              <svg class="map-search-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="M21 21l-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              <input type="search" id="place-search" class="map-search-input" autocomplete="off"
+                placeholder="Buscar por nombre…" data-i18n-placeholder="map.searchPlaceholder"
+                aria-label="Buscar lugar por nombre" />
+              <button type="button" id="search-clear" class="map-search-clear"
+                aria-label="Limpiar búsqueda" hidden>&times;</button>
+            </div>
+          </div>
+
+          <p class="map-result-count" id="map-result-count" role="status" aria-live="polite" hidden></p>
+
           <div class="map-wrap">
             <div id="cm-map" role="application" aria-label="Mapa de lugares sin TACC"></div>
             <div class="map-status" id="map-status" role="status" aria-live="polite"></div>

@@ -148,6 +148,8 @@
     "map.popupBadge": "100% gluten-free",
     "map.legend1": "Gluten-free",
     "map.legend2": "Has gluten-free options",
+    "map.allCities": "All cities",
+    "map.searchPlaceholder": "Search by name…",
 
     "suggest.eyebrow": "Add a place",
     "suggest.title": "The community grows the map",
@@ -217,14 +219,30 @@
     ES[node.getAttribute("data-i18n")] = node.textContent;
   });
 
+  // Same pattern for placeholder-translated inputs (e.g. the map search box).
+  var i18nPhNodes = Array.prototype.slice.call(
+    document.querySelectorAll("[data-i18n-placeholder]")
+  );
+  var ESph = {};
+  i18nPhNodes.forEach(function (node) {
+    ESph[node.getAttribute("data-i18n-placeholder")] = node.getAttribute("placeholder") || "";
+  });
+
   function applyLang(lang) {
     var dict = lang === "en" ? EN : ES;
     i18nNodes.forEach(function (node) {
       var key = node.getAttribute("data-i18n");
       if (dict[key] != null) node.textContent = dict[key];
     });
+    i18nPhNodes.forEach(function (node) {
+      var key = node.getAttribute("data-i18n-placeholder");
+      var val = lang === "en" ? EN[key] : ESph[key];
+      if (val != null) node.setAttribute("placeholder", val);
+    });
     document.documentElement.setAttribute("lang", lang);
     try { localStorage.setItem("celiacmap-lang", lang); } catch (e) {}
+    // Let other modules (map.js) re-render their dynamic, non-data-i18n text.
+    try { document.dispatchEvent(new CustomEvent("celiacmap:lang", { detail: lang })); } catch (e) {}
   }
 
   var langToggle = document.getElementById("lang-toggle");

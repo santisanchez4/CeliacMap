@@ -51,6 +51,14 @@
       social: { es: "Encontrado en redes sociales", en: "Found on social media" },
       manual: { es: "Lugar curado", en: "Curated place" },
       user: { es: "Sugerido por la comunidad", en: "Community suggested" }
+    },
+    controls: {
+      results: { es: "resultados", en: "results" },
+      result: { es: "resultado", en: "result" },
+      noResults: {
+        es: "No encontramos lugares con ese nombre.",
+        en: "No places match that name."
+      }
     }
   };
 
@@ -311,34 +319,71 @@
   }
 
   /* --------------------------- Markers ------------------------------ */
-  var entries = [];                       // { marker, category }
+  var entries = [];                       // { marker, category, name, city }
   var visible = L.layerGroup().addTo(map);
   var currentCategory = "all";
+  var currentCity = "all";
+  var currentQuery = "";
 
-  function frame() {
-    // Always recompute the container size first: the map lives below the fold
-    // inside a reveal-animated section, so Leaflet's cached size can be stale,
-    // which throws off both hit-testing and fitBounds.
-    map.invalidateSize();
-    var shown = [];
-    entries.forEach(function (e) {
-      if (currentCategory === "all" || e.category === currentCategory) shown.push(e.marker);
-    });
-    // "Todos" frames the two cities; a specific category frames its markers.
-    if (currentCategory === "all" || !shown.length) {
-      map.fitBounds(CITY_BOUNDS, { padding: [40, 40] });
+  var searchInput = document.getElementById("place-search");
+  var searchClear = document.getElementById("search-clear");
+  var citySelect = document.getElementById("city-select");
+  var countEl = document.getElementById("map-result-count");
+
+  // A marker passes when it satisfies all three filters at once.
+  function matches(e) {
+    if (currentCategory !== "all" && e.category !== currentCategory) return false;
+    if (currentCity !== "all" && e.city !== currentCity) return false;
+    if (currentQuery.length >= 2 && e.name.indexOf(currentQuery) === -1) return false;
+    return true;
+  }
+
+  function shownMarkers() {
+    var out = [];
+    entries.forEach(function (e) { if (matches(e)) out.push(e.marker); });
+    return out;
+  }
+
+  // The result count only surfaces while actively searching (>= 2 chars).
+  function updateCount(n) {
+    if (!countEl) return;
+    if (currentQuery.length < 2) {
+      countEl.hidden = true;
+      countEl.textContent = "";
+      countEl.classList.remove("is-empty");
+      return;
+    }
+    var l = lang();
+    countEl.hidden = false;
+    if (n === 0) {
+      countEl.textContent = LABELS.controls.noResults[l];
+      countEl.classList.add("is-empty");
     } else {
-      map.fitBounds(L.featureGroup(shown).getBounds().pad(0.2), { maxZoom: 14 });
+      var word = n === 1 ? LABELS.controls.result[l] : LABELS.controls.results[l];
+      countEl.textContent = n + " " + word;
+      countEl.classList.remove("is-empty");
     }
   }
 
-  function applyFilter(category) {
-    currentCategory = category;
+  // Re-apply category + city + search to the marker layer.
+  function refresh() {
     visible.clearLayers();
+    var n = 0;
     entries.forEach(function (e) {
-      if (category === "all" || e.category === category) visible.addLayer(e.marker);
+      if (matches(e)) { visible.addLayer(e.marker); n += 1; }
     });
-    frame();
+    updateCount(n);
+    return n;
+  }
+
+  function frameVisible() {
+    map.invalidateSize();
+    var shown = shownMarkers();
+    if (shown.length) {
+      map.fitBounds(L.featureGroup(shown).getBounds().pad(0.2), { maxZoom: 14 });
+    } else if (currentCity === "all") {
+      map.fitBounds(CITY_BOUNDS, { padding: [40, 40] });
+    }
   }
 
   // Reframe once when the map first scrolls into view (handles init-below-fold),
@@ -349,7 +394,7 @@
       es.forEach(function (en) {
         if (en.isIntersecting && !framedOnce) {
           framedOnce = true;
-          frame();
+          frameVisible();
           io.disconnect();
         }
       });
@@ -362,6 +407,11 @@
     resizeTimer = setTimeout(function () { map.invalidateSize(); }, 200);
   });
 
+  // Re-render the dynamic count text when the page language toggles.
+  document.addEventListener("celiacmap:lang", function () {
+    updateCount(shownMarkers().length);
+  });
+
   /* ----------------------------- Chips ------------------------------ */
   var chips = Array.prototype.slice.call(document.querySelectorAll(".map-chips .chip"));
   chips.forEach(function (chip) {
@@ -372,9 +422,46 @@
       });
       chip.classList.add("chip-active");
       chip.setAttribute("aria-pressed", "true");
-      applyFilter(chip.getAttribute("data-category") || "all");
+      currentCategory = chip.getAttribute("data-category") || "all";
+      refresh();
+      frameVisible();
     });
   });
+
+  /* ------------------------- City selector -------------------------- */
+  if (citySelect) {
+    citySelect.addEventListener("change", function () {
+      currentCity = citySelect.value || "all";
+      refresh();
+      var opt = citySelect.options[citySelect.selectedIndex];
+      var lat = opt ? parseFloat(opt.getAttribute("data-lat")) : NaN;
+      var lng = opt ? parseFloat(opt.getAttribute("data-lng")) : NaN;
+      var zoom = opt ? parseInt(opt.getAttribute("data-zoom"), 10) : NaN;
+      map.invalidateSize();
+      if (currentCity !== "all" && isFinite(lat) && isFinite(lng)) {
+        map.flyTo([lat, lng], isFinite(zoom) ? zoom : 13, { duration: 0.8 });
+      } else {
+        frameVisible();
+      }
+    });
+  }
+
+  /* --------------------------- Search ------------------------------- */
+  function onSearch() {
+    currentQuery = (searchInput.value || "").trim().toLowerCase();
+    if (searchClear) searchClear.hidden = currentQuery.length === 0;
+    refresh();
+  }
+  if (searchInput) searchInput.addEventListener("input", onSearch);
+  if (searchClear) {
+    searchClear.addEventListener("click", function () {
+      searchInput.value = "";
+      currentQuery = "";
+      searchClear.hidden = true;
+      refresh();
+      searchInput.focus();
+    });
+  }
 
   /* ----------------------------- Data ------------------------------- */
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
@@ -415,10 +502,16 @@
         } else {
           marker.bindPopup(function () { return popupHtml(p); });
         }
-        entries.push({ marker: marker, category: p.category });
+        entries.push({
+          marker: marker,
+          category: p.category,
+          name: (p.name || "").toLowerCase(),
+          city: p.city || ""
+        });
       });
       setStatus(null);
-      applyFilter("all");
+      refresh();
+      frameVisible();
     })
     .catch(function () {
       setStatus("error");
