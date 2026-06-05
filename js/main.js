@@ -146,9 +146,8 @@
     "map.chip3": "Cafés",
     "map.chip4": "Shops",
     "map.popupBadge": "100% gluten-free",
-    "map.legend1": "100% gluten-free",
-    "map.legend2": "Celiac-friendly",
-    "map.legend3": "Has options",
+    "map.legend1": "Gluten-free",
+    "map.legend2": "Has gluten-free options",
 
     "suggest.eyebrow": "Add a place",
     "suggest.title": "The community grows the map",

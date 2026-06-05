@@ -99,17 +99,16 @@
   map.on("focus", function () { map.scrollWheelZoom.enable(); });
   map.on("blur", function () { map.scrollWheelZoom.disable(); });
 
+  // 2 visual levels: gluten_free_100 + celiac_friendly share the dark "safe"
+  // color; options_available is the light "options" color.
   function safetyClass(level) {
-    if (level === "gluten_free_100") return "cm-marker--safe";
-    if (level === "celiac_friendly") return "cm-marker--friendly";
     if (level === "options_available") return "cm-marker--options";
-    return "cm-marker--mid";
+    return "cm-marker--safe";
   }
 
   function safetyBadgeClass(level) {
-    if (level === "gluten_free_100") return "pp-badge--safe";
-    if (level === "celiac_friendly") return "pp-badge--friendly";
-    return "pp-badge--options";
+    if (level === "options_available") return "pp-badge--options";
+    return "pp-badge--safe";
   }
 
   function icon(level) {

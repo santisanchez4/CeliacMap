@@ -28,10 +28,9 @@
 
   --color-gold: #bfa06a;           /* muted accent, decorative only */
 
-  /* Safety-level scale: dark = 100% sin TACC, medium = apto celíaco,
-     light = tiene opciones. */
+  /* Safety-level scale (2 levels): dark = sin TACC (gluten_free_100 +
+     celiac_friendly), light = tiene opciones sin TACC (options_available). */
   --color-safe: var(--green-deep);
-  --color-friendly: var(--green-soft);
   --color-options: #95d5b2;
   --color-mid: var(--green-soft);  /* legacy alias */
 
@@ -462,7 +461,6 @@ h1, h2, h3 {
   box-shadow: 0 4px 10px rgba(26, 58, 42, 0.30);
 }
 .cm-marker--safe     { background: var(--color-safe); }
-.cm-marker--friendly { background: var(--color-friendly); }
 .cm-marker--options  { background: var(--color-options); }
 .cm-marker--mid      { background: var(--color-mid); }  /* legacy fallback */
 
@@ -493,7 +491,6 @@ h1, h2, h3 {
 .map-legend li { display: inline-flex; align-items: center; gap: 8px; font-size: 0.875rem; color: var(--color-text-muted); }
 .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(38, 53, 43, 0.12); }
 .dot-safe { background: var(--color-safe); }
-.dot-friendly { background: var(--color-friendly); }
 .dot-options { background: var(--color-options); }
 .dot-mid { background: var(--color-mid); }  /* legacy */
 
@@ -562,7 +559,6 @@ h1, h2, h3 {
 }
 .pp-badge::before { content: ""; width: 9px; height: 9px; border-radius: 50%; }
 .pp-badge--safe::before     { background: var(--color-safe); }
-.pp-badge--friendly::before { background: var(--color-friendly); }
 .pp-badge--options::before  { background: var(--color-options); }
 .pp-badge--cat { background: var(--color-primary-light); color: var(--green-deepest); border-color: transparent; }
 .pp-badge--cat::before { display: none; }
