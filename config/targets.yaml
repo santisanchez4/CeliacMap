@@ -53,7 +53,8 @@ categories:
     - store
     - health
 
-# Phase 1: Uruguay + Argentina. Each city defines a search center + radius.
+# Uruguay (full national coverage) + Argentina (major metros + Entre Ríos).
+# Each city defines a search center + radius. Adding a city = a new entry here.
 countries:
   - name: Uruguay
     cities:
@@ -61,9 +62,99 @@ countries:
         lat: -34.9011
         lng: -56.1645
         radius_m: 12000
+      - name: Punta del Este
+        lat: -34.9667
+        lng: -54.9500
+        radius_m: 14000   # also covers Maldonado
+      - name: Colonia del Sacramento
+        lat: -34.4716
+        lng: -57.8444
+        radius_m: 8000
+      - name: Salto
+        lat: -31.3833
+        lng: -57.9667
+        radius_m: 8000
+      - name: Paysandú
+        lat: -32.3171
+        lng: -58.0807
+        radius_m: 8000
+      - name: Rivera
+        lat: -30.9022
+        lng: -55.5508
+        radius_m: 7000
+      - name: Tacuarembó
+        lat: -31.7167
+        lng: -55.9833
+        radius_m: 7000
+      - name: Melo
+        lat: -32.3661
+        lng: -54.1675
+        radius_m: 7000
+      - name: Treinta y Tres
+        lat: -33.2294
+        lng: -54.3836
+        radius_m: 6000
+      - name: Rocha
+        lat: -34.4827
+        lng: -54.3336
+        radius_m: 6000
+      - name: Minas
+        lat: -34.3753
+        lng: -55.2386
+        radius_m: 6000
+      - name: Trinidad
+        lat: -33.5236
+        lng: -56.9008
+        radius_m: 5000
+      - name: Durazno
+        lat: -33.3809
+        lng: -56.5231
+        radius_m: 6000
+      - name: Mercedes
+        lat: -33.2524
+        lng: -58.0269
+        radius_m: 7000
+      - name: Artigas
+        lat: -30.4006
+        lng: -56.4644
+        radius_m: 6000
+      - name: Fray Bentos
+        lat: -33.1392
+        lng: -58.3008
+        radius_m: 6000
   - name: Argentina
     cities:
       - name: Buenos Aires
         lat: -34.6037
         lng: -58.3816
         radius_m: 15000
+      # Major metros
+      - name: Córdoba
+        lat: -31.4201
+        lng: -64.1888
+        radius_m: 12000
+      - name: Rosario
+        lat: -32.9468
+        lng: -60.6393
+        radius_m: 12000
+      - name: Mendoza
+        lat: -32.8895
+        lng: -68.8458
+        radius_m: 10000
+      - name: La Plata
+        lat: -34.9215
+        lng: -57.9545
+        radius_m: 10000
+      - name: Mar del Plata
+        lat: -38.0055
+        lng: -57.5426
+        radius_m: 10000
+      # Entre Ríos province
+      - name: Gualeguaychú
+        lat: -33.0088
+        lng: -58.5228
+        radius_m: 8000
+      - name: Paraná
+        lat: -31.7333
+        lng: -60.5333
+        radius_m: 10000
