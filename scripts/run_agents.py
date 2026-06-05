@@ -124,6 +124,13 @@ def run_pipeline(
     )
     budget = Budget(budget_total)
 
+    # Keep the daily pipeline self-sufficient: discovery (Search/Social) is
+    # clamped so it can never consume the slice reserved for the Validator, and
+    # the Updater takes whatever remains. Per-run shape (budget 350):
+    #   Search <= 80 | Social <= 25 | Validator reserve 80 | Updater = remainder.
+    SOCIAL_MAX = 25
+    VALIDATOR_RESERVE = 80
+
     summaries: dict[str, Any] = {}
     started = time.monotonic()
 
@@ -137,8 +144,11 @@ def run_pipeline(
         max_results_per_query=settings.max_search_results_per_query,
         max_review_enrichments=settings.max_review_enrichments_per_run,
         max_detail_lookups=settings.max_detail_lookups_per_run,
-        # Clamp the per-run query cap to whatever budget remains.
-        max_queries_per_run=budget.allow(settings.max_search_queries_per_run),
+        # Cap by setting, and never plan into the Validator's reserved slice.
+        max_queries_per_run=min(
+            settings.max_search_queries_per_run,
+            max(0, budget.remaining - VALIDATOR_RESERVE),
+        ),
     )
     summaries["search"] = search.run()
     budget.consume(
@@ -146,9 +156,9 @@ def run_pipeline(
         + summaries["search"].get("details_fetched", 0)
     )
 
-    # 2. Social — Tavily search + Find Place geocoding, clamped to budget and to
-    #    its own per-run query cap (stays under the Tavily 1000/month free tier).
-    soc_cap = budget.allow(settings.max_social_queries_per_run)
+    # 2. Social — Tavily search + Find Place geocoding. Capped at SOCIAL_MAX to
+    #    curb geocoding waste, and never planned into the Validator's reserve.
+    soc_cap = min(SOCIAL_MAX, max(0, budget.remaining - VALIDATOR_RESERVE))
     if soc_cap > 0 and settings.tavily_api_key and haiku:
         search_client = TavilySearchClient(settings.tavily_api_key)
         social = SocialAgent(
@@ -170,8 +180,9 @@ def run_pipeline(
         summaries["social"] = {"skipped": "budget exhausted or social not configured"}
 
     # 3. Validator — one Sonnet call per pending candidate (with any stored
-    #    review snippets as context), clamped to budget.
-    val_cap = budget.allow(settings.max_validations_per_run)
+    #    review snippets as context). Guaranteed the reserved slice so discovery
+    #    can never starve publishing; validates up to VALIDATOR_RESERVE per run.
+    val_cap = budget.allow(VALIDATOR_RESERVE)
     if val_cap > 0:
         validator = ValidatorAgent(db, llm, max_per_run=val_cap)
         summaries["validator"] = validator.run()

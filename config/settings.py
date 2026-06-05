@@ -55,7 +55,7 @@ class Settings:
     max_detail_lookups_per_run: int = 60
     # Combined cap on paid API calls for one full pipeline run (search +
     # validator + updater), enforced by scripts/run_agents.py.
-    agent_daily_budget: int = 200
+    agent_daily_budget: int = 350
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -74,7 +74,7 @@ class Settings:
             max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 30),
             max_review_enrichments_per_run=_int("MAX_REVIEW_ENRICHMENTS_PER_RUN", 30),
             max_detail_lookups_per_run=_int("MAX_DETAIL_LOOKUPS_PER_RUN", 60),
-            agent_daily_budget=_int("AGENT_DAILY_BUDGET", 200),
+            agent_daily_budget=_int("AGENT_DAILY_BUDGET", 350),
         )
 
     def require(self, *names: str) -> None:

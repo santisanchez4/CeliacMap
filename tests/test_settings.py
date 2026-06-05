@@ -62,7 +62,7 @@ def test_from_env_falls_back_on_invalid_int(monkeypatch):
 
     settings = Settings.from_env()
 
-    assert settings.agent_daily_budget == 200  # default
+    assert settings.agent_daily_budget == 350  # default
     assert settings.max_validations_per_run == 50  # default
 
 
