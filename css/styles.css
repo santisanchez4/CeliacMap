@@ -569,8 +569,10 @@ h1, h2, h3 {
 }
 .pp-badge--source::before { display: none; }
 
-.pp-rating { margin-top: 14px; color: var(--color-gold); letter-spacing: 2px; font-size: 1rem; }
-.pp-rating span { color: var(--color-text-muted); letter-spacing: normal; font-size: 0.8rem; margin-left: 6px; }
+.pp-rating { margin-top: 14px; display: flex; align-items: center; gap: 8px; }
+.pp-stars { color: var(--color-gold); letter-spacing: 2px; font-size: 1rem; }
+.pp-rating-num { font-weight: 600; font-size: 0.92rem; color: var(--color-text); }
+.pp-rating-count { color: var(--color-text-muted); font-size: 0.8rem; }
 
 .pp-fields { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
 .pp-field { display: flex; flex-direction: column; gap: 2px; }
@@ -581,9 +583,22 @@ h1, h2, h3 {
   color: var(--color-text-muted);
 }
 .pp-field-value { font-size: 0.92rem; color: var(--color-text); line-height: 1.45; }
-.pp-link { color: var(--color-primary); font-weight: 600; word-break: break-word; }
+.pp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary);
+  font-weight: 600;
+  word-break: break-word;
+}
 .pp-link:hover { text-decoration: underline; }
-.pp-hours { white-space: pre-line; }
+.pp-ico { flex: none; }
+
+/* Opening hours: one line per day, today's row emphasized. */
+.pp-hours { display: flex; flex-direction: column; gap: 2px; }
+.pp-hours li { font-size: 0.88rem; color: var(--color-text-muted); }
+.pp-hours-today { color: var(--color-text); font-weight: 600; }
+.pp-hours-line { white-space: pre-line; }
 
 .pp-footer { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-border); }
 .pp-report { font-size: 0.82rem; color: var(--color-text-muted); }

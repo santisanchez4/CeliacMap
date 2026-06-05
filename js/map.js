@@ -150,12 +150,47 @@
     return "★★★★★".slice(0, full) + "☆☆☆☆☆".slice(0, 5 - full);
   }
 
-  function formatHours(h) {
-    if (Array.isArray(h)) return h.map(esc).join("\n");
-    if (h && typeof h === "object" && Array.isArray(h.weekday_text)) {
-      return h.weekday_text.map(esc).join("\n");
+  // Inline SVGs (themeable via currentColor) — no icon library.
+  var ICONS = {
+    phone:
+      '<svg class="pp-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">' +
+      '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+      'd="M5 4h3l1.5 5-2 1.5a11 11 0 0 0 5 5l1.5-2 5 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
+    external:
+      '<svg class="pp-ico" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">' +
+      '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+      'd="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
+    instagram:
+      '<svg class="pp-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">' +
+      '<rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/>' +
+      '<circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/>' +
+      '<circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg>',
+    facebook:
+      '<svg class="pp-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">' +
+      '<path fill="currentColor" d="M14 9h3V6h-3c-1.7 0-3 1.3-3 3v2H9v3h2v6h3v-6h2.5l.5-3H14V9.5c0-.3.2-.5.5-.5Z"/></svg>'
+  };
+
+  function socialIcon(url) {
+    var u = String(url).toLowerCase();
+    if (u.indexOf("instagram") !== -1) return ICONS.instagram;
+    if (u.indexOf("facebook") !== -1 || u.indexOf("fb.com") !== -1) return ICONS.facebook;
+    return ICONS.external;
+  }
+
+  // Render Google's weekday_text (Monday-first) with today's line highlighted.
+  function hoursHtml(h) {
+    var weekday = Array.isArray(h) ? h : (h && h.weekday_text) || null;
+    if (!weekday || !weekday.length) {
+      return '<span class="pp-hours-line">' + esc(String(h)) + "</span>";
     }
-    return esc(String(h));
+    var todayIdx = (new Date().getDay() + 6) % 7; // JS Sun=0 -> Google Mon=0
+    var items = weekday
+      .map(function (line, i) {
+        var cls = i === todayIdx ? ' class="pp-hours-today"' : "";
+        return "<li" + cls + ">" + esc(line) + "</li>";
+      })
+      .join("");
+    return '<ul class="pp-hours">' + items + "</ul>";
   }
 
   function field(label, valueHtml) {
@@ -181,28 +216,39 @@
       "</div>";
 
     if (typeof p.rating === "number" && p.rating > 0) {
+      var num = p.rating.toFixed(1);
       var count =
         typeof p.user_ratings_total === "number"
-          ? "<span>" + p.user_ratings_total + " " + esc(P.reviews[l]) + "</span>"
+          ? ' <span class="pp-rating-count">(' + p.user_ratings_total + " " + esc(P.reviews[l]) + ")</span>"
           : "";
-      html += '<div class="pp-rating" aria-label="' + p.rating + '/5">' + stars(p.rating) + count + "</div>";
+      html += '<div class="pp-rating" aria-label="' + num + '/5">' +
+        '<span class="pp-stars">' + stars(p.rating) + "</span>" +
+        '<span class="pp-rating-num">' + num + "</span>" + count + "</div>";
     }
 
     html += '<div class="pp-fields">';
     if (p.address) html += field(P.address[l], esc(p.address));
-    if (p.phone) html += field(P.phone[l], esc(p.phone));
-    if (p.opening_hours) html += field(P.hours[l], '<span class="pp-hours">' + formatHours(p.opening_hours) + "</span>");
+    if (p.phone) {
+      var tel = String(p.phone).replace(/[^\d+]/g, "");
+      html += field(
+        P.phone[l],
+        '<a class="pp-link" href="tel:' + esc(tel) + '">' + ICONS.phone + esc(p.phone) + "</a>"
+      );
+    }
+    if (p.opening_hours) html += field(P.hours[l], hoursHtml(p.opening_hours));
     if (p.website) {
       html += field(
         P.website[l],
-        '<a class="pp-link" href="' + esc(p.website) + '" target="_blank" rel="noopener">' + esc(P.visit[l]) + "</a>"
+        '<a class="pp-link" href="' + esc(p.website) + '" target="_blank" rel="noopener">' +
+          esc(P.visit[l]) + ICONS.external + "</a>"
       );
     }
     if (p.social_url) {
+      var socialText = p.social_url.replace(/^https?:\/\//, "").replace(/\/+$/, "");
       html += field(
         P.social[l],
         '<a class="pp-link" href="' + esc(p.social_url) + '" target="_blank" rel="noopener">' +
-          esc(p.social_url.replace(/^https?:\/\//, "")) + "</a>"
+          socialIcon(p.social_url) + esc(socialText) + "</a>"
       );
     }
     html += "</div>";
@@ -340,7 +386,8 @@
 
   var url =
     cfg.SUPABASE_URL.replace(/\/+$/, "") +
-    "/rest/v1/places?select=id,name,lat,lng,category,city,safety_level,address,source" +
+    "/rest/v1/places?select=id,name,lat,lng,category,city,safety_level,address,source," +
+    "phone,website,opening_hours,social_url,rating,user_ratings_total" +
     "&status=eq.approved&limit=1000";
 
   fetch(url, {
