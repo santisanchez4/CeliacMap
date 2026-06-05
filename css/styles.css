@@ -461,6 +461,7 @@ h1, h2, h3 {
 .map-select:hover { border-color: var(--color-primary); }
 
 .map-search {
+  position: relative;
   flex: 1 1 240px;
   display: flex;
   align-items: center;
@@ -499,6 +500,37 @@ h1, h2, h3 {
 
 .map-result-count { margin: -2px 0 14px; padding-left: 4px; font-size: 0.85rem; color: var(--color-text-muted); }
 .map-result-count.is-empty { color: var(--color-primary); font-weight: 500; }
+
+/* Autocomplete suggestions dropdown */
+.map-suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  max-height: 340px;
+  overflow-y: auto;
+}
+.map-suggest-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.map-suggest-item:hover,
+.map-suggest-item.is-active { background: var(--color-primary-light); }
+.map-suggest-name { font-family: var(--font-serif); font-size: 1rem; color: var(--color-text); }
+.map-suggest-item:hover .map-suggest-name,
+.map-suggest-item.is-active .map-suggest-name { color: var(--color-primary); }
+.map-suggest-meta { font-size: 0.78rem; color: var(--color-text-muted); }
 
 @media (max-width: 640px) {
   .map-toolbar { flex-direction: column; align-items: stretch; }

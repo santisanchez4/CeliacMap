@@ -72,6 +72,12 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  // Lower-case + strip accents, for accent-insensitive name matching.
+  function normalize(s) {
+    return String(s == null ? "" : s)
+      .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  }
+
   function setStatus(key) {
     if (!statusEl) return;
     if (!key) {
@@ -329,6 +335,7 @@
   var searchClear = document.getElementById("search-clear");
   var citySelect = document.getElementById("city-select");
   var countEl = document.getElementById("map-result-count");
+  var suggestEl = document.getElementById("search-suggest");
 
   // A marker passes when it satisfies all three filters at once.
   function matches(e) {
@@ -446,29 +453,128 @@
     });
   }
 
-  /* --------------------------- Search ------------------------------- */
+  /* ----------------------- Search + autocomplete -------------------- */
   // Filter the markers instantly on every keystroke, then (debounced) fit the
   // map to the matches so the results are actually visible — otherwise, at the
   // zoomed-out overview, filtered markers stay tiny dots and search looks inert.
   var searchTimer;
+  var suggItems = [];   // [{ entry, el }]
+  var activeIdx = -1;
+
+  function closeSuggest() {
+    if (!suggestEl) return;
+    suggestEl.hidden = true;
+    suggestEl.innerHTML = "";
+    suggItems = [];
+    activeIdx = -1;
+    if (searchInput) {
+      searchInput.setAttribute("aria-expanded", "false");
+      searchInput.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  function selectSuggestion(entry) {
+    clearTimeout(searchTimer);          // don't let the debounced fit override us
+    closeSuggest();
+    map.invalidateSize();
+    map.flyTo(entry.marker.getLatLng(), 16, { duration: 0.8 });
+    showDetails(entry.place, entry.marker);
+  }
+
+  function setActive(idx) {
+    if (!suggItems.length) return;
+    if (idx < 0) idx = suggItems.length - 1;
+    if (idx >= suggItems.length) idx = 0;
+    suggItems.forEach(function (it, i) {
+      var on = i === idx;
+      it.el.classList.toggle("is-active", on);
+      if (on) it.el.setAttribute("aria-selected", "true");
+      else it.el.removeAttribute("aria-selected");
+    });
+    activeIdx = idx;
+    searchInput.setAttribute("aria-activedescendant", suggItems[idx].el.id);
+    if (suggItems[idx].el.scrollIntoView) {
+      suggItems[idx].el.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  // Build the dropdown from the already-loaded markers (no extra API calls).
+  function renderSuggest() {
+    if (!suggestEl) return;
+    if (currentQuery.length < 2) { closeSuggest(); return; }
+    var l = lang();
+    var found = [];
+    for (var i = 0; i < entries.length && found.length < 8; i++) {
+      if (entries[i].name.indexOf(currentQuery) !== -1) found.push(entries[i]);
+    }
+    if (!found.length) { closeSuggest(); return; }
+
+    suggestEl.innerHTML = "";
+    suggItems = found.map(function (entry, idx) {
+      var cat = (LABELS.category[entry.category] && LABELS.category[entry.category][l]) || entry.category;
+      var meta = [entry.city, cat].filter(Boolean).join(" · ");
+      var li = document.createElement("li");
+      li.className = "map-suggest-item";
+      li.id = "suggest-" + idx;
+      li.setAttribute("role", "option");
+      li.innerHTML =
+        '<span class="map-suggest-name">' + esc(entry.place.name) + "</span>" +
+        '<span class="map-suggest-meta">' + esc(meta) + "</span>";
+      li.addEventListener("click", function (e) {
+        // Stop the panel's outside-click handler from closing what we open.
+        e.stopPropagation();
+        selectSuggestion(entry);
+      });
+      li.addEventListener("mouseenter", function () { setActive(idx); });
+      suggestEl.appendChild(li);
+      return { entry: entry, el: li };
+    });
+    activeIdx = -1;
+    suggestEl.hidden = false;
+    searchInput.setAttribute("aria-expanded", "true");
+  }
+
   function onSearch() {
-    currentQuery = (searchInput.value || "").trim().toLowerCase();
-    if (searchClear) searchClear.hidden = currentQuery.length === 0;
+    currentQuery = normalize(searchInput.value);
+    if (searchClear) searchClear.hidden = searchInput.value.length === 0;
     refresh();
+    renderSuggest();
     clearTimeout(searchTimer);
     searchTimer = setTimeout(frameVisible, 280);
   }
-  if (searchInput) searchInput.addEventListener("input", onSearch);
+
+  if (searchInput) {
+    searchInput.addEventListener("input", onSearch);
+    searchInput.addEventListener("keydown", function (e) {
+      if (suggestEl && !suggestEl.hidden) {
+        if (e.key === "ArrowDown") { e.preventDefault(); setActive(activeIdx + 1); return; }
+        if (e.key === "ArrowUp") { e.preventDefault(); setActive(activeIdx - 1); return; }
+        if (e.key === "Enter" && activeIdx >= 0 && suggItems[activeIdx]) {
+          e.preventDefault();
+          selectSuggestion(suggItems[activeIdx].entry);
+          return;
+        }
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSuggest(); return; }
+      }
+    });
+  }
   if (searchClear) {
     searchClear.addEventListener("click", function () {
       searchInput.value = "";
       currentQuery = "";
       searchClear.hidden = true;
+      closeSuggest();
       refresh();
       frameVisible();
       searchInput.focus();
     });
   }
+  // Close the dropdown when clicking outside the search field.
+  document.addEventListener("click", function (e) {
+    if (!suggestEl || suggestEl.hidden) return;
+    if (e.target === searchInput || suggestEl.contains(e.target)) return;
+    closeSuggest();
+  });
 
   /* ----------------------------- Data ------------------------------- */
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
@@ -512,8 +618,9 @@
         entries.push({
           marker: marker,
           category: p.category,
-          name: (p.name || "").toLowerCase(),
-          city: p.city || ""
+          city: p.city || "",
+          place: p,
+          name: normalize(p.name)        // accent-insensitive match key
         });
       });
       setStatus(null);

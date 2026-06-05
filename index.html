@@ -324,10 +324,13 @@
                 <path d="M21 21l-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
               </svg>
               <input type="search" id="place-search" class="map-search-input" autocomplete="off"
-                placeholder="Buscar restaurante, café o comercio..." data-i18n-placeholder="map.searchPlaceholder"
-                aria-label="Buscar lugar por nombre" />
+                placeholder="Buscar un lugar sin TACC..." data-i18n-placeholder="map.searchPlaceholder"
+                aria-label="Buscar lugar por nombre" role="combobox" aria-expanded="false"
+                aria-controls="search-suggest" aria-autocomplete="list" />
               <button type="button" id="search-clear" class="map-search-clear"
                 aria-label="Limpiar búsqueda" hidden>&times;</button>
+              <ul class="map-suggest" id="search-suggest" role="listbox"
+                aria-label="Sugerencias de lugares" hidden></ul>
             </div>
           </div>
 
