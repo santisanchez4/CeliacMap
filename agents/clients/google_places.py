@@ -25,6 +25,12 @@ DEFAULT_DETAIL_FIELDS = [
     "geometry/location",
     "type",
     "business_status",
+    # Rich detail fields surfaced in the frontend place panel.
+    "formatted_phone_number",
+    "website",
+    "opening_hours",
+    "rating",
+    "user_ratings_total",
 ]
 
 # Extra fields requested when we also want community reviews for enrichment.
@@ -86,11 +92,16 @@ class GooglePlacesClient:
         )
 
     def place_details(self, place_id: str, fields: list[str] | None = None) -> dict:
-        return self._client.place(place_id=place_id, fields=fields or DEFAULT_DETAIL_FIELDS)
+        # language='es' so opening_hours.weekday_text reads in Spanish.
+        return self._client.place(
+            place_id=place_id, fields=fields or DEFAULT_DETAIL_FIELDS, language="es"
+        )
 
     def place_details_with_reviews(self, place_id: str) -> dict:
         """Place details including up to ~5 community reviews (for enrichment)."""
-        return self._client.place(place_id=place_id, fields=REVIEW_DETAIL_FIELDS)
+        return self._client.place(
+            place_id=place_id, fields=REVIEW_DETAIL_FIELDS, language="es"
+        )
 
     def find_place(
         self, text: str, location: tuple[float, float] | None = None
@@ -127,6 +138,39 @@ class GooglePlacesClient:
             "country": country,
             "city": city,
         }
+
+    @staticmethod
+    def extract_rich_fields(result: dict[str, Any]) -> dict:
+        """Pull the optional detail fields shown in the frontend place panel.
+
+        Only includes keys that are actually present (non-empty), so callers can
+        merge the result into an update patch without clobbering existing data
+        with nulls. ``opening_hours`` is stored as the localized ``weekday_text``
+        list (``open_now`` is intentionally dropped — it would go stale).
+        """
+        rich: dict[str, Any] = {}
+
+        phone = (result.get("formatted_phone_number") or "").strip()
+        if phone:
+            rich["phone"] = phone
+
+        website = (result.get("website") or "").strip()
+        if website:
+            rich["website"] = website
+
+        weekday_text = (result.get("opening_hours") or {}).get("weekday_text")
+        if weekday_text:
+            rich["opening_hours"] = weekday_text
+
+        rating = result.get("rating")
+        if isinstance(rating, (int, float)):
+            rich["rating"] = float(rating)
+
+        total = result.get("user_ratings_total")
+        if isinstance(total, int):
+            rich["user_ratings_total"] = total
+
+        return rich
 
     @staticmethod
     def extract_gf_snippets(reviews: list[dict[str, Any]] | None) -> list[dict]:

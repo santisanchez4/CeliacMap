@@ -45,13 +45,17 @@ def make_result(
     }
 
 
-def make_agent(targets=TARGETS, max_review_enrichments=0):
+def make_agent(targets=TARGETS, max_review_enrichments=0, max_detail_lookups=0):
     db = MagicMock()
     # A truthy row means "inserted" in the agent's accounting.
     db.insert_place_candidate.return_value = {"id": "row-1"}
     places = MagicMock()
     agent = SearchAgent(
-        db, places, targets, max_review_enrichments=max_review_enrichments
+        db,
+        places,
+        targets,
+        max_review_enrichments=max_review_enrichments,
+        max_detail_lookups=max_detail_lookups,
     )
     return agent, db, places
 
@@ -200,7 +204,7 @@ def test_extract_gf_snippets_handles_none():
 
 
 def test_review_enrichment_stores_matching_snippets():
-    agent, db, places = make_agent(max_review_enrichments=5)
+    agent, db, places = make_agent(max_review_enrichments=5, max_detail_lookups=5)
     places.text_search.return_value = {"results": [make_result("A")]}
     places.place_details_with_reviews.return_value = {
         "result": {
@@ -220,7 +224,7 @@ def test_review_enrichment_stores_matching_snippets():
 
 
 def test_review_enrichment_disabled_by_default():
-    agent, db, places = make_agent()  # max_review_enrichments=0
+    agent, db, places = make_agent()  # max_detail_lookups=0 -> no details call
     places.text_search.return_value = {"results": [make_result("A")]}
 
     summary = agent.run()
@@ -231,7 +235,7 @@ def test_review_enrichment_disabled_by_default():
 
 
 def test_review_enrichment_error_does_not_crash_run():
-    agent, db, places = make_agent(max_review_enrichments=5)
+    agent, db, places = make_agent(max_review_enrichments=5, max_detail_lookups=5)
     places.text_search.return_value = {"results": [make_result("A")]}
     places.place_details_with_reviews.side_effect = RuntimeError("details down")
 
@@ -240,3 +244,66 @@ def test_review_enrichment_error_does_not_crash_run():
     # The candidate is still inserted; enrichment failure is best-effort.
     assert summary["inserted"] == 1
     assert summary["reviews_enriched"] == 0
+
+
+# --- Rich detail fields (phone/website/hours/rating) ----------------------
+
+
+def test_extract_rich_fields_maps_present_values():
+    result = {
+        "formatted_phone_number": "2900 1234",
+        "website": "https://example.uy",
+        "opening_hours": {"open_now": True, "weekday_text": ["lunes: 9–18"]},
+        "rating": 4.6,
+        "user_ratings_total": 213,
+    }
+    rich = GooglePlacesClient.extract_rich_fields(result)
+    assert rich == {
+        "phone": "2900 1234",
+        "website": "https://example.uy",
+        "opening_hours": ["lunes: 9–18"],   # weekday_text only; open_now dropped
+        "rating": 4.6,
+        "user_ratings_total": 213,
+    }
+
+
+def test_extract_rich_fields_omits_missing():
+    assert GooglePlacesClient.extract_rich_fields({}) == {}
+    assert GooglePlacesClient.extract_rich_fields({"website": ""}) == {}
+
+
+def test_rich_fields_applied_to_inserted_candidate():
+    agent, db, places = make_agent(max_detail_lookups=5)
+    places.text_search.return_value = {"results": [make_result("A")]}
+    places.place_details_with_reviews.return_value = {
+        "result": {
+            "formatted_phone_number": "2900 1234",
+            "website": "https://example.uy",
+            "rating": 4.6,
+            "user_ratings_total": 50,
+        }
+    }
+
+    summary = agent.run()
+
+    places.place_details_with_reviews.assert_called_once_with("A")
+    patch = db.update_place.call_args.args[1]
+    assert patch["phone"] == "2900 1234"
+    assert patch["website"] == "https://example.uy"
+    assert patch["rating"] == 4.6
+    assert summary["details_fetched"] == 1
+    assert summary["rich_updated"] == 1
+
+
+def test_details_lookup_capped():
+    agent, db, places = make_agent(max_detail_lookups=1)
+    places.text_search.return_value = {
+        "results": [make_result("A"), make_result("B")]
+    }
+    places.place_details_with_reviews.return_value = {"result": {"rating": 4.0}}
+
+    summary = agent.run()
+
+    assert summary["inserted"] == 2
+    assert summary["details_fetched"] == 1   # capped at 1
+    assert places.place_details_with_reviews.call_count == 1

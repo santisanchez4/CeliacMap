@@ -17,7 +17,8 @@ then turn each promising result into a real ``places`` candidate:
    are skipped and logged.
 5. Insert as ``status='pending'``, ``source='social'``, ``external_id`` = the
    Google ``place_id`` (so a place found both via Search and via Social is not
-   duplicated), recording the social profile URL in ``validation_notes``.
+   duplicated), recording the social profile URL in its own ``social_url`` column
+   (the Validator overwrites ``validation_notes``, so the URL lives apart from it).
 
 Every result and a final run summary are written to ``agent_log``. The Validator
 judges social candidates exactly like any other pending place.
@@ -262,7 +263,9 @@ class SocialAgent(BaseAgent):
                     "city": lead_city,
                     "source": "social",
                     "external_id": external_id,
-                    "validation_notes": f"Social lead: {url}",
+                    # Stored in its own column so the Validator (which overwrites
+                    # validation_notes with its rationale) can't clobber it.
+                    "social_url": url,
                 }
                 try:
                     row = self.db.insert_place_candidate(candidate)

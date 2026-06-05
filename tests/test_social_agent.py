@@ -149,7 +149,8 @@ def test_successful_insert_geocoded_candidate():
     assert candidate["source"] == "social"
     assert candidate["external_id"] == "ext-1"
     assert candidate["lat"] == -34.9 and candidate["lng"] == -56.2
-    assert candidate["validation_notes"] == "Social lead: https://instagram.com/cafex"
+    assert candidate["social_url"] == "https://instagram.com/cafex"
+    assert "validation_notes" not in candidate
 
 
 # --- Dedup ----------------------------------------------------------------

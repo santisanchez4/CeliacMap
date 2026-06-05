@@ -128,19 +128,20 @@ def run_pipeline(
     started = time.monotonic()
 
     # 1. Search — bounded by targets.yaml x max_results_per_query; consumes its
-    #    Google text-search queries (plus any review-enrichment detail calls) from
-    #    the combined budget.
+    #    Google text-search queries plus one Place Details call per new candidate
+    #    (rich panel fields + review enrichment) from the combined budget.
     search = SearchAgent(
         db,
         places,
         targets,
         max_results_per_query=settings.max_search_results_per_query,
         max_review_enrichments=settings.max_review_enrichments_per_run,
+        max_detail_lookups=settings.max_detail_lookups_per_run,
     )
     summaries["search"] = search.run()
     budget.consume(
         summaries["search"].get("queries", 0)
-        + summaries["search"].get("reviews_enriched", 0)
+        + summaries["search"].get("details_fetched", 0)
     )
 
     # 2. Social — Tavily search + Find Place geocoding, clamped to budget and to

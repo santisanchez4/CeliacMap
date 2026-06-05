@@ -35,12 +35,16 @@ class SearchAgent(BaseAgent):
         targets: dict,
         max_results_per_query: int = 20,
         max_review_enrichments: int = 0,
+        max_detail_lookups: int = 0,
     ):
         super().__init__(db)
         self.places = places
         self.targets = targets
         self.max_results_per_query = max_results_per_query
-        # Review enrichment is opt-in (costs one details call per new candidate).
+        # One Place Details call per new candidate populates the rich panel fields
+        # (phone/website/hours/rating); the same call also feeds GF review
+        # enrichment. Both are capped per run to stay within the API budget.
+        self.max_detail_lookups = max_detail_lookups
         self.max_review_enrichments = max_review_enrichments
         self._category_by_type = self._build_type_index(targets.get("categories", {}))
 
@@ -60,46 +64,58 @@ class SearchAgent(BaseAgent):
                 return self._category_by_type[gtype]
         return DEFAULT_CATEGORY
 
-    def _enrich_reviews(self, place_id: str, external_id: str) -> int:
-        """Fetch the place's reviews and store any with a gluten-free signal.
+    def _apply_place_details(
+        self, place_id: str, external_id: str, *, store_reviews: bool
+    ) -> dict:
+        """Fetch Place Details once; use it for rich fields (+ optional reviews).
 
-        Returns the number of snippets stored. Failures are logged but never
-        crash the search run (enrichment is best-effort context for the Validator).
+        Returns ``{"rich": bool, "snippets": int}``. Best-effort: any failure is
+        logged but never crashes the run.
         """
         try:
             details = self.places.place_details_with_reviews(external_id)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("review fetch failed for %s", external_id)
+            logger.exception("details fetch failed for %s", external_id)
             self.log(
-                "review_enrich_failed",
+                "details_fetch_failed",
                 {"external_id": external_id, "error": str(exc)},
                 status="error",
                 place_id=place_id,
             )
-            return 0
+            return {"rich": False, "snippets": 0}
 
         result = details.get("result") or {}
-        snippets = GooglePlacesClient.extract_gf_snippets(result.get("reviews"))
-        stored = 0
-        for snippet in snippets:
+
+        rich = GooglePlacesClient.extract_rich_fields(result)
+        applied = False
+        if rich:
             try:
-                self.db.insert_review(
-                    place_id,
-                    snippet["text"],
-                    rating=snippet.get("rating"),
-                    source="google",
-                )
-                stored += 1
+                self.db.update_place(place_id, rich)
+                applied = True
             except Exception:  # noqa: BLE001
-                logger.exception("storing review failed for %s", place_id)
-        if stored:
-            self.log(
-                "reviews_enriched",
-                {"external_id": external_id, "snippets": stored},
-                status="success",
-                place_id=place_id,
-            )
-        return stored
+                logger.exception("applying rich fields failed for %s", place_id)
+
+        stored = 0
+        if store_reviews:
+            for snippet in GooglePlacesClient.extract_gf_snippets(result.get("reviews")):
+                try:
+                    self.db.insert_review(
+                        place_id,
+                        snippet["text"],
+                        rating=snippet.get("rating"),
+                        source="google",
+                    )
+                    stored += 1
+                except Exception:  # noqa: BLE001
+                    logger.exception("storing review failed for %s", place_id)
+            if stored:
+                self.log(
+                    "reviews_enriched",
+                    {"external_id": external_id, "snippets": stored},
+                    status="success",
+                    place_id=place_id,
+                )
+        return {"rich": applied, "snippets": stored}
 
     def run(self) -> dict:
         search_terms = self.targets.get("search_terms", [])
@@ -109,6 +125,8 @@ class SearchAgent(BaseAgent):
         inserted = 0
         skipped = 0
         errors = 0
+        details_fetched = 0
+        rich_updated = 0
         reviews_enriched = 0
         review_snippets = 0
 
@@ -173,12 +191,20 @@ class SearchAgent(BaseAgent):
                             continue
                         if row:
                             inserted += 1
-                            # Best-effort review enrichment, capped per run.
-                            if reviews_enriched < self.max_review_enrichments:
-                                stored = self._enrich_reviews(row.get("id"), external_id)
-                                if stored:
+                            # One Details call per new candidate: rich panel fields
+                            # always, GF review snippets while under their own cap.
+                            if details_fetched < self.max_detail_lookups:
+                                details_fetched += 1
+                                out = self._apply_place_details(
+                                    row.get("id"),
+                                    external_id,
+                                    store_reviews=reviews_enriched < self.max_review_enrichments,
+                                )
+                                if out["rich"]:
+                                    rich_updated += 1
+                                if out["snippets"]:
                                     reviews_enriched += 1
-                                    review_snippets += stored
+                                    review_snippets += out["snippets"]
 
         summary = {
             "queries": queries,
@@ -187,6 +213,8 @@ class SearchAgent(BaseAgent):
             "inserted": inserted,
             "skipped": skipped,
             "errors": errors,
+            "details_fetched": details_fetched,
+            "rich_updated": rich_updated,
             "reviews_enriched": reviews_enriched,
             "review_snippets": review_snippets,
         }
@@ -219,6 +247,7 @@ def main() -> int:
         load_targets(),
         max_results_per_query=settings.max_search_results_per_query,
         max_review_enrichments=settings.max_review_enrichments_per_run,
+        max_detail_lookups=settings.max_detail_lookups_per_run,
     )
 
     summary = agent.run()

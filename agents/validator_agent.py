@@ -167,6 +167,9 @@ class ValidatorAgent(BaseAgent):
                 continue
 
             status = "approved" if v["approved"] else "discarded"
+            # NOTE: update_place_validation only patches status/confidence/notes/
+            # category/safety_level — never social_url, so the Social agent's
+            # profile URL is preserved through validation.
             try:
                 if v["approved"]:
                     self.db.update_place_validation(

@@ -115,6 +115,12 @@ class UpdaterAgent(BaseAgent):
         if new_category and new_category != place.get("category"):
             patch["category"] = new_category
 
+        # Rich panel fields (phone/website/hours/rating). Only patch a field when
+        # Google has a value and it differs from what we already store.
+        for key, value in GooglePlacesClient.extract_rich_fields(result).items():
+            if value not in (None, "", []) and value != place.get(key):
+                patch[key] = value
+
         return patch
 
     def run(self) -> dict:

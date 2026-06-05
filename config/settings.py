@@ -48,6 +48,8 @@ class Settings:
     # and number of Search-agent review enrichments per run.
     max_social_queries_per_run: int = 30
     max_review_enrichments_per_run: int = 30
+    # Place Details lookups per Search run (rich panel fields + review enrichment).
+    max_detail_lookups_per_run: int = 60
     # Combined cap on paid API calls for one full pipeline run (search +
     # validator + updater), enforced by scripts/run_agents.py.
     agent_daily_budget: int = 200
@@ -67,6 +69,7 @@ class Settings:
             max_updates_per_run=_int("MAX_UPDATES_PER_RUN", 50),
             max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 30),
             max_review_enrichments_per_run=_int("MAX_REVIEW_ENRICHMENTS_PER_RUN", 30),
+            max_detail_lookups_per_run=_int("MAX_DETAIL_LOOKUPS_PER_RUN", 60),
             agent_daily_budget=_int("AGENT_DAILY_BUDGET", 200),
         )
 

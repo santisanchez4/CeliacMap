@@ -99,6 +99,41 @@ def test_patch_combines_multiple_changes():
     }
 
 
+# --- Rich detail fields ---------------------------------------------------
+
+
+def test_patch_includes_rich_fields():
+    agent, _, _ = make_agent()
+    place = {"name": "Same", "address": "Addr 1", "category": "restaurant"}
+    result = {
+        "name": "Same",
+        "formatted_address": "Addr 1",
+        "types": ["restaurant"],
+        "formatted_phone_number": "2900 1234",
+        "website": "https://x.uy",
+        "rating": 4.2,
+        "user_ratings_total": 88,
+    }
+    patch = agent._build_patch(place, result)
+    assert patch["phone"] == "2900 1234"
+    assert patch["website"] == "https://x.uy"
+    assert patch["rating"] == 4.2
+    assert patch["user_ratings_total"] == 88
+
+
+def test_patch_skips_unchanged_rich_fields():
+    agent, _, _ = make_agent()
+    place = {
+        "name": "Same", "address": "Addr 1", "category": "restaurant",
+        "phone": "2900 1234", "rating": 4.2,
+    }
+    result = {
+        "name": "Same", "formatted_address": "Addr 1", "types": ["restaurant"],
+        "formatted_phone_number": "2900 1234", "rating": 4.2,
+    }
+    assert agent._build_patch(place, result) == {}
+
+
 # --- No-op when nothing changed -------------------------------------------
 
 
