@@ -35,10 +35,13 @@ create table if not exists public.places (
                           check (status in ('pending', 'approved', 'discarded')),
   address               text,
   source                text not null default 'manual'
-                          check (source in ('google_places', 'manual', 'user', 'social')),
+                          check (source in ('google_places', 'manual', 'user', 'social', 'web')),
   external_id           text,                 -- e.g. Google place_id (for dedup)
   validation_confidence numeric,              -- validator output (0..1)
   validation_notes      text,                 -- validator rationale
+  -- Discovery agents (Social v2, Web v3) keep the originating profile / source
+  -- URL here so the Validator (which overwrites validation_notes) can't clobber it.
+  social_url            text,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
@@ -65,15 +68,21 @@ create index if not exists places_status_idx        on public.places (status);
 create index if not exists places_category_idx      on public.places (category);
 create index if not exists places_country_city_idx  on public.places (country, city);
 
--- Allow places discovered by the Social agent (source='social'). On an
--- already-created table the inline check above is a no-op, so widen it in place.
+-- Allow places discovered by the Social agent (source='social') and the Web
+-- discovery agent (source='web'). On an already-created table the inline check
+-- above is a no-op, so widen it in place.
 do $$
 begin
   alter table public.places drop constraint if exists places_source_check;
   alter table public.places
     add constraint places_source_check
-    check (source in ('google_places', 'manual', 'user', 'social'));
+    check (source in ('google_places', 'manual', 'user', 'social', 'web'));
 end $$;
+
+-- The discovery agents store the originating source URL in its own column so the
+-- Validator's validation_notes update can't overwrite it. Added idempotently for
+-- databases created before this column existed.
+alter table public.places add column if not exists social_url text;
 
 -- ---------------------------------------------------------------------
 -- Table: reviews
@@ -107,7 +116,7 @@ end $$;
 create table if not exists public.agent_log (
   id          uuid primary key default gen_random_uuid(),
   agent       text not null
-                check (agent in ('search', 'validator', 'updater', 'social', 'pipeline')),
+                check (agent in ('search', 'validator', 'updater', 'social', 'web', 'pipeline')),
   action      text not null,
   result      jsonb,
   status      text check (status in ('success', 'error')),
@@ -118,15 +127,15 @@ create table if not exists public.agent_log (
 create index if not exists agent_log_created_at_idx on public.agent_log (created_at);
 create index if not exists agent_log_agent_idx      on public.agent_log (agent);
 
--- Allow the Social agent (agent='social') and the pipeline orchestrator
--- (agent='pipeline') to log under agent_log. On an already-created table the
--- inline check above is a no-op, so widen the existing constraint in place.
+-- Allow the Social agent (agent='social'), the Web discovery agent (agent='web')
+-- and the pipeline orchestrator (agent='pipeline') to log under agent_log. On an
+-- already-created table the inline check above is a no-op, so widen it in place.
 do $$
 begin
   alter table public.agent_log drop constraint if exists agent_log_agent_check;
   alter table public.agent_log
     add constraint agent_log_agent_check
-    check (agent in ('search', 'validator', 'updater', 'social', 'pipeline'));
+    check (agent in ('search', 'validator', 'updater', 'social', 'web', 'pipeline'));
 end $$;
 
 -- ---------------------------------------------------------------------

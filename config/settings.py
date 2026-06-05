@@ -41,6 +41,8 @@ class Settings:
     tavily_api_key: str = ""
     validator_model: str = "claude-sonnet-4-6"
     haiku_model: str = "claude-haiku-4-5"
+    # Web discovery agent (v3): reasons freely + uses the Anthropic web search tool.
+    web_search_model: str = "claude-sonnet-4-6"
     max_search_results_per_query: int = 20
     # Cap on Google text-search queries per Search run (city x term matrix can be
     # large); keeps a run within the daily API budget. 0 = unlimited.
@@ -53,6 +55,10 @@ class Settings:
     max_review_enrichments_per_run: int = 30
     # Place Details lookups per Search run (rich panel fields + review enrichment).
     max_detail_lookups_per_run: int = 60
+    # Web discovery agent (v3): number of cities researched per run (opt-in via
+    # web: true in targets.yaml) and the web-search cap handed to the model per city.
+    max_web_cities_per_run: int = 2
+    max_web_searches_per_city: int = 8
     # Combined cap on paid API calls for one full pipeline run (search +
     # validator + updater), enforced by scripts/run_agents.py.
     agent_daily_budget: int = 350
@@ -67,6 +73,7 @@ class Settings:
             tavily_api_key=os.getenv("TAVILY_API_KEY", "").strip(),
             validator_model=os.getenv("VALIDATOR_MODEL", "claude-sonnet-4-6").strip(),
             haiku_model=os.getenv("HAIKU_MODEL", "claude-haiku-4-5").strip(),
+            web_search_model=os.getenv("WEB_SEARCH_MODEL", "claude-sonnet-4-6").strip(),
             max_search_results_per_query=_int("MAX_SEARCH_RESULTS_PER_QUERY", 20),
             max_search_queries_per_run=_int("MAX_SEARCH_QUERIES_PER_RUN", 80),
             max_validations_per_run=_int("MAX_VALIDATIONS_PER_RUN", 50),
@@ -74,6 +81,8 @@ class Settings:
             max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 30),
             max_review_enrichments_per_run=_int("MAX_REVIEW_ENRICHMENTS_PER_RUN", 30),
             max_detail_lookups_per_run=_int("MAX_DETAIL_LOOKUPS_PER_RUN", 60),
+            max_web_cities_per_run=_int("MAX_WEB_CITIES_PER_RUN", 2),
+            max_web_searches_per_city=_int("MAX_WEB_SEARCHES_PER_CITY", 8),
             agent_daily_budget=_int("AGENT_DAILY_BUDGET", 350),
         )
 

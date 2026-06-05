@@ -1,9 +1,9 @@
-"""Pipeline orchestrator — runs Search -> Validator -> Updater in order.
+"""Pipeline orchestrator — runs Search -> Social -> Web -> Validator -> Updater.
 
 This is the CI entrypoint for the daily GitHub Actions cron (and for manual
 ``workflow_dispatch`` validation). It:
 
-- runs the three agents in sequence (each stage feeds the next);
+- runs the discovery + validation agents in sequence (each stage feeds the next);
 - enforces a single **combined daily budget** across all paid API calls — search
   consumes its query count, then the validator/updater per-run sizes are clamped
   to whatever budget is left, so the day's total stays bounded;
@@ -34,6 +34,7 @@ from agents.search_agent import SearchAgent
 from agents.social_agent import SocialAgent
 from agents.updater_agent import UpdaterAgent
 from agents.validator_agent import ValidatorAgent
+from agents.web_agent import WebAgent
 from config.settings import Settings, get_settings, load_targets
 
 logger = logging.getLogger("celiacmap.agent")
@@ -124,11 +125,12 @@ def run_pipeline(
     )
     budget = Budget(budget_total)
 
-    # Keep the daily pipeline self-sufficient: discovery (Search/Social) is
+    # Keep the daily pipeline self-sufficient: discovery (Search/Social/Web) is
     # clamped so it can never consume the slice reserved for the Validator, and
     # the Updater takes whatever remains. Per-run shape (budget 350):
-    #   Search <= 80 | Social <= 25 | Validator reserve 80 | Updater = remainder.
+    #   Search <= 80 | Social <= 25 | Web <= 40 | Validator reserve 80 | Updater = rest.
     SOCIAL_MAX = 25
+    WEB_MAX = 40
     VALIDATOR_RESERVE = 80
 
     summaries: dict[str, Any] = {}
@@ -179,7 +181,31 @@ def run_pipeline(
     else:
         summaries["social"] = {"skipped": "budget exhausted or social not configured"}
 
-    # 3. Validator — one Sonnet call per pending candidate (with any stored
+    # 3. Web (v3) — autonomous web-search discovery for the cities flagged
+    #    web:true in targets.yaml. Each city costs its web-search budget + one
+    #    Find Place geocode per lead. Capped at WEB_MAX and never planned into
+    #    the Validator's reserve.
+    web_room = min(WEB_MAX, max(0, budget.remaining - VALIDATOR_RESERVE))
+    if web_room > 0 and settings.anthropic_api_key:
+        web = WebAgent(
+            db,
+            places,
+            llm,  # reuse the Sonnet client; model overridden per-call below
+            targets,
+            model=settings.web_search_model,
+            max_cities=settings.max_web_cities_per_run,
+            max_searches_per_city=settings.max_web_searches_per_city,
+        )
+        summaries["web"] = web.run()
+        # Consume the metered calls: web searches + Google Find Place geocodes.
+        budget.consume(
+            summaries["web"].get("searches", 0)
+            + summaries["web"].get("geocoded", 0)
+        )
+    else:
+        summaries["web"] = {"skipped": "budget exhausted or web not configured"}
+
+    # 4. Validator — one Sonnet call per pending candidate (with any stored
     #    review snippets as context). Guaranteed the reserved slice so discovery
     #    can never starve publishing; validates up to VALIDATOR_RESERVE per run.
     val_cap = budget.allow(VALIDATOR_RESERVE)
@@ -190,7 +216,7 @@ def run_pipeline(
     else:
         summaries["validator"] = {"skipped": "budget exhausted"}
 
-    # 4. Updater — one Google details call per approved place, clamped to budget.
+    # 5. Updater — one Google details call per approved place, clamped to budget.
     upd_cap = budget.allow(settings.max_updates_per_run)
     if upd_cap > 0:
         updater = UpdaterAgent(
@@ -213,6 +239,7 @@ def run_pipeline(
         "duration_s": round(time.monotonic() - started, 1),
         "search": summaries["search"],
         "social": summaries["social"],
+        "web": summaries["web"],
         "validator": summaries["validator"],
         "updater": summaries["updater"],
     }
@@ -271,6 +298,7 @@ def main() -> int:
     print(f"  duration_s       : {overall['duration_s']}")
     print(f"  search           : {overall['search']}")
     print(f"  social           : {overall['social']}")
+    print(f"  web              : {overall['web']}")
     print(f"  validator        : {overall['validator']}")
     print(f"  updater          : {overall['updater']}")
 

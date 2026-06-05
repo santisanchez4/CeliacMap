@@ -29,9 +29,9 @@ DEFAULT_SAFETY_LEVEL = "options_available"
 RUBRIC = """\
 You are the Validator for CeliacMap, a curated directory of gluten-free / \
 "sin TACC" (celiac-safe) places in Latin America. You receive a single candidate \
-place that was discovered automatically via Google Places (so you only have its \
-name, address, city/country and a guessed category). Decide whether it belongs in \
-the directory, then classify it.
+place that was discovered automatically — via Google Places, public social-media \
+pages, or web research — so you usually only have its name, address, city/country \
+and a guessed category. Decide whether it belongs in the directory, then classify it.
 
 This data is used by people with celiac disease, for whom gluten is a health \
 hazard. Never overstate how safe a place is. When unsure, be conservative.

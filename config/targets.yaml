@@ -55,6 +55,10 @@ categories:
 
 # Uruguay (full national coverage) + Argentina (major metros + Entre Ríos).
 # Each city defines a search center + radius. Adding a city = a new entry here.
+#
+# Web discovery (Web agent, v3): a city is researched by the autonomous web-search
+# agent only when it is flagged `web: true`. Rollout starts with Montevideo and
+# Buenos Aires; add the flag to more cities after verifying it works.
 countries:
   - name: Uruguay
     cities:
@@ -62,6 +66,7 @@ countries:
         lat: -34.9011
         lng: -56.1645
         radius_m: 12000
+        web: true
       - name: Punta del Este
         lat: -34.9667
         lng: -54.9500
@@ -128,6 +133,7 @@ countries:
         lat: -34.6037
         lng: -58.3816
         radius_m: 15000
+        web: true
       # Major metros
       - name: Córdoba
         lat: -31.4201
