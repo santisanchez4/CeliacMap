@@ -286,13 +286,21 @@
           </div>
 
           <div class="map-wrap">
-            <div id="map" role="application" aria-label="Mapa de lugares sin TACC"></div>
+            <div id="cm-map" role="application" aria-label="Mapa de lugares sin TACC"></div>
             <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
+
+            <aside class="place-panel" id="place-panel" aria-hidden="true"
+              role="dialog" aria-modal="false" aria-label="Detalle del lugar" tabindex="-1">
+              <button type="button" class="place-panel-close" id="place-panel-close"
+                aria-label="Cerrar">&times;</button>
+              <div class="place-panel-body" id="place-panel-body"></div>
+            </aside>
           </div>
 
           <ul class="map-legend">
             <li><span class="dot dot-safe"></span><span data-i18n="map.legend1">100% sin TACC</span></li>
-            <li><span class="dot dot-mid"></span><span data-i18n="map.legend2">Opciones aptas</span></li>
+            <li><span class="dot dot-friendly"></span><span data-i18n="map.legend2">Apto celíaco</span></li>
+            <li><span class="dot dot-options"></span><span data-i18n="map.legend3">Tiene opciones</span></li>
           </ul>
         </div>
       </div>

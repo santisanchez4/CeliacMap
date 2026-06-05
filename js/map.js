@@ -11,7 +11,9 @@
   "use strict";
 
   var cfg = window.CELIACMAP_CONFIG || {};
-  var mapEl = document.getElementById("map");
+  // #cm-map, not #map: the <section id="map"> is the nav anchor; using #map here
+  // returned the section (first match) and made Leaflet size/click the whole section.
+  var mapEl = document.getElementById("cm-map");
   if (!mapEl || typeof L === "undefined") return;
   var statusEl = document.getElementById("map-status");
 
@@ -31,6 +33,22 @@
       loading: { es: "Cargando lugares…", en: "Loading places…" },
       empty: { es: "Todavía no hay lugares para mostrar.", en: "No places to show yet." },
       error: { es: "No se pudieron cargar los lugares.", en: "Couldn't load places." }
+    },
+    panel: {
+      address: { es: "Dirección", en: "Address" },
+      phone: { es: "Teléfono", en: "Phone" },
+      hours: { es: "Horarios", en: "Opening hours" },
+      website: { es: "Sitio web", en: "Website" },
+      social: { es: "Redes sociales", en: "Social media" },
+      visit: { es: "Visitar sitio", en: "Visit website" },
+      report: { es: "Reportar un error", en: "Report an error" },
+      reviews: { es: "reseñas", en: "reviews" }
+    },
+    source: {
+      google_places: { es: "Verificado por Google", en: "Verified by Google" },
+      social: { es: "Encontrado en redes sociales", en: "Found on social media" },
+      manual: { es: "Lugar curado", en: "Curated place" },
+      user: { es: "Sugerido por la comunidad", en: "Community suggested" }
     }
   };
 
@@ -59,6 +77,14 @@
   // Centered on the Río de la Plata to frame both Montevideo and Buenos Aires.
   var map = L.map(mapEl, { scrollWheelZoom: false }).setView([-34.75, -57.4], 6);
 
+  // The two Phase-1 cities. The default view frames exactly these two, so
+  // outlier places (Mar del Plata, Paysandú, …) don't blow out the zoom and
+  // collapse the city clusters into unclickable blobs.
+  var CITY_BOUNDS = L.latLngBounds([
+    [-34.9011, -56.1645], // Montevideo
+    [-34.6037, -58.3816]  // Buenos Aires
+  ]);
+
   L.tileLayer(
     "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     {
@@ -74,7 +100,16 @@
   map.on("blur", function () { map.scrollWheelZoom.disable(); });
 
   function safetyClass(level) {
-    return level === "gluten_free_100" ? "cm-marker--safe" : "cm-marker--mid";
+    if (level === "gluten_free_100") return "cm-marker--safe";
+    if (level === "celiac_friendly") return "cm-marker--friendly";
+    if (level === "options_available") return "cm-marker--options";
+    return "cm-marker--mid";
+  }
+
+  function safetyBadgeClass(level) {
+    if (level === "gluten_free_100") return "pp-badge--safe";
+    if (level === "celiac_friendly") return "pp-badge--friendly";
+    return "pp-badge--options";
   }
 
   function icon(level) {
@@ -103,23 +138,182 @@
     );
   }
 
+  /* --------------------------- Side panel --------------------------- */
+  var panelEl = document.getElementById("place-panel");
+  var panelBody = document.getElementById("place-panel-body");
+  var panelClose = document.getElementById("place-panel-close");
+  var panelAvailable = !!(panelEl && panelBody);
+
+  function stars(rating) {
+    var full = Math.max(0, Math.min(5, Math.round(rating)));
+    return "★★★★★".slice(0, full) + "☆☆☆☆☆".slice(0, 5 - full);
+  }
+
+  function formatHours(h) {
+    if (Array.isArray(h)) return h.map(esc).join("\n");
+    if (h && typeof h === "object" && Array.isArray(h.weekday_text)) {
+      return h.weekday_text.map(esc).join("\n");
+    }
+    return esc(String(h));
+  }
+
+  function field(label, valueHtml) {
+    return (
+      '<div class="pp-field"><span class="pp-field-label">' + esc(label) +
+      '</span><span class="pp-field-value">' + valueHtml + "</span></div>"
+    );
+  }
+
+  // Renders only the fields present on the row, so phone/hours/website/social/
+  // rating light up automatically once those columns exist and are populated.
+  function panelHtml(p) {
+    var l = lang();
+    var cat = (LABELS.category[p.category] && LABELS.category[p.category][l]) || p.category;
+    var saf = (LABELS.safety[p.safety_level] && LABELS.safety[p.safety_level][l]) || p.safety_level;
+    var P = LABELS.panel;
+    var html = '<h3 class="pp-title">' + esc(p.name) + "</h3>";
+    if (p.city) html += '<p class="pp-meta">' + esc(p.city) + "</p>";
+
+    html += '<div class="pp-badges">' +
+      '<span class="pp-badge pp-badge--cat">' + esc(cat) + "</span>" +
+      '<span class="pp-badge ' + safetyBadgeClass(p.safety_level) + '">' + esc(saf) + "</span>" +
+      "</div>";
+
+    if (typeof p.rating === "number" && p.rating > 0) {
+      var count =
+        typeof p.user_ratings_total === "number"
+          ? "<span>" + p.user_ratings_total + " " + esc(P.reviews[l]) + "</span>"
+          : "";
+      html += '<div class="pp-rating" aria-label="' + p.rating + '/5">' + stars(p.rating) + count + "</div>";
+    }
+
+    html += '<div class="pp-fields">';
+    if (p.address) html += field(P.address[l], esc(p.address));
+    if (p.phone) html += field(P.phone[l], esc(p.phone));
+    if (p.opening_hours) html += field(P.hours[l], '<span class="pp-hours">' + formatHours(p.opening_hours) + "</span>");
+    if (p.website) {
+      html += field(
+        P.website[l],
+        '<a class="pp-link" href="' + esc(p.website) + '" target="_blank" rel="noopener">' + esc(P.visit[l]) + "</a>"
+      );
+    }
+    if (p.social_url) {
+      html += field(
+        P.social[l],
+        '<a class="pp-link" href="' + esc(p.social_url) + '" target="_blank" rel="noopener">' +
+          esc(p.social_url.replace(/^https?:\/\//, "")) + "</a>"
+      );
+    }
+    html += "</div>";
+
+    var srcLabel = (LABELS.source[p.source] && LABELS.source[p.source][l]) || "";
+    if (srcLabel) {
+      html += '<div class="pp-badges"><span class="pp-badge pp-badge--source">' + esc(srcLabel) + "</span></div>";
+    }
+
+    html += '<div class="pp-footer"><a class="pp-report" href="#" data-pp-report>' + esc(P.report[l]) + "</a></div>";
+    return html;
+  }
+
+  function openPanel(p) {
+    panelBody.innerHTML = panelHtml(p);
+    panelEl.classList.add("is-open");
+    panelEl.setAttribute("aria-hidden", "false");
+  }
+
+  function closePanel() {
+    if (!panelAvailable) return;
+    panelEl.classList.remove("is-open");
+    panelEl.setAttribute("aria-hidden", "true");
+  }
+
+  // Open the side panel; fall back to the Leaflet popup if anything fails.
+  function showDetails(p, marker) {
+    if (panelAvailable) {
+      try {
+        openPanel(p);
+        return;
+      } catch (e) {
+        /* fall through to popup */
+      }
+    }
+    if (!marker.getPopup()) marker.bindPopup(popupHtml(p));
+    marker.openPopup();
+  }
+
+  if (panelAvailable) {
+    panelClose.addEventListener("click", closePanel);
+    // Close on background map click (Leaflet does not fire this for markers).
+    map.on("click", closePanel);
+    // Close on click anywhere outside the panel and outside the map.
+    document.addEventListener("click", function (e) {
+      if (!panelEl.classList.contains("is-open")) return;
+      if (panelEl.contains(e.target) || mapEl.contains(e.target)) return;
+      closePanel();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closePanel();
+    });
+    // "Reportar error" is a placeholder for now.
+    panelBody.addEventListener("click", function (e) {
+      var t = e.target;
+      if (t && t.getAttribute && t.getAttribute("data-pp-report") !== null) {
+        e.preventDefault();
+      }
+    });
+  }
+
   /* --------------------------- Markers ------------------------------ */
   var entries = [];                       // { marker, category }
   var visible = L.layerGroup().addTo(map);
+  var currentCategory = "all";
 
-  function applyFilter(category) {
-    visible.clearLayers();
+  function frame() {
+    // Always recompute the container size first: the map lives below the fold
+    // inside a reveal-animated section, so Leaflet's cached size can be stale,
+    // which throws off both hit-testing and fitBounds.
+    map.invalidateSize();
     var shown = [];
     entries.forEach(function (e) {
-      if (category === "all" || e.category === category) {
-        visible.addLayer(e.marker);
-        shown.push(e.marker);
-      }
+      if (currentCategory === "all" || e.category === currentCategory) shown.push(e.marker);
     });
-    if (shown.length) {
+    // "Todos" frames the two cities; a specific category frames its markers.
+    if (currentCategory === "all" || !shown.length) {
+      map.fitBounds(CITY_BOUNDS, { padding: [40, 40] });
+    } else {
       map.fitBounds(L.featureGroup(shown).getBounds().pad(0.2), { maxZoom: 14 });
     }
   }
+
+  function applyFilter(category) {
+    currentCategory = category;
+    visible.clearLayers();
+    entries.forEach(function (e) {
+      if (category === "all" || e.category === category) visible.addLayer(e.marker);
+    });
+    frame();
+  }
+
+  // Reframe once when the map first scrolls into view (handles init-below-fold),
+  // and keep the size correct on window resize.
+  if ("IntersectionObserver" in window) {
+    var framedOnce = false;
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (en) {
+        if (en.isIntersecting && !framedOnce) {
+          framedOnce = true;
+          frame();
+          io.disconnect();
+        }
+      });
+    }, { threshold: 0.15 });
+    io.observe(mapEl);
+  }
+  var resizeTimer;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { map.invalidateSize(); }, 200);
+  });
 
   /* ----------------------------- Chips ------------------------------ */
   var chips = Array.prototype.slice.call(document.querySelectorAll(".map-chips .chip"));
@@ -145,7 +339,7 @@
 
   var url =
     cfg.SUPABASE_URL.replace(/\/+$/, "") +
-    "/rest/v1/places?select=id,name,lat,lng,category,city,safety_level,address" +
+    "/rest/v1/places?select=id,name,lat,lng,category,city,safety_level,address,source" +
     "&status=eq.approved&limit=1000";
 
   fetch(url, {
@@ -166,7 +360,13 @@
       rows.forEach(function (p) {
         if (typeof p.lat !== "number" || typeof p.lng !== "number") return;
         var marker = L.marker([p.lat, p.lng], { icon: icon(p.safety_level), title: p.name });
-        marker.bindPopup(function () { return popupHtml(p); });
+        if (panelAvailable) {
+          marker.on("click", (function (place, mk) {
+            return function () { showDetails(place, mk); };
+          })(p, marker));
+        } else {
+          marker.bindPopup(function () { return popupHtml(p); });
+        }
         entries.push({ marker: marker, category: p.category });
       });
       setStatus(null);
