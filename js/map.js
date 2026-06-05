@@ -25,9 +25,11 @@
       shop: { es: "Comercio", en: "Shop" }
     },
     safety: {
-      gluten_free_100: { es: "100% sin TACC", en: "100% gluten-free" },
-      celiac_friendly: { es: "Apto celíacos", en: "Celiac-friendly" },
-      options_available: { es: "Opciones aptas", en: "Options available" }
+      // 2 levels (matches the map legend): gluten_free_100 + celiac_friendly
+      // share "Sin TACC"; options_available is "Tiene opciones sin TACC".
+      gluten_free_100: { es: "Sin TACC", en: "Gluten-free" },
+      celiac_friendly: { es: "Sin TACC", en: "Gluten-free" },
+      options_available: { es: "Tiene opciones sin TACC", en: "Has gluten-free options" }
     },
     status: {
       loading: { es: "Cargando lugares…", en: "Loading places…" },
