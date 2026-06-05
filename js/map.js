@@ -447,10 +447,16 @@
   }
 
   /* --------------------------- Search ------------------------------- */
+  // Filter the markers instantly on every keystroke, then (debounced) fit the
+  // map to the matches so the results are actually visible — otherwise, at the
+  // zoomed-out overview, filtered markers stay tiny dots and search looks inert.
+  var searchTimer;
   function onSearch() {
     currentQuery = (searchInput.value || "").trim().toLowerCase();
     if (searchClear) searchClear.hidden = currentQuery.length === 0;
     refresh();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(frameVisible, 280);
   }
   if (searchInput) searchInput.addEventListener("input", onSearch);
   if (searchClear) {
@@ -459,6 +465,7 @@
       currentQuery = "";
       searchClear.hidden = true;
       refresh();
+      frameVisible();
       searchInput.focus();
     });
   }
