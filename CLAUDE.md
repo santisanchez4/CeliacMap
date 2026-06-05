@@ -59,6 +59,15 @@ AGENTS (Python)
     the lead via Google Find Place to obtain real coordinates + a canonical
     place_id, deduplicates (within the run and against existing places sharing
     the place_id), and inserts candidates with status "pending", source "social".
+- Web agent (v3, autonomous):
+    Uses the Anthropic web search tool (claude-sonnet-4-6 + server-side
+    web_search / web_fetch). Given a single city/country (data-driven via
+    config/targets.yaml, opt-in per city with web: true), the model reasons
+    freely about how to find gluten-free / sin TACC places — forums, blogs,
+    Facebook groups, Instagram, news — instead of a fixed query matrix. Each
+    lead is geocoded via Google Find Place (real coords + canonical place_id),
+    deduplicated across sources, and inserted with status "pending",
+    source "web" (originating URL kept in social_url).
 - Validator agent:
     Uses the Anthropic Claude API (claude-sonnet-4-6).
     Analyzes each pending candidate, verifies category, safety level
@@ -112,6 +121,14 @@ GEOGRAPHIC SCOPE
   title/snippet into a clean `{name, city, category, address}` lead is exactly the
   cheap, high-volume free-text task Haiku is suited to; the heavier Validator gate
   (Sonnet) still judges every social candidate afterwards.
+- **Web (v3) → `claude-sonnet-4-6`** with the Anthropic web search tool. Unlike
+  the cheap Social parse, this is a genuinely agentic task — the model writes its
+  own queries, reads forums/blogs/IG/FB, and extracts candidates with evidence.
+  Sonnet 4.6 is the cost/quality balance for a recurring daily batch; upgradeable
+  to `claude-opus-4-8` via the `WEB_SEARCH_MODEL` env var (one-line flip, no code
+  change) if discovery quality proves weak. The Sonnet Validator still gates every
+  web candidate, and every lead must geocode to a real Google `place_id`, so a
+  hallucinated place is dropped before it can be published.
 - **Provider strategy:** standardize on Anthropic behind a thin
   `agents/clients/llm.py` wrapper so OpenAI / DeepSeek can be swapped if cost
   demands, without touching agent logic.
@@ -158,7 +175,7 @@ which `_normalize()` then coerces into schema-safe values.
 **Full rubric (English — as it exists in code):**
 
 ```text
-You are the Validator for CeliacMap, a curated directory of gluten-free / "sin TACC" (celiac-safe) places in Latin America. You receive a single candidate place that was discovered automatically via Google Places (so you only have its name, address, city/country and a guessed category). Decide whether it belongs in the directory, then classify it.
+You are the Validator for CeliacMap, a curated directory of gluten-free / "sin TACC" (celiac-safe) places in Latin America. You receive a single candidate place that was discovered automatically — via Google Places, public social-media pages, or web research — so you usually only have its name, address, city/country and a guessed category. Decide whether it belongs in the directory, then classify it.
 
 This data is used by people with celiac disease, for whom gluten is a health hazard. Never overstate how safe a place is. When unsure, be conservative.
 
@@ -189,7 +206,7 @@ Respond with ONLY a JSON object, no prose, in exactly this shape:
 **Spanish translation (reference only — the code uses the English version above):**
 
 ```text
-Sos el Validador de CeliacMap, un directorio curado de lugares sin gluten / "sin TACC" (seguros para celíacos) en América Latina. Recibís un único lugar candidato que fue descubierto automáticamente mediante Google Places (así que solo tenés su nombre, dirección, ciudad/país y una categoría estimada). Decidí si pertenece al directorio y luego clasificalo.
+Sos el Validador de CeliacMap, un directorio curado de lugares sin gluten / "sin TACC" (seguros para celíacos) en América Latina. Recibís un único lugar candidato que fue descubierto automáticamente —mediante Google Places, páginas públicas de redes sociales o investigación web— así que normalmente solo tenés su nombre, dirección, ciudad/país y una categoría estimada. Decidí si pertenece al directorio y luego clasificalo.
 
 Estos datos los usan personas con enfermedad celíaca, para quienes el gluten es un peligro para la salud. Nunca exageres lo seguro que es un lugar. Ante la duda, sé conservador.
 
@@ -487,6 +504,46 @@ A full visual and content redesign was applied to `index.html` and
   Places details call, failures never abort the run, and only snippets matching a
   gluten-free / celiac keyword (accent-insensitive) are stored.
 
+### Web discovery agent (v3) design decisions
+
+The discovery lineage is now **v1 (Google Places tags) → v2 (Tavily social) →
+v3 (autonomous web search)**. v3 (`agents/web_agent.py`) does not replace v1/v2;
+it adds a smarter third funnel that feeds the **same unchanged Validator gate**.
+
+- **No predefined tags — the model reasons freely.** Instead of a fixed query
+  matrix, the Web agent hands Claude the Anthropic **server-side web search +
+  web fetch tools** (`web_search_20260209` / `web_fetch_20260209`, wrapped by
+  `LLMClient.research_with_web_search`) and a single city/country, and lets it
+  decide what to search and which pages to read (forums, blogs, FB groups, IG,
+  news). This stays on the first-party Anthropic API the project already uses —
+  no new provider.
+- **Coordinates — geocode, don't relax NOT NULL.** Same problem and solution as
+  the Social agent: a web mention has no coordinates, so each lead is resolved via
+  **Google Find Place** (`name + city`, biased to the city center) to obtain real
+  coordinates + a canonical Google `place_id`. Unresolvable leads are skipped and
+  logged (`web_unresolved`).
+- **Dedup — across sources via the geocoded `place_id`.** Web stores the Google
+  `place_id` as `external_id`, so the `(source, external_id)` unique constraint
+  dedups within web runs, and `place_exists_by_external_id` dedups against places
+  already found by Search/Social (same `place_id`, different `source`). The source
+  URL is preserved in the `social_url` column (shared with the Social agent; the
+  Validator overwrites `validation_notes`, so the URL lives apart from it).
+- **Hallucination guard (health-sensitive).** A web agent can invent a
+  plausible-sounding place. Two backstops: (a) every lead must geocode to a real
+  Google `place_id` or it is dropped, and (b) the Sonnet Validator still judges it
+  against the health-sensitive rubric; `verified` stays `false`. The research
+  rubric also explicitly forbids fabricating a name or URL.
+- **Rollout — opt-in per city.** A city is researched only when flagged
+  `web: true` in `targets.yaml`; v3 starts with **Montevideo + Buenos Aires** and
+  expands after verification. Bounded by `MAX_WEB_CITIES_PER_RUN` and
+  `MAX_WEB_SEARCHES_PER_CITY`, and by a `WEB_MAX` slice of the shared
+  `AGENT_DAILY_BUDGET` that never eats the Validator's reserve.
+- **Schema gap fixed.** `social_url` was used by the Social agent in code but was
+  missing from `db/schema.sql`; it is now added there (idempotently) since v3
+  reuses it. `places.source` and `agent_log.agent` CHECKs gained `'web'`.
+- **Model — `claude-sonnet-4-6`** (see the Web bullet under **AI model
+  decisions**); `WEB_SEARCH_MODEL` allows a one-line upgrade to `claude-opus-4-8`.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
@@ -539,6 +596,18 @@ A full visual and content redesign was applied to `index.html` and
     *enabled on the project* and *allowed in the API key's restrictions* (alongside
     Places API New). Google is sunsetting legacy APIs — a future migration to the
     Places API (New) `searchText` endpoint is the durable fix (deferred).
+- ✅ **Phase 11 — Web discovery agent (v3, autonomous).** `agents/web_agent.py`
+  gives Claude (`claude-sonnet-4-6`) the Anthropic server-side web search tool and
+  a single city, letting it reason freely about where to find gluten-free / sin
+  TACC places (forums, blogs, FB groups, Instagram, news) instead of a fixed query
+  matrix. Leads are geocoded via Google Find Place, deduplicated across sources,
+  and inserted as `pending` with `source='web'`. The pipeline now runs
+  **search → social → web → validator → updater** under the shared budget. New env
+  vars: `WEB_SEARCH_MODEL`, `MAX_WEB_CITIES_PER_RUN`, `MAX_WEB_SEARCHES_PER_CITY`.
+  Rollout is opt-in per city via `web: true` (Montevideo + Buenos Aires to start).
+  Design rationale: **Web discovery agent (v3) design decisions** above. Code
+  complete with 16 offline tests; first live standalone run on Montevideo is the
+  next verification step before enabling it in the full daily pipeline.
 
 ### GitHub Pages deploy decision
 

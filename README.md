@@ -21,14 +21,20 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   Search API, parses each lead with `claude-haiku-4-5`, geocodes it via Google
   Find Place, and inserts candidates as `pending`. _(Live: a run inserted 30 social
   candidates; the Validator approved 23.)_
+- ✅ **Web agent (v3, autonomous)** — hands `claude-sonnet-4-6` the Anthropic web
+  search tool and a single city, letting it reason freely about where to find
+  gluten-free / sin TACC places (forums, blogs, FB groups, Instagram, news) instead
+  of a fixed query matrix; geocodes each lead, dedups across sources, inserts as
+  `pending` (`source='web'`). Opt-in per city via `web: true` in `targets.yaml`
+  (Montevideo + Buenos Aires to start).
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.
 - ✅ **Updater agent** — re-checks approved places via Google Places; closes /
   updates / flags. Deterministic, with a narrow Haiku fallback.
-- ✅ **Pipeline orchestrator** (`scripts/run_agents.py`) — runs all four agents
-  (search → social → validator → updater) under one combined daily budget, with a
-  `--dry-run` mode.
+- ✅ **Pipeline orchestrator** (`scripts/run_agents.py`) — runs all five agents
+  (search → social → web → validator → updater) under one combined daily budget,
+  with a `--dry-run` mode.
 - ✅ **GitHub Actions daily cron** — runs the pipeline once per day (manual
   `workflow_dispatch` with a dry-run toggle for validation).
 - ✅ **Deployed to GitHub Pages** — the frontend ships automatically from `main`
@@ -51,9 +57,10 @@ See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 
 **Agents**
 - Python 3.14
-- [Anthropic API](https://docs.anthropic.com/) (`claude-sonnet-4-6` Validator,
-  `claude-haiku-4-5` Social/Updater)
-- [Google Places API](https://developers.google.com/maps/documentation/places/web-service) — Search / Social / Updater
+- [Anthropic API](https://docs.anthropic.com/) (`claude-sonnet-4-6` Validator + Web,
+  `claude-haiku-4-5` Social/Updater) — incl. the server-side **web search tool**
+  (Web agent, v3)
+- [Google Places API](https://developers.google.com/maps/documentation/places/web-service) — Search / Social / Web / Updater
 - [Tavily Search API](https://tavily.com/) — Social agent (discovers public
   Instagram / Facebook pages)
 - Key libraries: `supabase` (supabase-py), `anthropic`, `googlemaps`,
@@ -72,9 +79,10 @@ CeliacMap has three layers:
    the browser can only read approved data.
 3. **Agents** — a daily Python pipeline: **Search** finds candidates via Google
    Places (status `pending`, plus GF review enrichment) → **Social** discovers
-   Instagram / Facebook pages via the Tavily Search API → **Validator** uses Claude
-   to approve/discard → **Updater** keeps published places current. Orchestrated by
-   GitHub Actions.
+   Instagram / Facebook pages via the Tavily Search API → **Web** (v3) uses the
+   Anthropic web search tool to discover places from forums/blogs/social → **Validator**
+   uses Claude to approve/discard → **Updater** keeps published places current.
+   Orchestrated by GitHub Actions.
 
 Full details, schema, and design decisions: [`CLAUDE.md`](CLAUDE.md#architecture).
 
@@ -98,7 +106,7 @@ verdict `{verdict, category, safety_level, confidence, reason}`.
 **Full rubric (English — as it exists in code):**
 
 ```text
-You are the Validator for CeliacMap, a curated directory of gluten-free / "sin TACC" (celiac-safe) places in Latin America. You receive a single candidate place that was discovered automatically via Google Places (so you only have its name, address, city/country and a guessed category). Decide whether it belongs in the directory, then classify it.
+You are the Validator for CeliacMap, a curated directory of gluten-free / "sin TACC" (celiac-safe) places in Latin America. You receive a single candidate place that was discovered automatically — via Google Places, public social-media pages, or web research — so you usually only have its name, address, city/country and a guessed category. Decide whether it belongs in the directory, then classify it.
 
 This data is used by people with celiac disease, for whom gluten is a health hazard. Never overstate how safe a place is. When unsure, be conservative.
 
@@ -129,7 +137,7 @@ Respond with ONLY a JSON object, no prose, in exactly this shape:
 **Spanish translation (reference only — the code uses the English version above):**
 
 ```text
-Sos el Validador de CeliacMap, un directorio curado de lugares sin gluten / "sin TACC" (seguros para celíacos) en América Latina. Recibís un único lugar candidato que fue descubierto automáticamente mediante Google Places (así que solo tenés su nombre, dirección, ciudad/país y una categoría estimada). Decidí si pertenece al directorio y luego clasificalo.
+Sos el Validador de CeliacMap, un directorio curado de lugares sin gluten / "sin TACC" (seguros para celíacos) en América Latina. Recibís un único lugar candidato que fue descubierto automáticamente —mediante Google Places, páginas públicas de redes sociales o investigación web— así que normalmente solo tenés su nombre, dirección, ciudad/país y una categoría estimada. Decidí si pertenece al directorio y luego clasificalo.
 
 Estos datos los usan personas con enfermedad celíaca, para quienes el gluten es un peligro para la salud. Nunca exageres lo seguro que es un lugar. Ante la duda, sé conservador.
 
@@ -193,6 +201,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── base.py                 # shared base + agent_log helper
 │   ├── search_agent.py         # Google Places → pending candidates (+ reviews)
 │   ├── social_agent.py         # Tavily search → Haiku parse → geocode → pending
+│   ├── web_agent.py            # Anthropic web search → geocode → pending (v3)
 │   ├── validator_agent.py      # Claude approves/discards pending
 │   ├── updater_agent.py        # re-checks approved places
 │   └── clients/                # supabase / google_places / tavily_client / llm
@@ -201,7 +210,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   └── targets.yaml            # countries/cities + search/social terms
 ├── scripts/
 │   ├── check_setup.py          # connectivity / config preflight
-│   └── run_agents.py           # pipeline: search → social → validator → updater
+│   └── run_agents.py           # pipeline: search → social → web → validator → updater
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
 │   └── seed.sql                # manual seed (UY/AR)
@@ -226,13 +235,14 @@ cp .env.example .env             # fill in Supabase service_role + API keys
 pip install -r requirements.txt
 python scripts/check_setup.py    # preflight: config + connectivity
 
-# Run the full pipeline (search → social → validator → updater) under one budget:
+# Run the full pipeline (search → social → web → validator → updater) under one budget:
 python -m scripts.run_agents --dry-run   # rehearse: no database writes
 python -m scripts.run_agents             # real run
 
 # …or run any stage on its own:
-python -m agents.search_agent    # discover candidates  → pending (+ reviews)
-python -m agents.social_agent    # discover IG/FB pages → pending
+python -m agents.search_agent    # discover candidates    → pending (+ reviews)
+python -m agents.social_agent    # discover IG/FB pages   → pending
+python -m agents.web_agent       # autonomous web search  → pending (v3)
 python -m agents.validator_agent # approve / discard pending
 python -m agents.updater_agent   # re-check approved places
 ```

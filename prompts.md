@@ -271,3 +271,57 @@ added `tavily-python` to `requirements.txt`, and updated the offline tests
 - **Full cleanup:** the dead Custom Search env vars and the stdlib client were
   removed rather than left in place; `TAVILY_API_KEY` was also added to the daily
   CI workflow so the Social stage can finally run in CI.
+
+## 11. Web search discovery agent (v3, autonomous)
+
+**Prompt (summary):** "Design and build a v3 discovery agent using Anthropic's web
+search tool. Instead of predefined tags, it receives a city/country, reasons freely
+about how to find gluten-free / sin TACC places, uses web search to read forums,
+blogs, Facebook groups and Instagram, extracts candidates with context, and passes
+them to the existing Validator. This is the evolution v1 (Google Places tags) → v2
+(Tavily social) → v3 (autonomous web search). Present the plan first; implement on
+approval (schema → llm → agent → config → orchestrator → tests → docs). Roll out to
+Montevideo + Buenos Aires only via a per-city `web: true` toggle, model
+`claude-sonnet-4-6`, and make the small neutral provenance tweak to the Validator
+rubric (proposing exact wording first)."
+
+**Used for:** Adding `agents/web_agent.py` and the `LLMClient.research_with_web_search`
+wrapper (Anthropic server-side `web_search_20260209` / `web_fetch_20260209`,
+handling `pause_turn`), wiring the **web** stage into `scripts/run_agents.py`
+(search → social → web → validator → updater under the shared `AGENT_DAILY_BUDGET`),
+the per-city `web: true` opt-in in `targets.yaml`, new settings/env vars
+(`WEB_SEARCH_MODEL`, `MAX_WEB_CITIES_PER_RUN`, `MAX_WEB_SEARCHES_PER_CITY`), the
+idempotent schema migration (`places.source` / `agent_log.agent` gain `'web'`; the
+`social_url` column — used in code but missing from `schema.sql` — is added), the
+neutral provenance wording in the Validator rubric, and 16 offline tests
+(`tests/test_web_agent.py`).
+
+**The research rubric (system prompt) handed to the model per city:**
+
+```text
+You are the Web Researcher for CeliacMap, a curated directory of gluten-free / "sin TACC" (celiac-safe) places in Latin America. Given one city and country, use web search to find real, currently-operating places that serve or sell gluten-free / celiac-safe food: restaurants, cafes/bakeries, and shops (dietéticas, health-food stores, supermarkets with GF products).
+
+Reason freely about how to find them. Do not rely on a single query — search the way a celiac local would: community blogs and forums, Facebook groups, Instagram posts and roundups, local news and "dónde comer sin TACC" guides, and celiac association listings. Prioritise places that are discussed by the community but may not be obvious on the map. Fetch pages when a snippet looks promising but incomplete.
+
+For every place you are reasonably confident is real and gluten-free relevant, collect: name, category (restaurant | cafe | shop), address (or null), evidence (one sentence on why it is GF relevant), and source_url. Only include places physically in the requested city/country. Do NOT invent places — if you cannot find a real source, leave it out. Prefer fewer, well-supported places over many weak guesses.
+
+Respond with ONLY a JSON object: {"places": [{name, category, address, evidence, source_url}]}.
+```
+
+**Key decisions made during this prompt:**
+- **Reuse, don't reinvent:** v3 mirrors the Social agent's geocode-and-dedup spine
+  (Google Find Place → real coords + canonical `place_id` → `place_exists_by_external_id`)
+  so a place found by Search/Social/Web is one row, and feeds the **unchanged**
+  Validator gate.
+- **Model — `claude-sonnet-4-6`:** genuinely agentic (free reasoning + tool use),
+  so a stronger model than the Social parse; Sonnet is the cost/quality balance for
+  a daily batch, with `WEB_SEARCH_MODEL` allowing a one-line upgrade to Opus 4.8.
+- **Hallucination guard (health-sensitive):** the rubric forbids fabricating a
+  name/URL; every lead must geocode to a real Google `place_id` or it is dropped;
+  the Validator still judges every candidate; `verified` stays `false`.
+- **Opt-in rollout:** a `web: true` flag per city (Montevideo + Buenos Aires first)
+  keeps cost bounded and lets the approach be verified before expanding.
+- **Provenance tweak (proposed before changing):** the Validator rubric's "discovered
+  via Google Places" clause became neutral — "via Google Places, public social-media
+  pages, or web research" — kept in sync across `validator_agent.py`, `README.md`,
+  and `CLAUDE.md`. No verdict/category/safety rule changed.
