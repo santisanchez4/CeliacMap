@@ -6,6 +6,7 @@ supabase>=2.23,<2.26    # Supabase client (service_role, server-side)
 anthropic>=0.105,<1     # Claude API (Validator agent) - latest stable 0.105.2
 googlemaps>=4.10,<5     # Google Places API (Search / Updater / Social geocoding)
 tavily-python>=0.5,<1   # Tavily Search API (Social agent discovery)
+fastmcp>=3,<4           # MCP server (mcp_server/server.py) — AI toolkit
 python-dotenv>=1.0,<2   # load .env locally (CI uses real env vars)
 PyYAML>=6.0,<7          # read config/targets.yaml
 pytest>=8,<9            # unit tests (offline, all external calls mocked)

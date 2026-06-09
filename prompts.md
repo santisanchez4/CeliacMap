@@ -325,3 +325,98 @@ Respond with ONLY a JSON object: {"places": [{name, category, address, evidence,
   via Google Places" clause became neutral — "via Google Places, public social-media
   pages, or web research" — kept in sync across `validator_agent.py`, `README.md`,
   and `CLAUDE.md`. No verdict/category/safety rule changed.
+
+## 12. AI Toolkit — Validator rubric adoption (three-tier verdict)
+
+**Prompt (summary):** "Integrate an academic 'Toolkit de IA' (documented prompts,
+CLAUDE.md, a reusable Skill, an MCP server). Adopt the toolkit's richer Validator
+rubric as canonical — three-tier verdict `approved`/`rejected`/`needs_review` with
+`confidence_score`, `flags`, `recommendation` and explicit 0.85/0.7/0.5 gates —
+replacing the previous `approve`/`discard` rubric. Keep the frontend alive with an
+**additive** status mapping and keep `category`/`safety_level` in the output."
+
+**Used for:** A deliberate change to the project's single health-sensitive quality
+gate (`RUBRIC` in `agents/validator_agent.py`). The verdict now maps to
+`places.status` additively — `approved`→`approved`, `rejected`→`discarded`,
+`needs_review`→`needs_review` (a new human-review tier held back from the map) —
+so `js/map.js`, RLS and the seed are untouched. `confidence_score` persists to
+`validation_confidence`, `reasoning` to `validation_notes`, and `flags`/
+`recommendation` to new columns. The same `RUBRIC` is reused on-demand by the MCP
+server's `validate_place` tool, so batch and on-demand validation are identical.
+
+**Key decisions made during this prompt:**
+- **Confidence gates are code-enforced** (`ValidatorAgent._decide_status`), defense
+  in depth: auto-approval requires `confidence_score >= 0.85`; `< 0.5` (or an
+  explicit `rejected`) discards; everything between — and the `< 0.7` safety floor —
+  is held as `needs_review`, regardless of the model's stated verdict.
+- **`category` + `safety_level` retained** in the output (the toolkit rubric dropped
+  them) because the schema requires them and the map renders safety badges.
+- **Rubric language → Spanish**, matching the MCP `validate_place` prompt and this
+  log, so the code prompt and the documented prompt are the same text.
+
+**The adopted Validator system prompt (`RUBRIC`, as it exists in code):**
+
+```text
+Eres el Validator Agent de CeliacMap, un sistema de validación conservador para lugares gluten free / sin TACC en Uruguay y Argentina. Recibes un único lugar candidato descubierto automáticamente — vía Google Places, páginas públicas de redes sociales o investigación web — así que normalmente solo tienes su nombre, dirección, ciudad/país y una categoría estimada.
+
+Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
+
+Rubric de validación (veredicto):
+- "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
+- "needs_review" (0.5 <= confidence_score < 0.85): Evidencia parcial, ambigua o que requiere confirmación humana.
+- "rejected" (confidence_score < 0.5): Sin evidencia suficiente, información contradictoria o señales de riesgo para celíacos.
+
+Flags de alerta a detectar (cada una reduce la confianza):
+- Menciona "sin gluten" pero no "sin TACC" (puede ser marketing, no médico)
+- No menciona protocolo de contaminación cruzada
+- Solo tiene opciones vegetarianas/veganas sin mención explícita sin TACC
+- Información desactualizada (> 12 meses)
+- Reseñas negativas de celíacos
+- Descripción ambigua ("apto para dietas especiales")
+
+Asigna una categoría (exactamente una):
+- "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
+- "cafe": cafés, cafeterías, panaderías, pastelerías.
+- "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
+
+Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
+- "gluten_free_100": establecimiento totalmente sin gluten / dedicado a celíacos.
+- "celiac_friendly": atiende explícitamente a celíacos (certificado, "apto celíacos", preparación dedicada).
+- "options_available": ofrece algunas opciones sin gluten pero no está especializado. Es el piso por defecto cuando la evidencia es escasa.
+
+También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantente conservador.
+
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
+{"verdict": "approved" | "rejected" | "needs_review",
+ "confidence_score": <número entre 0.0 y 1.0>,
+ "category": "restaurant" | "cafe" | "shop",
+ "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
+ "reasoning": "<explicación clara en español, máximo 3 oraciones>",
+ "flags": ["<flag detectado>", ...],
+ "recommendation": "<acción concreta sugerida para el operador>"}
+```
+
+## 13. AI Toolkit — MCP server `validate_place` tool
+
+**Archivo:** `mcp_server/server.py` · **Modelo:** `claude-sonnet-4-6`
+**Propósito:** Validación on-demand desde Claude Desktop / Claude Code / agentes
+externos, usando exactamente el mismo rubric que el pipeline diario.
+
+The tool imports the canonical `RUBRIC` (above) as the system prompt and runs the
+candidate through `ValidatorAgent._normalize` (same gates), so there is **no second
+copy** of the rubric to drift. The user message is built from the tool arguments:
+
+```text
+Valida el siguiente lugar:
+
+Nombre: [name]
+Dirección: [address]
+Ciudad: [city]
+
+Evidencia recopilada:
+[evidence]
+```
+
+The tool returns `{verdict, confidence_score, category, safety_level, reasoning,
+flags, recommendation, db_status}` — `db_status` is the status the candidate would
+take in the database (`approved` / `needs_review` / `discarded`).

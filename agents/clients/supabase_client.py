@@ -83,6 +83,8 @@ class SupabaseClient:
         verified: bool | None = None,
         category: str | None = None,
         safety_level: str | None = None,
+        flags: list[str] | None = None,
+        recommendation: str | None = None,
     ) -> None:
         patch: dict[str, Any] = {"status": status}
         if confidence is not None:
@@ -95,6 +97,10 @@ class SupabaseClient:
             patch["category"] = category
         if safety_level is not None:
             patch["safety_level"] = safety_level
+        if flags is not None:
+            patch["flags"] = flags
+        if recommendation is not None:
+            patch["recommendation"] = recommendation
         self._db.table("places").update(patch).eq("id", place_id).execute()
 
     # --- reviews ------------------------------------------------------

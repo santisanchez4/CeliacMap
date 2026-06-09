@@ -39,6 +39,10 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   `workflow_dispatch` with a dry-run toggle for validation).
 - ✅ **Deployed to GitHub Pages** — the frontend ships automatically from `main`
   via GitHub Actions ([live demo](https://santisanchez4.github.io/CeliacMap/)).
+- ✅ **AI Toolkit** — documented prompts ([`prompts.md`](prompts.md)), a reusable
+  Skill ([`skills/validator-rubric/SKILL.md`](skills/validator-rubric/SKILL.md)),
+  and an **MCP server** ([`mcp_server/`](mcp_server/)) exposing 6 tools over Supabase
+  + the Validator rubric for Claude Desktop / Claude Code / external agents.
 
 See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 
@@ -64,7 +68,7 @@ See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 - [Tavily Search API](https://tavily.com/) — Social agent (discovers public
   Instagram / Facebook pages)
 - Key libraries: `supabase` (supabase-py), `anthropic`, `googlemaps`,
-  `tavily-python`, `python-dotenv`, `PyYAML`
+  `tavily-python`, `fastmcp` (MCP server), `python-dotenv`, `PyYAML`
 
 **Automation**
 - [GitHub Actions](https://docs.github.com/actions) — daily agent cron + Pages deploy
@@ -101,74 +105,66 @@ candidate (the `RUBRIC` constant in
 [`agents/validator_agent.py`](agents/validator_agent.py)). It is fixed across all
 candidates in a run, so it is sent as a **cached system block**; the per-candidate
 data goes in the user message. The model must reply with only the structured JSON
-verdict `{verdict, category, safety_level, confidence, reason}`.
+verdict `{verdict, confidence_score, category, safety_level, reasoning, flags,
+recommendation}`. The **same `RUBRIC`** is reused on-demand by the MCP server's
+`validate_place` tool.
 
-**Full rubric (English — as it exists in code):**
+**Three-tier verdict + code-enforced gates.** The verdict is `approved` /
+`needs_review` / `rejected`, mapped to `places.status` **additively**:
+`approved`→`approved`, `rejected`→`discarded`, `needs_review`→`needs_review` (a
+human-review tier held back from the map). `ValidatorAgent._decide_status` enforces
+the gates regardless of the model's stated verdict: auto-approval requires
+`confidence_score >= 0.85`; `< 0.5` (or `rejected`) discards; everything between —
+and the `< 0.7` safety floor — becomes `needs_review`.
 
-```text
-You are the Validator for CeliacMap, a curated directory of gluten-free / "sin TACC" (celiac-safe) places in Latin America. You receive a single candidate place that was discovered automatically — via Google Places, public social-media pages, or web research — so you usually only have its name, address, city/country and a guessed category. Decide whether it belongs in the directory, then classify it.
-
-This data is used by people with celiac disease, for whom gluten is a health hazard. Never overstate how safe a place is. When unsure, be conservative.
-
-Decide a verdict:
-- "approve": the place plausibly serves or sells gluten-free / celiac-safe food (a restaurant, a cafe/bakery, or a shop with GF products). Names or addresses mentioning "sin TACC", "sin gluten", "gluten free", "celíaco/a", "apto celíacos" are strong positive signals.
-- "discard": clearly not a food/place business, clearly unrelated to gluten-free needs, generic/ambiguous with no GF signal, or implausible as a directory entry.
-
-Assign a category (exactly one):
-- "restaurant": restaurants, takeaways, places to eat a meal.
-- "cafe": cafes, coffee shops, bakeries, pastry shops.
-- "shop": grocery stores, supermarkets, health-food / dietetica shops.
-
-Assign a safety_level (exactly one), choosing the LOWER level whenever unsure:
-- "gluten_free_100": a fully gluten-free / dedicated celiac establishment.
-- "celiac_friendly": explicitly caters to celiacs (certified, "apto celíacos", dedicated preparation).
-- "options_available": offers some gluten-free options but is not specialized. This is the default floor when evidence is thin.
-
-You may also be given community review snippets that mention gluten-free / celiac terms. Weigh them as supporting evidence (they can raise confidence or sharpen the safety_level), but never let enthusiastic reviews push you above the evidence — when the signal is thin, stay conservative.
-
-Respond with ONLY a JSON object, no prose, in exactly this shape:
-{"verdict": "approve" | "discard",
- "category": "restaurant" | "cafe" | "shop",
- "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
- "confidence": <number between 0 and 1>,
- "reason": "<one or two short sentences>"}
-```
-
-**Spanish translation (reference only — the code uses the English version above):**
+**Full rubric (Spanish — as it exists in code):**
 
 ```text
-Sos el Validador de CeliacMap, un directorio curado de lugares sin gluten / "sin TACC" (seguros para celíacos) en América Latina. Recibís un único lugar candidato que fue descubierto automáticamente —mediante Google Places, páginas públicas de redes sociales o investigación web— así que normalmente solo tenés su nombre, dirección, ciudad/país y una categoría estimada. Decidí si pertenece al directorio y luego clasificalo.
+Eres el Validator Agent de CeliacMap, un sistema de validación conservador para lugares gluten free / sin TACC en Uruguay y Argentina. Recibes un único lugar candidato descubierto automáticamente — vía Google Places, páginas públicas de redes sociales o investigación web — así que normalmente solo tienes su nombre, dirección, ciudad/país y una categoría estimada.
 
-Estos datos los usan personas con enfermedad celíaca, para quienes el gluten es un peligro para la salud. Nunca exageres lo seguro que es un lugar. Ante la duda, sé conservador.
+Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
 
-Decidí un veredicto:
-- "approve" (aprobar): el lugar plausiblemente sirve o vende comida sin gluten / segura para celíacos (un restaurante, un café/panadería, o un comercio con productos sin gluten). Nombres o direcciones que mencionen "sin TACC", "sin gluten", "gluten free", "celíaco/a", "apto celíacos" son señales positivas fuertes.
-- "discard" (descartar): claramente no es un negocio de comida/lugar, claramente no tiene relación con necesidades sin gluten, genérico/ambiguo sin ninguna señal sin gluten, o inverosímil como entrada del directorio.
+Rubric de validación (veredicto):
+- "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
+- "needs_review" (0.5 <= confidence_score < 0.85): Evidencia parcial, ambigua o que requiere confirmación humana.
+- "rejected" (confidence_score < 0.5): Sin evidencia suficiente, información contradictoria o señales de riesgo para celíacos.
 
-Asigná una categoría (exactamente una):
+Flags de alerta a detectar (cada una reduce la confianza):
+- Menciona "sin gluten" pero no "sin TACC" (puede ser marketing, no médico)
+- No menciona protocolo de contaminación cruzada
+- Solo tiene opciones vegetarianas/veganas sin mención explícita sin TACC
+- Información desactualizada (> 12 meses)
+- Reseñas negativas de celíacos
+- Descripción ambigua ("apto para dietas especiales")
+
+Asigna una categoría (exactamente una):
 - "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
 - "cafe": cafés, cafeterías, panaderías, pastelerías.
 - "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
 
-Asigná un nivel de seguridad (safety_level, exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
-- "gluten_free_100": un establecimiento totalmente sin gluten / dedicado a celíacos.
+Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
+- "gluten_free_100": establecimiento totalmente sin gluten / dedicado a celíacos.
 - "celiac_friendly": atiende explícitamente a celíacos (certificado, "apto celíacos", preparación dedicada).
-- "options_available": ofrece algunas opciones sin gluten pero no está especializado. Este es el piso por defecto cuando la evidencia es escasa.
+- "options_available": ofrece algunas opciones sin gluten pero no está especializado. Es el piso por defecto cuando la evidencia es escasa.
 
-También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pesalos como evidencia de apoyo (pueden aumentar la confianza o afinar el safety_level), pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantenete conservador.
+También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantente conservador.
 
-Respondé con SOLO un objeto JSON, sin prosa, exactamente con esta forma:
-{"verdict": "approve" | "discard",
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
+{"verdict": "approved" | "rejected" | "needs_review",
+ "confidence_score": <número entre 0.0 y 1.0>,
  "category": "restaurant" | "cafe" | "shop",
  "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
- "confidence": <número entre 0 y 1>,
- "reason": "<una o dos oraciones breves>"}
+ "reasoning": "<explicación clara en español, máximo 3 oraciones>",
+ "flags": ["<flag detectado>", ...],
+ "recommendation": "<acción concreta sugerida para el operador>"}
 ```
 
 > ⚠️ **Do not lose or change this prompt without careful consideration.** It is the
 > quality gate for a health-sensitive use case. Any edit to the wording, the
-> categories, the safety levels, or the "be conservative when unsure" rule directly
-> affects which places are approved for celiac users.
+> categories, the safety levels, the confidence gates, or the "be conservative when
+> unsure" rule directly affects which places are approved for celiac users. See
+> [`skills/validator-rubric/SKILL.md`](skills/validator-rubric/SKILL.md) for the
+> rubric documented as a reusable Skill.
 
 ## Design
 
@@ -202,9 +198,14 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── search_agent.py         # Google Places → pending candidates (+ reviews)
 │   ├── social_agent.py         # Tavily search → Haiku parse → geocode → pending
 │   ├── web_agent.py            # Anthropic web search → geocode → pending (v3)
-│   ├── validator_agent.py      # Claude approves/discards pending
+│   ├── validator_agent.py      # Claude: approved / needs_review / rejected
 │   ├── updater_agent.py        # re-checks approved places
 │   └── clients/                # supabase / google_places / tavily_client / llm
+├── mcp_server/                 # AI toolkit — MCP server (FastMCP, 6 tools)
+│   ├── server.py
+│   └── README.md
+├── skills/                     # AI toolkit — reusable skills
+│   └── validator-rubric/SKILL.md
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
 │   └── targets.yaml            # countries/cities + search/social terms
@@ -264,6 +265,19 @@ can also be triggered manually (with a dry-run toggle) from the Actions tab.
 
 Secrets (Supabase `service_role`, Google Places, Tavily, Anthropic) live only in
 `.env` locally and in GitHub Actions Secrets — never in the frontend.
+
+### MCP server (AI Toolkit)
+
+The MCP server exposes the database + the Validator rubric as tools for Claude
+Desktop / Claude Code / external agents. It reuses the same `.env` (no new vars):
+
+```bash
+python mcp_server/server.py          # run the server
+claude mcp add celiacmap python mcp_server/server.py   # register with Claude Code
+```
+
+See [`mcp_server/README.md`](mcp_server/README.md) for the tool list and the
+Claude Desktop config.
 
 ## Live Demo
 

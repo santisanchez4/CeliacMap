@@ -29,16 +29,24 @@ create table if not exists public.places (
                           check (safety_level in
                             ('gluten_free_100', 'celiac_friendly', 'options_available')),
   verified              boolean not null default false,
-  -- Agent flow: search inserts 'pending'; validator sets 'approved'/'discarded';
-  -- the frontend shows only 'approved'.
+  -- Agent flow: search inserts 'pending'; validator sets
+  -- 'approved'/'rejected'(=discarded)/'needs_review'; the frontend shows only
+  -- 'approved'. 'needs_review' is the human-review queue (held back from the map
+  -- when the validator's confidence is below the 0.7 safety floor).
   status                text not null default 'pending'
-                          check (status in ('pending', 'approved', 'discarded')),
+                          check (status in
+                            ('pending', 'approved', 'discarded', 'needs_review')),
   address               text,
   source                text not null default 'manual'
                           check (source in ('google_places', 'manual', 'user', 'social', 'web')),
   external_id           text,                 -- e.g. Google place_id (for dedup)
-  validation_confidence numeric,              -- validator output (0..1)
-  validation_notes      text,                 -- validator rationale
+  validation_confidence numeric,              -- validator output: confidence_score (0..1)
+  validation_notes      text,                 -- validator rationale: reasoning
+  -- Validator rubric output (adopted Jun 2026): alert signals detected and the
+  -- concrete action suggested for a human operator. See the Validator rubric in
+  -- CLAUDE.md / skills/validator-rubric/SKILL.md.
+  flags                 jsonb,                -- list of detected alert flags
+  recommendation        text,                 -- suggested operator action
   -- Discovery agents (Social v2, Web v3) keep the originating profile / source
   -- URL here so the Validator (which overwrites validation_notes) can't clobber it.
   social_url            text,
@@ -83,6 +91,23 @@ end $$;
 -- Validator's validation_notes update can't overwrite it. Added idempotently for
 -- databases created before this column existed.
 alter table public.places add column if not exists social_url text;
+
+-- Validator rubric adoption (Jun 2026): the verdict gains a 'needs_review' tier
+-- (verdict 'needs_review' / any confidence < 0.7 → held back from the map for a
+-- human). On an already-created table the inline check above is a no-op, so widen
+-- it in place. 'rejected' verdicts continue to map to status 'discarded'.
+do $$
+begin
+  alter table public.places drop constraint if exists places_status_check;
+  alter table public.places
+    add constraint places_status_check
+    check (status in ('pending', 'approved', 'discarded', 'needs_review'));
+end $$;
+
+-- The Validator now also persists its detected flags and suggested operator
+-- action. Added idempotently for databases created before these columns existed.
+alter table public.places add column if not exists flags jsonb;
+alter table public.places add column if not exists recommendation text;
 
 -- ---------------------------------------------------------------------
 -- Table: reviews

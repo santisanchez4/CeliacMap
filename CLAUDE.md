@@ -89,13 +89,16 @@ GEOGRAPHIC SCOPE
 
 ### Schema refinements (beyond the original spec)
 
-- **`places.status`** (`pending` | `approved` | `discarded`) is the spine of the
-  agent flow: Search inserts `pending`, Validator sets `approved`/`discarded`, and
-  the frontend shows **only `approved`** places.
+- **`places.status`** (`pending` | `approved` | `discarded` | `needs_review`) is the
+  spine of the agent flow: Search inserts `pending`, Validator sets `approved` /
+  `discarded` (= verdict `rejected`) / `needs_review` (the human-review queue), and
+  the frontend shows **only `approved`** places. `needs_review` was added when the
+  three-tier rubric was adopted (see **AI Toolkit** in the Decisions Log).
 - **`places.source` / `external_id`** record provenance and enable deduplication
   (unique on `(source, external_id)`); `external_id` stores the Google `place_id`.
 - **`places.validation_confidence` / `validation_notes`** persist the Validator's
-  output for auditing and future escalation.
+  `confidence_score` / `reasoning` for auditing and future escalation; **`flags`**
+  (jsonb) and **`recommendation`** (text) persist the rest of the three-tier verdict.
 - **`reviews.user_id`** is **nullable** (auth deferred); **`source`** distinguishes
   seed / agent / user / **google** reviews (the last added for the Search agent's
   review enrichment). `rating` is constrained to 1–5.
@@ -113,7 +116,9 @@ GEOGRAPHIC SCOPE
 
 - **Validator → `claude-sonnet-4-6`.** Strong judgment at the one true quality
   gate, with the best cost/quality balance for a recurring daily batch. Emits a
-  structured JSON verdict `{verdict, category, safety_level, confidence, reason}`.
+  structured JSON verdict `{verdict, confidence_score, category, safety_level,
+  reasoning, flags, recommendation}` (three-tier `approved`/`needs_review`/`rejected`
+  with code-enforced 0.85/0.7/0.5 gates — see the Core Prompt section).
 - **Search / Updater → deterministic first**, with `claude-haiku-4-5` used only
   where free-text interpretation is genuinely needed (ambiguous category,
   "no longer offers GF" signals). Keeps CI fast and cheap.
@@ -169,76 +174,72 @@ This is the exact system prompt sent to `claude-sonnet-4-6` for every pending
 candidate (the `RUBRIC` constant in `agents/validator_agent.py`). It is fixed
 across all candidates in a run, so it is sent as a **cached system block**; the
 per-candidate data goes in the user message. The model must reply with only the
-structured JSON verdict `{verdict, category, safety_level, confidence, reason}`,
-which `_normalize()` then coerces into schema-safe values.
+structured JSON verdict `{verdict, confidence_score, category, safety_level,
+reasoning, flags, recommendation}`, which `_normalize()` then coerces into
+schema-safe values. The **same `RUBRIC`** is reused on-demand by the MCP server's
+`validate_place` tool, so batch and on-demand validation share one source of truth.
 
-**Full rubric (English — as it exists in code):**
+**Three-tier verdict + code-enforced gates (adopted Jun 2026).** The verdict is
+`approved` / `needs_review` / `rejected`, mapped to `places.status` **additively**:
+`approved`→`approved`, `rejected`→`discarded`, `needs_review`→`needs_review` (a
+human-review tier held back from the map). `ValidatorAgent._decide_status` enforces
+the gates as defense in depth regardless of the model's stated verdict:
+auto-approval requires `confidence_score >= 0.85`; `< 0.5` (or an explicit
+`rejected`) discards; everything between — and the `< 0.7` safety floor — becomes
+`needs_review`. `confidence_score` persists to `validation_confidence`, `reasoning`
+to `validation_notes`, and `flags` / `recommendation` to their own columns.
+`category` + `safety_level` are retained in the output (the schema requires them and
+the map renders safety badges).
 
-```text
-You are the Validator for CeliacMap, a curated directory of gluten-free / "sin TACC" (celiac-safe) places in Latin America. You receive a single candidate place that was discovered automatically — via Google Places, public social-media pages, or web research — so you usually only have its name, address, city/country and a guessed category. Decide whether it belongs in the directory, then classify it.
-
-This data is used by people with celiac disease, for whom gluten is a health hazard. Never overstate how safe a place is. When unsure, be conservative.
-
-Decide a verdict:
-- "approve": the place plausibly serves or sells gluten-free / celiac-safe food (a restaurant, a cafe/bakery, or a shop with GF products). Names or addresses mentioning "sin TACC", "sin gluten", "gluten free", "celíaco/a", "apto celíacos" are strong positive signals.
-- "discard": clearly not a food/place business, clearly unrelated to gluten-free needs, generic/ambiguous with no GF signal, or implausible as a directory entry.
-
-Assign a category (exactly one):
-- "restaurant": restaurants, takeaways, places to eat a meal.
-- "cafe": cafes, coffee shops, bakeries, pastry shops.
-- "shop": grocery stores, supermarkets, health-food / dietetica shops.
-
-Assign a safety_level (exactly one), choosing the LOWER level whenever unsure:
-- "gluten_free_100": a fully gluten-free / dedicated celiac establishment.
-- "celiac_friendly": explicitly caters to celiacs (certified, "apto celíacos", dedicated preparation).
-- "options_available": offers some gluten-free options but is not specialized. This is the default floor when evidence is thin.
-
-You may also be given community review snippets that mention gluten-free / celiac terms. Weigh them as supporting evidence (they can raise confidence or sharpen the safety_level), but never let enthusiastic reviews push you above the evidence — when the signal is thin, stay conservative.
-
-Respond with ONLY a JSON object, no prose, in exactly this shape:
-{"verdict": "approve" | "discard",
- "category": "restaurant" | "cafe" | "shop",
- "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
- "confidence": <number between 0 and 1>,
- "reason": "<one or two short sentences>"}
-```
-
-**Spanish translation (reference only — the code uses the English version above):**
+**Full rubric (Spanish — as it exists in code):**
 
 ```text
-Sos el Validador de CeliacMap, un directorio curado de lugares sin gluten / "sin TACC" (seguros para celíacos) en América Latina. Recibís un único lugar candidato que fue descubierto automáticamente —mediante Google Places, páginas públicas de redes sociales o investigación web— así que normalmente solo tenés su nombre, dirección, ciudad/país y una categoría estimada. Decidí si pertenece al directorio y luego clasificalo.
+Eres el Validator Agent de CeliacMap, un sistema de validación conservador para lugares gluten free / sin TACC en Uruguay y Argentina. Recibes un único lugar candidato descubierto automáticamente — vía Google Places, páginas públicas de redes sociales o investigación web — así que normalmente solo tienes su nombre, dirección, ciudad/país y una categoría estimada.
 
-Estos datos los usan personas con enfermedad celíaca, para quienes el gluten es un peligro para la salud. Nunca exageres lo seguro que es un lugar. Ante la duda, sé conservador.
+Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
 
-Decidí un veredicto:
-- "approve" (aprobar): el lugar plausiblemente sirve o vende comida sin gluten / segura para celíacos (un restaurante, un café/panadería, o un comercio con productos sin gluten). Nombres o direcciones que mencionen "sin TACC", "sin gluten", "gluten free", "celíaco/a", "apto celíacos" son señales positivas fuertes.
-- "discard" (descartar): claramente no es un negocio de comida/lugar, claramente no tiene relación con necesidades sin gluten, genérico/ambiguo sin ninguna señal sin gluten, o inverosímil como entrada del directorio.
+Rubric de validación (veredicto):
+- "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
+- "needs_review" (0.5 <= confidence_score < 0.85): Evidencia parcial, ambigua o que requiere confirmación humana.
+- "rejected" (confidence_score < 0.5): Sin evidencia suficiente, información contradictoria o señales de riesgo para celíacos.
 
-Asigná una categoría (exactamente una):
+Flags de alerta a detectar (cada una reduce la confianza):
+- Menciona "sin gluten" pero no "sin TACC" (puede ser marketing, no médico)
+- No menciona protocolo de contaminación cruzada
+- Solo tiene opciones vegetarianas/veganas sin mención explícita sin TACC
+- Información desactualizada (> 12 meses)
+- Reseñas negativas de celíacos
+- Descripción ambigua ("apto para dietas especiales")
+
+Asigna una categoría (exactamente una):
 - "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
 - "cafe": cafés, cafeterías, panaderías, pastelerías.
 - "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
 
-Asigná un nivel de seguridad (safety_level, exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
-- "gluten_free_100": un establecimiento totalmente sin gluten / dedicado a celíacos.
+Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
+- "gluten_free_100": establecimiento totalmente sin gluten / dedicado a celíacos.
 - "celiac_friendly": atiende explícitamente a celíacos (certificado, "apto celíacos", preparación dedicada).
-- "options_available": ofrece algunas opciones sin gluten pero no está especializado. Este es el piso por defecto cuando la evidencia es escasa.
+- "options_available": ofrece algunas opciones sin gluten pero no está especializado. Es el piso por defecto cuando la evidencia es escasa.
 
-También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pesalos como evidencia de apoyo (pueden aumentar la confianza o afinar el safety_level), pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantenete conservador.
+También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantente conservador.
 
-Respondé con SOLO un objeto JSON, sin prosa, exactamente con esta forma:
-{"verdict": "approve" | "discard",
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
+{"verdict": "approved" | "rejected" | "needs_review",
+ "confidence_score": <número entre 0.0 y 1.0>,
  "category": "restaurant" | "cafe" | "shop",
  "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
- "confidence": <número entre 0 y 1>,
- "reason": "<una o dos oraciones breves>"}
+ "reasoning": "<explicación clara en español, máximo 3 oraciones>",
+ "flags": ["<flag detectado>", ...],
+ "recommendation": "<acción concreta sugerida para el operador>"}
 ```
 
 > ⚠️ **Do not lose or change this prompt without careful consideration.** It is the
 > quality gate for a health-sensitive use case. Any edit to the wording, the
-> categories, the safety levels, or the "be conservative when unsure" rule directly
-> affects which places are approved for celiac users — treat changes as a deliberate
-> design decision, test them, and record them in this Decisions Log.
+> categories, the safety levels, the confidence gates, or the "be conservative when
+> unsure" rule directly affects which places are approved for celiac users — treat
+> changes as a deliberate design decision, test them, and record them in this
+> Decisions Log. (The Jun 2026 move from the `approve`/`discard` rubric to this
+> three-tier rubric is recorded under **AI Toolkit** in the Decisions Log.)
 
 ## Technical Scope
 
@@ -293,19 +294,27 @@ Target (functional product — see **## Architecture**):
 ├── agents/                     # Python agents
 │   ├── base.py
 │   ├── search_agent.py
+│   ├── social_agent.py
+│   ├── web_agent.py
 │   ├── validator_agent.py
 │   ├── updater_agent.py
-│   └── clients/{supabase_client,google_places,llm}.py
+│   └── clients/{supabase_client,google_places,tavily_client,llm}.py
+├── mcp_server/                 # AI toolkit — MCP server
+│   ├── server.py               # 6 tools over Supabase + the Validator rubric
+│   └── README.md
+├── skills/                     # AI toolkit — reusable skills
+│   └── validator-rubric/SKILL.md
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
 │   └── targets.yaml            # countries/cities + search terms
 ├── scripts/
-│   ├── run_agents.py           # CI entrypoint: search → validator → updater
-│   └── load_seed.py
+│   ├── run_agents.py           # CI entrypoint: search → social → web → validator → updater
+│   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
 │   └── seed.sql                # manual seed (UY/AR)
-├── .github/workflows/agents-daily.yml
+├── tests/                      # offline unit tests (external calls mocked)
+├── .github/workflows/{agents-daily,deploy-pages}.yml
 ├── requirements.txt
 ├── .env.example
 ├── README.md  CLAUDE.md  prompts.md  .gitignore
@@ -544,6 +553,48 @@ it adds a smarter third funnel that feeds the **same unchanged Validator gate**.
 - **Model — `claude-sonnet-4-6`** (see the Web bullet under **AI model
   decisions**); `WEB_SEARCH_MODEL` allows a one-line upgrade to `claude-opus-4-8`.
 
+### AI Toolkit (prompts + Skill + MCP server) design decisions
+
+An academic "Toolkit de IA" deliverable, integrated Jun 2026 from a set of incoming
+files. The central decision was to **adopt the toolkit's richer Validator rubric**
+as canonical rather than adapt the toolkit to the old rubric.
+
+- **Three-tier rubric adopted (deliberate health-gate change).** The Validator
+  verdict moved from `approve`/`discard` to `approved`/`needs_review`/`rejected`
+  with `confidence_score`, `flags`, `recommendation` and explicit 0.85 / 0.7 / 0.5
+  confidence gates. This is a deliberate change to the single health-sensitive
+  quality gate — the new `needs_review` tier is a safety improvement (low-confidence
+  candidates are escalated to a human instead of being forced to a binary verdict),
+  and the gates are **code-enforced** in `ValidatorAgent._decide_status` as defense
+  in depth (the model cannot auto-approve below 0.85). The full rubric text lives in
+  the Core Prompt section and in `agents/validator_agent.py`.
+- **Additive status mapping — keep the frontend alive.** Rather than rename the
+  load-bearing published-state contract (`js/map.js` queries `status=eq.approved`),
+  the verdict maps onto the existing `places.status` additively: `rejected` reuses
+  `discarded`, and only `needs_review` is a new status value. RLS, the seed, and the
+  map query are untouched. (Alternative considered and rejected: literal column /
+  status renames to `active` / `confidence_score`, which would have broken the
+  frontend, RLS and every agent/test referencing `approved`/`discarded`.)
+- **`category` + `safety_level` retained.** The toolkit rubric dropped them, but the
+  schema requires them (`NOT NULL`) and the map renders safety badges, so the
+  adopted prompt still requests both.
+- **MCP server reuses canonical logic — no second copy.** `mcp_server/server.py`
+  imports the `RUBRIC` + `ValidatorAgent` normalization and the `agents/clients/*`,
+  so the on-demand `validate_place` tool is identical to the daily pipeline and uses
+  the **real** schema (the incoming `server.py` had assumed a divergent schema —
+  `type`/`confidence_score`/`status='active'`/`source='mcp_suggestion'` — that would
+  have failed against the live DB; corrected during integration).
+- **`suggest_place` geocodes (like Social/Web).** A suggestion has no coordinates,
+  but `places.lat/lng` are `NOT NULL`; the tool resolves the lead via Google Find
+  Place and inserts `source='user'`, `status='pending'` for the daily Validator to
+  judge. Unresolvable suggestions are rejected, never inserted unmappable.
+- **Dependency — `fastmcp` (`>=3,<4`).** The only new dependency; verified to
+  coexist with the deliberate `supabase<2.26` / `anthropic<1` pins. Lives in the
+  single `requirements.txt` (the daily CI job installs it too — harmless).
+- **Skill is a documentation artifact** at repo root `skills/validator-rubric/`
+  (per the academic spec), not a harness-invocable `.claude/skills/` skill; it points
+  to `agents/validator_agent.py` as the source of truth to prevent drift.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
@@ -608,6 +659,21 @@ it adds a smarter third funnel that feeds the **same unchanged Validator gate**.
   Design rationale: **Web discovery agent (v3) design decisions** above. Code
   complete with 16 offline tests; first live standalone run on Montevideo is the
   next verification step before enabling it in the full daily pipeline.
+- ✅ **Phase 12 — AI Toolkit (prompts + Skill + MCP server) & three-tier rubric.**
+  Added an academic "Toolkit de IA": documented prompts (`prompts.md` §12–13), a
+  reusable Skill (`skills/validator-rubric/SKILL.md`), and an MCP server
+  (`mcp_server/server.py` + `README.md`) exposing 6 tools (`search_places`,
+  `get_place_detail`, `validate_place`, `suggest_place`, `get_map_stats`,
+  `list_pending_reviews`) over Supabase + the canonical Validator rubric. The
+  Validator rubric was **deliberately changed** from `approve`/`discard` to a
+  three-tier `approved`/`needs_review`/`rejected` verdict with `confidence_score`,
+  `flags`, `recommendation` and code-enforced 0.85/0.7/0.5 gates (see **AI Toolkit**
+  in the Decisions Log and the Core Prompt section). Schema gained the
+  `needs_review` status plus `flags`/`recommendation` columns (idempotent). New
+  dependency: `fastmcp`. The MCP `validate_place` tool and the daily Validator share
+  one `RUBRIC`. Full offline suite green (122 tests). The MCP server imports
+  cleanly; a first live `validate_place` / `suggest_place` smoke test against
+  Supabase is the next verification step.
 
 ### GitHub Pages deploy decision
 
