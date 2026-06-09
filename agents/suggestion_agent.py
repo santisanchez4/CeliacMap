@@ -47,11 +47,17 @@ def promote_suggestion(
     name: str,
     city: str,
     country: str,
+    address: Optional[str] = None,
     category: Optional[str] = None,
     evidence_url: Optional[str] = None,
     notes: Optional[str] = None,
 ) -> dict[str, Any]:
     """Geocode a suggested lead and promote it into ``places`` as a pending candidate.
+
+    The Find Place query combines ``name``, ``address`` and ``city`` so the lead
+    resolves to the right place_id; the street address is the strongest geocoding
+    signal, so a suggestion without one often cannot be placed on the map. ``address``
+    is optional only so the MCP ``suggest_place`` tool can call this without one.
 
     Shared by the MCP ``suggest_place`` tool (on-demand) and :class:`SuggestionAgent`
     (daily batch). Always makes exactly one Google Find Place call.
@@ -61,7 +67,8 @@ def promote_suggestion(
         {"outcome": "promoted" | "duplicate" | "unresolved" | "insert_failed",
          "place_id": <uuid|None>, "external_id": <google place_id|None>, "name": name}
     """
-    resolved = places.find_place(f"{name} {city}".strip())
+    query = " ".join(part for part in (name, address, city) if part).strip()
+    resolved = places.find_place(query)
     if not resolved or not resolved.get("place_id"):
         return {"outcome": "unresolved", "place_id": None, "external_id": None, "name": name}
 
@@ -134,6 +141,7 @@ class SuggestionAgent(BaseAgent):
                     name=s["name"],
                     city=s["city"],
                     country=s["country"],
+                    address=s.get("address"),
                     category=s.get("category"),
                     evidence_url=s.get("evidence_url"),
                     notes=s.get("notes"),

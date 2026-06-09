@@ -179,6 +179,11 @@ create table if not exists public.suggestions (
   id                uuid primary key default gen_random_uuid(),
   name              text not null
                       check (char_length(name) between 2 and 120),
+  -- Street address — required on the form. Used (with name + city) to geocode the
+  -- lead via Google Find Place; without it the promoter often cannot resolve a
+  -- real place_id, so the suggestion never reaches the map.
+  address           text not null
+                      check (char_length(address) between 2 and 200),
   city              text not null
                       check (char_length(city) between 2 and 80),
   country           text not null
@@ -202,6 +207,12 @@ create table if not exists public.suggestions (
 );
 
 create index if not exists suggestions_status_idx on public.suggestions (status);
+
+-- Address column added after the table first shipped. On an already-created DB the
+-- inline NOT NULL above is a no-op, so add it idempotently here (nullable, since a
+-- pre-existing row may lack it); required-ness for new public submissions is
+-- enforced by the RLS WITH CHECK below.
+alter table public.suggestions add column if not exists address text;
 
 -- ---------------------------------------------------------------------
 -- Trigger: keep places.updated_at fresh on UPDATE
@@ -267,12 +278,18 @@ create policy "public read reviews of approved places"
 -- (service_role bypasses RLS and retains full access.)
 
 -- suggestions: the public may only INSERT a fresh submission. The WITH CHECK
--- forces a safe initial state (status='new', not pre-promoted); the column
--- CHECKs above bound every field's length so the table can't be abused as
--- free storage. No SELECT/UPDATE/DELETE policy => those are denied to anon.
+-- forces a safe initial state (status='new', not pre-promoted) and requires a
+-- non-empty address (needed to geocode); the column CHECKs above bound every
+-- field's length so the table can't be abused as free storage. No
+-- SELECT/UPDATE/DELETE policy => those are denied to anon.
 drop policy if exists "public can submit suggestions" on public.suggestions;
 create policy "public can submit suggestions"
   on public.suggestions
   for insert
   to anon, authenticated
-  with check (status = 'new' and promoted_place_id is null);
+  with check (
+    status = 'new'
+    and promoted_place_id is null
+    and address is not null
+    and char_length(address) between 2 and 200
+  );

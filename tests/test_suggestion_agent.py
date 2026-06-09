@@ -62,6 +62,27 @@ def test_promote_inserts_user_candidate():
     assert candidate["validation_notes"] == "menú sin TACC"
 
 
+def test_promote_geocodes_with_address():
+    db, places = make_db(), make_places()
+    promote_suggestion(
+        db, places,
+        name="Cafe X", address="Av. 18 de Julio 1234", city="Montevideo",
+        country="Uruguay",
+    )
+    query = places.find_place.call_args.args[0]
+    assert "Cafe X" in query
+    assert "Av. 18 de Julio 1234" in query
+    assert "Montevideo" in query
+
+
+def test_promote_geocodes_without_address_when_absent():
+    # The MCP suggest_place tool may call without an address; the query must still
+    # be well-formed (name + city, no stray whitespace).
+    db, places = make_db(), make_places()
+    promote_suggestion(db, places, name="Cafe X", city="Montevideo", country="Uruguay")
+    assert places.find_place.call_args.args[0] == "Cafe X Montevideo"
+
+
 def test_promote_defaults_missing_or_bad_category():
     db, places = make_db(), make_places()
     promote_suggestion(db, places, name="X", city="C", country="Uruguay")
@@ -104,11 +125,13 @@ def test_promote_insert_failed_when_no_row_returned():
 # --- SuggestionAgent.run --------------------------------------------------
 
 
-def make_suggestion(sid="s-1", name="Cafe X", city="Montevideo", country="Uruguay",
+def make_suggestion(sid="s-1", name="Cafe X", address="Av. 18 de Julio 1234",
+                    city="Montevideo", country="Uruguay",
                     category=None, evidence_url=None, notes=None):
     return {
-        "id": sid, "name": name, "city": city, "country": country,
-        "category": category, "evidence_url": evidence_url, "notes": notes,
+        "id": sid, "name": name, "address": address, "city": city,
+        "country": country, "category": category,
+        "evidence_url": evidence_url, "notes": notes,
     }
 
 
@@ -118,6 +141,8 @@ def test_run_promotes_and_marks_suggestion():
 
     summary = SuggestionAgent(db, places, max_per_run=10).run()
 
+    # The stored address is threaded into the geocode query.
+    assert "Av. 18 de Julio 1234" in places.find_place.call_args.args[0]
     assert summary["seen"] == 1
     assert summary["promoted"] == 1
     assert summary["geocodes"] == 1

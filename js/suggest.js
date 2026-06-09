@@ -18,6 +18,7 @@
   var submitBtn = document.getElementById("sg-submit");
   var honeypot = document.getElementById("sg-website");
   var nameEl = document.getElementById("sg-name");
+  var addressEl = document.getElementById("sg-address");
   var cityEl = document.getElementById("sg-city");
   var countryEl = document.getElementById("sg-country");
   var categoryEl = document.getElementById("sg-category");
@@ -32,7 +33,7 @@
 
   var MSG = {
     es: {
-      missing: "Completá nombre, ciudad y país.",
+      missing: "Completá nombre, dirección, ciudad y país.",
       cooldown: "Esperá un momento antes de enviar otra sugerencia.",
       sending: "Enviando…",
       success: "¡Gracias! Tu sugerencia se revisará y, si se confirma, aparecerá en el mapa.",
@@ -40,7 +41,7 @@
       config: "El formulario no está disponible en este momento."
     },
     en: {
-      missing: "Please fill in name, city and country.",
+      missing: "Please fill in name, address, city and country.",
       cooldown: "Please wait a moment before sending another suggestion.",
       sending: "Sending…",
       success: "Thanks! Your suggestion will be reviewed and, if confirmed, it will appear on the map.",
@@ -79,6 +80,7 @@
 
     var data = {
       name: (nameEl.value || "").trim(),
+      address: (addressEl.value || "").trim(),
       city: (cityEl.value || "").trim(),
       country: countryEl.value || "",
       category: categoryEl.value || null,
@@ -86,7 +88,7 @@
       notes: (notesEl.value || "").trim() || null
     };
 
-    if (!data.name || !data.city || !data.country) {
+    if (!data.name || !data.address || !data.city || !data.country) {
       show("missing", "err");
       return;
     }

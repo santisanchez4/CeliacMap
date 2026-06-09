@@ -163,6 +163,8 @@
     "suggest.form.intro": "Fill in the place details. We review it and, if confirmed, it appears on the map.",
     "suggest.form.name": "Place name *",
     "suggest.form.namePh": "e.g. Gluten-Free Café",
+    "suggest.form.address": "Address *",
+    "suggest.form.addressPh": "e.g. Av. 18 de Julio 1234",
     "suggest.form.city": "City *",
     "suggest.form.cityPh": "e.g. Montevideo",
     "suggest.form.country": "Country *",
