@@ -117,6 +117,22 @@ def _overall_status(summaries: dict[str, Any]) -> str:
     return "success"
 
 
+def _transient_error_count(overall: dict[str, Any]) -> int:
+    """Total per-item errors agents tallied while still completing the run.
+
+    Each agent catches per-item failures (e.g. a single flaky geocode, search
+    query, web-research call or place_details lookup), records them in its summary's
+    ``errors`` count and in ``agent_log``, and keeps going. These are **non-fatal**:
+    they are reported but must not fail the daily CI job — only a fatal error that
+    prevents the pipeline from completing does (see ``main``).
+    """
+    total = 0
+    for summary in overall.values():
+        if isinstance(summary, dict) and isinstance(summary.get("errors"), int):
+            total += summary["errors"]
+    return total
+
+
 def run_pipeline(
     settings: Settings, *, dry_run: bool, budget_total: int
 ) -> dict[str, Any]:
@@ -318,7 +334,14 @@ def main() -> int:
     if args.dry_run:
         logger.info("Running pipeline in DRY-RUN mode — no database writes.")
 
-    overall = run_pipeline(settings, dry_run=args.dry_run, budget_total=budget_total)
+    try:
+        overall = run_pipeline(settings, dry_run=args.dry_run, budget_total=budget_total)
+    except Exception:
+        # The pipeline did NOT complete (a stage crashed, the DB was unreachable,
+        # config was invalid, etc.). This is the only condition that fails the CI
+        # job, so the run is investigated.
+        logger.exception("pipeline run failed before completing")
+        return 1
 
     print("\nPipeline run complete:")
     print(f"  dry_run          : {overall['dry_run']}")
@@ -332,7 +355,17 @@ def main() -> int:
     print(f"  validator        : {overall['validator']}")
     print(f"  updater          : {overall['updater']}")
 
-    return 1 if _overall_status(overall) == "error" else 0
+    # Exit code reflects whether the pipeline COMPLETED, not whether every external
+    # call succeeded. Reaching here means it did, so the CI job is green. The agents
+    # catch per-item failures (a flaky geocode / search / details call), tally them
+    # as transient `errors`, and keep going; those are surfaced here and recorded in
+    # agent_log, but must not fail the daily run. (A transient blip used to flip the
+    # whole pipeline to a CI failure even when all places were processed.)
+    transient = _transient_error_count(overall)
+    if transient:
+        print(f"  note             : {transient} transient per-item error(s) "
+              "handled and logged to agent_log (non-fatal).")
+    return 0
 
 
 if __name__ == "__main__":
