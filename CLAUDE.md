@@ -595,6 +595,52 @@ as canonical rather than adapt the toolkit to the old rubric.
   (per the academic spec), not a harness-invocable `.claude/skills/` skill; it points
   to `agents/validator_agent.py` as the source of truth to prevent drift.
 
+### Suggest-a-Place public form design decisions
+
+The public "Suggest a Place" form (community Phase 2) lets anyone submit a
+gluten-free / sin TACC place that isn't on the map yet. Auth stays deferred, so it
+is anonymous. The central constraint: `places.lat/lng` are `NOT NULL` and geocoding
+needs the **secret Google key**, so the browser can neither geocode nor (per the
+secrets boundary) write to `places` — and RLS only lets the anon key `SELECT`
+approved rows.
+
+- **Intake table, not a direct `places` write or an Edge Function.** The browser
+  writes RAW input (no coordinates) into a new **`suggestions`** table the anon key
+  may only `INSERT` into; the daily pipeline's new **Suggestion promoter**
+  (`agents/suggestion_agent.py`) geocodes each via Google Find Place, dedups, and
+  promotes it into `places` as `source='user'`, `status='pending'` for the unchanged
+  Validator gate. Chosen over (a) a Supabase Edge Function (adds a new Deno/TS server
+  surface) and (b) a map-pin direct insert (loses the canonical Google `place_id`
+  used for cross-source dedup and lets browser-precision coords into `places`). This
+  keeps `places` always-mappable (honoring the documented NOT-NULL stance shared with
+  Social/Web/MCP), adds **no new server tech**, and keeps every secret server-side.
+  Trade-off: a suggestion appears only after the next daily run — consistent with the
+  MCP `suggest_place` tool's own "próximo pipeline diario" contract.
+- **Shared promotion core — no third copy.** The geocode→dedup→insert logic lives in
+  `promote_suggestion()` (in `agents/suggestion_agent.py`), reused **verbatim** by
+  both the daily `SuggestionAgent` and the MCP `suggest_place` tool (which was
+  refactored to call it), mirroring how the MCP `validate_place` reuses the canonical
+  `RUBRIC`. One source of truth → the on-demand tool and the batch never diverge.
+- **RLS — INSERT-only, state forced.** `grant insert` to anon (no SELECT/UPDATE/
+  DELETE), plus a `with check (status='new' and promoted_place_id is null)` policy
+  and per-column length `CHECK`s, so the public can submit but cannot read back,
+  mutate, pre-promote, or abuse the table as free storage. `suggestions.status`
+  (`new`/`promoted`/`duplicate`/`rejected`) is the **promoter's** processing state,
+  distinct from `places.status`.
+- **Spam — layered, no new dependency.** Honeypot field + min-fill-time + per-browser
+  `localStorage` cooldown (client), length-bounded RLS (server), and two strong
+  backstops already in the pipeline: the **geocode-gate** drops anything that isn't a
+  real Google place (→ `rejected`), and the **Validator** health-rubric gates the
+  rest. A CAPTCHA (Turnstile/hCaptcha) is deliberately deferred until real abuse
+  appears, to avoid a new third-party script.
+- **Validation timing — daily pipeline, not on submit.** The form does only client
+  validation (required fields, URL format, length); promotion + Validator judgment
+  happen in the daily run. Immediate validation would require the very server surface
+  the intake-table design avoids.
+- **`places` unchanged.** `source='user'` was already allowed by its CHECK; the
+  promoter inserts via the existing always-mappable `insert_place_candidate` path.
+  Only `agent_log.agent` gained `'suggestion'` (idempotent widener).
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
@@ -674,6 +720,22 @@ as canonical rather than adapt the toolkit to the old rubric.
   one `RUBRIC`. Full offline suite green (122 tests). The MCP server imports
   cleanly; a first live `validate_place` / `suggest_place` smoke test against
   Supabase is the next verification step.
+- ✅ **Phase 13 — Suggest-a-Place public form (community Phase 2).** A real form in
+  the `#suggest` section of `index.html` (+ `js/suggest.js`, bilingual via the
+  existing `data-i18n` system) lets anyone submit a place anonymously. The browser
+  writes raw input into a new anon-INSERT-only **`suggestions`** table; the daily
+  pipeline's new **Suggestion promoter** (`agents/suggestion_agent.py`) geocodes via
+  Google Find Place, dedups, and promotes each into `places` as `pending`
+  (`source='user'`) for the Validator. The pipeline now runs
+  **search → social → web → suggestion → validator → updater** under the shared
+  budget. Spam defenses: honeypot + min-fill-time + cooldown (client), INSERT-only
+  length-bounded RLS (server), and the geocode + Validator gates as backstops. The
+  MCP `suggest_place` tool was refactored to share `promote_suggestion`. New env var:
+  `MAX_SUGGESTIONS_PER_RUN`. Schema gained the `suggestions` table + RLS and
+  `agent_log.agent='suggestion'` (idempotent). Full offline suite green (133 tests,
+  +11). Design rationale: **Suggest-a-Place public form design decisions** above.
+  Next verification: apply `db/schema.sql`, submit a test suggestion from the form
+  (expect `201` + a `new` row), then a live pipeline run promoting it to `pending`.
 
 ### GitHub Pages deploy decision
 

@@ -1,4 +1,4 @@
-"""Pipeline orchestrator — runs Search -> Social -> Web -> Validator -> Updater.
+"""Pipeline orchestrator — runs Search -> Social -> Web -> Suggestion -> Validator -> Updater.
 
 This is the CI entrypoint for the daily GitHub Actions cron (and for manual
 ``workflow_dispatch`` validation). It:
@@ -32,6 +32,7 @@ from agents.clients.supabase_client import SupabaseClient
 from agents.clients.tavily_client import TavilySearchClient
 from agents.search_agent import SearchAgent
 from agents.social_agent import SocialAgent
+from agents.suggestion_agent import SuggestionAgent
 from agents.updater_agent import UpdaterAgent
 from agents.validator_agent import ValidatorAgent
 from agents.web_agent import WebAgent
@@ -64,7 +65,17 @@ class DryRunSupabase:
     def place_exists_by_external_id(self, external_id: str) -> bool:
         return self._inner.place_exists_by_external_id(external_id)
 
+    def fetch_new_suggestions(self, limit: int = 50) -> list[dict]:
+        return self._inner.fetch_new_suggestions(limit=limit)
+
     # --- writes become no-ops ----------------------------------------
+    def update_suggestion_status(
+        self, suggestion_id: str, status: str, promoted_place_id: str | None = None
+    ) -> None:
+        logger.info(
+            "[dry-run] would mark suggestion %s -> %s", suggestion_id, status
+        )
+
     def insert_place_candidate(self, candidate: dict[str, Any]) -> None:
         logger.info("[dry-run] would insert candidate %r", candidate.get("name"))
         return None
@@ -109,7 +120,7 @@ def _overall_status(summaries: dict[str, Any]) -> str:
 def run_pipeline(
     settings: Settings, *, dry_run: bool, budget_total: int
 ) -> dict[str, Any]:
-    """Run search -> validator -> updater under one combined budget."""
+    """Run search -> social -> web -> suggestion -> validator -> updater under one combined budget."""
     targets = load_targets()
     raw_db = SupabaseClient(
         settings.supabase_url, settings.supabase_service_role_key
@@ -131,6 +142,7 @@ def run_pipeline(
     #   Search <= 80 | Social <= 25 | Web <= 40 | Validator reserve 80 | Updater = rest.
     SOCIAL_MAX = 25
     WEB_MAX = 40
+    SUGGEST_MAX = 30
     VALIDATOR_RESERVE = 80
 
     summaries: dict[str, Any] = {}
@@ -205,7 +217,23 @@ def run_pipeline(
     else:
         summaries["web"] = {"skipped": "budget exhausted or web not configured"}
 
-    # 4. Validator — one Sonnet call per pending candidate (with any stored
+    # 4. Suggestions — promote public "Suggest a Place" form submissions into
+    #    pending `places` candidates (one Google Find Place geocode each). Runs
+    #    before the Validator so freshly promoted user places are judged this run.
+    #    Capped at SUGGEST_MAX and never planned into the Validator's reserve.
+    sug_cap = min(
+        settings.max_suggestions_per_run,
+        SUGGEST_MAX,
+        max(0, budget.remaining - VALIDATOR_RESERVE),
+    )
+    if sug_cap > 0:
+        suggestion = SuggestionAgent(db, places, max_per_run=sug_cap)
+        summaries["suggestion"] = suggestion.run()
+        budget.consume(summaries["suggestion"].get("geocodes", 0))
+    else:
+        summaries["suggestion"] = {"skipped": "budget exhausted"}
+
+    # 5. Validator — one Sonnet call per pending candidate (with any stored
     #    review snippets as context). Guaranteed the reserved slice so discovery
     #    can never starve publishing; validates up to VALIDATOR_RESERVE per run.
     val_cap = budget.allow(VALIDATOR_RESERVE)
@@ -216,7 +244,7 @@ def run_pipeline(
     else:
         summaries["validator"] = {"skipped": "budget exhausted"}
 
-    # 5. Updater — one Google details call per approved place, clamped to budget.
+    # 6. Updater — one Google details call per approved place, clamped to budget.
     upd_cap = budget.allow(settings.max_updates_per_run)
     if upd_cap > 0:
         updater = UpdaterAgent(
@@ -240,6 +268,7 @@ def run_pipeline(
         "search": summaries["search"],
         "social": summaries["social"],
         "web": summaries["web"],
+        "suggestion": summaries["suggestion"],
         "validator": summaries["validator"],
         "updater": summaries["updater"],
     }
@@ -260,7 +289,7 @@ def run_pipeline(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run the CeliacMap agent pipeline (search -> validator -> updater)."
+        description="Run the CeliacMap agent pipeline (search -> social -> web -> suggestion -> validator -> updater)."
     )
     parser.add_argument(
         "--dry-run",
@@ -299,6 +328,7 @@ def main() -> int:
     print(f"  search           : {overall['search']}")
     print(f"  social           : {overall['social']}")
     print(f"  web              : {overall['web']}")
+    print(f"  suggestion       : {overall['suggestion']}")
     print(f"  validator        : {overall['validator']}")
     print(f"  updater          : {overall['updater']}")
 

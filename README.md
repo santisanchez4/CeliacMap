@@ -27,14 +27,20 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   of a fixed query matrix; geocodes each lead, dedups across sources, inserts as
   `pending` (`source='web'`). Opt-in per city via `web: true` in `targets.yaml`
   (Montevideo + Buenos Aires to start).
+- ✅ **Suggest a Place form** — a public form (no login) lets anyone submit a
+  gluten-free / sin TACC place that isn't on the map yet. The browser writes raw
+  input (no coordinates) into a `suggestions` table via the anon key (RLS:
+  INSERT-only); the daily **Suggestion promoter** geocodes each via Google Find
+  Place, dedups, and promotes it into `places` as `pending` (`source='user'`) for
+  the Validator to judge. Honeypot + timing + cooldown guard against spam.
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.
 - ✅ **Updater agent** — re-checks approved places via Google Places; closes /
   updates / flags. Deterministic, with a narrow Haiku fallback.
-- ✅ **Pipeline orchestrator** (`scripts/run_agents.py`) — runs all five agents
-  (search → social → web → validator → updater) under one combined daily budget,
-  with a `--dry-run` mode.
+- ✅ **Pipeline orchestrator** (`scripts/run_agents.py`) — runs all six agents
+  (search → social → web → suggestion → validator → updater) under one combined
+  daily budget, with a `--dry-run` mode.
 - ✅ **GitHub Actions daily cron** — runs the pipeline once per day (manual
   `workflow_dispatch` with a dry-run toggle for validation).
 - ✅ **Deployed to GitHub Pages** — the frontend ships automatically from `main`
@@ -79,14 +85,16 @@ CeliacMap has three layers:
 
 1. **Frontend** — static site + Leaflet map that reads **approved** places from
    Supabase and filters them by category (Restaurants, Cafés, Shops).
-2. **Database** — Supabase Postgres (`places`, `reviews`, `agent_log`) with RLS so
-   the browser can only read approved data.
+2. **Database** — Supabase Postgres (`places`, `reviews`, `agent_log`,
+   `suggestions`) with RLS so the browser can only read approved data and submit
+   suggestions (INSERT-only).
 3. **Agents** — a daily Python pipeline: **Search** finds candidates via Google
    Places (status `pending`, plus GF review enrichment) → **Social** discovers
    Instagram / Facebook pages via the Tavily Search API → **Web** (v3) uses the
-   Anthropic web search tool to discover places from forums/blogs/social → **Validator**
-   uses Claude to approve/discard → **Updater** keeps published places current.
-   Orchestrated by GitHub Actions.
+   Anthropic web search tool to discover places from forums/blogs/social →
+   **Suggestion** promotes public form submissions into `pending` candidates →
+   **Validator** uses Claude to approve/discard → **Updater** keeps published places
+   current. Orchestrated by GitHub Actions.
 
 Full details, schema, and design decisions: [`CLAUDE.md`](CLAUDE.md#architecture).
 
@@ -191,13 +199,15 @@ serif display headings over a clean sans body, and generous spacing.
 ├── js/
 │   ├── main.js                 # i18n, nav, reveal
 │   ├── config.js               # Supabase URL + anon key (public)
-│   └── map.js                  # Leaflet + Supabase data + filters
+│   ├── map.js                  # Leaflet + Supabase data + filters
+│   └── suggest.js              # public "Suggest a Place" form → suggestions table
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
 │   ├── base.py                 # shared base + agent_log helper
 │   ├── search_agent.py         # Google Places → pending candidates (+ reviews)
 │   ├── social_agent.py         # Tavily search → Haiku parse → geocode → pending
 │   ├── web_agent.py            # Anthropic web search → geocode → pending (v3)
+│   ├── suggestion_agent.py     # promotes public form suggestions → pending
 │   ├── validator_agent.py      # Claude: approved / needs_review / rejected
 │   ├── updater_agent.py        # re-checks approved places
 │   └── clients/                # supabase / google_places / tavily_client / llm
@@ -211,9 +221,9 @@ serif display headings over a clean sans body, and generous spacing.
 │   └── targets.yaml            # countries/cities + search/social terms
 ├── scripts/
 │   ├── check_setup.py          # connectivity / config preflight
-│   └── run_agents.py           # pipeline: search → social → web → validator → updater
+│   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
-│   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
+│   ├── schema.sql              # tables (+ suggestions), constraints, indexes, RLS, triggers
 │   └── seed.sql                # manual seed (UY/AR)
 ├── tests/                      # offline unit tests (all external calls mocked)
 ├── .github/workflows/          # agents-daily cron + Pages deploy

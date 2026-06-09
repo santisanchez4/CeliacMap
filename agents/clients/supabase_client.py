@@ -132,6 +132,31 @@ class SupabaseClient:
         )
         return res.data or []
 
+    # --- suggestions --------------------------------------------------
+    def fetch_new_suggestions(self, limit: int = 50) -> list[dict]:
+        """Return public-form suggestions awaiting promotion (status='new')."""
+        res = (
+            self._db.table("suggestions")
+            .select("*")
+            .eq("status", "new")
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def update_suggestion_status(
+        self,
+        suggestion_id: str,
+        status: str,
+        promoted_place_id: str | None = None,
+    ) -> None:
+        """Mark a suggestion as promoted / duplicate / rejected by the promoter."""
+        patch: dict[str, Any] = {"status": status}
+        if promoted_place_id is not None:
+            patch["promoted_place_id"] = promoted_place_id
+        self._db.table("suggestions").update(patch).eq("id", suggestion_id).execute()
+
     # --- agent_log ----------------------------------------------------
     def insert_agent_log(
         self,

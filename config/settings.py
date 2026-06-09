@@ -59,6 +59,9 @@ class Settings:
     # web: true in targets.yaml) and the web-search cap handed to the model per city.
     max_web_cities_per_run: int = 2
     max_web_searches_per_city: int = 8
+    # Public "Suggest a Place" form: max submissions the daily Suggestion promoter
+    # geocodes + promotes per run (each costs one Google Find Place call).
+    max_suggestions_per_run: int = 30
     # Combined cap on paid API calls for one full pipeline run (search +
     # validator + updater), enforced by scripts/run_agents.py.
     agent_daily_budget: int = 350
@@ -83,6 +86,7 @@ class Settings:
             max_detail_lookups_per_run=_int("MAX_DETAIL_LOOKUPS_PER_RUN", 60),
             max_web_cities_per_run=_int("MAX_WEB_CITIES_PER_RUN", 2),
             max_web_searches_per_city=_int("MAX_WEB_SEARCHES_PER_CITY", 8),
+            max_suggestions_per_run=_int("MAX_SUGGESTIONS_PER_RUN", 30),
             agent_daily_budget=_int("AGENT_DAILY_BUDGET", 350),
         )
 

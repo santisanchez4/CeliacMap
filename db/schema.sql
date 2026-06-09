@@ -141,7 +141,7 @@ end $$;
 create table if not exists public.agent_log (
   id          uuid primary key default gen_random_uuid(),
   agent       text not null
-                check (agent in ('search', 'validator', 'updater', 'social', 'web', 'pipeline')),
+                check (agent in ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion')),
   action      text not null,
   result      jsonb,
   status      text check (status in ('success', 'error')),
@@ -152,16 +152,56 @@ create table if not exists public.agent_log (
 create index if not exists agent_log_created_at_idx on public.agent_log (created_at);
 create index if not exists agent_log_agent_idx      on public.agent_log (agent);
 
--- Allow the Social agent (agent='social'), the Web discovery agent (agent='web')
--- and the pipeline orchestrator (agent='pipeline') to log under agent_log. On an
--- already-created table the inline check above is a no-op, so widen it in place.
+-- Allow the Social agent (agent='social'), the Web discovery agent (agent='web'),
+-- the pipeline orchestrator (agent='pipeline') and the Suggestion promoter
+-- (agent='suggestion') to log under agent_log. On an already-created table the
+-- inline check above is a no-op, so widen it in place.
 do $$
 begin
   alter table public.agent_log drop constraint if exists agent_log_agent_check;
   alter table public.agent_log
     add constraint agent_log_agent_check
-    check (agent in ('search', 'validator', 'updater', 'social', 'web', 'pipeline'));
+    check (agent in ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion'));
 end $$;
+
+-- ---------------------------------------------------------------------
+-- Table: suggestions  (public "Suggest a Place" form intake)
+-- ---------------------------------------------------------------------
+-- The public form (anon key) writes RAW user input here — no coordinates.
+-- A place has NOT NULL lat/lng and needs the secret Google key to geocode, so
+-- the browser cannot write to `places` directly. Instead the daily pipeline's
+-- Suggestion promoter reads new suggestions, geocodes each via Google Find Place,
+-- dedups, and inserts a real `places` candidate (source='user', status='pending')
+-- for the Validator to judge. This keeps `places` always-mappable and every
+-- secret server-side. `status` here is the promoter's processing state, NOT the
+-- place's publish state.
+create table if not exists public.suggestions (
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null
+                      check (char_length(name) between 2 and 120),
+  city              text not null
+                      check (char_length(city) between 2 and 80),
+  country           text not null
+                      check (country in ('Uruguay', 'Argentina')),
+  -- Provisional; the Validator assigns the real category. Optional on the form.
+  category          text
+                      check (category is null or category in ('restaurant', 'cafe', 'shop')),
+  evidence_url      text
+                      check (evidence_url is null or char_length(evidence_url) <= 500),
+  notes             text
+                      check (notes is null or char_length(notes) <= 1000),
+  -- Promoter processing state (not the place's publish state):
+  --   new       -> awaiting the next pipeline run
+  --   promoted  -> a places row was created (promoted_place_id set)
+  --   duplicate -> geocoded place_id already exists in places
+  --   rejected  -> could not geocode to a real Google place_id
+  status            text not null default 'new'
+                      check (status in ('new', 'promoted', 'rejected', 'duplicate')),
+  promoted_place_id uuid references public.places(id) on delete set null,
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists suggestions_status_idx on public.suggestions (status);
 
 -- ---------------------------------------------------------------------
 -- Trigger: keep places.updated_at fresh on UPDATE
@@ -185,15 +225,21 @@ create trigger places_set_updated_at
 -- ---------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------
-alter table public.places    enable row level security;
-alter table public.reviews   enable row level security;
-alter table public.agent_log enable row level security;
+alter table public.places      enable row level security;
+alter table public.reviews     enable row level security;
+alter table public.agent_log   enable row level security;
+alter table public.suggestions enable row level security;
 
 -- Table-level privileges (RLS still gates rows).
 grant select on public.places  to anon, authenticated;
 grant select on public.reviews to anon, authenticated;
 -- agent_log is server-only: make sure public roles cannot touch it.
 revoke all on public.agent_log from anon, authenticated;
+-- suggestions: the public form may INSERT only — never read back others'
+-- submissions, update or delete. (Reads/updates happen server-side via the
+-- service_role key, which bypasses RLS.)
+revoke all on public.suggestions from anon, authenticated;
+grant insert on public.suggestions to anon, authenticated;
 
 -- places: anyone may read ONLY approved rows.
 drop policy if exists "public read approved places" on public.places;
@@ -219,3 +265,14 @@ create policy "public read reviews of approved places"
 
 -- agent_log: no policy for anon/authenticated => fully denied to the public.
 -- (service_role bypasses RLS and retains full access.)
+
+-- suggestions: the public may only INSERT a fresh submission. The WITH CHECK
+-- forces a safe initial state (status='new', not pre-promoted); the column
+-- CHECKs above bound every field's length so the table can't be abused as
+-- free storage. No SELECT/UPDATE/DELETE policy => those are denied to anon.
+drop policy if exists "public can submit suggestions" on public.suggestions;
+create policy "public can submit suggestions"
+  on public.suggestions
+  for insert
+  to anon, authenticated
+  with check (status = 'new' and promoted_place_id is null);

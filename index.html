@@ -390,6 +390,73 @@
             </p>
           </article>
         </div>
+
+        <form class="suggest-form reveal" id="suggest-form" novalidate>
+          <p class="suggest-form-intro" data-i18n="suggest.form.intro">
+            Completá los datos del lugar. Lo revisamos y, si se confirma, aparece en el mapa.
+          </p>
+
+          <div class="suggest-grid">
+            <div class="field">
+              <label for="sg-name" data-i18n="suggest.form.name">Nombre del lugar *</label>
+              <input id="sg-name" name="name" type="text" required maxlength="120"
+                autocomplete="off" placeholder="Ej: Cafetería Sin Gluten"
+                data-i18n-placeholder="suggest.form.namePh" />
+            </div>
+            <div class="field">
+              <label for="sg-city" data-i18n="suggest.form.city">Ciudad *</label>
+              <input id="sg-city" name="city" type="text" required maxlength="80"
+                autocomplete="off" placeholder="Ej: Montevideo"
+                data-i18n-placeholder="suggest.form.cityPh" />
+            </div>
+            <div class="field">
+              <label for="sg-country" data-i18n="suggest.form.country">País *</label>
+              <select id="sg-country" name="country" required>
+                <option value="" data-i18n="suggest.form.countryPh">Elegí un país</option>
+                <option value="Uruguay">Uruguay</option>
+                <option value="Argentina">Argentina</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sg-category" data-i18n="suggest.form.category">Tipo (opcional)</label>
+              <select id="sg-category" name="category">
+                <option value="" data-i18n="suggest.form.categoryAny">Sin especificar</option>
+                <option value="restaurant" data-i18n="suggest.form.catRestaurant">Restaurante</option>
+                <option value="cafe" data-i18n="suggest.form.catCafe">Café / Panadería</option>
+                <option value="shop" data-i18n="suggest.form.catShop">Comercio / Dietética</option>
+              </select>
+            </div>
+            <div class="field field-full">
+              <label for="sg-url" data-i18n="suggest.form.url">Link de referencia (opcional)</label>
+              <input id="sg-url" name="evidence_url" type="url" maxlength="500"
+                autocomplete="off" placeholder="Instagram, Google Maps o sitio web"
+                data-i18n-placeholder="suggest.form.urlPh" />
+            </div>
+            <div class="field field-full">
+              <label for="sg-notes" data-i18n="suggest.form.notes">Notas (opcional)</label>
+              <textarea id="sg-notes" name="notes" rows="3" maxlength="1000"
+                placeholder="¿Por qué es apto? ¿Tiene menú sin TACC, certificación, protocolo?"
+                data-i18n-placeholder="suggest.form.notesPh"></textarea>
+            </div>
+          </div>
+
+          <!-- Honeypot: off-screen, never shown to humans; bots fill it and are dropped. -->
+          <div class="suggest-hp" aria-hidden="true">
+            <label for="sg-website">No completar este campo</label>
+            <input id="sg-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+
+          <div class="suggest-actions">
+            <button class="btn btn-accent" type="submit" id="sg-submit"
+              data-i18n="suggest.form.submit">Enviar sugerencia</button>
+            <p class="suggest-disclaimer" data-i18n="suggest.form.disclaimer">
+              Tu sugerencia se valida antes de publicarse. El nivel de seguridad es una
+              estimación de la comunidad, no una garantía médica.
+            </p>
+          </div>
+
+          <p class="suggest-status" id="sg-status" role="status" aria-live="polite" hidden></p>
+        </form>
       </div>
     </section>
 
@@ -614,5 +681,6 @@
   <script src="js/main.js"></script>
   <script src="js/config.js"></script>
   <script src="js/map.js"></script>
+  <script src="js/suggest.js"></script>
 </body>
 </html>

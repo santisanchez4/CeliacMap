@@ -420,3 +420,32 @@ Evidencia recopilada:
 The tool returns `{verdict, confidence_score, category, safety_level, reasoning,
 flags, recommendation, db_status}` — `db_status` is the status the candidate would
 take in the database (`approved` / `needs_review` / `discarded`).
+
+## 14. Suggest-a-Place public form (community Phase 2)
+
+**Prompt (summary):** "Build the 'Suggest a Place' feature — a public form (no
+login) that lets users submit a gluten-free / sin TACC place that isn't on the map
+yet. Plan it first (frontend form, backend/DB, validation timing, spam protection,
+files) for approval, then implement."
+
+**Used for:** Adding the first public **write** path to the product. The browser
+writes raw input into a new anon-INSERT-only `suggestions` table; the daily
+pipeline's **Suggestion promoter** (`agents/suggestion_agent.py`) geocodes via
+Google Find Place, dedups, and promotes each into `places` as `pending`
+(`source='user'`) for the unchanged Validator gate. New `js/suggest.js` submits via
+the Supabase REST API with the public anon key.
+
+**Key decisions made during this prompt** (full rationale in CLAUDE.md →
+**Suggest-a-Place public form design decisions**):
+- **Intake table + pipeline promotion**, chosen over a Supabase Edge Function or a
+  map-pin direct `places` insert — no new server tech, keeps `places` always-mappable
+  and every secret server-side.
+- **Shared `promote_suggestion` core** reused by both the daily `SuggestionAgent` and
+  the refactored MCP `suggest_place` tool (no second copy).
+- **Spam:** honeypot + min-fill-time + cooldown (client), INSERT-only length-bounded
+  RLS (server), geocode + Validator gates as backstops; CAPTCHA deferred.
+- **Validation on the daily pipeline, not on submit** (the form does client-side
+  validation only).
+
+No new LLM prompt was introduced — promoted user suggestions are judged by the same
+canonical Validator `RUBRIC` (§12) as every other pending candidate.

@@ -48,6 +48,7 @@ from fastmcp import FastMCP
 from agents.clients.google_places import GooglePlacesClient
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.suggestion_agent import promote_suggestion
 from agents.validator_agent import RUBRIC, ValidatorAgent
 from config.settings import get_settings
 
@@ -242,8 +243,20 @@ def suggest_place(
     Returns:
         JSON con el ID de la sugerencia y el estado de la operación.
     """
-    resolved = _places().find_place(f"{name} {city}")
-    if not resolved or not resolved.get("place_id"):
+    # Same geocode -> dedup -> insert core the daily Suggestion promoter uses,
+    # so the on-demand MCP tool and the batch pipeline never diverge.
+    result = promote_suggestion(
+        _db(),
+        _places(),
+        name=name,
+        city=city,
+        country=country,
+        evidence_url=evidence_url,
+        notes=notes,
+    )
+    outcome = result["outcome"]
+
+    if outcome == "unresolved":
         return json.dumps(
             {
                 "success": False,
@@ -254,39 +267,24 @@ def suggest_place(
             },
             ensure_ascii=False,
         )
-
-    external_id = resolved["place_id"]
-    if _db().place_exists_by_external_id(external_id):
+    if outcome == "duplicate":
         return json.dumps(
             {
                 "success": True,
                 "message": f"'{name}' ya está en la base de datos (no duplicado).",
                 "status": "already_known",
-                "external_id": external_id,
+                "external_id": result["external_id"],
             },
             ensure_ascii=False,
         )
-
-    candidate = GooglePlacesClient.to_candidate(resolved, country=country, city=city)
-    candidate.update(
-        {
-            "source": "user",
-            "category": "restaurant",          # provisional; el Validator lo corrige
-            "safety_level": "options_available",  # piso conservador por defecto
-            "social_url": evidence_url,
-            "validation_notes": notes,
-        }
-    )
-
-    inserted = _db().insert_place_candidate(candidate)
-    if inserted:
+    if outcome == "promoted":
         return json.dumps(
             {
                 "success": True,
                 "message": f"Sugerencia recibida. '{name}' será revisado en el próximo pipeline diario.",
-                "suggestion_id": inserted.get("id"),
+                "suggestion_id": result["place_id"],
                 "status": "pending",
-                "external_id": external_id,
+                "external_id": result["external_id"],
             },
             ensure_ascii=False,
         )
