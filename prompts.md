@@ -78,6 +78,43 @@ candidates for the Validator to judge.
   results per query are capped by `MAX_SEARCH_RESULTS_PER_QUERY`. Per-query
   failures and a final run summary are written to `agent_log`.
 
+**Input variables** (data-driven from `config/targets.yaml`):
+- `{{country}}`: country block to search (e.g. `Uruguay`).
+- `{{city}}`: city within that block (e.g. `Montevideo`).
+- `{{search_terms}}`: GF / sin-TACC terms crossed with the city (e.g. `sin TACC`,
+  `gluten free`, `celíaco`).
+- `{{categories}}`: the google-type → CeliacMap category map used to classify
+  each result.
+
+**Worked example:**
+
+For `targets.yaml` → `Uruguay` / `Montevideo` / term `"sin TACC"`, the agent runs
+a Google Places Text Search for `"sin TACC Montevideo"`. A result such as:
+
+```json
+{ "name": "El Buen Sabor",
+  "formatted_address": "Av. 18 de Julio 1234, Montevideo, Uruguay",
+  "place_id": "ChIJ_xyz_buensabor",
+  "types": ["restaurant", "food", "point_of_interest"],
+  "geometry": { "location": { "lat": -34.9059, "lng": -56.1913 } } }
+```
+
+is mapped deterministically (no LLM) and inserted as a candidate:
+
+```json
+{ "name": "El Buen Sabor",
+  "address": "Av. 18 de Julio 1234, Montevideo, Uruguay",
+  "lat": -34.9059, "lng": -56.1913,
+  "category": "restaurant",            // inverted from `types` via the categories map
+  "country": "Uruguay", "city": "Montevideo",
+  "source": "google_places", "external_id": "ChIJ_xyz_buensabor",
+  "safety_level": "options_available", // conservative floor; the Validator sets the real one
+  "status": "pending" }
+```
+
+Re-running on Montevideo will not insert a second row for the same `place_id` —
+the `(source, external_id)` unique constraint dedups it.
+
 ## 5. Validator agent (Phase 6)
 
 **Prompt (summary):** "Proceed with Phase 6 — build the Validator agent. Pull all
@@ -235,6 +272,34 @@ tests (`tests/test_social_agent.py` plus search/validator additions).
   dependency; `places.source` gains `'social'`, `reviews.source` gains `'google'`,
   and `agent_log.agent` gains `'social'` via idempotent `DO` blocks.
 
+**Input variables** (the per-result Haiku parse that turns one noisy Tavily
+search result into a structured lead — used once per social result):
+- `{{platform}}`: source platform (`instagram` | `facebook`).
+- `{{result_title}}`: title of the Tavily search result.
+- `{{result_link}}`: URL of the profile / post.
+- `{{result_snippet}}`: snippet text returned by Tavily.
+
+**Worked example:**
+
+A Tavily result for query `"sin TACC" "Montevideo"` restricted to `instagram.com`:
+
+```text
+title:   El Buen Sabor (@elbuensabor.uy) • Instagram
+link:    https://www.instagram.com/elbuensabor.uy/
+snippet: Restaurante sin TACC en el Centro de Montevideo. Menú celíaco certificado 🌾🚫
+```
+
+`claude-haiku-4-5` parses it into a clean lead:
+
+```json
+{ "name": "El Buen Sabor", "city": "Montevideo", "category": "restaurant", "address": null }
+```
+
+The agent then geocodes `name + city` via Google Find Place (→ real coords +
+canonical `place_id`), keeps the profile URL in `validation_notes`, and inserts
+the lead as `pending`, `source='social'` for the Validator. A result Haiku cannot
+confidently resolve to a name is dropped (`social_unresolved`).
+
 ## 10. Social agent search provider: Google Custom Search → Tavily
 
 **Prompt:** "We are replacing Google Custom Search with Tavily API for the social
@@ -307,6 +372,37 @@ For every place you are reasonably confident is real and gluten-free relevant, c
 
 Respond with ONLY a JSON object: {"places": [{name, category, address, evidence, source_url}]}.
 ```
+
+**Input variables** (the only two inputs; the model writes its own search queries
+from them — the system prompt above is fixed and the city/country are injected
+into the user turn that starts the research):
+- `{{city}}`: target city to research (e.g. `Montevideo`).
+- `{{country}}`: country containing that city (e.g. `Uruguay`).
+
+**Worked example:**
+
+User turn: `Investiga: Montevideo, Uruguay`
+
+After running `web_search` / `web_fetch` over community blogs, IG roundups, celiac
+Facebook groups and the ACELU listings, the model replies with only:
+
+```json
+{
+  "places": [
+    {
+      "name": "El Buen Sabor",
+      "category": "restaurant",
+      "address": "Av. 18 de Julio 1234, Montevideo",
+      "evidence": "Recomendado en un grupo de Facebook celíaco de Montevideo como restaurante con menú sin TACC certificado y cocina separada.",
+      "source_url": "https://www.facebook.com/groups/celiacosuy/posts/123456789"
+    }
+  ]
+}
+```
+
+The agent geocodes `"El Buen Sabor Montevideo"` via Google Find Place (→ real
+coords + canonical `place_id`), dedups across sources, and inserts it as `pending`,
+`source='web'` (the `source_url` kept in `social_url`) for the Validator to judge.
 
 **Key decisions made during this prompt:**
 - **Reuse, don't reinvent:** v3 mirrors the Social agent's geocode-and-dedup spine
@@ -396,6 +492,54 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdo
  "recommendation": "<acción concreta sugerida para el operador>"}
 ```
 
+**Input variables** (the `RUBRIC` above is the fixed, cached **system** block; the
+per-candidate data is interpolated into the **user** message, same shape the MCP
+`validate_place` tool builds — see §13):
+- `{{name}}`: candidate place name.
+- `{{address}}`: street address (or "desconocida").
+- `{{city}}`: city.
+- `{{country}}`: country (`Uruguay` | `Argentina`).
+- `{{category}}`: provisional category from discovery (may be unknown).
+- `{{evidence}}`: collected evidence — discovery snippet, Google description, and
+  any stored gluten-free review snippets.
+
+**Worked example:**
+
+System = the full `RUBRIC` above (cached). User message:
+
+```text
+Valida el siguiente lugar:
+
+Nombre: El Buen Sabor
+Dirección: Av. 18 de Julio 1234, Montevideo
+Ciudad: Montevideo, Uruguay
+Categoría estimada: restaurant
+
+Evidencia recopilada:
+El local se promociona como "menú sin TACC certificado por ACELU", con cocina
+dedicada y protocolo de contaminación cruzada. Reseña de Google (source=google):
+"Soy celíaca y comí tranquila, tienen carta sin TACC separada."
+```
+
+The Validator replies with only the JSON verdict:
+
+```json
+{
+  "verdict": "approved",
+  "confidence_score": 0.9,
+  "category": "restaurant",
+  "safety_level": "celiac_friendly",
+  "reasoning": "Evidencia explícita de menú sin TACC certificado por ACELU, cocina dedicada y protocolo de contaminación cruzada, respaldada por una reseña de una persona celíaca.",
+  "flags": [],
+  "recommendation": "Aprobar y publicar; reconfirmar la certificación ACELU en la próxima pasada del Updater."
+}
+```
+
+`_decide_status` maps `confidence_score 0.9 >= 0.85` → `places.status = 'approved'`
+(published on the map). Had the evidence only said "opciones sin gluten" with no
+contaminación-cruzada mention, the score would fall below the `0.7` floor and the
+same code would force `needs_review` instead — never auto-approve on weak signal.
+
 ## 13. AI Toolkit — MCP server `validate_place` tool
 
 **Archivo:** `mcp_server/server.py` · **Modelo:** `claude-sonnet-4-6`
@@ -420,6 +564,58 @@ Evidencia recopilada:
 The tool returns `{verdict, confidence_score, category, safety_level, reasoning,
 flags, recommendation, db_status}` — `db_status` is the status the candidate would
 take in the database (`approved` / `needs_review` / `discarded`).
+
+**Input variables** (the four tool arguments, interpolated into the user prompt
+above):
+- `{{name}}`: nombre del establecimiento.
+- `{{address}}`: dirección completa.
+- `{{city}}`: ciudad.
+- `{{evidence}}`: texto con la evidencia recopilada (posts, sitio web, reseñas,
+  descripción de Google Maps).
+
+**Worked example:**
+
+Tool call:
+
+```python
+validate_place(
+    name="El Buen Sabor",
+    address="Av. 18 de Julio 1234",
+    city="Montevideo, Uruguay",
+    evidence="El Instagram del local anuncia menú sin TACC certificado por ACELU y cocina separada; varias reseñas de celíacos positivas.",
+)
+```
+
+builds the user prompt:
+
+```text
+Valida el siguiente lugar:
+
+Nombre: El Buen Sabor
+Dirección: Av. 18 de Julio 1234
+Ciudad: Montevideo, Uruguay
+
+Evidencia recopilada:
+El Instagram del local anuncia menú sin TACC certificado por ACELU y cocina
+separada; varias reseñas de celíacos positivas.
+```
+
+and returns:
+
+```json
+{
+  "verdict": "approved",
+  "confidence_score": 0.88,
+  "category": "restaurant",
+  "safety_level": "celiac_friendly",
+  "reasoning": "Mención explícita de menú sin TACC certificado por ACELU y cocina separada, con reseñas positivas de personas celíacas.",
+  "flags": [],
+  "recommendation": "Publicar; verificar la vigencia de la certificación ACELU.",
+  "db_status": "approved",
+  "validated_at": "2026-06-19T12:00:00+00:00",
+  "place_name": "El Buen Sabor"
+}
+```
 
 ## 14. Suggest-a-Place public form (community Phase 2)
 
