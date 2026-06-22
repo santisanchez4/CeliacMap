@@ -705,6 +705,17 @@ approved rows.
   Design rationale: **Web discovery agent (v3) design decisions** above. Code
   complete with 16 offline tests; first live standalone run on Montevideo is the
   next verification step before enabling it in the full daily pipeline.
+  - **⚠️ Disabled in the daily pipeline (Jun 2026).** A live daily run with
+    `web: true` on Montevideo + Buenos Aires **timed out the 30-min CI job**: each
+    city's autonomous web search took ~10–16 min, and Montevideo's final turn
+    exhausted its continuation budget while still searching, returning empty
+    (non-JSON) output (`JSONDecodeError: Expecting value: line 1 column 1 (char 0)`
+    from `LLMClient.research_with_web_search`). The `web: true` flags were commented
+    out in `config/targets.yaml`, so the daily pipeline runs
+    **search → social → suggestion → validator → updater** reliably. Re-enabling the
+    Web agent requires fixing (a) per-city latency / continuation budget and
+    (b) the empty-final-text → JSON parse path, then a standalone verification —
+    exactly the gate this phase already called for.
 - ✅ **Phase 12 — AI Toolkit (prompts + Skill + MCP server) & three-tier rubric.**
   Added an academic "Toolkit de IA": documented prompts (`prompts.md` §12–13), a
   reusable Skill (`skills/validator-rubric/SKILL.md`), and an MCP server

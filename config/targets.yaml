@@ -57,8 +57,13 @@ categories:
 # Each city defines a search center + radius. Adding a city = a new entry here.
 #
 # Web discovery (Web agent, v3): a city is researched by the autonomous web-search
-# agent only when it is flagged `web: true`. Rollout starts with Montevideo and
-# Buenos Aires; add the flag to more cities after verifying it works.
+# agent only when it is flagged `web: true`.
+#
+# DISABLED in the daily pipeline (Jun 2026): the autonomous web-search stage takes
+# ~10-16 min per city and the final turn can exhaust its continuation budget while
+# still searching, returning empty (non-JSON) output — together this blew the 30-min
+# job timeout. The agent must be verified standalone (latency + JSON parsing) before
+# any city is re-flagged `web: true`. See the Web agent notes in CLAUDE.md.
 countries:
   - name: Uruguay
     cities:
@@ -66,7 +71,7 @@ countries:
         lat: -34.9011
         lng: -56.1645
         radius_m: 12000
-        web: true
+        # web: true  # disabled — see note above
       - name: Punta del Este
         lat: -34.9667
         lng: -54.9500
@@ -133,7 +138,7 @@ countries:
         lat: -34.6037
         lng: -58.3816
         radius_m: 15000
-        web: true
+        # web: true  # disabled — see note above
       # Major metros
       - name: Córdoba
         lat: -31.4201
