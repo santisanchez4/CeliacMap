@@ -5,13 +5,9 @@
 name: Agents - daily pipeline
 
 on:
-  # Daily cron disabled (Jun 2026): the Anthropic API key ran out of credit, so the
-  # pipeline can no longer run unattended. Re-enable by uncommenting the schedule
-  # block below once the API balance is topped up. Manual workflow_dispatch runs are
-  # left available for testing.
-  # schedule:
-  #   # 09:00 UTC daily (~06:00 in Uruguay / Argentina). Cron uses the default branch.
-  #   - cron: "0 9 * * *"
+  schedule:
+    # 09:00 UTC daily (~06:00 in Uruguay / Argentina). Cron uses the default branch.
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
