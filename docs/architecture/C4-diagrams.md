@@ -12,6 +12,7 @@ flowchart TB
     anthropic[["Anthropic API<br/><i>Claude Haiku (descubrimiento)<br/>y Sonnet (juicio de seguridad)</i>"]]
     google[["Google Places API<br/><i>Búsqueda determinística<br/>de comercios</i>"]]
     tavily[["Tavily API<br/><i>Descubrimiento de menciones<br/>en redes sociales</i>"]]
+    resend[["Resend API<br/><i>Envío y recepción de<br/>email transaccional (Outreach)</i>"]]
     github_actions[["GitHub Actions<br/><i>Orquesta el pipeline<br/>de forma mensual</i>"]]
 
     usuario -->|"Consulta el mapa<br/>HTTPS"| celiacmap
@@ -20,6 +21,8 @@ flowchart TB
     celiacmap -->|"Valida y clasifica<br/>candidatos"| anthropic
     celiacmap -->|"Busca comercios<br/>candidatos"| google
     celiacmap -->|"Busca menciones<br/>sociales"| tavily
+    celiacmap -->|"Envía email de<br/>confirmación"| resend
+    resend -->|"Notifica respuesta<br/>del comercio, webhook"| celiacmap
     github_actions -->|"Ejecuta el pipeline<br/>mensualmente"| celiacmap
 
     style celiacmap fill:#1168bd,color:#fff
@@ -28,6 +31,7 @@ flowchart TB
     style anthropic fill:#999,color:#fff
     style google fill:#999,color:#fff
     style tavily fill:#999,color:#fff
+    style resend fill:#999,color:#fff
     style github_actions fill:#999,color:#fff
 ```
 
@@ -40,10 +44,13 @@ flowchart TB
     anthropic[["Anthropic API"]]
     google[["Google Places API"]]
     tavily[["Tavily API"]]
+    resend[["Resend API<br/><i>Envío y recepción de<br/>email transaccional</i>"]]
+    github_actions[["GitHub Actions<br/><i>Cron mensual +<br/>repository_dispatch</i>"]]
 
     subgraph celiacmap["CeliacMap [SYSTEM]"]
         frontend["<b>Frontend estático</b><br/><i>HTML/CSS/JS + Leaflet.js</i><br/>Mapa interactivo, servido por<br/>GitHub Pages, sin build step"]
-        pipeline["<b>Pipeline de agentes</b><br/><i>Python</i><br/>Search, Social, Validator,<br/>Updater, Web y Suggestion Agents"]
+        pipeline["<b>Pipeline de agentes</b><br/><i>Python</i><br/>Search, Social, Web, Suggestion,<br/>Validator, Updater y Outreach<br/>(7 etapas) + Reply Handler<br/>(on-demand, vía dispatch)"]
+        edge_function["<b>Edge Function</b><br/><i>Deno/TypeScript</i><br/>outreach-reply: recibe webhooks<br/>de Resend, dispara repository_dispatch"]
         mcp["<b>MCP Server</b><br/><i>Python/FastMCP</i><br/>Expone 6 tools para interactuar<br/>con los datos validados"]
         db[("<b>Base de datos</b><br/><i>Supabase (PostgreSQL)</i><br/>Lugares validados, sugerencias,<br/>estado del rubric de 3 niveles")]
     end
@@ -56,15 +63,25 @@ flowchart TB
     pipeline -->|"Descubre (Haiku) y<br/>valida (Sonnet), API"| anthropic
     pipeline -->|"Busca candidatos<br/>API"| google
     pipeline -->|"Busca menciones<br/>sociales, API"| tavily
+    pipeline -->|"Envía email de<br/>confirmación, API"| resend
+
+    resend -->|"email.received<br/>webhook"| edge_function
+    edge_function -->|"Persiste reply,<br/>flip outreach_status, REST"| db
+    edge_function -->|"repository_dispatch<br/>(outreach_reply_received)"| github_actions
+    github_actions -->|"Ejecuta<br/>outreach_reply_handler.py"| pipeline
+    github_actions -->|"Orquesta mensualmente<br/>cron"| pipeline
 
     mcp -->|"Consulta datos<br/>validados, REST"| db
 
     style frontend fill:#1168bd,color:#fff
     style pipeline fill:#1168bd,color:#fff
+    style edge_function fill:#1168bd,color:#fff
     style mcp fill:#1168bd,color:#fff
     style db fill:#1168bd,color:#fff
     style usuario fill:#08427b,color:#fff
     style anthropic fill:#999,color:#fff
     style google fill:#999,color:#fff
     style tavily fill:#999,color:#fff
+    style resend fill:#999,color:#fff
+    style github_actions fill:#999,color:#fff
 ```

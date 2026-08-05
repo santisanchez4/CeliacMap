@@ -1079,3 +1079,12 @@ Supabase Edge Function, the webhook receiver), `.github/workflows/outreach-reply
 - Outreach Agent: respuesta del comercio como evidencia adicional,
   no aprobación automática — ver
   docs/architecture/ADR-002-outreach-evidence-not-autoapproval.md
+- C4 diagrams actualizados (post Entregable 2) para reflejar el
+  Outreach Agent (Etapa 1 y 2): Nivel 1 agrega Resend como sistema
+  externo (envío + webhook de respuesta); Nivel 2 agrega el
+  contenedor Edge Function (`supabase/functions/outreach-reply/`) y
+  la cadena `Resend → Edge Function → GitHub Actions
+  (repository_dispatch) → outreach_reply_handler.py`, y el pipeline
+  pasa a listar sus 7 etapas reales en orden (`search → social → web
+  → suggestion → validator → updater → outreach`) más el Reply
+  Handler on-demand. Ver docs/architecture/C4-diagrams.md.
