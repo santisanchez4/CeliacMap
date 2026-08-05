@@ -1079,3 +1079,85 @@ For a `needs_review` place `{"name": "Café Aroma", "category": "cafe", "city":
 The agent sends this via Resend (to the fixed test recipient for now),
 records it in `outreach_messages`, and flips that place's
 `outreach_status` to `'sent'`.
+
+## 21. Outreach reply handler — opt-out detection (ADR-003)
+
+**Prompt (summary):** "Implement opt-out detection in the Outreach Agent,
+per ADR-003 (not yet written as a file, but the design is settled). In
+`outreach_agent.py`, the Haiku-drafted email must get a fixed, literal
+(non-LLM) closing line telling the business how to opt out. In
+`outreach_reply_handler.py`, before the full RUBRIC/Sonnet re-evaluation,
+add a cheap Haiku pre-check classifying whether the reply is an opt-out
+request. If yes: mark `places.outreach_opt_out = true`, log it, and skip
+the full re-evaluation (saves the Sonnet cost). If no: continue the
+existing flow unchanged. In `_select_candidates()` and
+`fetch_needs_review_for_outreach`, always exclude
+`outreach_opt_out = true` places, regardless of `outreach_status`. Start
+with the design."
+
+**Used for:** Implementing `OPT_OUT_FOOTER` + its append in `_draft()`
+(`agents/outreach_agent.py`), `OPT_OUT_RUBRIC` + `_classify_opt_out()` +
+its insertion into `handle()` (`agents/outreach_reply_handler.py`), the
+`outreach_opt_out` exclusion filter in both
+`SupabaseClient.fetch_needs_review_for_outreach` (SQL) and
+`OutreachAgent._select_candidates` (Python, defense in depth), the
+`places.outreach_opt_out` column (`db/schema.sql`, applied live to
+Supabase), and offline tests (`tests/test_outreach_agent.py`,
+`tests/test_outreach_reply_handler.py`).
+
+**Key decisions made during this prompt:**
+- **Classification fails closed, toward "not opt-out":** on any error
+  (Haiku call fails, malformed JSON), `_classify_opt_out()` defaults to
+  `is_opt_out=False` — never the reverse. A missed opt-out just falls
+  through into the existing, already-conservative Sonnet re-evaluation
+  (safe, known behavior); a false positive would permanently block a
+  legitimate business, since `outreach_opt_out` has no unset path in this
+  design. This needs its own `try/except`, separate from the full-eval's —
+  reusing that one would incorrectly abort the real re-evaluation on a
+  mere classification hiccup.
+- **Footer appended after `_draft()`'s empty-check, not before:**
+  appending first would make `body` always non-empty, silently defeating
+  the existing guard that returns `None` on a degenerate Haiku draft.
+- **Opt-out never touches `places.status`:** a business declining further
+  contact isn't evidence about GF safety — only `outreach_opt_out`
+  changes; the Validator-owned `status` stays whatever it was.
+
+**Input variables** (one call per received reply):
+- `{{reply_text}}` — the business's raw reply content, fetched via
+  `fetch_latest_received_message`, passed as-is with no template wrapping.
+
+**The exact rubric (`OPT_OUT_RUBRIC` in `agents/outreach_reply_handler.py`):**
+
+```text
+Analizás la respuesta de un comercio a un email de CeliacMap que le pedía
+confirmar si ofrece opciones sin TACC. Tu única tarea es determinar si el
+comercio está pidiendo explícitamente NO recibir más contactos de
+CeliacMap — nada más. No evalúes si el lugar es seguro para celíacos.
+
+Es un opt-out cuando el comercio pide explícitamente que no lo contacten
+más, que lo den de baja, que dejen de escribirle, o rechaza ser contactado
+nuevamente. NO es un opt-out una respuesta que simplemente no confirma
+información sin TACC, ignora la pregunta, o es ambigua — ante la duda,
+respondé false.
+
+Respondé ÚNICAMENTE con un objeto JSON válido, sin texto adicional,
+exactamente con esta forma:
+{"is_opt_out": true | false, "reason": "<breve explicación en español>"}
+```
+
+**Worked example:**
+
+For a received reply `"Por favor no nos contacten mas, no queremos
+participar."`, Haiku returns:
+
+```json
+{"is_opt_out": true, "reason": "El comercio pide explícitamente no ser contactado nuevamente."}
+```
+
+`_classify_opt_out()` returns `{"is_opt_out": True, "reason": "..."}`;
+`handle()` persists `places.outreach_opt_out = true` via `update_place`,
+logs `outreach_reply_opt_out_detected`, and returns
+`{"place_id": place_id, "opt_out": True}` — the RUBRIC/Sonnet call never
+fires. A reply like `"Si, tenemos opciones sin TACC certificadas."` would
+instead return `{"is_opt_out": false}`, and `handle()` continues into the
+existing full re-evaluation unchanged.

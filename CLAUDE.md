@@ -1079,6 +1079,9 @@ Supabase Edge Function, the webhook receiver), `.github/workflows/outreach-reply
 - Outreach Agent: respuesta del comercio como evidencia adicional,
   no aprobación automática — ver
   docs/architecture/ADR-002-outreach-evidence-not-autoapproval.md
+- Outreach Agent: condiciones para habilitar envío real a comercios
+  (dominio verificado, opt-out, volumen acotado) — ver
+  docs/architecture/ADR-003-outreach-real-send-conditions.md
 - C4 diagrams actualizados (post Entregable 2) para reflejar el
   Outreach Agent (Etapa 1 y 2): Nivel 1 agrega Resend como sistema
   externo (envío + webhook de respuesta); Nivel 2 agrega el
