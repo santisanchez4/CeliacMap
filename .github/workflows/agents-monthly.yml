@@ -38,6 +38,12 @@ jobs:
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      OUTREACH_TEST_RECIPIENT: ${{ secrets.OUTREACH_TEST_RECIPIENT }}
+      OUTREACH_SENDER_EMAIL: outreach@celiacmap.org
+      OUTREACH_INBOUND_DOMAIN: celiacmap.org
+      # Initial bounded volume per ADR-003, not the code default of 20.
+      OUTREACH_MONTHLY_LIMIT: "3"
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v5
