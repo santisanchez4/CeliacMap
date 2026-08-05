@@ -149,7 +149,7 @@
     "map.legend1": "Gluten-free",
     "map.legend2": "Has gluten-free options",
     "map.allCities": "All cities",
-    "map.searchPlaceholder": "Search a gluten-free place...",
+    "map.searchPlaceholder": "Search a gluten-free place…",
 
     "suggest.eyebrow": "Add a place",
     "suggest.title": "The community grows the map",

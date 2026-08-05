@@ -414,6 +414,11 @@ Do not wait to be asked. Keep documentation in sync with the code.
 ## Skills
 - skills/prompt-engineer/SKILL.md — load when writing,
   improving, or debugging any prompt for an LLM
+- .claude/skills/frontend-design/, .claude/skills/web-design-guidelines/,
+  .claude/skills/ui-ux-pro-max/ — third-party design-review skills (not
+  authored in this repo); load when reviewing or improving the frontend's
+  visual design. See **Frontend design audit** in the Decisions Log for
+  provenance and what was applied.
 
 ## Quality Criteria
 
@@ -824,6 +829,54 @@ Supabase Edge Function, the webhook receiver), `.github/workflows/outreach-reply
   (`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/`ANTHROPIC_API_KEY`) — no new
   ones needed there, since the Python side never calls Resend or GitHub
   itself.
+
+### Frontend design audit (frontend-design + web-design-guidelines + ui-ux-pro-max)
+
+Three third-party Claude Code skills were installed as **project skills** under
+`.claude/skills/` (not committed to `skills/`, which is the academic AI-toolkit
+deliverable — see **AI Toolkit** above) and used for a targeted design-review
+pass over the existing editorial redesign, not a rebuild:
+
+- **`frontend-design`** (`anthropics/skills`) — aesthetic-distinctiveness review.
+- **`web-design-guidelines`** (`vercel-labs/agent-skills`) — fetches the live
+  Vercel Web Interface Guidelines at review time and checks compliance.
+- **`ui-ux-pro-max`** (`nextlevelbuilder/ui-ux-pro-max-skill`) — searchable
+  UI/UX rule database (styles, palettes, typography, touch/a11y rules) via a
+  bundled Python CLI (`scripts/search.py`); ~1.8 MB, not just a `SKILL.md`.
+
+**Findings applied to `index.html` / `css/styles.css` / `js/main.js`:**
+- Touch targets under the 44×44px guideline (`.chip`, `.nav-toggle`,
+  `.map-search-clear`, `.place-panel-close`) — fixed via invisible hit-area
+  expansion (`::before` insets) where enlarging the visible control would hurt
+  the compact editorial look, and a direct size bump for `.place-panel-close`
+  (a corner control with room to grow).
+- Missing `.chip:hover` state, missing `overscroll-behavior: contain` and
+  `env(safe-area-inset-bottom)` on the mobile place-panel bottom sheet, missing
+  `touch-action: manipulation` / `-webkit-tap-highlight-color`, missing
+  `text-wrap: balance` on headings, missing `preconnect` for the `unpkg.com`
+  Leaflet CDN.
+- Literal `...` and straight quotes in the ES review pull-quotes and map
+  search placeholder — the EN dictionary in `main.js` already used curly
+  quotes/ellipsis; ES (the source-of-truth markup) did not.
+- `.step-line .step-num` was declared in HTML but never styled — the two
+  numbered-step sequences ("La solución" and "Sumá un lugar") rendered
+  identically. Gave the second one a smaller circular badge treatment (reusing
+  the existing `.card-icon` visual language) so repeating the 01/02/03 device
+  twice doesn't read as one decorative habit.
+- **One deliberate aesthetic risk, per `frontend-design`'s "spend your
+  boldness in one place":** replaced the `.ai-orb` — a generic glowing-circle
+  "AI" cliché — with a small radar/pin-constellation motif (`.ai-radar`,
+  reusing the same brand pin SVG used in the header/hero/footer, with a
+  pulsing scan ring), grounded in what the AI section actually describes
+  (agents discovering and validating pins on a map) instead of an abstract
+  orb. Scoped to one section; the rest of the established palette/typography
+  (documented under **Editorial redesign** above) was intentionally left
+  untouched — this was a compliance-and-polish pass, not a new design system.
+- Verified live in Chrome against the real Supabase-backed map (place markers,
+  the place-detail panel with real data, filter-chip hover, reveal timing) with
+  zero console errors; the harness's window-resize tool would not reliably
+  force a mobile viewport for screenshotting, so the safe-area / bottom-sheet
+  CSS was verified by inspection rather than a mobile screenshot.
 
 ### Build status (phases)
 
