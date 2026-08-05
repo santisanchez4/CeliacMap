@@ -66,6 +66,14 @@ def test_from_env_falls_back_on_invalid_int(monkeypatch):
     assert settings.max_validations_per_run == 50  # default
 
 
+def test_from_env_parses_outreach_live_mode(monkeypatch):
+    monkeypatch.delenv("OUTREACH_LIVE_MODE", raising=False)
+    assert Settings.from_env().outreach_live_mode is False
+
+    monkeypatch.setenv("OUTREACH_LIVE_MODE", "true")
+    assert Settings.from_env().outreach_live_mode is True
+
+
 # --- Budget clamping logic ------------------------------------------------
 
 

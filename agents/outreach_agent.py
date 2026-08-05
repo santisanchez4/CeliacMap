@@ -11,8 +11,8 @@ evidence (the business's reply, handled by a separate, not-yet-built
 Before selecting candidates, ``_scrape_missing_emails`` best-effort scrapes
 each not-yet-checked place's own (non-social) website for a contact email via
 ``WebsiteScraperClient`` and persists ``places.contact_email`` /
-``contact_email_checked_at`` — a real contact-email source for future use,
-since every send below still goes to the fixed sandbox recipient regardless.
+``contact_email_checked_at`` — the real contact-email source live mode
+(below) sends to once enabled.
 
 Approach, per candidate:
 
@@ -21,11 +21,11 @@ Approach, per candidate:
    place with neither is unlikely to be reachable at all).
 2. Draft a short confirmation email with ``claude-haiku-4-5`` (same
    fixed-rubric + JSON-contract pattern as the Social agent's ``PARSE_RUBRIC``).
-3. Send it via Resend. **Sandbox note:** without a verified sending domain,
-   every email currently goes to a fixed ``test_recipient`` regardless of the
-   place's own contact info — Google Places has no email field, and Resend's
-   shared sandbox sender can only deliver to the account's own verified
-   address anyway (see CLAUDE.md's Outreach agent design decisions).
+3. Send it via Resend. **Recipient (ADR-003):** by default (``live_mode``
+   false) every email still goes to a fixed ``test_recipient``, regardless of
+   the place's own contact info. With ``live_mode`` true, it goes to the
+   place's real ``contact_email`` instead — never a mix of the two (see
+   CLAUDE.md's Outreach agent design decisions).
 4. On success, record the sent message in ``outreach_messages`` and flip
    ``places.outreach_status`` to ``'sent'`` (channel ``'email'``) so the place
    isn't re-contacted every run. On failure, nothing is written — the place
@@ -97,6 +97,7 @@ class OutreachAgent(BaseAgent):
         max_scrapes_per_run: int = 30,
         inbound_domain: str = "",
         sender_email: str = "outreach@celiacmap.org",
+        live_mode: bool = False,
     ):
         super().__init__(db)
         self.llm = llm
@@ -108,6 +109,7 @@ class OutreachAgent(BaseAgent):
         self.max_scrapes_per_run = max_scrapes_per_run
         self.inbound_domain = inbound_domain
         self.sender_email = sender_email
+        self.live_mode = live_mode
 
     def _reply_to_for(self, place_id: str) -> str | None:
         """Unique outreach+<place_id>@<inbound domain> address (Etapa 2) so a
@@ -159,7 +161,9 @@ class OutreachAgent(BaseAgent):
         reachable = [
             p
             for p in candidates
-            if (p.get("phone") or p.get("website")) and not p.get("outreach_opt_out")
+            if (p.get("phone") or p.get("website"))
+            and not p.get("outreach_opt_out")
+            and (not self.live_mode or p.get("contact_email"))
         ]
         return reachable[: self.max_per_run]
 
@@ -208,9 +212,26 @@ class OutreachAgent(BaseAgent):
                 continue
             drafted += 1
 
+            if self.live_mode:
+                recipient = place.get("contact_email")
+                if not recipient:
+                    errors += 1
+                    logger.error(
+                        "live mode: place %s has no contact_email, skipping send", place_id
+                    )
+                    self.log(
+                        "outreach_send_missing_contact_email",
+                        {"place_id": place_id, "name": place.get("name")},
+                        status="error",
+                        place_id=place_id,
+                    )
+                    continue
+            else:
+                recipient = self.test_recipient
+
             try:
                 self.resend.send(
-                    to=self.test_recipient,
+                    to=recipient,
                     subject=draft["subject"],
                     text=draft["body"],
                     from_address=self.sender_email,
@@ -300,6 +321,7 @@ def main() -> int:
         max_scrapes_per_run=settings.max_email_scrapes_per_run,
         inbound_domain=settings.outreach_inbound_domain,
         sender_email=settings.outreach_sender_email,
+        live_mode=settings.outreach_live_mode,
     )
 
     summary = agent.run()

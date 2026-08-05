@@ -16,6 +16,7 @@ def make_place(
     website=None,
     contact_email_checked_at=None,
     outreach_opt_out=False,
+    contact_email=None,
 ):
     return {
         "id": id,
@@ -26,6 +27,7 @@ def make_place(
         "website": website,
         "contact_email_checked_at": contact_email_checked_at,
         "outreach_opt_out": outreach_opt_out,
+        "contact_email": contact_email,
     }
 
 
@@ -35,6 +37,7 @@ def make_agent(
     test_recipient="dev@example.com",
     inbound_domain="",
     sender_email="outreach@celiacmap.org",
+    live_mode=False,
 ):
     db = MagicMock()
     db.fetch_needs_review_for_outreach.return_value = [make_place()]
@@ -58,6 +61,7 @@ def make_agent(
         max_scrapes_per_run=max_scrapes_per_run,
         inbound_domain=inbound_domain,
         sender_email=sender_email,
+        live_mode=live_mode,
     )
     return agent, db, llm, resend_client, scraper
 
@@ -91,6 +95,25 @@ def test_select_candidates_excludes_opt_out():
     db.fetch_needs_review_for_outreach.return_value = [
         make_place(id="p1", phone="099", outreach_opt_out=False),
         make_place(id="p2", phone="099", outreach_opt_out=True),
+    ]
+    selected = agent._select_candidates()
+    assert [p["id"] for p in selected] == ["p1"]
+
+
+def test_select_candidates_requires_contact_email_in_live_mode():
+    agent, db, _, _, _ = make_agent(live_mode=True)
+    db.fetch_needs_review_for_outreach.return_value = [
+        make_place(id="p1", phone="099", contact_email=None),
+        make_place(id="p2", phone="099", contact_email="biz@example.com"),
+    ]
+    selected = agent._select_candidates()
+    assert [p["id"] for p in selected] == ["p2"]
+
+
+def test_select_candidates_ignores_contact_email_when_not_live():
+    agent, db, _, _, _ = make_agent(live_mode=False)
+    db.fetch_needs_review_for_outreach.return_value = [
+        make_place(id="p1", phone="099", contact_email=None),
     ]
     selected = agent._select_candidates()
     assert [p["id"] for p in selected] == ["p1"]
@@ -353,3 +376,35 @@ def test_send_uses_configured_sender_email():
     agent.run()
 
     assert resend_client.send.call_args.kwargs["from_address"] == "hola@celiacmap.org"
+
+
+# --- Live mode (ADR-003 final step) -------------------------------------------
+
+
+def test_send_uses_contact_email_in_live_mode():
+    agent, db, llm, resend_client, _ = make_agent(live_mode=True)
+    db.fetch_needs_review_for_outreach.return_value = [
+        make_place(id="p1", phone="099", contact_email="biz@example.com")
+    ]
+
+    agent.run()
+
+    assert resend_client.send.call_args.kwargs["to"] == "biz@example.com"
+
+
+def test_live_mode_skips_and_logs_missing_contact_email_defense_in_depth():
+    agent, db, llm, resend_client, _ = make_agent(live_mode=True)
+    # Simulate a bug/race condition: a candidate reaches the send step in
+    # live mode despite lacking contact_email, bypassing _select_candidates()'s
+    # own filter — proves there is no silent fallback to test_recipient.
+    with patch.object(
+        agent,
+        "_select_candidates",
+        return_value=[make_place(id="p1", contact_email=None)],
+    ):
+        summary = agent.run()
+
+    assert summary["errors"] == 1
+    assert summary["sent"] == 0
+    resend_client.send.assert_not_called()
+    db.insert_outreach_message.assert_not_called()

@@ -30,6 +30,13 @@ def _int(name: str, default: int) -> int:
         return default
 
 
+def _bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw in (None, ""):
+        return default
+    return raw.strip().lower() in ("true", "1", "yes", "on")
+
+
 @dataclass(frozen=True)
 class Settings:
     """Resolved configuration. Secrets may be empty until validated per use."""
@@ -79,6 +86,10 @@ class Settings:
     outreach_inbound_domain: str = ""
     # Outreach agent cap: confirmation emails sent per run (7th pipeline stage).
     outreach_monthly_limit: int = 20
+    # Outreach agent (ADR-003 final step): when true, routes real sends to
+    # place["contact_email"] instead of outreach_test_recipient. Defaults to
+    # false — nothing changes until this is deliberately flipped.
+    outreach_live_mode: bool = False
     # Outreach agent's contact_email scraper: websites scraped per run. Mirrors
     # every other agent's per-run cap, bounding worst-case latency (each site
     # gets a synchronous 5s-timeout GET) as the eligible pool grows.
@@ -115,6 +126,7 @@ class Settings:
             ).strip(),
             outreach_inbound_domain=os.getenv("OUTREACH_INBOUND_DOMAIN", "").strip(),
             outreach_monthly_limit=_int("OUTREACH_MONTHLY_LIMIT", 20),
+            outreach_live_mode=_bool("OUTREACH_LIVE_MODE", False),
             max_email_scrapes_per_run=_int("MAX_EMAIL_SCRAPES_PER_RUN", 30),
             agent_daily_budget=_int("AGENT_DAILY_BUDGET", 350),
         )
