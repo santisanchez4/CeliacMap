@@ -98,6 +98,85 @@ def test_find_email_returns_none_when_nothing_found(mock_get):
     assert WebsiteScraperClient().find_email("https://cafex.com") is None
 
 
+# --- find_email: rejects image-filename false positives ---------------------------
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_find_email_rejects_real_world_image_filename_false_positive(mock_get):
+    # Real false positive found in production: a retina image filename
+    # ("nuvempago@2x.png") matches EMAIL_RE's shape exactly — "2x.png" looks
+    # like a valid domain + 2+ letter TLD — but is never a real email.
+    mock_get.return_value = _mock_response(
+        '<img src="/assets/nuvempago@2x.png" alt="Nuvem Pago">'
+    )
+    assert WebsiteScraperClient().find_email("https://cafex.com") is None
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_find_email_rejects_known_image_extensions(mock_get):
+    for filename in (
+        "logo@2x.png",
+        "icon@2x.jpg",
+        "photo@2x.jpeg",
+        "banner@2x.gif",
+        "sprite@2x.svg",
+        "hero@2x.webp",
+        "favicon@2x.ico",
+    ):
+        mock_get.return_value = _mock_response(f'<img src="/assets/{filename}">')
+        assert WebsiteScraperClient().find_email("https://cafex.com") is None, filename
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_find_email_rejects_image_filename_in_mailto_link(mock_get):
+    mock_get.return_value = _mock_response('<a href="mailto:nuvempago@2x.png">Ver logo</a>')
+    assert WebsiteScraperClient().find_email("https://cafex.com") is None
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_find_email_falls_back_to_generic_regex_when_mailto_is_image_filename(mock_get):
+    mock_get.return_value = _mock_response(
+        '<a href="mailto:nuvempago@2x.png">Ver logo</a> Escribinos a hola@cafex.com'
+    )
+    assert WebsiteScraperClient().find_email("https://cafex.com") == "hola@cafex.com"
+
+
+# --- find_email: rejects platform/infrastructure domains --------------------------
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_find_email_rejects_wix_sentry_platform_domain(mock_get):
+    # Real case (Sweetly): a Wix-built site embeds a Sentry DSN
+    # ("key@sentry-next.wixpress.com") in its JS — matches EMAIL_RE's shape
+    # but belongs to Wix's infra, not the business.
+    mock_get.return_value = _mock_response(
+        'Sentry.init({dsn: "https://a1b2c3d4e5f6@sentry-next.wixpress.com/123456"});'
+    )
+    assert WebsiteScraperClient().find_email("https://sweetly.com") is None
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_find_email_rejects_known_platform_domains(mock_get):
+    for domain in (
+        "wixpress.com",
+        "sentry.io",
+        "sentry-cdn.com",
+        "godaddy.com",
+        "squarespace.com",
+    ):
+        mock_get.return_value = _mock_response(f"Contacto: soporte@{domain}")
+        assert WebsiteScraperClient().find_email("https://cafex.com") is None, domain
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_find_email_does_not_falsely_reject_lookalike_domain(mock_get):
+    # "wixpress.com" must match as a domain suffix (exact or subdomain), not
+    # a raw substring — an unrelated domain that merely contains the
+    # pattern must NOT be rejected.
+    mock_get.return_value = _mock_response("Contacto: hola@wearewixpress.com")
+    assert WebsiteScraperClient().find_email("https://cafex.com") == "hola@wearewixpress.com"
+
+
 # --- find_email: never raises -----------------------------------------------------
 
 
