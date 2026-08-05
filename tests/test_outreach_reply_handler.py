@@ -181,7 +181,7 @@ def test_outreach_confirmed_place_is_still_actionable():
     result = handler.handle("place-1")
 
     assert result["status"] == "outreach_confirmed"
-    llm.complete_json.assert_called_once()
+    assert llm.complete_json.call_count == 2  # opt-out classification + full eval
 
 
 # --- Error handling ------------------------------------------------------------
@@ -204,3 +204,82 @@ def test_persist_failure_is_skipped():
     result = handler.handle("place-1")
 
     assert result == {"skipped": "persist failed"}
+
+
+# --- Opt-out detection (ADR-003) -------------------------------------------------
+
+
+def test_opt_out_reply_sets_flag_and_skips_full_evaluation():
+    handler, db, llm = make_handler()
+    db.fetch_latest_received_message.return_value = make_message(
+        content="Por favor no nos contacten mas, no queremos participar."
+    )
+    llm.complete_json.side_effect = [
+        {"is_opt_out": True, "reason": "El comercio pide no ser contactado."}
+    ]
+
+    result = handler.handle("place-1")
+
+    assert result == {"place_id": "place-1", "opt_out": True}
+    db.update_place.assert_called_once_with("place-1", {"outreach_opt_out": True})
+    db.update_place_validation.assert_not_called()
+    llm.complete_json.assert_called_once()  # proves the Sonnet call never fired
+
+
+def test_non_opt_out_reply_continues_to_full_evaluation():
+    handler, db, llm = make_handler()
+    llm.complete_json.side_effect = [
+        {"is_opt_out": False},
+        {
+            "verdict": "approved",
+            "confidence_score": 0.9,
+            "category": "cafe",
+            "safety_level": "celiac_friendly",
+            "reasoning": "Confirmado por el comercio.",
+            "flags": [],
+            "recommendation": "Aprobar tras revisión final.",
+        },
+    ]
+
+    result = handler.handle("place-1")
+
+    assert result == {"place_id": "place-1", "status": "outreach_confirmed"}
+    assert llm.complete_json.call_count == 2
+    db.update_place.assert_not_called()
+    db.update_place_validation.assert_called_once()
+
+
+def test_opt_out_classification_failure_defaults_to_continue():
+    handler, db, llm = make_handler()
+    llm.complete_json.side_effect = [
+        RuntimeError("haiku boom"),
+        {
+            "verdict": "needs_review",
+            "confidence_score": 0.6,
+            "category": "cafe",
+            "safety_level": "options_available",
+            "reasoning": "Respuesta ambigua.",
+            "flags": [],
+            "recommendation": "Pedir más detalle.",
+        },
+    ]
+
+    result = handler.handle("place-1")
+
+    assert result["status"] == "needs_review"
+    db.update_place.assert_not_called()
+    assert llm.complete_json.call_count == 2
+
+
+def test_opt_out_persist_failure_is_skipped():
+    handler, db, llm = make_handler()
+    db.fetch_latest_received_message.return_value = make_message(
+        content="No nos contacten mas por favor."
+    )
+    llm.complete_json.side_effect = [{"is_opt_out": True}]
+    db.update_place.side_effect = RuntimeError("db down")
+
+    result = handler.handle("place-1")
+
+    assert result == {"skipped": "opt-out persist failed"}
+    db.update_place_validation.assert_not_called()

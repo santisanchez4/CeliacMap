@@ -71,6 +71,15 @@ con esta forma:
 {"subject": "<asunto breve>", "body": "<cuerpo del email en texto plano>"}
 """
 
+# Fixed, non-LLM-generated closing line appended to every drafted body — a
+# literal opt-out instruction the model never sees or paraphrases, so its
+# exact wording can be trusted verbatim by the Haiku classifier in
+# outreach_reply_handler.py (ADR-003).
+OPT_OUT_FOOTER = (
+    "Si preferís no recibir más contactos de CeliacMap, respondé este email "
+    "indicando que no querés ser contactado nuevamente."
+)
+
 
 class OutreachAgent(BaseAgent):
     name = "outreach"
@@ -147,7 +156,11 @@ class OutreachAgent(BaseAgent):
 
     def _select_candidates(self) -> list[dict]:
         candidates = self.db.fetch_needs_review_for_outreach(CANDIDATE_FETCH_LIMIT)
-        reachable = [p for p in candidates if p.get("phone") or p.get("website")]
+        reachable = [
+            p
+            for p in candidates
+            if (p.get("phone") or p.get("website")) and not p.get("outreach_opt_out")
+        ]
         return reachable[: self.max_per_run]
 
     def _draft(self, place: dict) -> dict | None:
@@ -169,7 +182,7 @@ class OutreachAgent(BaseAgent):
         body = (draft.get("body") or "").strip()
         if not subject or not body:
             return None
-        return {"subject": subject, "body": body}
+        return {"subject": subject, "body": f"{body}\n\n{OPT_OUT_FOOTER}"}
 
     def run(self) -> dict:
         self._scrape_missing_emails()

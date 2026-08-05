@@ -197,6 +197,16 @@ end $$;
 alter table public.places add column if not exists contact_email text;
 alter table public.places add column if not exists contact_email_checked_at timestamptz;
 
+-- Outreach Agent (ADR-003, opt-out mechanism): a business's reply can
+-- explicitly request no further contact. Once true, the place must never be
+-- reselected as an outreach candidate again, regardless of outreach_status.
+-- Not enforced by a DB constraint: like outreach_status/outreach_channel
+-- above, eligibility is filtered in application code
+-- (OutreachAgent._select_candidates / SupabaseClient.fetch_needs_review_for_outreach
+-- must exclude outreach_opt_out = true once ADR-003 lands).
+alter table public.places add column if not exists outreach_opt_out boolean
+  not null default false;
+
 -- ---------------------------------------------------------------------
 -- Table: reviews
 -- ---------------------------------------------------------------------

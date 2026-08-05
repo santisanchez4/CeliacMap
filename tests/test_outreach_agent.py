@@ -15,6 +15,7 @@ def make_place(
     phone="099123456",
     website=None,
     contact_email_checked_at=None,
+    outreach_opt_out=False,
 ):
     return {
         "id": id,
@@ -24,6 +25,7 @@ def make_place(
         "phone": phone,
         "website": website,
         "contact_email_checked_at": contact_email_checked_at,
+        "outreach_opt_out": outreach_opt_out,
     }
 
 
@@ -84,6 +86,16 @@ def test_select_candidates_respects_cap():
     assert len(selected) == 1
 
 
+def test_select_candidates_excludes_opt_out():
+    agent, db, _, _, _ = make_agent()
+    db.fetch_needs_review_for_outreach.return_value = [
+        make_place(id="p1", phone="099", outreach_opt_out=False),
+        make_place(id="p2", phone="099", outreach_opt_out=True),
+    ]
+    selected = agent._select_candidates()
+    assert [p["id"] for p in selected] == ["p1"]
+
+
 # --- Drafting ----------------------------------------------------------------
 
 
@@ -101,6 +113,15 @@ def test_draft_returns_none_on_empty_subject_or_body():
     assert agent._draft(make_place()) is None
 
 
+def test_draft_appends_opt_out_footer():
+    agent, _, llm, _, _ = make_agent()
+    draft = agent._draft(make_place())
+    assert draft["body"].endswith(
+        "Si preferís no recibir más contactos de CeliacMap, respondé este email "
+        "indicando que no querés ser contactado nuevamente."
+    )
+
+
 # --- Happy path ----------------------------------------------------------------
 
 
@@ -114,10 +135,15 @@ def test_successful_draft_and_send():
     assert summary["sent"] == 1
     assert summary["errors"] == 0
 
+    expected_body = (
+        "Hola, somos el equipo de CeliacMap...\n\n"
+        "Si preferís no recibir más contactos de CeliacMap, respondé este email "
+        "indicando que no querés ser contactado nuevamente."
+    )
     resend_client.send.assert_called_once_with(
         to="dev@example.com",
         subject="Confirmacion sin TACC - Cafe X",
-        text="Hola, somos el equipo de CeliacMap...",
+        text=expected_body,
         from_address="outreach@celiacmap.org",
         reply_to=None,
     )

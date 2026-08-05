@@ -75,12 +75,19 @@ class SupabaseClient:
         return res.data[0] if res.data else None
 
     def fetch_needs_review_for_outreach(self, limit: int = 100) -> list[dict]:
-        """Oldest needs_review places not yet contacted (used by the Outreach agent)."""
+        """Oldest needs_review places not yet contacted (used by the Outreach agent).
+
+        outreach_opt_out=False is enforced here (primary, cheap) and again in
+        OutreachAgent._select_candidates (defense in depth, ADR-003) — a place
+        that asked not to be contacted again must never be reselected,
+        regardless of outreach_status.
+        """
         res = (
             self._db.table("places")
             .select("*")
             .eq("status", "needs_review")
             .eq("outreach_status", "not_sent")
+            .eq("outreach_opt_out", False)
             .order("created_at")
             .limit(limit)
             .execute()

@@ -32,6 +32,26 @@ logger = logging.getLogger("celiacmap.agent")
 # re-evaluated by a duplicate/late/redelivered webhook.
 ACTIONABLE_STATUSES = ("needs_review", "outreach_confirmed")
 
+# Haiku pre-check: does this reply request no further contact? Kept
+# separate from RUBRIC (Sonnet) — a cheap yes/no classification, not a
+# safety judgment, so it never touches the Validator's rubric.
+OPT_OUT_RUBRIC = """\
+Analizás la respuesta de un comercio a un email de CeliacMap que le pedía \
+confirmar si ofrece opciones sin TACC. Tu única tarea es determinar si el \
+comercio está pidiendo explícitamente NO recibir más contactos de \
+CeliacMap — nada más. No evalúes si el lugar es seguro para celíacos.
+
+Es un opt-out cuando el comercio pide explícitamente que no lo contacten \
+más, que lo den de baja, que dejen de escribirle, o rechaza ser contactado \
+nuevamente. NO es un opt-out una respuesta que simplemente no confirma \
+información sin TACC, ignora la pregunta, o es ambigua — ante la duda, \
+respondé false.
+
+Respondé ÚNICAMENTE con un objeto JSON válido, sin texto adicional, \
+exactamente con esta forma:
+{"is_opt_out": true | false, "reason": "<breve explicación en español>"}
+"""
+
 
 def _build_reply_prompt(place: dict, reviews: list[dict], reply_text: str) -> str:
     base = ValidatorAgent._build_user_prompt(place, reviews)
@@ -47,10 +67,31 @@ def _build_reply_prompt(place: dict, reviews: list[dict], reply_text: str) -> st
 class OutreachReplyHandler(BaseAgent):
     name = "outreach_reply"
 
-    def __init__(self, db: SupabaseClient, llm: LLMClient):
+    def __init__(self, db: SupabaseClient, llm: LLMClient, haiku_model: str | None = None):
         super().__init__(db)
         self.llm = llm
+        self.haiku_model = haiku_model
         self.validator = ValidatorAgent(db, llm)  # reused only for ._normalize()
+
+    def _classify_opt_out(self, reply_text: str) -> dict:
+        """Cheap Haiku pre-check. Always returns {'is_opt_out': bool, 'reason': str | None}.
+
+        Defaults to is_opt_out=False on any classification failure: a missed
+        opt-out just proceeds into the existing, already-conservative Sonnet
+        re-evaluation below; a false positive would permanently block a
+        legitimate business, since outreach_opt_out has no unset path.
+        """
+        try:
+            raw = self.llm.complete_json(
+                OPT_OUT_RUBRIC, reply_text, model=self.haiku_model, max_tokens=200
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("opt-out classification failed")
+            return {"is_opt_out": False, "reason": None}
+        return {
+            "is_opt_out": bool(raw.get("is_opt_out")),
+            "reason": (str(raw.get("reason") or "").strip() or None),
+        }
 
     def handle(self, place_id: str) -> dict:
         place = self.db.fetch_place_by_id(place_id)
@@ -81,6 +122,28 @@ class OutreachReplyHandler(BaseAgent):
                 place_id=place_id,
             )
             return {"skipped": "no reply content"}
+
+        classification = self._classify_opt_out(reply_text)
+        if classification["is_opt_out"]:
+            try:
+                self.db.update_place(place_id, {"outreach_opt_out": True})
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("persisting opt-out failed for %s", place_id)
+                self.log(
+                    "outreach_reply_opt_out_persist_failed",
+                    {"place_id": place_id, "error": str(exc)},
+                    status="error",
+                    place_id=place_id,
+                )
+                return {"skipped": "opt-out persist failed"}
+
+            self.log(
+                "outreach_reply_opt_out_detected",
+                {"place_id": place_id, "reason": classification["reason"]},
+                status="success",
+                place_id=place_id,
+            )
+            return {"place_id": place_id, "opt_out": True}
 
         try:
             reviews = self.db.fetch_reviews_for_place(place_id)
@@ -152,7 +215,7 @@ def main() -> int:
     db = SupabaseClient(settings.supabase_url, settings.supabase_service_role_key)
     llm = LLMClient(settings.anthropic_api_key, settings.validator_model)
 
-    result = OutreachReplyHandler(db, llm).handle(args.place_id)
+    result = OutreachReplyHandler(db, llm, haiku_model=settings.haiku_model).handle(args.place_id)
     print("Outreach reply handled:", result)
     return 0
 
