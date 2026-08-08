@@ -160,6 +160,49 @@ GEOGRAPHIC SCOPE
 - **Health-sensitive false approvals:** `verified` stays `false` until confirmed;
   `status` + `agent_log` act as a human review queue; surface a UI disclaimer that
   `safety_level` is a community/AI estimate, not a medical guarantee.
+- **Search agent stamped `city`/`country` from the query target, not from the
+  result's own address — fixed.** `SearchAgent.run()`
+  (`agents/search_agent.py:180-182`) calls
+  `GooglePlacesClient.to_candidate(result, country=country_name, city=city_name)`,
+  and `to_candidate` used to echo those **search query** target values from
+  `config/targets.yaml` straight through, never parsing the actual `result`'s
+  address. Google's Text Search (biased by `location`/`radius_m`, not
+  hard-bounded) can return a real business located elsewhere — most visibly
+  across an international border — and the candidate got stamped with the
+  query's city/country regardless. Confirmed live 2026-08-08: a report that
+  `San Felipa - Sin gluten` showed `city='Fray Bentos'`/`country='Uruguay'`
+  while its own `address` said "Gualeguaychú, Entre Ríos, Argentina"
+  (corrected manually via `supabase db query --linked`) prompted a broader
+  read-only sweep — querying production for `source='google_places'` rows
+  where `address` names a country the `country` column disagrees with
+  turned up **15 more** rows, all stamped `country='Uruguay'` for a `city`
+  actually in Argentina (`address` field itself correctly named the real
+  Argentine city/province): 10 stamped `Fray Bentos`, 3 `Salto`, 1 `Rivera`,
+  1 `Colonia del Sacramento`; 13 of the 15 were already `status='approved'`,
+  live on the public map. Not purely a border-town effect: several of the
+  mismatched addresses (Bahía Blanca, San Nicolás de los Arroyos, Luján,
+  Cdad. Autónoma de Buenos Aires) are hundreds of km from the queried
+  Uruguayan city, so it was a general "trust the query, not the result" bug,
+  not just border-adjacency confusion.
+
+  **Fix (2026-08-08):** `GooglePlacesClient.to_candidate()` now prefers
+  `GooglePlacesClient.parse_city_country_from_address()` — a heuristic
+  parser scoped to this project's Uruguay/Argentina scope only (real
+  province/department name lists distinguish "this segment is a province"
+  from "this segment is the city," which is what a naive fixed-position
+  split gets wrong for addresses with no province line, e.g. C.A.B.A.) —
+  and only falls back to the query target when the address doesn't parse to
+  a recognized country. `GooglePlacesClient.extract_rich_fields()` (applied
+  via the existing, already-budgeted `_apply_place_details` Details call —
+  zero new API calls) additionally overrides city/country with the
+  structured `address_components` (`"address_component"` added to
+  `DEFAULT_DETAIL_FIELDS`) whenever that call happens, since it's the
+  authoritative source over the string-parsed fallback. 9 new tests in
+  `tests/test_search_agent.py` (233 total). This only prevents the bug
+  going forward — it does not retroactively touch already-inserted rows;
+  the 15 confirmed above were corrected separately via a one-off SQL script
+  (`db/fixes/2026-08-08-border-city-country-mismatch.sql`, run manually
+  against production — see that file's own commit).
 
 ## The Core Prompt — Validator Rubric
 

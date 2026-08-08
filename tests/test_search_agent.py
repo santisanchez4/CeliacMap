@@ -254,6 +254,72 @@ def test_extract_gf_snippets_handles_none():
     assert GooglePlacesClient.extract_gf_snippets(None) == []
 
 
+# --- city/country derivation (CLAUDE.md "Key risks": Search agent stamps
+# city/country from the query target, not the result) ----------------------
+
+
+def test_to_candidate_derives_country_from_result_address_not_target():
+    # Regression for the real production bug: searching "Fray Bentos,
+    # Uruguay" can legitimately return a business actually located across
+    # the border in Gualeguaychú, Argentina (confirmed live for 16 rows,
+    # see CLAUDE.md). to_candidate must reflect the RESULT's own address,
+    # never the query target it happened to be searched under.
+    result = {
+        "name": "San Felipa - Sin gluten",
+        "formatted_address": "Italia 38, E2820 Gualeguaychú, Entre Ríos, Argentina",
+        "geometry": {"location": {"lat": -33.0092671, "lng": -58.5152646}},
+        "place_id": "ChIJ_test_san_felipa",
+    }
+
+    candidate = GooglePlacesClient.to_candidate(result, country="Uruguay", city="Fray Bentos")
+
+    assert candidate["country"] == "Argentina"
+    assert candidate["city"] == "Gualeguaychú"
+
+
+def test_parse_address_handles_missing_province_segment():
+    # C.A.B.A. addresses have no separate province line (unlike "...Entre
+    # Ríos, Argentina") -- the segment right before the country IS the city,
+    # not a province to skip past.
+    address = "Concepción Arenal 3519, C1427EKC Cdad. Autónoma de Buenos Aires, Argentina"
+    city, country = GooglePlacesClient.parse_city_country_from_address(address)
+    assert country == "Argentina"
+    assert city == "Cdad. Autónoma de Buenos Aires"
+
+
+def test_parse_address_strips_postal_code_prefix():
+    city, country = GooglePlacesClient.parse_city_country_from_address(
+        "Rocamora 257, E2820 Gualeguaychú, Entre Ríos, Argentina"
+    )
+    assert city == "Gualeguaychú"
+    assert country == "Argentina"
+
+
+def test_parse_address_returns_none_for_unrecognized_country():
+    # Outside this project's Phase 1 scope (Uruguay/Argentina) -- refuse to
+    # guess rather than fabricate a value.
+    city, country = GooglePlacesClient.parse_city_country_from_address(
+        "Av. Paulista 1000, São Paulo, Brazil"
+    )
+    assert (city, country) == (None, None)
+
+
+def test_parse_address_returns_none_for_empty_address():
+    assert GooglePlacesClient.parse_city_country_from_address("") == (None, None)
+    assert GooglePlacesClient.parse_city_country_from_address(None) == (None, None)
+
+
+def test_to_candidate_falls_back_to_target_when_address_unparseable():
+    # make_result()'s default formatted_address ("Av. Siempre Viva 123") has
+    # no recognizable country segment -- to_candidate must behave exactly
+    # like before this fix, so every other existing test using make_result()
+    # is unaffected.
+    result = make_result("X")
+    candidate = GooglePlacesClient.to_candidate(result, country="Uruguay", city="Montevideo")
+    assert candidate["country"] == "Uruguay"
+    assert candidate["city"] == "Montevideo"
+
+
 # --- Review enrichment in the run -----------------------------------------
 
 
@@ -326,6 +392,28 @@ def test_extract_rich_fields_omits_missing():
     assert GooglePlacesClient.extract_rich_fields({"website": ""}) == {}
 
 
+def test_extract_rich_fields_includes_city_country_from_address_components():
+    result = {
+        "address_components": [
+            {"long_name": "Gualeguaychú", "short_name": "Gualeguaychú", "types": ["locality", "political"]},
+            {"long_name": "Entre Ríos", "short_name": "Entre Ríos", "types": ["administrative_area_level_1", "political"]},
+            {"long_name": "Argentina", "short_name": "AR", "types": ["country", "political"]},
+        ]
+    }
+    rich = GooglePlacesClient.extract_rich_fields(result)
+    assert rich["city"] == "Gualeguaychú"
+    assert rich["country"] == "Argentina"
+
+
+def test_extract_rich_fields_omits_city_country_when_components_absent():
+    # No address_components in the Details response -> don't add the keys at
+    # all, so update_place() never clobbers the value to_candidate() already
+    # set with an empty/None patch.
+    rich = GooglePlacesClient.extract_rich_fields({"rating": 4.5})
+    assert "city" not in rich
+    assert "country" not in rich
+
+
 def test_rich_fields_applied_to_inserted_candidate():
     agent, db, places = make_agent(max_detail_lookups=5)
     places.text_search.return_value = {"results": [make_result("A")]}
@@ -347,6 +435,35 @@ def test_rich_fields_applied_to_inserted_candidate():
     assert patch["rating"] == 4.6
     assert summary["details_fetched"] == 1
     assert summary["rich_updated"] == 1
+
+
+def test_run_patches_city_country_via_details_when_available():
+    # End-to-end: the initial insert uses to_candidate()'s formatted_address
+    # fallback (target was wrong: Uruguay/Fray Bentos), then the Details call
+    # -- already happening for rich fields, no new API call -- corrects it
+    # via the structured address_components, same update_place() patch.
+    agent, db, places = make_agent(max_detail_lookups=5)
+    result = make_result("A")
+    result["formatted_address"] = "Italia 38, E2820 Gualeguaychú, Entre Ríos, Argentina"
+    places.text_search.return_value = {"results": [result]}
+    places.place_details_with_reviews.return_value = {
+        "result": {
+            "address_components": [
+                {"long_name": "Gualeguaychú", "types": ["locality", "political"]},
+                {"long_name": "Argentina", "types": ["country", "political"]},
+            ]
+        }
+    }
+
+    agent.run()
+
+    insert_payload = db.insert_place_candidate.call_args.args[0]
+    assert insert_payload["country"] == "Argentina"  # fallback already got it right
+    assert insert_payload["city"] == "Gualeguaychú"
+
+    patch = db.update_place.call_args.args[1]
+    assert patch["city"] == "Gualeguaychú"
+    assert patch["country"] == "Argentina"
 
 
 def test_details_lookup_capped():

@@ -9,6 +9,7 @@ agents, not here.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from typing import Any
 
@@ -31,6 +32,11 @@ DEFAULT_DETAIL_FIELDS = [
     "opening_hours",
     "rating",
     "user_ratings_total",
+    # Structured city/country (see GooglePlacesClient.city_country_from_components):
+    # more reliable than parsing formatted_address, and this call already
+    # happens for every candidate within max_detail_lookups, so this is a free
+    # extra field, not a new API call.
+    "address_component",
 ]
 
 # Extra fields requested when we also want community reviews for enrichment.
@@ -63,6 +69,41 @@ GF_KEYWORDS = (
     "celiaca",
     "apto celiaco",
     "apto celiacos",
+)
+
+
+# Scoped to this project's Phase 1 geographic scope (CLAUDE.md: Uruguay and
+# Argentina). Used only to tell a "province/department" address segment apart
+# from a "city" segment when parsing formatted_address -- NOT a general-purpose
+# geocoder. Revisit when the project scope expands beyond these two countries.
+SUPPORTED_COUNTRIES = {"argentina": "Argentina", "uruguay": "Uruguay"}
+
+AR_PROVINCES = {
+    "buenos aires", "catamarca", "chaco", "chubut", "cordoba", "corrientes",
+    "entre rios", "formosa", "jujuy", "la pampa", "la rioja", "mendoza",
+    "misiones", "neuquen", "rio negro", "salta", "san juan", "san luis",
+    "santa cruz", "santa fe", "santiago del estero", "tierra del fuego",
+    "tucuman",
+}
+
+UY_DEPARTMENTS = {
+    "artigas", "canelones", "cerro largo", "colonia", "durazno", "flores",
+    "florida", "lavalleja", "maldonado", "montevideo", "paysandu",
+    "rio negro", "rivera", "rocha", "salto", "san jose", "soriano",
+    "tacuarembo", "treinta y tres",
+}
+
+# Argentine postal codes are either plain digits (old format, e.g. "E2820")
+# or the full CPA format letter+4digits+3letters (e.g. "C1427EKC"); Uruguayan
+# codes are 5 plain digits. Matches either, followed by the required space
+# before the actual place name.
+_POSTAL_PREFIX_RE = re.compile(r"^(?:[A-Za-z]\d{4}[A-Za-z]{3}|[A-Za-z]?\d{4,5})\s+")
+
+# Strips an optional "Provincia de "/"Province of " prefix or " Province"
+# suffix so "Provincia de Buenos Aires" / "Entre Ríos Province" both compare
+# equal to the bare province name.
+_PROVINCE_WRAP_RE = re.compile(
+    r"^(?:provincia de |province of )?(.+?)(?: province)?$", re.IGNORECASE
 )
 
 
@@ -125,9 +166,84 @@ class GooglePlacesClient:
         return candidates[0] if candidates else None
 
     @staticmethod
+    def parse_city_country_from_address(formatted_address: str | None) -> tuple[str | None, str | None]:
+        """Best-effort (city, country) from a Google `formatted_address` string.
+
+        Only trusted as a fallback: it's a fixed heuristic over Google's
+        typical AR/UY address shape ("street, [postal]city, province,
+        country" -- or without a street, or without a province line for
+        C.A.B.A.), not a general parser. Returns (None, None) whenever the
+        address doesn't end in a recognized country (this project's scope is
+        only Argentina/Uruguay), so callers always have a safe target-based
+        fallback of their own.
+        """
+        if not formatted_address:
+            return None, None
+        parts = [p.strip() for p in formatted_address.split(",") if p.strip()]
+        if len(parts) < 2:
+            return None, None
+
+        country = SUPPORTED_COUNTRIES.get(_normalize_text(parts[-1]))
+        if not country:
+            return None, None
+
+        provinces = AR_PROVINCES if country == "Argentina" else UY_DEPARTMENTS
+        second_to_last = parts[-2]
+        province_name = _PROVINCE_WRAP_RE.sub(r"\1", second_to_last).strip()
+
+        # A real province/department segment means the city is one segment
+        # further back; otherwise the segment right before the country IS
+        # the city (e.g. C.A.B.A. addresses have no separate province line).
+        if len(parts) >= 3 and _normalize_text(province_name) in provinces:
+            city_raw = parts[-3]
+        else:
+            city_raw = second_to_last
+
+        city = _POSTAL_PREFIX_RE.sub("", city_raw).strip() or None
+        return city, country
+
+    @staticmethod
+    def city_country_from_components(
+        address_components: list[dict[str, Any]] | None,
+    ) -> tuple[str | None, str | None]:
+        """(city, country) from a Place Details `address_components` list.
+
+        Structured and Google-maintained -- the authoritative source,
+        preferred over `parse_city_country_from_address` whenever a Details
+        call was made. `locality` is the usual city type; a few Argentine
+        addresses (e.g. some Buenos Aires Province localities) only carry
+        `administrative_area_level_2`, used as a fallback for city.
+        """
+        if not address_components:
+            return None, None
+        city = None
+        admin_area_2 = None
+        country = None
+        for component in address_components:
+            types = component.get("types") or []
+            if "country" in types:
+                country = component.get("long_name")
+            elif "locality" in types:
+                city = component.get("long_name")
+            elif "administrative_area_level_2" in types:
+                admin_area_2 = component.get("long_name")
+        return city or admin_area_2, country
+
+    @staticmethod
     def to_candidate(result: dict[str, Any], *, country: str, city: str) -> dict:
-        """Map a raw Places result to a `places` candidate (no category yet)."""
+        """Map a raw Places result to a `places` candidate (no category yet).
+
+        `country`/`city` are the SEARCH TARGET (from config/targets.yaml) and
+        are only a fallback: Google's Text Search can legitimately return a
+        result located elsewhere (most visibly across an international
+        border near a bridge crossing -- see CLAUDE.md's "Key risks"), so the
+        result's own `formatted_address` is preferred whenever it parses to a
+        recognized country.
+        """
         loc = (result.get("geometry") or {}).get("location") or {}
+        parsed_city, parsed_country = GooglePlacesClient.parse_city_country_from_address(
+            result.get("formatted_address")
+        )
         return {
             "name": result.get("name"),
             "lat": loc.get("lat"),
@@ -135,8 +251,8 @@ class GooglePlacesClient:
             "address": result.get("formatted_address") or result.get("vicinity"),
             "external_id": result.get("place_id"),
             "source": "google_places",
-            "country": country,
-            "city": city,
+            "country": parsed_country or country,
+            "city": parsed_city or city,
         }
 
     @staticmethod
@@ -169,6 +285,14 @@ class GooglePlacesClient:
         total = result.get("user_ratings_total")
         if isinstance(total, int):
             rich["user_ratings_total"] = total
+
+        city, country = GooglePlacesClient.city_country_from_components(
+            result.get("address_components")
+        )
+        if city:
+            rich["city"] = city
+        if country:
+            rich["country"] = country
 
         return rich
 
