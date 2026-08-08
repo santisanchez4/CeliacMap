@@ -40,6 +40,7 @@ jobs:
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       OUTREACH_TEST_RECIPIENT: ${{ secrets.OUTREACH_TEST_RECIPIENT }}
+      OUTREACH_LIVE_MODE: ${{ secrets.OUTREACH_LIVE_MODE }}
       OUTREACH_SENDER_EMAIL: outreach@celiacmap.org
       OUTREACH_INBOUND_DOMAIN: celiacmap.org
       # Initial bounded volume per ADR-003, not the code default of 20.
