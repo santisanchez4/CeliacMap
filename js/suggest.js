@@ -85,7 +85,8 @@
       country: countryEl.value || "",
       category: categoryEl.value || null,
       evidence_url: (urlEl.value || "").trim() || null,
-      notes: (notesEl.value || "").trim() || null
+      notes: (notesEl.value || "").trim() || null,
+      origin: "community"
     };
 
     if (!data.name || !data.address || !data.city || !data.country) {

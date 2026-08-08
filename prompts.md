@@ -1192,3 +1192,73 @@ existing full re-evaluation unchanged.
   Secret and forwarded into `agents-monthly.yml`'s `env:` block — closing the
   gap where the secret existed but the workflow never passed it through to
   `scripts/run_agents.py`. See CLAUDE.md's Phase 18 build-status entry.
+
+## 23. ADR-004 + PLAN-community-reviews.md — Community Reports Design
+
+**Prompt (summary):** "Draft ADR-004 (reportes comunitarios como evidencia,
+no acción directa — mismo patrón que ADR-002/outreach). Investigá cómo está
+armado `outreach_reply_handler.py` + su Edge Function para reusar el mismo
+patrón, ahora disparado por un `INSERT` en una tabla nueva `place_reports`
+en vez de un webhook de email, y redactá
+`docs/plans/PLAN-community-reviews.md` con schema, frontend, backend y
+tests. Mostrame el plan para revisión antes de tocar código."
+
+**Used for:** Documenting a proposed (not yet built) feature — community
+"recommend / report" evidence on places already published on the map —
+before any schema or code changes, same plan-first discipline used for
+Outreach. Produced
+`docs/architecture/ADR-004-community-reports-evidence-not-direct-action.md`
+(Estado: Propuesto) and `docs/plans/PLAN-community-reviews.md`.
+
+**Key decisions made across this multi-turn design session:**
+- **Reused Etapa 2's exact pattern, one real difference in status
+  mapping.** The planned `agents/review_handler.py` reuses `RUBRIC` /
+  `ValidatorAgent._normalize` unmodified, same as `outreach_reply_handler.py`
+  — but with **no remapping** to a distinct status (unlike outreach's
+  `outreach_confirmed`): since the place is already `approved`, the
+  Validator's own verdict (approved/needs_review/discarded) is trusted
+  directly.
+- **Fase 0 surfaced a real design gap before any code was written.**
+  Investigating Supabase Database Webhooks (the planned trigger, replacing
+  Resend's webhook) found they do **not** auto-retry on non-2xx/timeout,
+  unlike Resend — invalidating the original "500 = retryable" assumption
+  borrowed from `outreach-reply.ts`. Resolved by adding a monthly sweep
+  stage (`ReviewHandler.sweep()`) to `scripts/run_agents.py` as a safety
+  net, with an atomic claim (`claim_place_report`, CAS on
+  `place_reports.status`) as the one guard making the real-time path and
+  the sweep safe to race against each other — a report is never processed
+  twice.
+- **Schema prepared (Fase 1), not yet applied live:** `place_reports`
+  table + `suggestions.origin` column drafted in `db/schema.sql`;
+  `js/suggest.js` sends `origin: 'community'` explicitly.
+- **Real production bug found and fixed while preparing this apply**
+  (unrelated to the new feature, but blocking it): running `db/schema.sql`
+  fresh end-to-end for the first time (previous migrations were always
+  applied incrementally, one new block at a time) revealed that superseded
+  `CHECK`-widening `do $$` blocks are **not** safe to leave in the file once
+  real production data exists outside their (narrower) allowed set — an
+  *earlier*, narrower block fails outright against current rows, even
+  though a *later* block in the same file would have permitted them. Found
+  via the file's own `places_status_check` (an old 4-value block predating
+  `outreach_confirmed`, which real rows already use) and confirmed the same
+  latent bug in `agent_log_agent_check`'s 4-block widening chain via a
+  **read-only** `supabase db query --linked` check against production (19
+  `agent='outreach'` rows, 6 `agent='outreach_reply'` rows). Both collapsed
+  to a single final block each. General lesson: a chain of "widen in place"
+  migration blocks is only safe to *incrementally* apply over time as each
+  one ships — not to replay from scratch once real data has accumulated
+  past the earliest ones.
+- **Verification tooling discovered this session:** the Supabase CLI **is**
+  installed (npm devDependency, `node_modules/.bin/supabase`, v2.111.0 —
+  not on the system PATH, which is why it was initially missed) and already
+  linked+authenticated to the real `celiacmap` project. `supabase db query
+  --linked --file <path>` can execute SQL directly; `supabase db query
+  --linked "<sql>"` was used read-only above to confirm the `agent_log` bug
+  against real data. `pglast` (Python bindings to Postgres's real parser,
+  `libpg_query`) was used as a local syntax check — installed and
+  uninstalled per check, not a project dependency.
+
+**Not yet done:** the SQL has not been applied to the live database; Fase 2
+(backend: Edge Function, workflow, `agents/review_handler.py`) and Fase 3
+(frontend form) are still unbuilt — see `docs/plans/PLAN-community-reviews.md`
+for the full remaining plan.

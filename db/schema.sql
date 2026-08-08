@@ -92,18 +92,6 @@ end $$;
 -- databases created before this column existed.
 alter table public.places add column if not exists social_url text;
 
--- Validator rubric adoption (Jun 2026): the verdict gains a 'needs_review' tier
--- (verdict 'needs_review' / any confidence < 0.7 → held back from the map for a
--- human). On an already-created table the inline check above is a no-op, so widen
--- it in place. 'rejected' verdicts continue to map to status 'discarded'.
-do $$
-begin
-  alter table public.places drop constraint if exists places_status_check;
-  alter table public.places
-    add constraint places_status_check
-    check (status in ('pending', 'approved', 'discarded', 'needs_review'));
-end $$;
-
 -- The Validator now also persists its detected flags and suggested operator
 -- action. Added idempotently for databases created before these columns existed.
 alter table public.places add column if not exists flags jsonb;
@@ -250,38 +238,16 @@ create table if not exists public.agent_log (
 create index if not exists agent_log_created_at_idx on public.agent_log (created_at);
 create index if not exists agent_log_agent_idx      on public.agent_log (agent);
 
--- Allow the Social agent (agent='social'), the Web discovery agent (agent='web'),
--- the pipeline orchestrator (agent='pipeline') and the Suggestion promoter
--- (agent='suggestion') to log under agent_log. On an already-created table the
--- inline check above is a no-op, so widen it in place.
-do $$
-begin
-  alter table public.agent_log drop constraint if exists agent_log_agent_check;
-  alter table public.agent_log
-    add constraint agent_log_agent_check
-    check (agent in ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion'));
-end $$;
-
--- Outreach Agent (agents/outreach_agent.py, Phase 15): let the outreach send
--- stage log to agent_log like every other agent. Until this widening is
--- applied, every BaseAgent.log() call from agent='outreach' fails silently
--- (caught by the try/except in agents/base.py), so the pipeline runs without
--- error but the audit trail stays empty. On an already-created table the
--- inline check above is a no-op, so widen it in place.
-do $$
-begin
-  alter table public.agent_log drop constraint if exists agent_log_agent_check;
-  alter table public.agent_log
-    add constraint agent_log_agent_check
-    check (agent in
-      ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion', 'outreach'));
-end $$;
-
--- Outreach Agent Etapa 2 (agents/outreach_reply_handler.py): let the reply
--- handler — triggered by a GitHub repository_dispatch event fired from the
--- Supabase Edge Function, never the monthly cron — log to agent_log like
--- every other agent. Same silent-failure-until-applied gap as the
--- 'outreach' widening above.
+-- agent_log.agent was widened incrementally over time as new agents shipped:
+-- base (search/validator/updater/social/web/pipeline/suggestion) -> +outreach
+-- (Phase 15) -> +outreach_reply (Etapa 2) -> +review_handler (ADR-004,
+-- docs/plans/PLAN-community-reviews.md). Collapsed into a single widening
+-- here instead of that chain of separate DO blocks: applied one at a time,
+-- incrementally, each was always safe — but with real production rows
+-- already using 'outreach' (19) and 'outreach_reply' (6) (confirmed live via
+-- `supabase db query --linked`), re-running the OLDER, narrower intermediate
+-- blocks against a fully-populated table fails outright on a full fresh
+-- apply — the same bug class found and fixed in places_status_check above.
 do $$
 begin
   alter table public.agent_log drop constraint if exists agent_log_agent_check;
@@ -289,7 +255,7 @@ begin
     add constraint agent_log_agent_check
     check (agent in
       ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion',
-       'outreach', 'outreach_reply'));
+       'outreach', 'outreach_reply', 'review_handler'));
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -342,6 +308,70 @@ create index if not exists suggestions_status_idx on public.suggestions (status)
 -- enforced by the RLS WITH CHECK below.
 alter table public.suggestions add column if not exists address text;
 
+-- Community reports (PLAN-community-reviews.md): distinguishes who a
+-- suggestions row came from. Every current writer (js/suggest.js, and the
+-- new report form's no-match fallback) sends 'community' explicitly — see
+-- the RLS WITH CHECK below, which enforces it server-side too. 'business' is
+-- reserved for a future self-onboarding flow (none exists yet); the column
+-- ships now so that flow won't need its own migration later.
+alter table public.suggestions add column if not exists origin text
+  not null default 'community'
+  check (origin in ('community', 'business'));
+
+-- ---------------------------------------------------------------------
+-- Table: place_reports  (community "recommend / report" form intake)
+-- ---------------------------------------------------------------------
+-- The public form (anon key) writes a report about a place ALREADY on the
+-- map — unlike `suggestions`, which is for places not yet published. Per
+-- ADR-004, a report never modifies `places` directly: it is evidence
+-- reinjected into the same Validator rubric. A 'negative' report on an
+-- 'approved' place triggers an automatic re-evaluation (real-time via a
+-- Supabase Database Webhook -> Edge Function -> repository_dispatch, with a
+-- monthly sweep as a safety net — see PLAN-community-reviews.md, "Barrido
+-- mensual + idempotencia"); a 'positive' report, or a 'negative' report on a
+-- place that isn't 'approved', or a report with no place_id match, never
+-- triggers anything automatic (ADR-004 points 2-4) and stays for manual review.
+create table if not exists public.place_reports (
+  id               uuid primary key default gen_random_uuid(),
+  -- Nullable: a report with no autocomplete match keeps place_id null and
+  -- records the free-text name instead (see place_reports_has_target below).
+  place_id         uuid references public.places(id) on delete set null,
+  place_name_text  text
+                     check (place_name_text is null or char_length(place_name_text) between 2 and 120),
+  report_type      text not null
+                     check (report_type in ('positive', 'negative')),
+  description      text not null
+                     check (char_length(description) between 5 and 2000),
+  -- Processing state (not the place's publish state):
+  --   new        -> just inserted; also the TERMINAL state for 'positive'
+  --                 reports, 'negative' reports on a non-approved place, and
+  --                 reports with no place_id match (ADR-004 points 2-4) —
+  --                 nothing automated moves them past this.
+  --   dispatched -> negative + place approved: the Edge Function fired the
+  --                 repository_dispatch (best-effort — Supabase Database
+  --                 Webhooks do not auto-retry on non-2xx/timeout, unlike
+  --                 the Resend webhook Etapa 2 of outreach relies on; the
+  --                 monthly sweep covers whatever is left stuck here).
+  --   processing -> ReviewHandler.handle() atomically claimed this report
+  --                 (CAS: new/dispatched -> processing) and is evaluating
+  --                 it now. This state is what makes the real-time path and
+  --                 the monthly sweep safe to race against each other.
+  --   processed  -> review_handler.py finished re-evaluating and persisted
+  --                 a Validator verdict.
+  --   skipped    -> claimed, but the place was no longer 'approved' by the
+  --                 time this ran (another report already moved it).
+  --   error      -> the re-evaluation itself failed (LLM or persistence).
+  status           text not null default 'new'
+                     check (status in
+                       ('new', 'dispatched', 'processing', 'processed', 'skipped', 'error')),
+  created_at       timestamptz not null default now(),
+  constraint place_reports_has_target
+    check (place_id is not null or place_name_text is not null)
+);
+
+create index if not exists place_reports_place_id_idx on public.place_reports (place_id);
+create index if not exists place_reports_status_idx   on public.place_reports (status);
+
 -- ---------------------------------------------------------------------
 -- Trigger: keep places.updated_at fresh on UPDATE
 -- ---------------------------------------------------------------------
@@ -369,6 +399,7 @@ alter table public.reviews     enable row level security;
 alter table public.agent_log   enable row level security;
 alter table public.suggestions enable row level security;
 alter table public.outreach_messages enable row level security;
+alter table public.place_reports enable row level security;
 
 -- Table-level privileges (RLS still gates rows).
 grant select on public.places  to anon, authenticated;
@@ -383,6 +414,10 @@ revoke all on public.outreach_messages from anon, authenticated;
 -- service_role key, which bypasses RLS.)
 revoke all on public.suggestions from anon, authenticated;
 grant insert on public.suggestions to anon, authenticated;
+-- place_reports: same INSERT-only shape as suggestions — the public can
+-- submit a report but never read back others' submissions, update or delete.
+revoke all on public.place_reports from anon, authenticated;
+grant insert on public.place_reports to anon, authenticated;
 
 -- places: anyone may read ONLY approved rows.
 drop policy if exists "public read approved places" on public.places;
@@ -413,10 +448,13 @@ create policy "public read reviews of approved places"
 -- public, same as agent_log. (service_role bypasses RLS and retains full access.)
 
 -- suggestions: the public may only INSERT a fresh submission. The WITH CHECK
--- forces a safe initial state (status='new', not pre-promoted) and requires a
--- non-empty address (needed to geocode); the column CHECKs above bound every
--- field's length so the table can't be abused as free storage. No
--- SELECT/UPDATE/DELETE policy => those are denied to anon.
+-- forces a safe initial state (status='new', not pre-promoted), requires a
+-- non-empty address (needed to geocode), and forces origin='community' (the
+-- only writer today is js/suggest.js and the report form's no-match
+-- fallback — 'business' has no flow yet, so RLS refuses it defense-in-depth
+-- even if a client tried); the column CHECKs above bound every field's
+-- length so the table can't be abused as free storage. No SELECT/UPDATE/
+-- DELETE policy => those are denied to anon.
 drop policy if exists "public can submit suggestions" on public.suggestions;
 create policy "public can submit suggestions"
   on public.suggestions
@@ -427,4 +465,23 @@ create policy "public can submit suggestions"
     and promoted_place_id is null
     and address is not null
     and char_length(address) between 2 and 200
+    and origin = 'community'
+  );
+
+-- place_reports: the public may only INSERT a fresh report. The WITH CHECK
+-- forces a safe initial state (status='new'), requires either a matched
+-- place_id or a free-text place_name_text (place_reports_has_target already
+-- enforces this at the column level, restated here for defense-in-depth),
+-- and re-bounds description length; the column CHECKs above are the primary
+-- enforcement. No SELECT/UPDATE/DELETE policy => those are denied to anon
+-- (ReviewHandler reads/writes via the service_role key, which bypasses RLS).
+drop policy if exists "public can submit place reports" on public.place_reports;
+create policy "public can submit place reports"
+  on public.place_reports
+  for insert
+  to anon, authenticated
+  with check (
+    status = 'new'
+    and (place_id is not null or place_name_text is not null)
+    and char_length(description) between 5 and 2000
   );

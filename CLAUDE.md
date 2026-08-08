@@ -895,6 +895,73 @@ Supabase Edge Function, the webhook receiver), `.github/workflows/outreach-reply
   ones needed there, since the Python side never calls Resend or GitHub
   itself.
 
+### Community reports (`place_reports`) design decisions
+
+Proposed (not yet built) in
+`docs/architecture/ADR-004-community-reports-evidence-not-direct-action.md`
+(Estado: Propuesto) and `docs/plans/PLAN-community-reviews.md`. Lets anyone
+recommend or report on a place **already published** on the map — distinct
+from `suggestions`, which is for places not yet published. Same governing
+principle as Outreach (ADR-002): a report never modifies `places` directly,
+only reinjects evidence into the same Validator rubric.
+
+- **Reuses Etapa 2's exact pattern; one real difference.** The planned
+  `agents/review_handler.py` reuses `RUBRIC` / `ValidatorAgent._normalize`
+  unmodified, same reuse discipline as `outreach_reply_handler.py` — but
+  with **no status remapping**: since the place being reported on is
+  already `approved` (unlike outreach's `needs_review` starting point), the
+  Validator's own verdict (approved/needs_review/discarded) is trusted
+  directly instead of being funneled through a distinct
+  `outreach_confirmed`-style intermediate state.
+- **Trigger — a Supabase Database Webhook, not a Resend webhook.** `INSERT`
+  on `place_reports` (`report_type='negative'` + place `approved`) fires a
+  Database Webhook → a new Edge Function (`place-report-created`) →
+  `repository_dispatch` → a new workflow → `review_handler.py`, mirroring
+  outreach's Etapa 2 chain exactly except for the trigger source.
+- **Database Webhooks don't auto-retry — a monthly sweep is the
+  mitigation.** Confirmed (official docs + a GitHub discussion with no
+  maintainer reply) that, unlike the Resend webhook redelivery outreach's
+  Etapa 2 relies on, Supabase Database Webhooks do **not** retry on a
+  non-2xx response or a timeout. `ReviewHandler.sweep()` — planned as an
+  8th pipeline stage in `scripts/run_agents.py`, budgeted like every other
+  agent (`MAX_REVIEW_SWEEP_PER_RUN`) — re-drives anything left stuck in
+  `place_reports.status` `new`/`dispatched`. An atomic claim
+  (`claim_place_report`, CAS on `status`, new state `processing`) is the
+  single guard that makes the real-time path and the monthly sweep safe to
+  race against each other — whichever reaches the claim first does the
+  work; the other is a no-op.
+- **`suggestions.origin` added for the report form's no-match fallback.** A
+  report typed against the autocomplete with no match routes into the
+  existing `suggestions` pipeline instead of a dead end in `place_reports`
+  (which has nothing to auto-re-evaluate without a `place_id`). `origin`
+  (`'community'` default, `'business'` reserved unused) distinguishes
+  writers; `js/suggest.js` now sends `origin: 'community'` explicitly
+  rather than relying on the column default silently.
+- **Schema-migration lesson (applies beyond this feature).** Preparing this
+  schema surfaced a real bug already living in `db/schema.sql`: a chain of
+  `do $$ ... drop/add constraint ... check(...) ... end $$;` blocks that
+  incrementally *widen* a CHECK is only safe to apply **one block at a
+  time, as each ships** — replaying the whole file fresh once real
+  production data has accumulated past an early, narrower block makes that
+  block fail outright (`ALTER TABLE ... ADD CONSTRAINT` validates against
+  every existing row at the moment it runs, not just the file's final
+  state). Found in `places_status_check` (a stale 4-value block predating
+  `outreach_confirmed`, which real rows already use) and confirmed the same
+  latent bug in `agent_log_agent_check`'s 4-block chain via a **read-only**
+  `supabase db query --linked` check against production (19
+  `agent='outreach'` rows, 6 `agent='outreach_reply'` rows would have broken
+  it). Both collapsed to one final block each. Going forward, a superseded
+  intermediate widening step should be deleted, not kept as history, once
+  superseded.
+- **Tooling correction — the Supabase CLI is installed.** `node_modules/.bin/supabase`
+  (npm `devDependency`, v2.111.0), not on the system `PATH` — already
+  linked and authenticated to the real `celiacmap` project. `supabase db
+  query --linked --file <path>` can execute SQL directly against
+  production; `supabase db query --linked "<sql>"` was used read-only to
+  verify the bug above. Corrects an earlier claim made in this same session
+  that no CLI was available — worth remembering so future sessions don't
+  re-discover it the hard way.
+
 ### Frontend design audit (frontend-design + web-design-guidelines + ui-ux-pro-max)
 
 Three third-party Claude Code skills were installed as **project skills** under
@@ -1205,6 +1272,25 @@ pass over the existing editorial redesign, not a rebuild:
   not been observed end-to-end (bounce/delivery, opt-out reply, and a normal
   reply all still need a live confirmation) — the standalone verification
   called for in Phase 15/16 now applies specifically to live mode.
+- 🚧 **Phase 19 — Community reports (`place_reports`), schema prepared.**
+  `db/schema.sql` gained the `place_reports` table (`report_type`
+  positive/negative, nullable `place_id` + `place_name_text` fallback, and a
+  processing-state `status` including `processing` for the claim-based
+  idempotency guard — see **Community reports (`place_reports`) design
+  decisions** above), `suggestions.origin`, RLS for both, and a widened
+  `agent_log.agent` CHECK for `'review_handler'`. `js/suggest.js` sends
+  `origin: 'community'` explicitly. Design rationale:
+  `docs/architecture/ADR-004-community-reports-evidence-not-direct-action.md`
+  (Propuesto) and `docs/plans/PLAN-community-reviews.md`. Along the way, a
+  real bug already living in `db/schema.sql` was found and fixed — duplicate/
+  superseded `CHECK`-widening blocks unsafe to replay against current
+  production data (see the schema-migration lesson above) — unrelated to
+  this feature but blocking a first full fresh apply of the file.
+  Re-validated with `pglast` (a local Postgres-parser syntax check) after
+  every edit: 0 errors, 64 statements. **Not yet applied to the live
+  database.** Still unbuilt: Fase 2 (`agents/review_handler.py`, the
+  `place-report-created` Edge Function, its workflow) and Fase 3 (the
+  frontend report form) — see the plan's remaining phases.
 
 ### GitHub Pages deploy decision
 
