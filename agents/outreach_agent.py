@@ -60,7 +60,10 @@ dirigido a un comercio que aparece como candidato en el mapa pero todavía no \
 tiene evidencia suficiente confirmada.
 
 Se te da el nombre del comercio, su categoría y su ciudad. El email debe:
-- Presentar brevemente a CeliacMap (un mapa comunitario, no una entidad oficial).
+- Presentar brevemente a CeliacMap (un mapa comunitario, no una entidad oficial). \
+Al hacerlo, mencionar naturalmente que pueden ver cómo funciona en \
+https://celiacmap.org — integrado en la misma oración de presentación, nunca \
+como un link suelto al final ni como firma separada.
 - Pedir amablemente que confirmen si ofrecen opciones sin TACC y, si es \
 posible, que describan su protocolo de contaminación cruzada.
 - Ser breve (2-3 párrafos cortos), cordial, sin sonar a spam ni a exigencia.
