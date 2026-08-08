@@ -1287,8 +1287,14 @@ pass over the existing editorial redesign, not a rebuild:
   production data (see the schema-migration lesson above) — unrelated to
   this feature but blocking a first full fresh apply of the file.
   Re-validated with `pglast` (a local Postgres-parser syntax check) after
-  every edit: 0 errors, 64 statements. **Not yet applied to the live
-  database.** Still unbuilt: Fase 2 (`agents/review_handler.py`, the
+  every edit: 0 errors, 64 statements. **Applied live to Supabase** (pasted
+  manually into the SQL Editor, ran to `success`) and verified read-only
+  via `supabase db query --linked`: `place_reports` exists,
+  `suggestions.origin` defaults to `'community'`, and both fixed
+  constraints (`places_status_check` with its 5 values,
+  `agent_log_agent_check` with its 10) hold exactly as written — no data
+  was harmed by the earlier duplicate-CHECK bug, since it was caught before
+  this apply. Still unbuilt: Fase 2 (`agents/review_handler.py`, the
   `place-report-created` Edge Function, its workflow) and Fase 3 (the
   frontend report form) — see the plan's remaining phases.
 
