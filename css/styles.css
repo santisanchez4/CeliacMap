@@ -439,9 +439,19 @@ h1, h2, h3 {
 }
 
 /* ------------------------ Suggest-a-place form --------------------- */
-.suggest-form {
-  max-width: 720px;
+/* .suggest-forms holds Form A ("Sumá un lugar") and Form B ("Recomendar /
+   reportar") side by side; the two <form> cards below no longer center
+   themselves individually, .suggest-forms does that for the pair. */
+.suggest-forms {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+  align-items: start;
+  max-width: 1080px;
   margin: 48px auto 0;
+}
+.suggest-form,
+.report-form {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -535,11 +545,85 @@ h1, h2, h3 {
   border-color: #e3b9a9;
   color: #8a3115;
 }
-.suggest-form[aria-busy="true"] { opacity: 0.7; pointer-events: none; }
+.suggest-form[aria-busy="true"],
+.report-form[aria-busy="true"] { opacity: 0.7; pointer-events: none; }
+
+/* ------------------------ Recommend/report form (Form B) ----------- */
+.rp-type-toggle { border: none; padding: 0; margin: 0 0 22px; }
+.rp-type-toggle legend {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 9px;
+  padding: 0;
+}
+.rp-type-options { display: flex; gap: 10px; }
+.rp-type-options input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.rp-type-options label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.rp-type-options label:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.rp-type-options input[type="radio"]:checked + label {
+  background: var(--color-primary);
+  color: var(--color-bg);
+  border-color: var(--color-primary);
+}
+.rp-type-options input[type="radio"]:focus-visible + label {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.rp-search-field { position: relative; margin-bottom: 18px; }
+.rp-search-field #rp-search:read-only { background: var(--color-bg-alt); cursor: default; }
+.rp-clear-btn {
+  align-self: flex-start;
+  margin-top: 7px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rp-clear-btn:hover { color: var(--color-primary-dark); }
+
+.rp-no-match {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.rp-no-match .btn { margin-top: 12px; }
+.rp-no-match-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 900px) {
+  .suggest-forms { grid-template-columns: 1fr; gap: 32px; }
+}
 
 @media (max-width: 640px) {
   .suggest-grid { grid-template-columns: 1fr; }
-  .suggest-form { padding: 28px 22px; }
+  .suggest-form,
+  .report-form { padding: 28px 22px; }
+  .rp-type-options { flex-wrap: wrap; }
 }
 
 /* ---------------------------- Map demo ----------------------------- */

@@ -392,6 +392,7 @@
           </article>
         </div>
 
+        <div class="suggest-forms">
         <form class="suggest-form reveal" id="suggest-form" novalidate>
           <p class="suggest-form-intro" data-i18n="suggest.form.intro">
             Completá los datos del lugar. Lo revisamos y, si se confirma, aparece en el mapa.
@@ -464,6 +465,79 @@
 
           <p class="suggest-status" id="sg-status" role="status" aria-live="polite" hidden></p>
         </form>
+
+        <form class="report-form reveal" id="report-form" novalidate>
+          <p class="suggest-form-intro" data-i18n="report.form.intro">
+            ¿Ya conocés un lugar del mapa? Contanos tu experiencia — lo sumamos como
+            evidencia para el mismo proceso de validación.
+          </p>
+
+          <fieldset class="rp-type-toggle">
+            <legend data-i18n="report.form.typeLegend">¿Qué querés hacer? *</legend>
+            <div class="rp-type-options">
+              <input type="radio" name="rp-type" id="rp-type-positive" value="positive" checked>
+              <label for="rp-type-positive" data-i18n="report.form.typePositive">Recomendar</label>
+              <input type="radio" name="rp-type" id="rp-type-negative" value="negative">
+              <label for="rp-type-negative" data-i18n="report.form.typeNegative">Reportar</label>
+            </div>
+          </fieldset>
+
+          <div class="field rp-search-field">
+            <label for="rp-search" data-i18n="report.form.searchLabel">Lugar *</label>
+            <input id="rp-search" type="text" autocomplete="off" role="combobox"
+              aria-expanded="false" aria-controls="rp-results" aria-autocomplete="list"
+              placeholder="Buscá el lugar por nombre…" data-i18n-placeholder="report.form.searchPh" />
+            <button type="button" id="rp-search-clear" class="rp-clear-btn" hidden
+              data-i18n="report.form.clear">Cambiar lugar</button>
+            <input type="hidden" id="rp-place-id" name="place_id" />
+            <ul id="rp-results" class="map-suggest" role="listbox"
+              aria-label="Sugerencias de lugares" hidden></ul>
+          </div>
+
+          <div id="rp-no-match-positive" class="rp-no-match" hidden aria-live="polite">
+            <p data-i18n="report.noMatch.positive.text">
+              No lo encontramos en el mapa. Si es un lugar nuevo, sumalo como sugerencia.
+            </p>
+            <a href="#suggest-form" class="btn btn-outline" id="rp-goto-suggest"
+              data-i18n="report.noMatch.positive.cta">Sugerirlo como lugar nuevo</a>
+          </div>
+          <div id="rp-no-match-negative" class="rp-no-match" hidden aria-live="polite">
+            <p data-i18n="report.noMatch.negative.text">
+              No encontramos ese lugar en el mapa. Revisá que el nombre coincida, o si
+              realmente no está publicado, no hay nada que reportar todavía.
+            </p>
+            <span class="rp-no-match-hint" data-i18n="report.noMatch.negative.hint">
+              ¿Buscabas otro lugar? Volvé a intentar.
+            </span>
+          </div>
+
+          <div id="rp-details" hidden>
+            <div class="field field-full">
+              <label for="rp-description" data-i18n="report.form.descriptionLabel">Contanos qué pasó *</label>
+              <textarea id="rp-description" name="description" rows="3" minlength="5" maxlength="2000"
+                placeholder="Describí tu experiencia: qué encontraste, cuándo, y cualquier detalle relevante."
+                data-i18n-placeholder="report.form.descriptionPh"></textarea>
+            </div>
+
+            <!-- Honeypot: off-screen, never shown to humans; bots fill it and are dropped. -->
+            <div class="suggest-hp" aria-hidden="true">
+              <label for="rp-website">No completar este campo</label>
+              <input id="rp-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+            </div>
+
+            <div class="suggest-actions">
+              <button class="btn btn-accent" type="submit" id="rp-submit"
+                data-i18n="report.form.submit">Enviar</button>
+              <p class="suggest-disclaimer" data-i18n="report.form.disclaimer">
+                Tu aporte se suma como evidencia y se revisa junto con la información
+                existente del lugar; no cambia su estado de forma automática.
+              </p>
+            </div>
+          </div>
+
+          <p class="suggest-status" id="rp-status" role="status" aria-live="polite" hidden></p>
+        </form>
+        </div>
       </div>
     </section>
 
@@ -700,5 +774,6 @@
   <script src="js/config.js"></script>
   <script src="js/map.js"></script>
   <script src="js/suggest.js"></script>
+  <script src="js/report.js"></script>
 </body>
 </html>

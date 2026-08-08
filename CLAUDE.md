@@ -290,7 +290,9 @@ Target (functional product — see **## Architecture**):
 ├── js/
 │   ├── main.js                 # i18n, nav, reveal
 │   ├── config.js               # Supabase URL + anon key (public)
-│   └── map.js                  # Leaflet init, fetch approved places, filters
+│   ├── map.js                  # Leaflet init, fetch approved places, filters
+│   ├── suggest.js              # Form A: suggest a new place -> suggestions table
+│   └── report.js               # Form B: recommend/report an existing place -> place_reports
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
 │   ├── base.py
@@ -1370,8 +1372,62 @@ pass over the existing editorial redesign, not a rebuild:
   `GITHUB_DISPATCH_TOKEN` as Supabase secrets, creating the Database
   Webhook in the Supabase dashboard, and a live end-to-end verification
   (mirrors the live-verification gate every prior phase has required before
-  being marked done). Fase 3 (the frontend report form) is still unbuilt —
-  see the plan's remaining phases.
+  being marked done).
+
+  **Fase 3 (frontend) implemented, verified in Chrome against live data —
+  not yet reviewed by Santiago on the real site.** Form B ("Recomendar /
+  reportar") sits side by side with Form A ("Sumá un lugar") inside a new
+  `.suggest-forms` grid wrapper in `#suggest` — same card look, shared
+  CSS with Form A rather than a duplicate ruleset. `js/report.js` (new,
+  separate from `js/suggest.js`) implements: a real-radio segmented
+  toggle (positive/negative, defaults to `positive`); an accessible
+  combobox autocomplete against `places` (`status=eq.approved`, `name`
+  `ilike`, debounced 300ms, reusing `.map-suggest`/`.map-suggest-item`
+  verbatim from the map's own search — same look, same
+  `role="option"`/`aria-activedescendant`/arrow-key pattern as
+  `js/map.js`); a monotonically increasing request token so a slow
+  response to an earlier keystroke can't clobber a newer one's results
+  (`searchToken`/`token` in `runSearch`/`onSearchInput`); and, once a
+  place is matched, a revealed description field that `POST`s
+  `{place_id, report_type, description}` straight to `place_reports`
+  (anon key, RLS from Fase 1 already allows the insert — no new backend
+  call). Same anti-spam pattern as `suggest.js` (honeypot, 3s min-fill,
+  cooldown) but its **own** `localStorage` cooldown key
+  (`celiacmap-report-last`, independent from `suggest.js`'s
+  `celiacmap-suggest-last`) — recommending/reporting is a different
+  action and shouldn't rate-limit the other form.
+
+  **No-match behavior is deliberately asymmetric by type (not the
+  original plan draft's single generic fallback)** — refined during
+  design review: a `positive` no-match shows a CTA
+  ("Sugerirlo como lugar nuevo") that anchors to `#suggest-form` and
+  then focuses `#sg-name` after the scroll, since a recommended place
+  that isn't on the map yet is, in practice, a new-place suggestion. A
+  `negative` no-match shows a dead-end message with **no** button and
+  **no** redirect, plus a low-hierarchy secondary line ("¿Buscabas otro
+  lugar? Volvé a intentar.") so it doesn't read as a hard wall —
+  reporting on a place that was never published isn't actionable, and
+  routing it into `suggestions` would misrepresent a
+  possibly-nonexistent place as a new submission.
+
+  Verified live in Chrome against the real Supabase-backed `places`
+  table (a local `python -m http.server` instance, not file://, to
+  avoid any fetch/CORS ambiguity): autocomplete returns real approved
+  places, selecting one reveals the description panel and locks the
+  search input (with a "Cambiar lugar" affordance to undo), both
+  no-match variants render their differentiated copy, the CTA's
+  scroll-then-focus lands on `#sg-name` (confirmed via
+  `document.activeElement`, not just visually), the EN toggle renders
+  every new string correctly, and the `@media (max-width: 900px)` stack
+  rule is present as authored (confirmed by reading the loaded
+  stylesheet directly — the window-resize tool doesn't reliably force a
+  narrow viewport for screenshotting here either, same limitation noted
+  in **Frontend design audit** above) with zero console errors. The
+  actual submit → `place_reports` INSERT was **not** exercised live (to
+  avoid writing a test row into production from an automated pass) —
+  first real submit is Santiago's to trigger. Not yet done: Santiago's
+  own review of the live site, and Fase 4 (accepting ADR-004 once this
+  and the Fase 2 backend are both confirmed end-to-end).
 
 ### GitHub Pages deploy decision
 
