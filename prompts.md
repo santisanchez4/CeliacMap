@@ -1161,3 +1161,34 @@ logs `outreach_reply_opt_out_detected`, and returns
 fires. A reply like `"Si, tenemos opciones sin TACC certificadas."` would
 instead return `{"is_opt_out": false}`, and `handle()` continues into the
 existing full re-evaluation unchanged.
+
+## 22. `OUTREACH_LIVE_MODE` — final switch of ADR-003
+
+- **Trigger:** ADR-003's three conditions (verified domain, opt-out
+  mechanism, bounded volume) were all met; implement the actual code switch
+  from the sandbox test recipient to real per-business delivery.
+- **Change:** new `Settings.outreach_live_mode` (`OUTREACH_LIVE_MODE`,
+  default `false`). When `true`, `OutreachAgent` sends to
+  `place["contact_email"]` instead of `OUTREACH_TEST_RECIPIENT`, with no
+  shared code path between the two modes; `_select_candidates()` additionally
+  requires `contact_email` in live mode, and a candidate that reaches the
+  send step without one is skipped and logged
+  (`outreach_send_missing_contact_email`) rather than silently falling back
+  to the test recipient.
+- **Files:** `config/settings.py`, `agents/outreach_agent.py`,
+  `.env.example`, `tests/test_outreach_agent.py`, `tests/test_settings.py`.
+- **Rationale:** shipping the capability and flipping it on are kept
+  separate — the default stays `false`, so `OUTREACH_LIVE_MODE=true` in
+  `.env` / GitHub Secrets is a distinct, deliberate operational step, per
+  ADR-003's own framing (accepting the ADR documents that its conditions are
+  met; it doesn't itself activate sending).
+- **Follow-up (same review pass):** manually reviewing the first 3 real
+  live-mode candidates before activation surfaced a `website_scraper.py`
+  false-positive bug (image-filename and platform-domain emails matching the
+  regex) — fixed separately (`fix: reject false-positive emails from website
+  scraper`) before enabling live mode for real. See CLAUDE.md's updated
+  `contact_email` bullet under **Outreach agent design decisions**.
+- **CI wiring (later session):** `OUTREACH_LIVE_MODE` added as a GitHub
+  Secret and forwarded into `agents-monthly.yml`'s `env:` block — closing the
+  gap where the secret existed but the workflow never passed it through to
+  `scripts/run_agents.py`. See CLAUDE.md's Phase 18 build-status entry.

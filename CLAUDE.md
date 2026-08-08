@@ -668,18 +668,50 @@ email to businesses stuck in `needs_review`. Etapa 2
 (`outreach_reply_handler`, a webhook that re-evaluates the reply through the
 Validator) is not yet built.
 
-- **Sandbox sender means a fixed test recipient, not per-business email.**
-  Google Places Details never returns a business email address (confirmed
-  while building this agent — only `phone`/`website` exist, already
-  persisted), and separately Resend's shared sandbox sender
-  (`onboarding@resend.dev`) can only deliver to the Resend account's own
-  verified email until a custom domain is verified. Rather than block on
-  either gap, every outreach email currently goes to a fixed
-  `OUTREACH_TEST_RECIPIENT` env var — selection, drafting, budget,
-  `outreach_messages`, and `places.outreach_status` all still operate on the
-  real `needs_review` candidate; only the physical send destination is the
-  test inbox. Real per-business delivery is future work once a domain is
-  verified and a real contact-email source is added.
+- **Sandbox sender means a fixed test recipient, not per-business email
+  (superseded by `OUTREACH_LIVE_MODE` — see below).** Google Places Details
+  never returns a business email address (confirmed while building this
+  agent — only `phone`/`website` exist, already persisted), and separately
+  Resend's shared sandbox sender (`onboarding@resend.dev`) can only deliver
+  to the Resend account's own verified email until a custom domain is
+  verified. Every outreach email originally went to a fixed
+  `OUTREACH_TEST_RECIPIENT` env var regardless of mode — selection, drafting,
+  budget, `outreach_messages`, and `places.outreach_status` all still operate
+  on the real `needs_review` candidate; only the physical send destination
+  was the test inbox.
+- **`OUTREACH_LIVE_MODE` — the ADR-003 final switch to real per-business
+  delivery.** A new `Settings.outreach_live_mode` (bool, default `false`)
+  routes real sends to `place["contact_email"]` instead of
+  `OUTREACH_TEST_RECIPIENT` when `true` — there is deliberately **no shared
+  code path / silent fallback** between the two modes. In live mode,
+  `_select_candidates()` additionally requires `contact_email` to be present
+  (a candidate with no scraped email is simply not eligible), and as
+  defense-in-depth a candidate that somehow reaches the send step in live
+  mode without `contact_email` is skipped and logged
+  (`outreach_send_missing_contact_email`) rather than silently falling back
+  to the test recipient. `outreach_reply_handler.py` needed no change (it has
+  no recipient logic). Shipping this capability did **not** flip it on by
+  itself — `OUTREACH_LIVE_MODE=true` is a separate, deliberate operational
+  step (a GitHub Secret), per ADR-003's own framing. See
+  `docs/architecture/ADR-003-outreach-real-send-conditions.md`: all three of
+  its conditions (verified domain, opt-out mechanism, bounded initial volume)
+  are met and the secret is now set to `true` and wired into
+  `.github/workflows/agents-monthly.yml`'s `env:` block, so **the next
+  monthly cron run sends real email to real businesses** — this has not yet
+  been verified live end-to-end (the standalone verification called for in
+  Phase 15/16 below still applies, now for live mode specifically).
+- **Opt-out mechanism (ADR-003 condition 2).** Every Etapa 1 email appends a
+  fixed, literal (non-AI-generated) `OPT_OUT_FOOTER` telling the business how
+  to decline further contact. `places.outreach_opt_out` (bool) is excluded
+  from candidate selection everywhere — both
+  `SupabaseClient.fetch_needs_review_for_outreach` (SQL filter) and
+  `OutreachAgent._select_candidates` (Python, defense in depth) — regardless
+  of `outreach_status`, so an opted-out business is never recontacted even if
+  it later re-enters `needs_review`. Detection itself lives in Etapa 2's
+  reply handler (see **Outreach reply webhook (Etapa 2) design decisions**
+  below for the classifier). Opt-out never touches `places.status` — a
+  business declining contact isn't evidence about GF safety, only about
+  contact preference.
 - **Sender identity — configurable via settings, defaults to
   `outreach@celiacmap.org`.** The `from` address changed from Resend's shared
   sandbox sender (`onboarding@resend.dev`) to a project-owned address, read
@@ -690,8 +722,10 @@ Validator) is not yet built.
   fallback for callers that don't pass one, but `OutreachAgent` always does.
   Sending from `outreach@celiacmap.org` requires that domain to be verified
   with Resend — purely a sender-identity change, orthogonal to the recipient
-  (still the fixed `OUTREACH_TEST_RECIPIENT`; switching to real per-business
-  recipients is ADR-003, not yet resolved).
+  (the fixed `OUTREACH_TEST_RECIPIENT` by default, or the real
+  `contact_email` when `OUTREACH_LIVE_MODE` is enabled; domain verification
+  itself was ADR-003's first condition, now met — see the
+  `OUTREACH_LIVE_MODE` bullet above).
 - **Selection — phone or website present, oldest first, not yet contacted.**
   `SupabaseClient.fetch_needs_review_for_outreach` filters
   `status='needs_review'` and `outreach_status='not_sent'`, ordered oldest
@@ -730,9 +764,24 @@ Validator) is not yet built.
   setting (default 30, env `MAX_EMAIL_SCRAPES_PER_RUN`) mirroring every other
   agent's per-run limit — the Web agent's lack of one already caused a real CI
   timeout (Phase 11), and each scrape can legitimately take up to 5s. The
-  scraped email isn't consumed by the send step yet (still sandbox-only, per
-  the first bullet above); it's stored for when a verified sending domain
-  makes real per-business delivery possible.
+  scraped email is now consumed directly by the send step when
+  `OUTREACH_LIVE_MODE` is enabled (see the bullet above); previously it was
+  stored only for future use.
+- **Scraper false-positive fix, found via manual review before flipping live
+  mode.** Reviewing the first 3 real `OUTREACH_LIVE_MODE` candidates surfaced
+  two classes of bad `contact_email` matches: image-filename lookalikes that
+  match `EMAIL_RE`'s shape but are asset filenames (e.g. `nuvempago@2x.png`),
+  and platform/infrastructure domains (`wixpress.com`, `sentry.io`,
+  `sentry-cdn.com`, `godaddy.com`, `squarespace.com`) picked up from a site
+  builder's own scripts rather than the business. Fixed by rejecting both
+  patterns and switching `EMAIL_RE.search` to `finditer` so a rejected
+  candidate doesn't stop the scan before a real email further down the page;
+  domain rejection matches on proper suffix, not substring (avoids
+  false-rejecting lookalikes like `wearewixpress.com`). The two affected
+  places' `contact_email` / `contact_email_checked_at` were cleared so the
+  scraper retries them; a duplicate listing found in the same review (two
+  "Il Porto" entries sharing a phone/`contact_email`) was resolved via
+  `outreach_opt_out=true` on one, not a scraper change. 7 new tests.
 
 ### Outreach reply webhook (Etapa 2) design decisions
 
@@ -820,6 +869,22 @@ Supabase Edge Function, the webhook receiver), `.github/workflows/outreach-reply
   actionable but a step failed (content fetch / Supabase write / GitHub
   dispatch) — retryable, so Resend's automatic redelivery can recover from a
   transient failure.
+- **Opt-out classification runs before the RUBRIC re-evaluation, as a cheap
+  Haiku pre-check (ADR-003 condition 2).** `agents/outreach_reply_handler.py`
+  classifies every received reply with a small fixed rubric
+  (`OPT_OUT_RUBRIC`) before the full Sonnet re-evaluation: if the business is
+  explicitly asking not to be contacted again, `handle()` sets
+  `places.outreach_opt_out = true`, logs
+  `outreach_reply_opt_out_detected`, and returns without ever calling the
+  Sonnet `RUBRIC` — saving that cost and correctly treating "stop contacting
+  us" as contact preference, not GF-safety evidence (`places.status` is
+  untouched). **Fails closed toward "not opt-out"** on any classifier error
+  (a missed opt-out just falls through to the existing, already-conservative
+  Sonnet path; a false positive would permanently block a legitimate
+  business, since there's no unset path for `outreach_opt_out` in this
+  design) — the inverse of the health-rubric's own "escalate when unsure"
+  bias, deliberately, because the two failure directions have opposite
+  costs. Full text and a worked example: prompts.md §21.
 - **Two distinct secret stores, on purpose.** `RESEND_WEBHOOK_SECRET` and
   `GITHUB_DISPATCH_TOKEN` (a fine-grained PAT scoped to this repo only) are
   Supabase Edge Function secrets (`supabase secrets set`) — they're only
@@ -1098,6 +1163,48 @@ pass over the existing editorial redesign, not a rebuild:
   Supabase CLI's `--no-verify-jwt` deploy flag did not apply reliably (a
   known Supabase CLI issue) — resolved by disabling the toggle manually in
   the Supabase dashboard instead of via deploy flags.
+
+- 🚧 **Phase 18 — ADR-003 accepted: opt-out detection + `OUTREACH_LIVE_MODE`
+  (all three conditions met, real send not yet verified live).** Closes the
+  gap Phase 15/16 left open (sandbox-only sending) by implementing every
+  condition `docs/architecture/ADR-003-outreach-real-send-conditions.md`
+  requires before contacting real businesses:
+  1. **Domain verified** — `celiacmap.org` verified with Resend (DKIM, SPF,
+     send + receive MX) on 2026-08-04.
+  2. **Opt-out mechanism** — a fixed, non-AI-generated footer on every
+     outreach email plus a Haiku pre-check in
+     `agents/outreach_reply_handler.py` that sets
+     `places.outreach_opt_out = true` and excludes the place from all future
+     selection, fail-closed toward "not opt-out" on classifier error. See the
+     new bullets under **Outreach agent design decisions** and **Outreach
+     reply webhook (Etapa 2) design decisions** above, and prompts.md §21.
+  3. **Bounded volume** — `OUTREACH_MONTHLY_LIMIT=3` (not the code default of
+     20) in `agents-monthly.yml`.
+
+  The actual send-routing switch is `Settings.outreach_live_mode`
+  (`OUTREACH_LIVE_MODE`, default `false`): when `true`,
+  `agents/outreach_agent.py` sends to `place["contact_email"]` instead of
+  `OUTREACH_TEST_RECIPIENT`, with no shared code path between the two modes
+  and a defense-in-depth skip (`outreach_send_missing_contact_email`) if a
+  live-mode candidate somehow has no `contact_email`. See the
+  `OUTREACH_LIVE_MODE` bullet under **Outreach agent design decisions** above.
+
+  Along the way, manually reviewing the first 3 real live-mode candidates
+  before activating surfaced and fixed a `website_scraper.py` false-positive
+  bug (image-filename and platform-domain emails — see the updated
+  `contact_email` bullet above) and one duplicate listing (resolved via
+  `outreach_opt_out=true`).
+
+  **CI wiring completed this session:** `OUTREACH_LIVE_MODE` is now a GitHub
+  Secret (set to `true`) and forwarded into `agents-monthly.yml`'s `env:`
+  block for the `run-agents` job, alongside `RESEND_API_KEY` /
+  `OUTREACH_TEST_RECIPIENT`. This means **the next monthly cron run (1st of
+  the month) will send real outreach email to a real business**, not the
+  test recipient. Full offline suite green (202 tests). **Not yet verified
+  live:** a real send to a `contact_email` recipient with live mode on has
+  not been observed end-to-end (bounce/delivery, opt-out reply, and a normal
+  reply all still need a live confirmation) — the standalone verification
+  called for in Phase 15/16 now applies specifically to live mode.
 
 ### GitHub Pages deploy decision
 
