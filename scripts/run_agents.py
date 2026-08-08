@@ -1,4 +1,4 @@
-"""Pipeline orchestrator — runs Search -> Social -> Web -> Suggestion -> Validator -> Updater -> Outreach.
+"""Pipeline orchestrator — runs Search -> Social -> Web -> Suggestion -> Validator -> Updater -> Outreach -> Review sweep.
 
 This is the CI entrypoint for the daily GitHub Actions cron (and for manual
 ``workflow_dispatch`` validation). It:
@@ -33,6 +33,7 @@ from agents.clients.supabase_client import SupabaseClient
 from agents.clients.tavily_client import TavilySearchClient
 from agents.clients.website_scraper import WebsiteScraperClient
 from agents.outreach_agent import OutreachAgent
+from agents.review_handler import ReviewHandler
 from agents.search_agent import SearchAgent
 from agents.social_agent import SocialAgent
 from agents.suggestion_agent import SuggestionAgent
@@ -74,6 +75,15 @@ class DryRunSupabase:
     def fetch_needs_review_for_outreach(self, limit: int = 100) -> list[dict]:
         return self._inner.fetch_needs_review_for_outreach(limit=limit)
 
+    def fetch_stuck_negative_reports(self, limit: int = 50) -> list[dict]:
+        return self._inner.fetch_stuck_negative_reports(limit=limit)
+
+    def fetch_place_report_by_id(self, report_id: str) -> dict | None:
+        return self._inner.fetch_place_report_by_id(report_id)
+
+    def fetch_place_by_id(self, place_id: str) -> dict | None:
+        return self._inner.fetch_place_by_id(place_id)
+
     # --- writes become no-ops ----------------------------------------
     def update_suggestion_status(
         self, suggestion_id: str, status: str, promoted_place_id: str | None = None
@@ -103,6 +113,18 @@ class DryRunSupabase:
     def insert_agent_log(self, *args: Any, **kwargs: Any) -> None:
         # Keep the audit trail clean during dry runs — nothing is persisted.
         return None
+
+    def claim_place_report(self, report_id: str) -> bool:
+        # Unlike every other suppressed write, the caller's control flow branches
+        # on this return value (ReviewHandler.handle()'s idempotency guard) — a
+        # dry run must pretend the claim succeeded so the rest of the logic
+        # (fetch, evaluate, persist) is still exercised, per this wrapper's own
+        # "exercise the whole pipeline's logic without touching the database" goal.
+        logger.info("[dry-run] would claim place_report %s", report_id)
+        return True
+
+    def update_place_report_status(self, report_id: str, status: str) -> None:
+        logger.info("[dry-run] would set place_report %s -> %s", report_id, status)
 
 
 class Budget:
@@ -146,7 +168,7 @@ def _transient_error_count(overall: dict[str, Any]) -> int:
 def run_pipeline(
     settings: Settings, *, dry_run: bool, budget_total: int
 ) -> dict[str, Any]:
-    """Run search -> social -> web -> suggestion -> validator -> updater -> outreach under one combined budget."""
+    """Run search -> social -> web -> suggestion -> validator -> updater -> outreach -> review_sweep under one combined budget."""
     targets = load_targets()
     raw_db = SupabaseClient(
         settings.supabase_url, settings.supabase_service_role_key
@@ -312,6 +334,22 @@ def run_pipeline(
     else:
         summaries["outreach"] = {"skipped": "budget exhausted or outreach not configured"}
 
+    # 8. Review sweep — monthly safety net for community reports (ADR-004):
+    #    re-drives any negative place_reports row left stuck in 'new'/'dispatched'
+    #    because the real-time webhook path (Edge Function -> repository_dispatch
+    #    -> ReviewHandler.handle()) never reached 'processed' — Supabase Database
+    #    Webhooks do not auto-retry on a non-2xx response or a timeout. Cheap in
+    #    the normal case: the real-time path already resolved everything, so
+    #    fetch_stuck_negative_reports() usually returns nothing. Runs last, like
+    #    Updater/Outreach, taking whatever budget remains.
+    sweep_cap = budget.allow(settings.max_review_sweep_per_run)
+    if sweep_cap > 0:
+        review_handler = ReviewHandler(db, llm)
+        summaries["review_sweep"] = review_handler.sweep(limit=sweep_cap)
+        budget.consume(summaries["review_sweep"].get("processed", 0))
+    else:
+        summaries["review_sweep"] = {"skipped": "budget exhausted"}
+
     overall = {
         "dry_run": dry_run,
         "budget_total": budget.total,
@@ -324,6 +362,7 @@ def run_pipeline(
         "validator": summaries["validator"],
         "updater": summaries["updater"],
         "outreach": summaries["outreach"],
+        "review_sweep": summaries["review_sweep"],
     }
 
     status = _overall_status(summaries)
@@ -342,7 +381,7 @@ def run_pipeline(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run the CeliacMap agent pipeline (search -> social -> web -> suggestion -> validator -> updater -> outreach)."
+        description="Run the CeliacMap agent pipeline (search -> social -> web -> suggestion -> validator -> updater -> outreach -> review_sweep)."
     )
     parser.add_argument(
         "--dry-run",
@@ -392,6 +431,7 @@ def main() -> int:
     print(f"  validator        : {overall['validator']}")
     print(f"  updater          : {overall['updater']}")
     print(f"  outreach         : {overall['outreach']}")
+    print(f"  review_sweep     : {overall['review_sweep']}")
 
     # Exit code reflects whether the pipeline COMPLETED, not whether every external
     # call succeeded. Reaching here means it did, so the CI job is green. The agents

@@ -94,6 +94,13 @@ class Settings:
     # every other agent's per-run cap, bounding worst-case latency (each site
     # gets a synchronous 5s-timeout GET) as the eligible pool grows.
     max_email_scrapes_per_run: int = 30
+    # Community reports (place_reports) monthly sweep (8th pipeline stage,
+    # ReviewHandler.sweep()): re-drives negative reports left stuck in
+    # 'new'/'dispatched' because the real-time webhook path never reached
+    # 'processed' (Supabase Database Webhooks don't auto-retry). Default is
+    # low because in the normal case the real-time path already handled
+    # everything and this finds nothing to sweep.
+    max_review_sweep_per_run: int = 20
     # Combined cap on paid API calls for one full pipeline run (search +
     # validator + updater), enforced by scripts/run_agents.py.
     agent_daily_budget: int = 350
@@ -128,6 +135,7 @@ class Settings:
             outreach_monthly_limit=_int("OUTREACH_MONTHLY_LIMIT", 20),
             outreach_live_mode=_bool("OUTREACH_LIVE_MODE", False),
             max_email_scrapes_per_run=_int("MAX_EMAIL_SCRAPES_PER_RUN", 30),
+            max_review_sweep_per_run=_int("MAX_REVIEW_SWEEP_PER_RUN", 20),
             agent_daily_budget=_int("AGENT_DAILY_BUDGET", 350),
         )
 

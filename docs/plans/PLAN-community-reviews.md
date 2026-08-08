@@ -829,3 +829,22 @@ en `agent_log` con `agent='review_handler'`).
 - Notificar al autor del reporte del resultado de la re-evaluación (no
   hay autenticación, no hay a quién notificar — Fase 1 de este
   proyecto sigue sin auth de usuarios).
+
+## TODO — deuda técnica detectada al implementar
+
+- **`deno.lock` inconsistente entre las dos Edge Functions.** Al correr
+  `deno check`/`deno test` sobre `place-report-created/` por primera vez
+  (con `--node-modules-dir=auto`, necesario para resolver sus imports
+  `npm:`) Deno generó un `deno.lock` en la raíz del repo — el primero
+  que existe en el proyecto. `outreach-reply/` (la Edge Function
+  anterior) nunca tuvo uno propio: se verificó en su momento sin fijar
+  versiones. El lock ahora en la raíz cubre las dependencias `npm:` de
+  **ambas** funciones (Deno resuelve un único lockfile por raíz de
+  proyecto, no por función), así que `outreach-reply/` ya queda
+  cubierta de hecho — pero esto no fue una decisión deliberada tomada
+  para esa función en su momento, solo un efecto colateral de agregar
+  la segunda. Pendiente (no resuelto ahora, fuera de alcance de esta
+  fase): confirmar que fijar versiones no rompe nada en
+  `outreach-reply/` (correr su `deno check`/`deno test` con el lock
+  presente) y decidir si el lockfile se mantiene como práctica
+  estándar para toda Edge Function futura del proyecto.

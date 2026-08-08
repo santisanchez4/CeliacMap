@@ -1,0 +1,42 @@
+# Community reports - place_reports review handler.
+# Fires only when a negative report lands on an already-approved place — never
+# on a schedule. The Supabase Edge Function (supabase/functions/place-report-created/)
+# verifies the inbound Database Webhook, checks the place is still 'approved',
+# and dispatches this event; this workflow then runs the actual re-evaluation in
+# Python, reusing the same Validator rubric as the daily pipeline
+# (agents/review_handler.py). See
+# docs/architecture/ADR-004-community-reports-evidence-not-direct-action.md.
+name: Community report review
+
+on:
+  repository_dispatch:
+    types: [place_report_received]
+
+permissions:
+  contents: read
+
+jobs:
+  revalidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Re-evaluate place with the community report
+        run: |
+          python -m agents.review_handler \
+            --place-id "${{ github.event.client_payload.place_id }}" \
+            --report-id "${{ github.event.client_payload.report_id }}"

@@ -301,6 +301,7 @@ Target (functional product — see **## Architecture**):
 │   ├── updater_agent.py
 │   ├── outreach_agent.py       # Etapa 1: outreach_send
 │   ├── outreach_reply_handler.py  # Etapa 2: reply re-evaluation (repository_dispatch only)
+│   ├── review_handler.py       # Community reports: re-evaluation (repository_dispatch + monthly sweep)
 │   └── clients/{supabase_client,google_places,tavily_client,llm,
 │       resend_client,website_scraper}.py
 ├── mcp_server/                 # AI toolkit — MCP server
@@ -309,20 +310,23 @@ Target (functional product — see **## Architecture**):
 ├── skills/                     # AI toolkit — reusable skills
 │   └── validator-rubric/SKILL.md
 ├── supabase/functions/
-│   └── outreach-reply/         # Edge Function: Etapa 2 webhook receiver (Deno/TS)
+│   ├── outreach-reply/         # Edge Function: Etapa 2 webhook receiver (Deno/TS)
+│   │   ├── index.ts
+│   │   └── index.test.ts
+│   └── place-report-created/   # Edge Function: place_reports Database Webhook receiver (Deno/TS)
 │       ├── index.ts
 │       └── index.test.ts
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
 │   └── targets.yaml            # countries/cities + search terms
 ├── scripts/
-│   ├── run_agents.py           # CI entrypoint: search → social → web → validator → updater
+│   ├── run_agents.py           # CI entrypoint: search → social → web → suggestion → validator → updater → outreach → review_sweep
 │   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
 │   └── seed.sql                # manual seed (UY/AR)
 ├── tests/                      # offline unit tests (external calls mocked)
-├── .github/workflows/{agents-monthly,deploy-pages,outreach-reply}.yml
+├── .github/workflows/{agents-monthly,deploy-pages,outreach-reply,place-report-review}.yml
 ├── requirements.txt
 ├── .env.example
 ├── README.md  CLAUDE.md  prompts.md  .gitignore
@@ -897,15 +901,17 @@ Supabase Edge Function, the webhook receiver), `.github/workflows/outreach-reply
 
 ### Community reports (`place_reports`) design decisions
 
-Proposed (not yet built) in
+Proposed in
 `docs/architecture/ADR-004-community-reports-evidence-not-direct-action.md`
 (Estado: Propuesto) and `docs/plans/PLAN-community-reviews.md`. Lets anyone
 recommend or report on a place **already published** on the map — distinct
 from `suggestions`, which is for places not yet published. Same governing
 principle as Outreach (ADR-002): a report never modifies `places` directly,
-only reinjects evidence into the same Validator rubric.
+only reinjects evidence into the same Validator rubric. Backend (Fase 2) is
+implemented and offline-tested; not yet deployed/wired live — see the Phase
+19 build-status entry below.
 
-- **Reuses Etapa 2's exact pattern; one real difference.** The planned
+- **Reuses Etapa 2's exact pattern; one real difference.**
   `agents/review_handler.py` reuses `RUBRIC` / `ValidatorAgent._normalize`
   unmodified, same reuse discipline as `outreach_reply_handler.py` — but
   with **no status remapping**: since the place being reported on is
@@ -913,23 +919,54 @@ only reinjects evidence into the same Validator rubric.
   Validator's own verdict (approved/needs_review/discarded) is trusted
   directly instead of being funneled through a distinct
   `outreach_confirmed`-style intermediate state.
+- **Report-type guard, added beyond the original plan draft — defense in
+  depth, mirrors `ACTIONABLE_STATUSES`.** The plan's first draft of
+  `handle()` trusted the caller (the Edge Function's own
+  `isAutoRevaluationCandidate` gate, and the sweep's own
+  `report_type='negative'` SQL filter) to only ever invoke it for negative
+  reports. `handle()` now also re-checks `report_type` itself and skips
+  (`report_type=<value>`) otherwise — the same redundancy the place-status
+  check already had (the Edge Function checks `places.status` too, yet
+  `handle()` checks it again), for a health-sensitive gate where trusting
+  one layer alone is a needless risk.
 - **Trigger — a Supabase Database Webhook, not a Resend webhook.** `INSERT`
   on `place_reports` (`report_type='negative'` + place `approved`) fires a
-  Database Webhook → a new Edge Function (`place-report-created`) →
-  `repository_dispatch` → a new workflow → `review_handler.py`, mirroring
-  outreach's Etapa 2 chain exactly except for the trigger source.
+  Database Webhook → `supabase/functions/place-report-created/` →
+  `repository_dispatch` → `.github/workflows/place-report-review.yml` →
+  `review_handler.py`, mirroring outreach's Etapa 2 chain exactly except
+  for the trigger source and the secret check below.
+- **Secret verification — shared secret, not Svix HMAC.** Unlike
+  `outreach-reply/` (which verifies a Resend webhook signed with Svix
+  HMAC), Supabase Database Webhooks don't sign their payload at all, so
+  `place-report-created/index.ts` checks a simple shared secret instead —
+  read from either the `x-webhook-secret` header or a `?secret=` query
+  param (whichever the Dashboard's "Create a new Database Webhook" UI
+  turns out to support once configured live), compared with the same
+  constant-time `timingSafeEqual` helper `outreach-reply/` uses, duplicated
+  rather than shared (each Edge Function is its own isolated deploy, no
+  shared module in this repo today). New secret:
+  `PLACE_REPORTS_WEBHOOK_SECRET` (`supabase secrets set`, same store as
+  `RESEND_WEBHOOK_SECRET`/`GITHUB_DISPATCH_TOKEN` — never in `.env` /
+  GitHub Actions). `GITHUB_DISPATCH_TOKEN` is reused as-is.
 - **Database Webhooks don't auto-retry — a monthly sweep is the
   mitigation.** Confirmed (official docs + a GitHub discussion with no
   maintainer reply) that, unlike the Resend webhook redelivery outreach's
   Etapa 2 relies on, Supabase Database Webhooks do **not** retry on a
-  non-2xx response or a timeout. `ReviewHandler.sweep()` — planned as an
-  8th pipeline stage in `scripts/run_agents.py`, budgeted like every other
-  agent (`MAX_REVIEW_SWEEP_PER_RUN`) — re-drives anything left stuck in
-  `place_reports.status` `new`/`dispatched`. An atomic claim
-  (`claim_place_report`, CAS on `status`, new state `processing`) is the
-  single guard that makes the real-time path and the monthly sweep safe to
-  race against each other — whichever reaches the claim first does the
-  work; the other is a no-op.
+  non-2xx response or a timeout. `ReviewHandler.sweep()` is wired as the
+  **8th pipeline stage** in `scripts/run_agents.py` (after Outreach,
+  taking whatever budget remains — same pattern as Updater/Outreach),
+  budgeted like every other agent (`MAX_REVIEW_SWEEP_PER_RUN`, default 20)
+  — re-drives anything left stuck in `place_reports.status`
+  `new`/`dispatched`. An atomic claim (`claim_place_report`, CAS on
+  `status`, new state `processing`) is the single guard that makes the
+  real-time path and the monthly sweep safe to race against each other —
+  whichever reaches the claim first does the work; the other is a no-op.
+  `DryRunSupabase.claim_place_report` deliberately returns `True` (not the
+  logged-no-op pattern every other suppressed write uses) — the caller's
+  control flow branches on this specific return value, so a dry run must
+  simulate a successful claim to still exercise the fetch/evaluate/persist
+  path, matching this wrapper's own "exercise the whole pipeline's logic
+  without touching the database" goal.
 - **`suggestions.origin` added for the report form's no-match fallback.** A
   report typed against the autocomplete with no match routes into the
   existing `suggestions` pipeline instead of a dead end in `place_reports`
@@ -1144,10 +1181,17 @@ pass over the existing editorial redesign, not a rebuild:
   fixed `OUTREACH_TEST_RECIPIENT` for now (sandbox constraint, see **Outreach
   agent design decisions** above). New env vars: `RESEND_API_KEY`,
   `OUTREACH_TEST_RECIPIENT`, `OUTREACH_MONTHLY_LIMIT` (default 20). New
-  dependency: `resend>=2,<3`. Full offline suite green (144 tests, +9), plus a
-  fully-mocked `run_pipeline()` smoke test confirming the new stage threads
-  through the budget/summary/dry-run machinery correctly with zero real
-  network calls. The `agent_log.agent='outreach'` CHECK-widening addendum
+  dependency: `resend>=2,<3`. Full offline suite green (144 tests, +9).
+  Pipeline wiring itself (`scripts/run_agents.py`'s stage sequencing,
+  budget clamping per stage, `DryRunSupabase`) has no dedicated committed
+  test for any stage, including this one — only `Budget` and
+  `Settings.from_env` are tested generically
+  (`tests/test_settings.py`). *(Corrected Aug 2026: this entry previously
+  claimed a "fully-mocked `run_pipeline()` smoke test" existed; a
+  `git log -S` search turned up no such test ever committed. New stages
+  since have been verified with an uncommitted ad hoc smoke script instead
+  — see the Phase 19 entry below for the pattern.)* The
+  `agent_log.agent='outreach'` CHECK-widening addendum
   proposed alongside Phase 14 has been applied and verified live — a
   Supabase query confirms `agent_log` rows with `agent='outreach'`,
   `status='success'` (actions `outreach_sent`, `outreach_run_complete`).
@@ -1294,9 +1338,40 @@ pass over the existing editorial redesign, not a rebuild:
   constraints (`places_status_check` with its 5 values,
   `agent_log_agent_check` with its 10) hold exactly as written — no data
   was harmed by the earlier duplicate-CHECK bug, since it was caught before
-  this apply. Still unbuilt: Fase 2 (`agents/review_handler.py`, the
-  `place-report-created` Edge Function, its workflow) and Fase 3 (the
-  frontend report form) — see the plan's remaining phases.
+  this apply.
+
+  **Fase 2 (backend) code-complete, offline-tested, not yet deployed live.**
+  `agents/review_handler.py` (`ReviewHandler.handle()` + `.sweep()`, TDD —
+  22 test cases, `ValidatorAgent._normalize`/`_decide_status` real, not
+  mocked, same rigor as `test_outreach_reply_handler.py`) plus the four new
+  `SupabaseClient` methods it depends on
+  (`fetch_place_report_by_id`/`update_place_report_status`/
+  `claim_place_report`/`fetch_stuck_negative_reports`, no dedicated tests —
+  same convention as every other client method, exercised indirectly).
+  `supabase/functions/place-report-created/index.ts` (+ `index.test.ts`,
+  6 tests for the pure `isAutoRevaluationCandidate` gate) and
+  `.github/workflows/place-report-review.yml` mirror `outreach-reply/`'s
+  structure exactly except for the trigger source and the secret check —
+  see **Community reports (`place_reports`) design decisions** above for
+  both deltas from the plan's original draft (the report-type guard added
+  inside `handle()`, and the header-or-query-param secret check).
+  `ReviewHandler.sweep()` is wired as the pipeline's 8th stage in
+  `scripts/run_agents.py` under the shared `AGENT_DAILY_BUDGET`, capped by
+  new setting `MAX_REVIEW_SWEEP_PER_RUN` (default 20). `deno check` and
+  `deno test` both pass clean on the new Edge Function (6/6); full Python
+  offline suite green (224 tests, +22) — no new tests for the pipeline
+  wiring itself (`run_pipeline()` has no dedicated committed test for any
+  stage, see the corrected Phase 15 entry above); verified instead with an
+  uncommitted ad hoc smoke script (every stage mocked) confirming
+  `ReviewHandler` is constructed correctly, `sweep(limit=...)` receives the
+  budget-clamped value, and the stage is skipped cleanly when budget is
+  exhausted. **Not yet done:** deploying the
+  Edge Function, setting `PLACE_REPORTS_WEBHOOK_SECRET` /
+  `GITHUB_DISPATCH_TOKEN` as Supabase secrets, creating the Database
+  Webhook in the Supabase dashboard, and a live end-to-end verification
+  (mirrors the live-verification gate every prior phase has required before
+  being marked done). Fase 3 (the frontend report form) is still unbuilt —
+  see the plan's remaining phases.
 
 ### GitHub Pages deploy decision
 
