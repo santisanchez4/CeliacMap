@@ -224,6 +224,56 @@ class SupabaseClient:
         )
         return res.data[0] if res.data else None
 
+    # --- place_reports --------------------------------------------------
+    def fetch_place_report_by_id(self, report_id: str) -> dict | None:
+        res = (
+            self._db.table("place_reports")
+            .select("*")
+            .eq("id", report_id)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def update_place_report_status(self, report_id: str, status: str) -> None:
+        self._db.table("place_reports").update({"status": status}).eq("id", report_id).execute()
+
+    def claim_place_report(self, report_id: str) -> bool:
+        """Atomic claim (compare-and-swap on status) — the idempotency guard
+        shared by the real-time webhook path and the monthly sweep. Returns
+        True only if this call transitioned the row from 'new'/'dispatched'
+        to 'processing'; False means another call already claimed or
+        finished it, and the caller MUST NOT proceed (no LLM call, no writes
+        to `places`).
+        """
+        res = (
+            self._db.table("place_reports")
+            .update({"status": "processing"})
+            .eq("id", report_id)
+            .in_("status", ["new", "dispatched"])
+            .execute()
+        )
+        return bool(res.data)
+
+    def fetch_stuck_negative_reports(self, limit: int = 50) -> list[dict]:
+        """Negative reports still in 'new'/'dispatched' — candidates for the
+        monthly sweep (ReviewHandler.sweep()). Whether the place is still
+        'approved' is intentionally NOT filtered here: handle() re-checks it
+        via ACTIONABLE_STATUSES, so filtering twice would just duplicate
+        logic without changing the outcome.
+        """
+        res = (
+            self._db.table("place_reports")
+            .select("id, place_id")
+            .eq("report_type", "negative")
+            .in_("status", ["new", "dispatched"])
+            .not_.is_("place_id", "null")
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
     # --- agent_log ----------------------------------------------------
     def insert_agent_log(
         self,
