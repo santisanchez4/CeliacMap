@@ -252,6 +252,13 @@ class SocialAgent(BaseAgent):
                 except Exception:  # noqa: BLE001 - dedup check must not crash run
                     logger.exception("dedup check failed for %s", external_id)
 
+                # q["country"]/lead_city are the SEARCH TARGET and only a fallback:
+                # a social post mentioning the target city can point to a business
+                # located anywhere (see CLAUDE.md's Search agent city/country bug),
+                # so prefer Google's own formatted_address for the geocoded match.
+                parsed_city, parsed_country = GooglePlacesClient.parse_city_country_from_address(
+                    (match or {}).get("formatted_address")
+                )
                 candidate = {
                     "name": (match or {}).get("name") or lead["name"],
                     "lat": lat,
@@ -259,8 +266,8 @@ class SocialAgent(BaseAgent):
                     "address": (match or {}).get("formatted_address") or lead["address"],
                     "category": lead["category"],
                     "safety_level": DEFAULT_SAFETY_LEVEL,
-                    "country": q["country"],
-                    "city": lead_city,
+                    "country": parsed_country or q["country"],
+                    "city": parsed_city or lead_city,
                     "source": "social",
                     "external_id": external_id,
                     # Stored in its own column so the Validator (which overwrites

@@ -26,11 +26,12 @@ def make_match(
     lat=-34.9,
     lng=-56.2,
     business_status="OPERATIONAL",
+    formatted_address="Av. Siempre Viva 123",
 ):
     return {
         "place_id": place_id,
         "name": name,
-        "formatted_address": "Av. Siempre Viva 123",
+        "formatted_address": formatted_address,
         "geometry": {"location": {"lat": lat, "lng": lng}},
         "business_status": business_status,
     }
@@ -151,6 +152,51 @@ def test_successful_insert_geocoded_candidate():
     assert candidate["lat"] == -34.9 and candidate["lng"] == -56.2
     assert candidate["social_url"] == "https://instagram.com/cafex"
     assert "validation_notes" not in candidate
+
+
+def test_country_city_derived_from_matched_address_not_query_target():
+    """Regression test: a social post about "Montevideo" can point to a real
+    business anywhere (Tavily has no geographic filter). The candidate's
+    country/city must come from Google's own formatted_address for the
+    geocoded match, not from the Uruguay/Montevideo search target — the same
+    bug class already fixed in the Search agent (see CLAUDE.md)."""
+    agent, db, search, places, _ = make_agent(max_queries=1)
+    search.search.return_value = [
+        {"title": "Cafe X | Instagram", "link": "https://instagram.com/cafex",
+         "snippet": "sin TACC en Montevideo"}
+    ]
+    places.find_place.return_value = make_match(
+        name="CRAIG Bistro",
+        formatted_address="Montevideo 937, C1019 Cdad. Autónoma de Buenos Aires, Argentina",
+    )
+
+    agent.run()
+
+    candidate = db.insert_place_candidate.call_args.args[0]
+    assert candidate["country"] == "Argentina"
+    # find_place only returns formatted_address (no address_components), so
+    # this goes through the string-parse fallback, not the more precise
+    # Details-based city_country_from_components — same limit as
+    # GooglePlacesClient.to_candidate()'s own primary path.
+    assert candidate["city"] == "Cdad. Autónoma de Buenos Aires"
+
+
+def test_country_city_falls_back_to_query_target_when_address_unparseable():
+    """When the matched address doesn't parse to a recognized country (this
+    project's scope is only Argentina/Uruguay), fall back to the search
+    target — same fallback contract as GooglePlacesClient.to_candidate()."""
+    agent, db, search, places, _ = make_agent(max_queries=1)
+    search.search.return_value = [
+        {"title": "Cafe X | Instagram", "link": "https://instagram.com/cafex",
+         "snippet": "sin TACC en Montevideo"}
+    ]
+    places.find_place.return_value = make_match(formatted_address="Av. Siempre Viva 123")
+
+    agent.run()
+
+    candidate = db.insert_place_candidate.call_args.args[0]
+    assert candidate["country"] == "Uruguay"
+    assert candidate["city"] == "Montevideo"
 
 
 # --- Dedup ----------------------------------------------------------------
