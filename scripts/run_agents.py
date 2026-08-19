@@ -187,7 +187,7 @@ def run_pipeline(
     # Keep the daily pipeline self-sufficient: discovery (Search/Social/Web) is
     # clamped so it can never consume the slice reserved for the Validator, and
     # the Updater takes whatever remains. Per-run shape (budget 350):
-    #   Search <= 80 | Social <= 25 | Web <= 40 | Validator reserve 80 | Updater = rest.
+    #   Search <= 104 | Social <= 25 | Web <= 40 | Validator reserve 80 | Updater = rest.
     SOCIAL_MAX = 25
     WEB_MAX = 40
     SUGGEST_MAX = 30

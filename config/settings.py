@@ -55,7 +55,10 @@ class Settings:
     max_search_results_per_query: int = 20
     # Cap on Google text-search queries per Search run (city x term matrix can be
     # large); keeps a run within the daily API budget. 0 = unlimited.
-    max_search_queries_per_run: int = 80
+    # 104 keeps 3 search-terms/month coverage for all 32 cities (16 UY + 16 AR,
+    # after the GBA Norte + Oeste cercano expansion) under the term-major job
+    # order — 80 would only reach 2 terms for Argentina once GBA was added.
+    max_search_queries_per_run: int = 104
     max_validations_per_run: int = 50
     max_updates_per_run: int = 50
     # Social agent caps: number of Tavily searches per run (free tier: 1000/month)
@@ -117,7 +120,7 @@ class Settings:
             haiku_model=os.getenv("HAIKU_MODEL", "claude-haiku-4-5").strip(),
             web_search_model=os.getenv("WEB_SEARCH_MODEL", "claude-haiku-4-5").strip(),
             max_search_results_per_query=_int("MAX_SEARCH_RESULTS_PER_QUERY", 20),
-            max_search_queries_per_run=_int("MAX_SEARCH_QUERIES_PER_RUN", 80),
+            max_search_queries_per_run=_int("MAX_SEARCH_QUERIES_PER_RUN", 104),
             max_validations_per_run=_int("MAX_VALIDATIONS_PER_RUN", 50),
             max_updates_per_run=_int("MAX_UPDATES_PER_RUN", 50),
             max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 30),
