@@ -832,19 +832,78 @@ en `agent_log` con `agent='review_handler'`).
 
 ## TODO — deuda técnica detectada al implementar
 
-- **`deno.lock` inconsistente entre las dos Edge Functions.** Al correr
-  `deno check`/`deno test` sobre `place-report-created/` por primera vez
-  (con `--node-modules-dir=auto`, necesario para resolver sus imports
-  `npm:`) Deno generó un `deno.lock` en la raíz del repo — el primero
-  que existe en el proyecto. `outreach-reply/` (la Edge Function
-  anterior) nunca tuvo uno propio: se verificó en su momento sin fijar
-  versiones. El lock ahora en la raíz cubre las dependencias `npm:` de
-  **ambas** funciones (Deno resuelve un único lockfile por raíz de
-  proyecto, no por función), así que `outreach-reply/` ya queda
-  cubierta de hecho — pero esto no fue una decisión deliberada tomada
-  para esa función en su momento, solo un efecto colateral de agregar
-  la segunda. Pendiente (no resuelto ahora, fuera de alcance de esta
-  fase): confirmar que fijar versiones no rompe nada en
-  `outreach-reply/` (correr su `deno check`/`deno test` con el lock
-  presente) y decidir si el lockfile se mantiene como práctica
-  estándar para toda Edge Function futura del proyecto.
+- **`deno.lock` inconsistente entre las dos Edge Functions — investigado
+  y resuelto (2026-08-19).** Al correr `deno check`/`deno test` sobre
+  `place-report-created/` por primera vez (con `--node-modules-dir=auto`,
+  necesario para resolver sus imports `npm:`) Deno generó un `deno.lock`
+  en la raíz del repo — el primero que existe en el proyecto.
+  `outreach-reply/` (la Edge Function anterior) nunca tuvo uno propio: se
+  verificó en su momento sin fijar versiones. El lock en la raíz cubre
+  las dependencias `npm:` de **ambas** funciones (Deno resuelve un único
+  lockfile por raíz de proyecto, no por función), así que
+  `outreach-reply/` quedó cubierta de hecho — pero no fue una decisión
+  deliberada tomada para esa función en su momento, solo un efecto
+  colateral de agregar la segunda.
+
+  **Diagnóstico (sesión 2026-08-19, sin tocar código hasta confirmar):**
+
+  1. **`deno check`/`deno test` de `outreach-reply/` contra el lockfile
+     actual: limpio, 6/6 tests pasan** (requieren `--allow-env`, un
+     permiso de sandboxing de Deno para que el SDK de Resend lea
+     `RESEND_BASE_URL` — no relacionado al lockfile). Coincide
+     exactamente con lo ya documentado en CLAUDE.md antes de que
+     existiera este lock ("deno test passes 6/6"). Cero regresión
+     funcional detectable.
+  2. **Historial de deploys reales** (`supabase functions list`, CLI ya
+     autenticado): `outreach-reply` está en la versión 7, con su último
+     deploy real el **2026-08-04 01:06 UTC** — **4 días antes** de que
+     existiera el `deno.lock` (creado 2026-08-08). Es decir, la versión
+     que corre hoy en producción se deployó sin ningún lock, resolviendo
+     lo que Deno considerara "latest" en ese momento. `place-report-created`
+     (versión 3) se deployó el 2026-08-18, ya con el lock presente.
+  3. **Cruce con el historial de versiones en el registry de npm:**
+     - `resend`: el lock fija `4.8.0`, que es la **única versión 4.x que
+       existió jamás** (publicada 2025-08-04; el paquete saltó a 5.x/6.x
+       después). No hay ningún otro valor posible al que
+       `npm:resend@4` pudiera resolver, ni en agosto de 2026 ni ahora —
+       cero riesgo de drift en esta dependencia, por diseño del propio
+       rango semver.
+     - `@supabase/supabase-js`: el lock fija `2.112.0`. Hubo movimiento
+       real de versiones en la ventana relevante — `2.112.0` se publicó
+       2026-08-03T07:34 UTC (horas antes del deploy de `outreach-reply`
+       del 08-04), pero luego salieron `2.112.1` (08-05T10:45) y
+       `2.112.2` (08-06T13:36), **antes** de que se generara el lockfile
+       (08-08). Si el lockfile hubiera resuelto "latest" en frío el
+       08-08, se esperaría `2.112.2`; en cambio fijó `2.112.0` — la
+       versión que ya estaba resuelta/cacheada localmente desde que se
+       trabajó en `outreach-reply` días antes. La explicación más
+       plausible es que la generación del lock reutilizó la resolución
+       ya cacheada localmente (npm/Deno cache) en lugar de resolver
+       "latest" en frío — lo que significa que el lock terminó fijando,
+       por las fechas involucradas, la **misma** versión que ya estaba
+       viva en producción, no una más nueva y no probada.
+
+  **Conclusión: no hay drift real detectado.** El lockfile compartido
+  cayó en las mismas versiones que `outreach-reply/` ya tenía en
+  producción — exacto en `resend` por ser determinístico (una sola
+  versión 4.x posible), y con evidencia fuerte de ser exacto también en
+  `supabase-js` por la lógica de caché de resolución. Los tests offline
+  y el type-check lo confirman de forma directa e independiente de la
+  teoría de versiones.
+
+  **Decisión: se mantiene un único `deno.lock` en la raíz para todas las
+  Edge Functions del proyecto** — no se separa por función. Razones:
+  Deno resuelve un lock por raíz de proyecto, no por archivo/función,
+  así que forzar lockfiles separados requeriría pasar `--lock <path>` en
+  cada invocación local y en cada workflow, agregando complejidad
+  operativa permanente para un problema que hoy no existe: ambas
+  funciones comparten `@supabase/supabase-js@2` sin ningún conflicto de
+  versión, y `resend` solo lo usa `outreach-reply/` y es de resolución
+  única. Compartir el lock es, de hecho, una garantía de consistencia
+  (ambas funciones corren contra el mismo SDK ya probado), no un riesgo.
+  El formato v5 del lockfile además ya soporta múltiples versiones
+  resueltas del mismo paquete npm bajo especificadores distintos (p. ej.
+  `@2` y un futuro `@3` convivirían sin problema), así que un conflicto
+  real de versiones en el futuro tampoco forzaría la separación — se
+  resolvería dentro del mismo lock. Registrada también en el Decisions
+  Log de `CLAUDE.md`.

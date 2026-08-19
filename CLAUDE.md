@@ -1043,6 +1043,35 @@ implemented and offline-tested; not yet deployed/wired live — see the Phase
   verify the bug above. Corrects an earlier claim made in this same session
   that no CLI was available — worth remembering so future sessions don't
   re-discover it the hard way.
+- **Single root-level `deno.lock` is the deliberate standard for every
+  Edge Function — not one lockfile per function, unless a real version
+  conflict shows up.** Building `place-report-created/` generated this
+  repo's first `deno.lock` at the project root (Deno resolves one lock
+  per project root, not per file), which incidentally also started
+  covering `outreach-reply/` — the earlier Edge Function, which had never
+  had a lockfile of its own. Investigated (2026-08-19) rather than
+  assumed safe: `outreach-reply`'s `deno check`/`deno test` pass clean
+  against the shared lock (6/6, matching the pre-lock baseline already in
+  this file); its last real production deploy (`supabase functions list`
+  shows version 7, 2026-08-04) predates the lock (2026-08-08) by 4 days,
+  so live production ran unpinned at that time — but cross-checking
+  npm's registry timestamps shows the lock's pinned versions
+  (`resend@4.8.0` — the only 4.x release that ever existed;
+  `@supabase/supabase-js@2.112.0` — published hours before that deploy,
+  with `2.112.1`/`2.112.2` following before the lock was generated but
+  apparently not picked up, consistent with the lockfile inheriting an
+  already-cached local resolution rather than re-resolving "latest")
+  match what was already live, not a newer untested version. No drift
+  found. Decided to keep the lock shared rather than split it: Deno's
+  one-lock-per-root model would force `--lock <path>` on every local
+  command and workflow to separate them, for a conflict that doesn't
+  exist today (both functions want the same `@supabase/supabase-js@2`;
+  `resend` is single-version and only used by `outreach-reply`), and the
+  lockfile's own v5 format already supports multiple resolved versions of
+  the same npm package under different specifiers, so a genuine future
+  conflict wouldn't require splitting anyway. Full version-timeline
+  reasoning kept in `docs/plans/PLAN-community-reviews.md`'s TODO section
+  (marked resolved) for future reference.
 
 ### Frontend design audit (frontend-design + web-design-guidelines + ui-ux-pro-max)
 
