@@ -348,42 +348,31 @@ h1, h2, h3 {
 }
 .hero-stats span { font-size: 0.8125rem; letter-spacing: 0.02em; color: var(--color-text-muted); }
 
-/* Hero visual */
+/* Hero visual — "El litoral": silueta de línea de la costa Río de la
+   Plata (Uruguay/Argentina) con pines reales en vez de un mockup de
+   negocio inventado. Firma visual del sitio (ver AI section para su
+   reaparición como el radar de agentes escaneando la costa). */
 .hero-visual { position: relative; min-height: 240px; display: grid; place-items: center; }
-.hero-blob {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 80%;
-  aspect-ratio: 1;
-  background: linear-gradient(135deg, var(--green-soft), var(--green-pale));
-  border-radius: 42% 58% 54% 46% / 52% 44% 56% 48%;
-  filter: blur(4px);
-  opacity: 0.32;
-  z-index: 0;
+.hero-litoral { width: 100%; max-width: 460px; height: auto; overflow: visible; }
+.litoral-coast {
+  fill: none;
+  stroke: var(--color-primary-dark);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0.3;
 }
-.hero-card {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: 22px 26px;
+.litoral-pin { color: var(--color-primary); }
+.litoral-pin--ghost { color: var(--color-border); }
+.litoral-label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  fill: var(--color-text-muted);
 }
-.hero-card-pin {
-  width: 48px; height: 48px;
-  display: grid; place-items: center;
-  border-radius: 50%;
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+@media (max-width: 480px) {
+  .litoral-label { display: none; }
 }
-.hero-card-body { display: flex; flex-direction: column; gap: 6px; }
-.hero-card-body strong { font-family: var(--font-serif); font-size: 1.0625rem; font-weight: 600; }
-.hero-card-stars { color: var(--color-gold); font-size: 0.9rem; letter-spacing: 2px; }
 
 /* ------------------------------- Cards ----------------------------- */
 .card, .feature, .step, .review {
