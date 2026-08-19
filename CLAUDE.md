@@ -1361,7 +1361,8 @@ pass over the existing editorial redesign, not a rebuild:
   not been observed end-to-end (bounce/delivery, opt-out reply, and a normal
   reply all still need a live confirmation) — the standalone verification
   called for in Phase 15/16 now applies specifically to live mode.
-- 🚧 **Phase 19 — Community reports (`place_reports`), schema prepared.**
+- ✅ **Phase 19 — Community reports (`place_reports`), live and verified
+  end-to-end in production.**
   `db/schema.sql` gained the `place_reports` table (`report_type`
   positive/negative, nullable `place_id` + `place_name_text` fallback, and a
   processing-state `status` including `processing` for the claim-based
@@ -1370,7 +1371,7 @@ pass over the existing editorial redesign, not a rebuild:
   `agent_log.agent` CHECK for `'review_handler'`. `js/suggest.js` sends
   `origin: 'community'` explicitly. Design rationale:
   `docs/architecture/ADR-004-community-reports-evidence-not-direct-action.md`
-  (Propuesto) and `docs/plans/PLAN-community-reviews.md`. Along the way, a
+  (Aceptado) and `docs/plans/PLAN-community-reviews.md`. Along the way, a
   real bug already living in `db/schema.sql` was found and fixed — duplicate/
   superseded `CHECK`-widening blocks unsafe to replay against current
   production data (see the schema-migration lesson above) — unrelated to
@@ -1385,7 +1386,7 @@ pass over the existing editorial redesign, not a rebuild:
   was harmed by the earlier duplicate-CHECK bug, since it was caught before
   this apply.
 
-  **Fase 2 (backend) code-complete, offline-tested, not yet deployed live.**
+  **Fase 2 (backend) deployed and verified live in production.**
   `agents/review_handler.py` (`ReviewHandler.handle()` + `.sweep()`, TDD —
   22 test cases, `ValidatorAgent._normalize`/`_decide_status` real, not
   mocked, same rigor as `test_outreach_reply_handler.py`) plus the four new
@@ -1410,15 +1411,42 @@ pass over the existing editorial redesign, not a rebuild:
   uncommitted ad hoc smoke script (every stage mocked) confirming
   `ReviewHandler` is constructed correctly, `sweep(limit=...)` receives the
   budget-clamped value, and the stage is skipped cleanly when budget is
-  exhausted. **Not yet done:** deploying the
-  Edge Function, setting `PLACE_REPORTS_WEBHOOK_SECRET` /
-  `GITHUB_DISPATCH_TOKEN` as Supabase secrets, creating the Database
-  Webhook in the Supabase dashboard, and a live end-to-end verification
-  (mirrors the live-verification gate every prior phase has required before
-  being marked done).
+  exhausted.
 
-  **Fase 3 (frontend) implemented, verified in Chrome against live data —
-  not yet reviewed by Santiago on the real site.** Form B ("Recomendar /
+  **Deployed to production**: `supabase functions deploy
+  place-report-created` (`deno check` + `deno test`, 6/6, clean beforehand,
+  same rigor as `outreach-reply/`'s first deploy), `verify_jwt` disabled
+  manually in the dashboard (the same `--no-verify-jwt` CLI-flag
+  unreliability noted for `outreach-reply/` applied here too), fresh
+  `PLACE_REPORTS_WEBHOOK_SECRET` (`openssl rand -hex 32`) and
+  `GITHUB_DISPATCH_TOKEN` (regenerated with Actions read/write) set as
+  Supabase secrets, and a Database Webhook created on `place_reports`
+  INSERT pointing at the function with the shared-secret header.
+
+  **Verified end-to-end live in production, with real data, on 2026-08-18
+  ~21:49–21:58 UTC** (not staging — see **Verificación** in ADR-004 for
+  the full write-up). A real negative report was submitted from Form B on
+  `celiacmap.org` against **Cucina Paradiso Senza Glutine**
+  (`a52410f9-4069-4da1-ba35-1fdaa6fade80`, chosen for being outside the
+  manual seed set and starting from high confidence so any change would be
+  clearly attributable to the test): INSERT → Database Webhook → Edge
+  Function → `repository_dispatch` → `place-report-review.yml` (confirmed
+  via `gh run list`: `completed`/`success`, 21:49:41 UTC) →
+  `review_handler.py` → Sonnet re-evaluation through the unmodified
+  `RUBRIC`. Result: `validation_confidence` 0.95 → 0.52,
+  `status` `approved` → `needs_review`, 5 flags, a concrete
+  recommendation — exactly ADR-004's "evidence, not direct action" design,
+  confirmed in `agent_log` (`agent='review_handler'`,
+  `action='review_evaluated'`, `status='success'`). Being a deliberate
+  test and not a real user report, the row was reverted immediately after
+  (`status`/`validation_confidence`/`safety_level`/`validation_notes`
+  restored from the place's original 2026-06-04 `agent_log` validation
+  entry; `flags`/`recommendation` restored to `null`, their pre-test
+  value) — the `agent_log` and `place_reports` rows from the test were
+  left untouched as evidence of the verification.
+
+  **Fase 3 (frontend) implemented and reviewed live on celiacmap.org.**
+  Form B ("Recomendar /
   reportar") sits side by side with Form A ("Sumá un lugar") inside a new
   `.suggest-forms` grid wrapper in `#suggest` — same card look, shared
   CSS with Form A rather than a duplicate ruleset. `js/report.js` (new,
@@ -1466,11 +1494,29 @@ pass over the existing editorial redesign, not a rebuild:
   stylesheet directly — the window-resize tool doesn't reliably force a
   narrow viewport for screenshotting here either, same limitation noted
   in **Frontend design audit** above) with zero console errors. The
-  actual submit → `place_reports` INSERT was **not** exercised live (to
-  avoid writing a test row into production from an automated pass) —
-  first real submit is Santiago's to trigger. Not yet done: Santiago's
-  own review of the live site, and Fase 4 (accepting ADR-004 once this
-  and the Fase 2 backend are both confirmed end-to-end).
+  actual submit → `place_reports` INSERT was **not** exercised live in
+  that pass (to avoid writing a test row into production from an
+  automated run).
+
+  **Re-reviewed directly against `celiacmap.org`** (not the local dev
+  server) in a follow-up session: autocomplete, the Recomendar/Reportar
+  toggle (preserves the selected place across type changes), "Cambiar
+  lugar", both no-match variants, honeypot (`aria-hidden` +
+  `tabindex="-1"`, correctly invisible to every real user), EN i18n, and
+  the mobile stacking rule all re-confirmed against real production data
+  with zero console errors. One cosmetic-only gap found: the honeypot's
+  own label text has no EN translation — harmless since the field is
+  `aria-hidden`, so no real user (sighted or on a screen reader) ever
+  sees it; left as-is. Santiago then triggered the real submit himself
+  (see the Fase 2 verification note above) — the first genuine end-to-end
+  exercise of this path, immediately reverted since it was a deliberate
+  test.
+
+  **Fase 4 — ADR-004 accepted.**
+  `docs/architecture/ADR-004-community-reports-evidence-not-direct-action.md`
+  moved from "Propuesto" to "Aceptado" with a **Verificación** section
+  recording the live end-to-end test above — both Fase 2 and Fase 3 are
+  now confirmed end-to-end in production.
 
 ### GitHub Pages deploy decision
 
