@@ -98,7 +98,9 @@
   // collapse the city clusters into unclickable blobs.
   var CITY_BOUNDS = L.latLngBounds([
     [-34.9011, -56.1645], // Montevideo
-    [-34.6037, -58.3816]  // Buenos Aires
+    [-34.6037, -58.3816], // Buenos Aires (CABA)
+    [-34.4167, -58.5833], // Tigre (extremo norte GBA)
+    [-34.4670, -58.9170]  // Pilar (extremo oeste GBA)
   ]);
 
   L.tileLayer(

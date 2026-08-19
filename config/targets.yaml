@@ -139,6 +139,39 @@ countries:
         lng: -58.3816
         radius_m: 15000
         # web: true  # disabled — see note above
+      # Gran Buenos Aires — GBA Norte + Oeste cercano
+      - name: San Isidro
+        lat: -34.4670
+        lng: -58.5000
+        radius_m: 6000
+      - name: Vicente López
+        lat: -34.5170
+        lng: -58.4830
+        radius_m: 5000
+      - name: Tigre
+        lat: -34.4167
+        lng: -58.5833
+        radius_m: 10000
+      - name: San Fernando
+        lat: -34.4500
+        lng: -58.5670
+        radius_m: 5000
+      - name: Pilar
+        lat: -34.4670
+        lng: -58.9170
+        radius_m: 12000
+      - name: Morón
+        lat: -34.6500
+        lng: -58.6170
+        radius_m: 6000
+      - name: Ituzaingó
+        lat: -34.6522
+        lng: -58.6750
+        radius_m: 5000
+      - name: Hurlingham
+        lat: -34.6000
+        lng: -58.6330
+        radius_m: 4500
       # Major metros
       - name: Córdoba
         lat: -31.4201
