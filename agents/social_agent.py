@@ -91,6 +91,7 @@ class SocialAgent(BaseAgent):
         haiku_model: str | None = None,
         max_queries: int = 16,
         results_per_query: int = 10,
+        max_geocodes: int = 40,
     ):
         super().__init__(db)
         self.search_client = search_client
@@ -100,6 +101,11 @@ class SocialAgent(BaseAgent):
         self.haiku_model = haiku_model
         self.max_queries = max_queries
         self.results_per_query = results_per_query
+        # Independent cap on Find Place calls: max_queries only bounds Tavily
+        # searches, but one query can yield up to results_per_query leads,
+        # each geocoded separately — see the settings.py SOCIAL_MAX_GEOCODES
+        # comment for the real fan-out this guards against.
+        self.max_geocodes = max_geocodes
 
     def _build_queries(self) -> list[dict]:
         """Generate "<term>" "<city>" queries, one per platform (data-driven).
@@ -169,6 +175,7 @@ class SocialAgent(BaseAgent):
         queries_run = 0
         results_seen = 0
         parsed = 0
+        geocode_attempts = 0
         geocoded = 0
         inserted = 0
         skipped = 0
@@ -204,6 +211,21 @@ class SocialAgent(BaseAgent):
                 parsed += 1
 
                 lead_city = lead["city"] or q["city"]
+
+                # Independent geocode budget: max_queries only bounds Tavily
+                # searches, not the Find Place calls each query's leads can
+                # fan out into. Stop geocoding once the cap is hit; the rest
+                # of this run's leads are skipped, not inserted ungeocoded.
+                if geocode_attempts >= self.max_geocodes:
+                    skipped += 1
+                    self.log(
+                        "social_geocode_budget_exhausted",
+                        {"name": lead["name"], "url": url},
+                        status="success",
+                    )
+                    continue
+                geocode_attempts += 1
+
                 try:
                     match = self.places.find_place(
                         f"{lead['name']} {lead_city}".strip(),
@@ -340,6 +362,7 @@ def main() -> int:
         load_targets(),
         haiku_model=settings.haiku_model,
         max_queries=settings.max_social_queries_per_run,
+        max_geocodes=settings.social_max_geocodes,
     )
 
     summary = agent.run()

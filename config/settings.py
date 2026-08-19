@@ -64,6 +64,13 @@ class Settings:
     # Social agent caps: number of Tavily searches per run (free tier: 1000/month)
     # and number of Search-agent review enrichments per run.
     max_social_queries_per_run: int = 30
+    # Independent cap on Google Find Place geocode calls per Social run. A
+    # single Tavily query can surface multiple leads, each geocoded
+    # separately — the query cap above does NOT bound this. Confirmed live
+    # 2026-08-19: 25 queries triggered 102 geocode calls (4.1x), eating the
+    # budget planned for the Validator's reserve. 40 covers the real volume
+    # seen without leaving Social effectively uncapped.
+    social_max_geocodes: int = 40
     max_review_enrichments_per_run: int = 30
     # Place Details lookups per Search run (rich panel fields + review enrichment).
     max_detail_lookups_per_run: int = 60
@@ -124,6 +131,7 @@ class Settings:
             max_validations_per_run=_int("MAX_VALIDATIONS_PER_RUN", 50),
             max_updates_per_run=_int("MAX_UPDATES_PER_RUN", 50),
             max_social_queries_per_run=_int("MAX_SOCIAL_QUERIES_PER_RUN", 30),
+            social_max_geocodes=_int("SOCIAL_MAX_GEOCODES", 40),
             max_review_enrichments_per_run=_int("MAX_REVIEW_ENRICHMENTS_PER_RUN", 30),
             max_detail_lookups_per_run=_int("MAX_DETAIL_LOOKUPS_PER_RUN", 60),
             max_web_cities_per_run=_int("MAX_WEB_CITIES_PER_RUN", 2),

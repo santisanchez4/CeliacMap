@@ -187,7 +187,7 @@ def run_pipeline(
     # Keep the daily pipeline self-sufficient: discovery (Search/Social/Web) is
     # clamped so it can never consume the slice reserved for the Validator, and
     # the Updater takes whatever remains. Per-run shape (budget 350):
-    #   Search <= 104 | Social <= 25 | Web <= 40 | Validator reserve 80 | Updater = rest.
+    #   Search <= 104 | Social <= 25 queries / 40 geocodes | Web <= 40 | Validator reserve 80 | Updater = rest.
     SOCIAL_MAX = 25
     WEB_MAX = 40
     SUGGEST_MAX = 30
@@ -218,9 +218,15 @@ def run_pipeline(
         + summaries["search"].get("details_fetched", 0)
     )
 
-    # 2. Social — Tavily search + Find Place geocoding. Capped at SOCIAL_MAX to
-    #    curb geocoding waste, and never planned into the Validator's reserve.
+    # 2. Social — Tavily search + Find Place geocoding. Query count (SOCIAL_MAX)
+    #    and geocode count (settings.social_max_geocodes) are capped
+    #    independently — one query can fan out into several geocode calls
+    #    (confirmed live 2026-08-19: 25 queries -> 102 geocodes, which ate the
+    #    Validator's reserve) — and neither is planned into that reserve.
     soc_cap = min(SOCIAL_MAX, max(0, budget.remaining - VALIDATOR_RESERVE))
+    geo_cap = min(
+        settings.social_max_geocodes, max(0, budget.remaining - VALIDATOR_RESERVE)
+    )
     if soc_cap > 0 and settings.tavily_api_key and haiku:
         search_client = TavilySearchClient(settings.tavily_api_key)
         social = SocialAgent(
@@ -231,6 +237,7 @@ def run_pipeline(
             targets,
             haiku_model=settings.haiku_model,
             max_queries=soc_cap,
+            max_geocodes=geo_cap,
         )
         summaries["social"] = social.run()
         # Consume the metered calls: Tavily searches + Google Find Place geocodes.

@@ -203,6 +203,23 @@ GEOGRAPHIC SCOPE
   the 15 confirmed above were corrected separately via a one-off SQL script
   (`db/fixes/2026-08-08-border-city-country-mismatch.sql`, run manually
   against production — see that file's own commit).
+- **`VALIDATOR_RESERVE=80` (in `scripts/run_agents.py`) was sized for the old
+  daily cadence, not the current monthly one — unresolved, the `pending`
+  backlog is now structurally growing, not just occasionally spiking.**
+  Confirmed via a read-only audit of `agent_log` (2026-08-19): during the
+  daily/frequent cadence (Jun–Jul 2026), the Validator cleared its backlog
+  to zero on every single run (daily discovery volume ~10-20 candidates,
+  comfortably under 80). After the switch to monthly (Phase 8's cadence
+  change), a full month's discovery volume (~150-300 candidates, more with
+  the GBA Norte + Oeste expansion) now exceeds that still-80 reserve every
+  run, so `pending` grows net each month instead of draining — the
+  2026-08-19 GBA expansion run alone left 96 candidates stuck in `pending`,
+  only cleared by running the Validator standalone by hand between pipeline
+  runs (`MAX_VALIDATIONS_PER_RUN=96 python -m agents.validator_agent`; real
+  cost confirmed <$1 in the Anthropic Console). **Not yet decided:** raise
+  `VALIDATOR_RESERVE`, add a periodic standalone Validator run outside the
+  monthly pipeline, or revisit the cadence itself — no option evaluated,
+  deliberately left open for a future session.
 
 ## The Core Prompt — Validator Rubric
 

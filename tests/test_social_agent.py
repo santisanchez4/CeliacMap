@@ -37,7 +37,7 @@ def make_match(
     }
 
 
-def make_agent(targets=TARGETS, max_queries=16):
+def make_agent(targets=TARGETS, max_queries=16, max_geocodes=40):
     db = MagicMock()
     db.place_exists_by_external_id.return_value = False
     db.insert_place_candidate.return_value = {"id": "row-1"}
@@ -51,7 +51,10 @@ def make_agent(targets=TARGETS, max_queries=16):
         "category": "cafe",
         "address": None,
     }
-    agent = SocialAgent(db, search_client, places, llm, targets, max_queries=max_queries)
+    agent = SocialAgent(
+        db, search_client, places, llm, targets,
+        max_queries=max_queries, max_geocodes=max_geocodes,
+    )
     return agent, db, search_client, places, llm
 
 
@@ -197,6 +200,73 @@ def test_country_city_falls_back_to_query_target_when_address_unparseable():
     candidate = db.insert_place_candidate.call_args.args[0]
     assert candidate["country"] == "Uruguay"
     assert candidate["city"] == "Montevideo"
+
+
+# --- Geocode budget cap -----------------------------------------------------
+
+
+def test_geocode_cap_stops_calling_find_place_once_exhausted():
+    """Regression test for the real 2026-08-19 production incident: a single
+    Tavily query returned enough leads to fan out into far more geocode
+    calls than the query cap alone would suggest (25 queries -> 102
+    geocodes). max_geocodes must independently stop new find_place calls
+    once hit, within the very first (and only) query here."""
+    agent, db, search, places, _ = make_agent(max_queries=1, max_geocodes=2)
+    search.search.return_value = [
+        {"title": "A", "link": "https://instagram.com/a", "snippet": "sin TACC"},
+        {"title": "B", "link": "https://instagram.com/b", "snippet": "sin TACC"},
+        {"title": "C", "link": "https://instagram.com/c", "snippet": "sin TACC"},
+    ]
+    # All 3 leads parse to the same {name, city} (the mocked Haiku response is
+    # fixed), so a fixed place_id would collide with the dedup-by-external_id
+    # check. Vary it by call so the 2 that do geocode are counted as distinct
+    # new places, isolating the geocode cap from that unrelated dedup path.
+    geocode_calls = {"n": 0}
+
+    def fake_find_place(text, location=None):
+        geocode_calls["n"] += 1
+        return make_match(place_id=f"ext-{geocode_calls['n']}", name=f"Place {geocode_calls['n']}")
+
+    places.find_place.side_effect = fake_find_place
+
+    summary = agent.run()
+
+    # Only 2 of the 3 leads ever reach the paid Google API call.
+    assert places.find_place.call_count == 2
+    assert summary["inserted"] == 2
+    assert summary["skipped"] == 1
+
+    actions = [call.args[1] for call in db.insert_agent_log.call_args_list]
+    assert "social_geocode_budget_exhausted" in actions
+
+
+def test_geocode_cap_does_not_limit_query_count():
+    """The geocode cap and the query cap are independent: a low geocode cap
+    must not stop Tavily queries from running, only Find Place calls — even
+    across queries, once the geocode budget is spent, later queries' leads
+    are still parsed but never geocoded."""
+    agent, db, search, places, _ = make_agent(max_queries=3, max_geocodes=1)
+    calls = {"n": 0}
+
+    def fake_search(q, num=None, include_domains=None):
+        calls["n"] += 1
+        return [{
+            "title": "A",
+            "link": f"https://instagram.com/a{calls['n']}",
+            "snippet": "sin TACC",
+        }]
+
+    search.search.side_effect = fake_search
+    places.find_place.side_effect = lambda text, location=None: make_match(
+        place_id=text, name=text
+    )
+
+    summary = agent.run()
+
+    # All 3 queries ran (independent Tavily cap), but only the first lead
+    # across them ever got geocoded.
+    assert summary["queries"] == 3
+    assert places.find_place.call_count == 1
 
 
 # --- Dedup ----------------------------------------------------------------
