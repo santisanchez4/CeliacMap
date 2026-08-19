@@ -31,11 +31,12 @@ def make_match(
     lat=-34.9,
     lng=-56.2,
     business_status="OPERATIONAL",
+    formatted_address="Av. Siempre Viva 123",
 ):
     return {
         "place_id": place_id,
         "name": name,
-        "formatted_address": "Av. Siempre Viva 123",
+        "formatted_address": formatted_address,
         "geometry": {"location": {"lat": lat, "lng": lng}},
         "business_status": business_status,
     }
@@ -129,6 +130,42 @@ def test_successful_insert_geocoded_candidate():
     assert candidate["social_url"] == "https://blog.example/sin-tacc-mvd"
     assert candidate["safety_level"] == "options_available"
     assert "validation_notes" not in candidate
+
+
+def test_country_city_derived_from_matched_address_not_search_target():
+    """Regression test: the model has no geographic filter, so a lead "found"
+    for Montevideo can point to a real business anywhere. The candidate's
+    country/city must come from Google's own formatted_address for the
+    geocoded match, not from the researched city/country — the same bug
+    class already fixed in the Search and Social agents."""
+    agent, db, places, _ = make_agent(max_cities=1)
+    places.find_place.return_value = make_match(
+        name="CRAIG Bistro",
+        formatted_address="Montevideo 937, C1019 Cdad. Autónoma de Buenos Aires, Argentina",
+    )
+
+    agent.run()
+
+    candidate = db.insert_place_candidate.call_args.args[0]
+    assert candidate["country"] == "Argentina"
+    # find_place only returns formatted_address (no address_components), so
+    # this goes through the string-parse fallback — same limit noted in the
+    # Social agent's equivalent test.
+    assert candidate["city"] == "Cdad. Autónoma de Buenos Aires"
+
+
+def test_country_city_falls_back_to_search_target_when_address_unparseable():
+    """When the matched address doesn't parse to a recognized country (this
+    project's scope is only Argentina/Uruguay), fall back to the researched
+    city/country — same fallback contract as the Search/Social agents."""
+    agent, db, places, _ = make_agent(max_cities=1)
+    places.find_place.return_value = make_match(formatted_address="Av. Siempre Viva 123")
+
+    agent.run()
+
+    candidate = db.insert_place_candidate.call_args.args[0]
+    assert candidate["country"] == "Uruguay"
+    assert candidate["city"] == "Montevideo"
 
 
 def test_searches_budget_estimate_in_summary():

@@ -241,6 +241,13 @@ class WebAgent(BaseAgent):
                 except Exception:  # noqa: BLE001 - dedup check must not crash run
                     logger.exception("dedup check failed for %s", external_id)
 
+                # country/city are the SEARCH TARGET and only a fallback: the
+                # model has no geographic filter, so a lead "found" for this
+                # city can point to a business located anywhere — prefer
+                # Google's own formatted_address for the geocoded match.
+                parsed_city, parsed_country = GooglePlacesClient.parse_city_country_from_address(
+                    (match or {}).get("formatted_address")
+                )
                 candidate = {
                     "name": (match or {}).get("name") or lead["name"],
                     "lat": lat,
@@ -248,8 +255,8 @@ class WebAgent(BaseAgent):
                     "address": (match or {}).get("formatted_address") or lead["address"],
                     "category": lead["category"],
                     "safety_level": DEFAULT_SAFETY_LEVEL,
-                    "country": country,
-                    "city": city,
+                    "country": parsed_country or country,
+                    "city": parsed_city or city,
                     "source": "web",
                     "external_id": external_id,
                     # Kept in its own column so the Validator (which overwrites
