@@ -170,7 +170,6 @@ h1, h2, h3 {
 
 .grid { display: grid; gap: clamp(24px, 3vw, 36px); }
 .grid-3 { grid-template-columns: 1fr; }
-.grid-4 { grid-template-columns: 1fr; }
 
 /* Buttons */
 .btn {
@@ -375,7 +374,7 @@ h1, h2, h3 {
 }
 
 /* ------------------------------- Cards ----------------------------- */
-.card, .feature, .step, .review {
+.card, .step, .review {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -384,7 +383,7 @@ h1, h2, h3 {
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   height: 100%;
 }
-.card:hover, .feature:hover, .review:hover {
+.card:hover, .review:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow);
   border-color: var(--green-pale);
@@ -425,6 +424,53 @@ h1, h2, h3 {
   background: var(--color-primary-light);
   color: var(--color-primary);
   margin-bottom: 14px;
+}
+
+/* --------------------- Features (2 columnas + preview) ------------- */
+.features-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 44px;
+  align-items: start;
+}
+.features-list { display: flex; flex-direction: column; }
+.features-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.features-item:first-child { padding-top: 0; }
+.features-item:last-child { border-bottom: none; padding-bottom: 0; }
+.features-item .card-icon { margin-bottom: 0; flex: none; }
+
+/* Preview real: reusa .pp-* (mismas clases que el place-panel del mapa) en
+   vez de una captura de pantalla o un mockup con su propio set de estilos. */
+.features-preview-tag {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 14px;
+}
+.feature-panel {
+  max-width: 360px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 26px 26px 22px;
+}
+/* .pp-title normally reserves space for the place-panel's close button;
+   this static preview has none. */
+.feature-panel .pp-title { padding-right: 0; }
+
+@media (min-width: 900px) {
+  .features-layout { grid-template-columns: 1.15fr 0.85fr; gap: 60px; }
+  .features-preview { position: sticky; top: calc(var(--header-h) + 32px); }
 }
 
 /* ------------------------ Suggest-a-place form --------------------- */
@@ -1107,12 +1153,10 @@ h1, h2, h3 {
 /* ============================ Responsive ============================ */
 @media (min-width: 600px) {
   .grid-3 { grid-template-columns: repeat(2, 1fr); }
-  .grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (min-width: 900px) {
   .grid-3 { grid-template-columns: repeat(3, 1fr); }
-  .grid-4 { grid-template-columns: repeat(4, 1fr); }
   .timeline { grid-template-columns: repeat(4, 1fr); }
 
   .hero-inner { grid-template-columns: 1.05fr 0.95fr; }

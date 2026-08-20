@@ -232,51 +232,102 @@
           </p>
         </header>
 
-        <div class="grid grid-4">
-          <article class="feature reveal">
-            <div class="card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                d="M21 21l-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" /></svg>
+        <div class="features-layout">
+          <ul class="features-list reveal">
+            <li class="features-item">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M21 21l-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" /></svg>
+              </div>
+              <div>
+                <h3 class="card-title" data-i18n="features.f1.title">Búsqueda inteligente</h3>
+                <p class="card-text" data-i18n="features.f1.text">
+                  Filtrá por ubicación, tipo de lugar y nivel de seguridad.
+                </p>
+              </div>
+            </li>
+            <li class="features-item">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15" /></svg>
+              </div>
+              <div>
+                <h3 class="card-title" data-i18n="features.f2.title">Mapa interactivo</h3>
+                <p class="card-text" data-i18n="features.f2.text">
+                  Visualizá todos los lugares aptos cerca tuyo de un vistazo.
+                </p>
+              </div>
+            </li>
+            <li class="features-item">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+              </div>
+              <div>
+                <h3 class="card-title" data-i18n="features.f3.title">Lugares verificados</h3>
+                <p class="card-text" data-i18n="features.f3.text">
+                  Etiquetas claras de seguridad respaldadas por la comunidad.
+                </p>
+              </div>
+            </li>
+            <li class="features-item">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M7 8h10M7 12h6m-9 8 3.5-3H19a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14Z" /></svg>
+              </div>
+              <div>
+                <h3 class="card-title" data-i18n="features.f4.title">Reseñas reales</h3>
+                <p class="card-text" data-i18n="features.f4.text">
+                  Experiencias de otras personas celíacas que ya estuvieron ahí.
+                </p>
+              </div>
+            </li>
+          </ul>
+
+          <!-- Preview real: reusa las mismas clases .pp-* del place-panel que
+               se abre al clickear un pin en el mapa (js/map.js panelHtml()),
+               no es una captura ni un mockup aparte. -->
+          <div class="features-preview reveal" aria-hidden="true">
+            <span class="features-preview-tag" data-i18n="features.previewTag">Así se ve un lugar en el mapa</span>
+            <div class="feature-panel">
+              <h3 class="pp-title">Panadería Trigo Cero</h3>
+              <p class="pp-meta">Montevideo, Uruguay</p>
+
+              <div class="pp-badges">
+                <span class="pp-badge pp-badge--cat" data-i18n="features.preview.category">Café</span>
+                <span class="pp-badge pp-badge--safe" data-i18n="map.legend1">Sin TACC</span>
+              </div>
+
+              <div class="pp-rating" aria-label="4.8/5">
+                <span class="pp-stars">★★★★★</span>
+                <span class="pp-rating-num">4.8</span>
+                <span class="pp-rating-count">(23 <span data-i18n="features.preview.reviews">reseñas</span>)</span>
+              </div>
+
+              <div class="pp-fields">
+                <div class="pp-field">
+                  <span class="pp-field-label" data-i18n="features.preview.addressLabel">Dirección</span>
+                  <span class="pp-field-value">Av. 18 de Julio 1234</span>
+                </div>
+                <div class="pp-field">
+                  <span class="pp-field-label" data-i18n="features.preview.hoursLabel">Horarios</span>
+                  <span class="pp-field-value">
+                    <ul class="pp-hours">
+                      <li class="pp-hours-today" data-i18n="features.preview.hoursValue">Miércoles: 09:00 – 20:00</li>
+                    </ul>
+                  </span>
+                </div>
+              </div>
+
+              <div class="pp-footer">
+                <span class="pp-report" data-i18n="features.preview.report">Reportar un error</span>
+              </div>
             </div>
-            <h3 class="card-title" data-i18n="features.f1.title">Búsqueda inteligente</h3>
-            <p class="card-text" data-i18n="features.f1.text">
-              Filtrá por ubicación, tipo de lugar y nivel de seguridad.
-            </p>
-          </article>
-          <article class="feature reveal">
-            <div class="card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15" /></svg>
-            </div>
-            <h3 class="card-title" data-i18n="features.f2.title">Mapa interactivo</h3>
-            <p class="card-text" data-i18n="features.f2.text">
-              Visualizá todos los lugares aptos cerca tuyo de un vistazo.
-            </p>
-          </article>
-          <article class="feature reveal">
-            <div class="card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-            </div>
-            <h3 class="card-title" data-i18n="features.f3.title">Lugares verificados</h3>
-            <p class="card-text" data-i18n="features.f3.text">
-              Etiquetas claras de seguridad respaldadas por la comunidad.
-            </p>
-          </article>
-          <article class="feature reveal">
-            <div class="card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                d="M7 8h10M7 12h6m-9 8 3.5-3H19a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14Z" /></svg>
-            </div>
-            <h3 class="card-title" data-i18n="features.f4.title">Reseñas reales</h3>
-            <p class="card-text" data-i18n="features.f4.text">
-              Experiencias de otras personas celíacas que ya estuvieron ahí.
-            </p>
-          </article>
+          </div>
         </div>
       </div>
     </section>

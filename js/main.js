@@ -137,6 +137,13 @@
     "features.f3.text": "Clear safety labels backed by the community.",
     "features.f4.title": "Real reviews",
     "features.f4.text": "Experiences from other celiac people who have been there.",
+    "features.previewTag": "This is how a place looks on the map",
+    "features.preview.category": "Café",
+    "features.preview.reviews": "reviews",
+    "features.preview.addressLabel": "Address",
+    "features.preview.hoursLabel": "Opening hours",
+    "features.preview.hoursValue": "Wednesday: 9:00 AM – 8:00 PM",
+    "features.preview.report": "Report an error",
 
     "map.eyebrow": "Interactive map",
     "map.title": "The heart of CeliacMap",
