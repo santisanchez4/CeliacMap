@@ -132,6 +132,9 @@ h1, h2, h3 {
   line-height: 1.3;
 }
 
+/* Kicker muted, not brand-colored: with 10 of these on the page, keeping
+   the accent here diluted it everywhere else (CTAs, safety badges, the
+   hero litoral). Reserving green for action/verification moments. */
 .eyebrow {
   display: inline-block;
   font-family: var(--font-sans);
@@ -139,7 +142,7 @@ h1, h2, h3 {
   font-weight: 600;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--color-primary);
+  color: var(--color-text-muted);
   margin-bottom: 22px;
 }
 
@@ -389,6 +392,11 @@ h1, h2, h3 {
   border-color: var(--green-pale);
 }
 
+/* Problema: borde punteado — visualiza "todavía sin resolver". Solución
+   (below) usa borde sólido + línea superior verde para el contraste
+   narrativo inverso ("esto ya está resuelto"). */
+.card { border: 1.5px dashed var(--color-border); }
+
 .card-icon {
   width: 56px; height: 56px;
   display: grid; place-items: center;
@@ -397,9 +405,16 @@ h1, h2, h3 {
   color: var(--color-primary);
   margin-bottom: 24px;
 }
+/* Los íconos de Problema quedan neutros: usar el verde ("resuelto/seguro")
+   para ilustrar incertidumbre era una señal contradictoria. */
+#problem .card-icon {
+  background: var(--color-bg-alt);
+  color: var(--color-text-muted);
+}
 .card-text { margin-top: 12px; color: var(--color-text-muted); }
 
 /* Steps */
+#solution .step { border-top: 3px solid var(--color-primary); }
 .step-num {
   display: block;
   font-family: var(--font-serif);
