@@ -220,7 +220,6 @@
     "ai.li1": "Automatically discover new safe places.",
     "ai.li2": "Validate and cross-check reviews to detect inconsistencies.",
     "ai.li3": "Keep menus and data always up to date.",
-    "ai.note": "Note: AI is part of the product's future vision, not the current version.",
 
     "roadmap.eyebrow": "Roadmap",
     "roadmap.title": "How the product will grow",

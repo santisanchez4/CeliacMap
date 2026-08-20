@@ -1033,15 +1033,6 @@ h1, h2, h3 {
   background: var(--color-primary-light)
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232d6a4f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center / 13px no-repeat;
 }
-.note {
-  margin-top: 28px;
-  font-size: 0.9375rem;
-  color: var(--color-text-muted);
-  background: var(--color-bg-alt);
-  border-left: 3px solid var(--color-soft);
-  padding: 14px 18px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
 .ai-visual { display: grid; place-items: center; min-height: 220px; }
 
 /* Radar: agents scanning the map and surfacing pins — grounded in what the
