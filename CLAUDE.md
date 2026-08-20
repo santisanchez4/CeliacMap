@@ -216,10 +216,31 @@ GEOGRAPHIC SCOPE
   2026-08-19 GBA expansion run alone left 96 candidates stuck in `pending`,
   only cleared by running the Validator standalone by hand between pipeline
   runs (`MAX_VALIDATIONS_PER_RUN=96 python -m agents.validator_agent`; real
-  cost confirmed <$1 in the Anthropic Console). **Not yet decided:** raise
-  `VALIDATOR_RESERVE`, add a periodic standalone Validator run outside the
-  monthly pipeline, or revisit the cadence itself — no option evaluated,
-  deliberately left open for a future session.
+  cost confirmed <$1 in the Anthropic Console). **Decided (2026-08-20): a
+  mid-month standalone Validator run, not a `VALIDATOR_RESERVE` raise.**
+  Raising the shared reserve was rejected — it would dilute the
+  `AGENT_DAILY_BUDGET` cap Search/Social/Web/Suggestion draw from within the
+  same monthly run, right after the GBA Norte + Oeste expansion raised their
+  own per-run query budget; this isn't the moment to shrink it back down for
+  them. Instead, `.github/workflows/validator-midmonth.yml` runs the
+  Validator agent standalone on the 15th of each month (09:00 UTC — the same
+  slot `agents-monthly.yml` uses, two weeks later) plus `workflow_dispatch`
+  for manual runs, entirely independent of `agents-monthly.yml` and its
+  combined budget: it only needs `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+  / `ANTHROPIC_API_KEY`, not the full agent secret set. `MAX_VALIDATIONS_PER_RUN`
+  defaults to **150** for this workflow (overridable via the `max_validations`
+  dispatch input, same "blank = default" pattern as `agents-monthly.yml`'s
+  `budget` input) — comfortably above the typical ~70–150 left over after a
+  monthly run's 80-candidate batch, with headroom for a GBA-sized month (up
+  to ~220), while staying well inside the 30-minute job timeout and costing
+  well under $1 per run (per the 96-candidate drain's real, confirmed cost —
+  no fan-out, one Sonnet call per candidate). Shares `agents-monthly.yml`'s
+  `agents-monthly` concurrency group purely to avoid wasted duplicate work if
+  a manual trigger ever overlaps a pipeline run — `ValidatorAgent.run()` has
+  no row-claiming, so an overlap wouldn't corrupt anything, just waste API
+  calls, and there's no reason to allow that when preventing it is free.
+  `VALIDATOR_RESERVE` and `AGENT_DAILY_BUDGET` are unchanged — this solution
+  avoids them by design rather than retuning either.
 
 ## The Core Prompt — Validator Rubric
 
@@ -388,7 +409,8 @@ Target (functional product — see **## Architecture**):
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
 │   └── seed.sql                # manual seed (UY/AR)
 ├── tests/                      # offline unit tests (external calls mocked)
-├── .github/workflows/{agents-monthly,deploy-pages,outreach-reply,place-report-review}.yml
+├── .github/workflows/{agents-monthly,validator-midmonth,deploy-pages,
+│       outreach-reply,place-report-review}.yml
 ├── requirements.txt
 ├── .env.example
 ├── README.md  CLAUDE.md  prompts.md  .gitignore

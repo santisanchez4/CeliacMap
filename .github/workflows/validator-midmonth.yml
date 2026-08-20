@@ -1,0 +1,57 @@
+# Validator - mid-month standalone run.
+# Runs only the Validator agent (not the full monthly pipeline) to drain the
+# `pending` backlog the monthly pipeline leaves behind under VALIDATOR_RESERVE
+# before it compounds into the next month's run. Independent budget: does NOT
+# share AGENT_DAILY_BUDGET / VALIDATOR_RESERVE with agents-monthly.yml, so it
+# can't dilute Search/Social's per-run budget. See CLAUDE.md's
+# "VALIDATOR_RESERVE" bullet for the decision this workflow implements.
+name: Validator - mid-month standalone run
+
+on:
+  schedule:
+    # 09:00 UTC on the 15th of each month - same slot as agents-monthly.yml's
+    # 1st-of-month run, just two weeks later.
+    - cron: '0 9 15 * *'
+  workflow_dispatch:
+    inputs:
+      max_validations:
+        description: "Override MAX_VALIDATIONS_PER_RUN; blank = default (150)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# Shares the monthly pipeline's concurrency group: both call the same
+# ValidatorAgent.run() against the same `pending` queue with no row-claiming,
+# so an accidental overlap would just mean wasted duplicate validations, not
+# corruption - but there's no reason to allow it when it's free to prevent.
+concurrency:
+  group: agents-monthly
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MAX_VALIDATIONS_PER_RUN: ${{ inputs.max_validations || '150' }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Validator (standalone)
+        run: |
+          echo "MAX_VALIDATIONS_PER_RUN=$MAX_VALIDATIONS_PER_RUN"
+          python -m agents.validator_agent
