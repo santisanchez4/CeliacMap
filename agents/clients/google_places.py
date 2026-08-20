@@ -106,6 +106,19 @@ _PROVINCE_WRAP_RE = re.compile(
     r"^(?:provincia de |province of )?(.+?)(?: province)?$", re.IGNORECASE
 )
 
+# Google's `locality` component is occasionally a stray fragment rather than
+# a real place name -- confirmed live for "Palluzzi Libre de gluten"
+# (locality="CFX", the 3-letter suffix of an Argentine CPA postal code like
+# "B1923CFX"; corrected by hand to administrative_area_level_2="Berisso").
+# Real localities Google returns are Title Case with at least one lowercase
+# letter; a short, all-caps, single "word" has the postal-code-fragment
+# shape, not a place name.
+_SUSPECT_LOCALITY_RE = re.compile(r"^[A-Z]{2,4}$")
+
+
+def _looks_like_real_locality(name: str) -> bool:
+    return not _SUSPECT_LOCALITY_RE.match(name)
+
 
 def _normalize_text(text: str) -> str:
     """Lower-case and strip accents for robust keyword matching."""
@@ -212,7 +225,9 @@ class GooglePlacesClient:
         preferred over `parse_city_country_from_address` whenever a Details
         call was made. `locality` is the usual city type; a few Argentine
         addresses (e.g. some Buenos Aires Province localities) only carry
-        `administrative_area_level_2`, used as a fallback for city.
+        `administrative_area_level_2`, used as a fallback for city -- also
+        used when `locality` doesn't look like a real place name (see
+        `_looks_like_real_locality`).
         """
         if not address_components:
             return None, None
@@ -227,6 +242,8 @@ class GooglePlacesClient:
                 city = component.get("long_name")
             elif "administrative_area_level_2" in types:
                 admin_area_2 = component.get("long_name")
+        if city and not _looks_like_real_locality(city):
+            city = None
         return city or admin_area_2, country
 
     @staticmethod

@@ -414,6 +414,32 @@ def test_extract_rich_fields_omits_city_country_when_components_absent():
     assert "country" not in rich
 
 
+def test_city_country_from_components_rejects_postal_code_fragment_locality():
+    # Regression: Google returned locality="CFX" (the trailing 3-letter
+    # suffix of an Argentine CPA postal code) for "Palluzzi Libre de
+    # gluten", corrected by hand in production to "Berisso" via
+    # administrative_area_level_2. The fallback here reproduces that fix.
+    city, country = GooglePlacesClient.city_country_from_components([
+        {"long_name": "CFX", "types": ["locality", "political"]},
+        {"long_name": "Berisso", "types": ["administrative_area_level_2", "political"]},
+        {"long_name": "Argentina", "types": ["country", "political"]},
+    ])
+    assert city == "Berisso"
+    assert country == "Argentina"
+
+
+def test_city_country_from_components_accepts_normal_locality():
+    # A real locality (Title Case, not a short all-caps fragment) is used
+    # as-is -- confirms the sanity check doesn't reject legitimate cities.
+    city, country = GooglePlacesClient.city_country_from_components([
+        {"long_name": "Berisso", "types": ["locality", "political"]},
+        {"long_name": "Buenos Aires", "types": ["administrative_area_level_2", "political"]},
+        {"long_name": "Argentina", "types": ["country", "political"]},
+    ])
+    assert city == "Berisso"
+    assert country == "Argentina"
+
+
 def test_rich_fields_applied_to_inserted_candidate():
     agent, db, places = make_agent(max_detail_lookups=5)
     places.text_search.return_value = {"results": [make_result("A")]}
