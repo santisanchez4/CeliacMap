@@ -104,8 +104,12 @@
     [-34.4670, -58.9170]  // Pilar (extremo oeste GBA)
   ]);
 
+  // CartoDB Positron ("light_all"). The ?key= (domain-restricted, see config.js)
+  // clears the "API KEY REQUIRED" watermark CARTO now stamps on unkeyed tiles.
+  // Attribution for OpenStreetMap + CARTO is required by the free tier — keep it.
   L.tileLayer(
-    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=" +
+      cfg.CARTO_BASEMAP_KEY,
     {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +

@@ -584,6 +584,15 @@ A full visual and content redesign was applied to `index.html` and
   Full design, refined schema, model choices, deferred-auth and seed decisions, and
   risks are documented in **## Architecture** above. Build order and verification
   live in the approved plan file.
+- **Map tiles — CARTO Positron (`light_all`) with a domain-restricted key.** The
+  Leaflet base layer is CARTO's `light_all` raster style
+  (`{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png`). CARTO now stamps an
+  "API KEY REQUIRED" watermark on unkeyed tiles, so the URL carries
+  `?key=CARTO_BASEMAP_KEY` — a **public** frontend key added to `js/config.js`
+  alongside `SUPABASE_ANON_KEY`, restricted by CARTO to the `celiacmap.org` /
+  `localhost` domains in their dashboard (not a secret; free tier is 5M tile
+  requests/month). The OpenStreetMap + CARTO attribution on the map is a
+  condition of the free tier — do not remove it.
 - **Dedup key — full unique constraint, not a partial index.** The dedup key on
   `places (source, external_id)` was originally a **partial** unique index
   (`where external_id is not null`). PostgreSQL cannot use a partial index for
