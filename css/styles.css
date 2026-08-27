@@ -805,7 +805,10 @@ h1, h2, h3 {
 
 @media (max-width: 640px) {
   .map-toolbar { flex-direction: column; align-items: stretch; }
-  .map-select { flex-basis: auto; }
+  /* Column flex container: flex-basis is the main size = HEIGHT, so the 240px
+     basis stretches these pills into a tall circle. Fall back to the height. */
+  .map-select,
+  .map-search { flex-basis: auto; }
 }
 
 /* Real Leaflet map. NOTE: the id is #cm-map, not #map — the <section id="map">

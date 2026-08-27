@@ -93,9 +93,10 @@
   // Centered on the Río de la Plata to frame both Montevideo and Buenos Aires.
   var map = L.map(mapEl, { scrollWheelZoom: false }).setView([-34.75, -57.4], 6);
 
-  // The two Phase-1 cities. The default view frames exactly these two, so
-  // outlier places (Mar del Plata, Paysandú, …) don't blow out the zoom and
-  // collapse the city clusters into unclickable blobs.
+  // The Río de la Plata core (Montevideo + the Buenos Aires metro, Tigre to
+  // Pilar). frameVisible() uses this as the default view, so outlier cities
+  // (Córdoba, Mendoza, Mar del Plata, Patagonia, …) don't blow out the zoom
+  // and collapse the city clusters into unclickable blobs.
   var CITY_BOUNDS = L.latLngBounds([
     [-34.9011, -56.1645], // Montevideo
     [-34.6037, -58.3816], // Buenos Aires (CABA)
@@ -388,7 +389,15 @@
   function frameVisible() {
     map.invalidateSize();
     var shown = shownMarkers();
-    if (shown.length) {
+    var isDefaultView =
+      currentCategory === "all" && currentCity === "all" && currentQuery.length < 2;
+    if (isDefaultView) {
+      // Coverage now spans Tucumán to Patagonia; fitting every marker zooms out
+      // past the region (most of South America on a phone) and collapses the
+      // city clusters into unclickable blobs. The default view frames the Río
+      // de la Plata core — picking a city or searching reframes to the rest.
+      map.fitBounds(CITY_BOUNDS, { padding: [30, 30] });
+    } else if (shown.length) {
       map.fitBounds(L.featureGroup(shown).getBounds().pad(0.2), { maxZoom: 14 });
     } else if (currentCity === "all") {
       map.fitBounds(CITY_BOUNDS, { padding: [40, 40] });
