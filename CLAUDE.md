@@ -537,9 +537,20 @@ Key decisions made during development (keep this updated as the project evolves)
   visual built with HTML and CSS only (no map library), keeping the project
   dependency-free and self-contained.
 - **Icons — Inline SVG:** No icon library or font; icons are inline SVGs themeable
-  via `currentColor`. `assets/icons/` is kept as a structural placeholder.
-- **No binary image assets:** All visuals are built with CSS/SVG; `assets/images/`
-  is kept as a placeholder via `.gitkeep`.
+  via `currentColor`. `assets/icons/` holds only the favicon set (see below).
+- **No binary image assets — except the favicon PNGs:** All page visuals are built
+  with CSS/SVG; `assets/images/` is kept as a placeholder via `.gitkeep`. The one
+  exception is the favicon: `assets/icons/favicon.svg` is the source of truth, and
+  `favicon-48.png` / `favicon-96.png` / `apple-touch-icon.png` (180×180) are
+  generated from it. Google Search recommends a **PNG** as the primary favicon
+  format (SVG support in search results is inconsistent), so `index.html` lists the
+  PNGs first, then the SVG as a modern extra, then the Apple touch icon. PNGs are
+  regenerated locally with `scripts/gen_favicons.py` (svglib + reportlab/rlPyCairo —
+  `cairosvg` has no usable Windows build). `favicon-48/96` keep a transparent
+  background; `apple-touch-icon` is flattened onto solid white because iOS
+  composites transparency to black. Favicon `<link>`s use **relative** paths like
+  every other asset (the site deploys under the `/CeliacMap/` project subpath — an
+  earlier absolute `/assets/...` href was broken there).
 
 ### Editorial redesign (visual + content)
 
