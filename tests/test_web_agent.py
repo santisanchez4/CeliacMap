@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from agents.clients.google_places import ResolvedLocation
 from agents.web_agent import DEFAULT_CATEGORY, WebAgent
 
 TARGETS = {
@@ -31,15 +32,23 @@ def make_match(
     lat=-34.9,
     lng=-56.2,
     business_status="OPERATIONAL",
+    city="Montevideo",
+    country="Uruguay",
     formatted_address="Av. Siempre Viva 123",
+    geocode_method="find_place",
 ):
-    return {
-        "place_id": place_id,
-        "name": name,
-        "formatted_address": formatted_address,
-        "geometry": {"location": {"lat": lat, "lng": lng}},
-        "business_status": business_status,
-    }
+    """A ResolvedLocation as GooglePlacesClient.resolve_location would return."""
+    return ResolvedLocation(
+        place_id=place_id,
+        lat=lat,
+        lng=lng,
+        formatted_address=formatted_address,
+        name=name,
+        city=city,
+        country=country,
+        geocode_method=geocode_method,
+        business_status=business_status,
+    )
 
 
 def make_lead(
@@ -62,7 +71,7 @@ def make_agent(targets=TARGETS, max_cities=2):
     db.place_exists_by_external_id.return_value = False
     db.insert_place_candidate.return_value = {"id": "row-1"}
     places = MagicMock()
-    places.find_place.return_value = make_match()
+    places.resolve_location.return_value = make_match()
     llm = MagicMock()
     llm.research_with_web_search.return_value = {"places": [make_lead()]}
     agent = WebAgent(db, places, llm, targets, max_cities=max_cities)
@@ -129,43 +138,44 @@ def test_successful_insert_geocoded_candidate():
     assert candidate["lat"] == -34.9 and candidate["lng"] == -56.2
     assert candidate["social_url"] == "https://blog.example/sin-tacc-mvd"
     assert candidate["safety_level"] == "options_available"
+    assert candidate["geocode_method"] == "find_place"
     assert "validation_notes" not in candidate
 
 
-def test_country_city_derived_from_matched_address_not_search_target():
-    """Regression test: the model has no geographic filter, so a lead "found"
-    for Montevideo can point to a real business anywhere. The candidate's
-    country/city must come from Google's own formatted_address for the
-    geocoded match, not from the researched city/country — the same bug
-    class already fixed in the Search and Social agents."""
+def test_candidate_propagates_resolved_country_city():
+    """The candidate's country/city come from the ResolvedLocation, which
+    resolve_location derives from Google's own address (the model has no
+    geographic filter, so a lead "found" for Montevideo can point anywhere;
+    the address-vs-target parsing is covered in tests/test_google_places.py)."""
     agent, db, places, _ = make_agent(max_cities=1)
-    places.find_place.return_value = make_match(
+    places.resolve_location.return_value = make_match(
         name="CRAIG Bistro",
-        formatted_address="Montevideo 937, C1019 Cdad. Autónoma de Buenos Aires, Argentina",
+        city="Cdad. Autónoma de Buenos Aires",
+        country="Argentina",
     )
 
     agent.run()
 
     candidate = db.insert_place_candidate.call_args.args[0]
     assert candidate["country"] == "Argentina"
-    # find_place only returns formatted_address (no address_components), so
-    # this goes through the string-parse fallback — same limit noted in the
-    # Social agent's equivalent test.
     assert candidate["city"] == "Cdad. Autónoma de Buenos Aires"
+    assert candidate["name"] == "CRAIG Bistro"
 
 
-def test_country_city_falls_back_to_search_target_when_address_unparseable():
-    """When the matched address doesn't parse to a recognized country (this
-    project's scope is only Argentina/Uruguay), fall back to the researched
-    city/country — same fallback contract as the Search/Social agents."""
+def test_address_only_geocode_method_propagates():
+    """A web lead resolved only by geocoding its address is inserted with
+    geocode_method='address_only' for the Validator to weigh as weaker."""
     agent, db, places, _ = make_agent(max_cities=1)
-    places.find_place.return_value = make_match(formatted_address="Av. Siempre Viva 123")
+    places.resolve_location.return_value = make_match(
+        place_id="addr-1", name=None, geocode_method="address_only"
+    )
 
     agent.run()
 
     candidate = db.insert_place_candidate.call_args.args[0]
-    assert candidate["country"] == "Uruguay"
-    assert candidate["city"] == "Montevideo"
+    assert candidate["geocode_method"] == "address_only"
+    assert candidate["external_id"] == "addr-1"
+    assert candidate["name"] == "Cafe X"  # falls back to the lead name
 
 
 def test_searches_budget_estimate_in_summary():
@@ -207,7 +217,7 @@ def test_existing_external_id_is_skipped():
 
 def test_unresolved_lead_is_skipped():
     agent, db, places, _ = make_agent(max_cities=1)
-    places.find_place.return_value = None
+    places.resolve_location.return_value = None
 
     summary = agent.run()
 
@@ -218,7 +228,7 @@ def test_unresolved_lead_is_skipped():
 
 def test_closed_place_is_skipped():
     agent, db, places, _ = make_agent(max_cities=1)
-    places.find_place.return_value = make_match(business_status="CLOSED_PERMANENTLY")
+    places.resolve_location.return_value = make_match(business_status="CLOSED_PERMANENTLY")
 
     summary = agent.run()
 
@@ -242,7 +252,7 @@ def test_research_error_is_counted_and_does_not_crash():
 
 def test_geocode_error_is_counted():
     agent, db, places, _ = make_agent(max_cities=1)
-    places.find_place.side_effect = RuntimeError("places down")
+    places.resolve_location.side_effect = RuntimeError("places down")
 
     summary = agent.run()
 
@@ -271,8 +281,10 @@ def test_leads_per_city_cap():
         ]
     }
     # Distinct geocode per lead so dedup doesn't collapse them.
-    places.find_place.side_effect = lambda text, location=None: make_match(
-        place_id=text, name=text
+    places.resolve_location.side_effect = (
+        lambda name, address, city, country, location=None: make_match(
+            place_id=name, name=name
+        )
     )
 
     summary = agent.run()

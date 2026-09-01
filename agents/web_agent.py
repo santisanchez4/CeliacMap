@@ -15,9 +15,10 @@ like the Social agent does:
    v3 can be rolled out one city at a time.
 2. Ask the model (default ``claude-haiku-4-5``) for candidates with supporting
    evidence + a source URL (no coordinates — web mentions have none).
-3. Geocode each lead with Google Find Place (``name + city``) to obtain real
-   coordinates and a canonical Google ``place_id``. Leads that cannot be resolved
-   are skipped and logged (``places.lat/lng`` are NOT NULL).
+3. Resolve each lead via ``GooglePlacesClient.resolve_location`` (Find Place on
+   ``name + address + city``, then a Geocoding-API address-only fallback) to
+   obtain real coordinates and a canonical Google ``place_id``. Leads that
+   resolve to neither are skipped and logged (``places.lat/lng`` are NOT NULL).
 4. Insert as ``status='pending'``, ``source='web'``, ``external_id`` = the Google
    ``place_id`` (so a place found via Search/Social/Web is not duplicated), with
    the source URL kept in its own ``social_url`` column.
@@ -195,12 +196,12 @@ class WebAgent(BaseAgent):
                 leads_found += 1
 
                 try:
-                    match = self.places.find_place(
-                        f"{lead['name']} {city}".strip(), location=location
+                    resolved = self.places.resolve_location(
+                        lead["name"], lead["address"], city, country, location=location
                     )
                 except Exception as exc:  # noqa: BLE001
                     errors += 1
-                    logger.exception("find_place failed for %r", lead["name"])
+                    logger.exception("resolve_location failed for %r", lead["name"])
                     self.log(
                         "web_geocode_failed",
                         {"name": lead["name"], "city": city, "error": str(exc)},
@@ -208,12 +209,8 @@ class WebAgent(BaseAgent):
                     )
                     continue
 
-                external_id = (match or {}).get("place_id")
-                loc = ((match or {}).get("geometry") or {}).get("location") or {}
-                lat, lng = loc.get("lat"), loc.get("lng")
-
-                # No geocode -> no coordinates -> cannot place it on the map.
-                if not external_id or lat is None or lng is None:
+                # No business match and no geocodable address -> not mappable.
+                if resolved is None:
                     skipped += 1
                     self.log(
                         "web_unresolved",
@@ -222,10 +219,11 @@ class WebAgent(BaseAgent):
                     )
                     continue
 
-                if (match or {}).get("business_status") == "CLOSED_PERMANENTLY":
+                if resolved.business_status == "CLOSED_PERMANENTLY":
                     skipped += 1
                     continue
 
+                external_id = resolved.place_id
                 geocoded += 1
 
                 # Dedup: within the run, and against any place already in the DB
@@ -241,27 +239,26 @@ class WebAgent(BaseAgent):
                 except Exception:  # noqa: BLE001 - dedup check must not crash run
                     logger.exception("dedup check failed for %s", external_id)
 
-                # country/city are the SEARCH TARGET and only a fallback: the
-                # model has no geographic filter, so a lead "found" for this
-                # city can point to a business located anywhere — prefer
-                # Google's own formatted_address for the geocoded match.
-                parsed_city, parsed_country = GooglePlacesClient.parse_city_country_from_address(
-                    (match or {}).get("formatted_address")
-                )
+                # resolve_location already prefers Google's own formatted_address
+                # over the search target (country/city) — the model has no
+                # geographic filter, so a lead "found" for this city can point to
+                # a business located anywhere (see CLAUDE.md's Search agent bug).
                 candidate = {
-                    "name": (match or {}).get("name") or lead["name"],
-                    "lat": lat,
-                    "lng": lng,
-                    "address": (match or {}).get("formatted_address") or lead["address"],
+                    "name": resolved.name or lead["name"],
+                    "lat": resolved.lat,
+                    "lng": resolved.lng,
+                    "address": resolved.formatted_address or lead["address"],
                     "category": lead["category"],
                     "safety_level": DEFAULT_SAFETY_LEVEL,
-                    "country": parsed_country or country,
-                    "city": parsed_city or city,
+                    "country": resolved.country or country,
+                    "city": resolved.city or city,
                     "source": "web",
                     "external_id": external_id,
                     # Kept in its own column so the Validator (which overwrites
                     # validation_notes) can't clobber the provenance URL.
                     "social_url": lead["source_url"],
+                    # 'find_place' or 'address_only' (see resolve_location).
+                    "geocode_method": resolved.geocode_method,
                 }
                 try:
                     row = self.db.insert_place_candidate(candidate)

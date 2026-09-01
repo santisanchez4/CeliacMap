@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from agents.clients.google_places import ResolvedLocation
 from agents.suggestion_agent import (
     DEFAULT_CATEGORY,
     DEFAULT_SAFETY_LEVEL,
@@ -12,13 +13,28 @@ from agents.suggestion_agent import (
 )
 
 
-def make_match(place_id="ext-1", name="Cafe X", lat=-34.9, lng=-56.2):
-    return {
-        "place_id": place_id,
-        "name": name,
-        "formatted_address": "Av. Siempre Viva 123",
-        "geometry": {"location": {"lat": lat, "lng": lng}},
-    }
+def make_match(
+    place_id="ext-1",
+    name="Cafe X",
+    lat=-34.9,
+    lng=-56.2,
+    city="Montevideo",
+    country="Uruguay",
+    formatted_address="Av. Siempre Viva 123",
+    geocode_method="find_place",
+):
+    """A ResolvedLocation as GooglePlacesClient.resolve_location would return."""
+    return ResolvedLocation(
+        place_id=place_id,
+        lat=lat,
+        lng=lng,
+        formatted_address=formatted_address,
+        name=name,
+        city=city,
+        country=country,
+        geocode_method=geocode_method,
+        business_status="OPERATIONAL" if geocode_method == "find_place" else None,
+    )
 
 
 def make_db(exists=False, inserted_id="row-1"):
@@ -35,7 +51,7 @@ _DEFAULT = object()
 
 def make_places(match=_DEFAULT):
     places = MagicMock()
-    places.find_place.return_value = make_match() if match is _DEFAULT else match
+    places.resolve_location.return_value = make_match() if match is _DEFAULT else match
     return places
 
 
@@ -60,27 +76,56 @@ def test_promote_inserts_user_candidate():
     assert candidate["safety_level"] == DEFAULT_SAFETY_LEVEL
     assert candidate["social_url"] == "https://instagram.com/cafex"
     assert candidate["validation_notes"] == "menú sin TACC"
+    assert candidate["geocode_method"] == "find_place"
 
 
-def test_promote_geocodes_with_address():
+def test_promote_passes_lead_fields_to_resolve_location():
+    # resolve_location owns the query construction (tested in
+    # tests/test_google_places.py); the promoter just threads the lead through.
     db, places = make_db(), make_places()
     promote_suggestion(
         db, places,
         name="Cafe X", address="Av. 18 de Julio 1234", city="Montevideo",
         country="Uruguay",
     )
-    query = places.find_place.call_args.args[0]
-    assert "Cafe X" in query
-    assert "Av. 18 de Julio 1234" in query
-    assert "Montevideo" in query
+    args = places.resolve_location.call_args.args
+    assert args == ("Cafe X", "Av. 18 de Julio 1234", "Montevideo", "Uruguay")
 
 
 def test_promote_geocodes_without_address_when_absent():
-    # The MCP suggest_place tool may call without an address; the query must still
-    # be well-formed (name + city, no stray whitespace).
+    # The MCP suggest_place tool may call without an address.
     db, places = make_db(), make_places()
     promote_suggestion(db, places, name="Cafe X", city="Montevideo", country="Uruguay")
-    assert places.find_place.call_args.args[0] == "Cafe X Montevideo"
+    assert places.resolve_location.call_args.args == ("Cafe X", None, "Montevideo", "Uruguay")
+
+
+def test_promote_address_only_sets_marker():
+    """The 'Bienestar Gluten Free' case: Find Place misses, the address
+    geocodes — the candidate is promoted with geocode_method='address_only'."""
+    db = make_db()
+    places = make_places(
+        make_match(place_id="addr-1", name=None, geocode_method="address_only")
+    )
+    result = promote_suggestion(
+        db, places,
+        name="Bienestar Gluten Free", address="Rivera 1967",
+        city="Fray Bentos", country="Uruguay",
+    )
+    assert result["outcome"] == "promoted"
+    candidate = db.insert_place_candidate.call_args.args[0]
+    assert candidate["geocode_method"] == "address_only"
+    assert candidate["external_id"] == "addr-1"
+    assert candidate["name"] == "Bienestar Gluten Free"  # geocode has no name
+
+
+def test_promote_still_unresolved_when_address_fails_too():
+    db, places = make_db(), make_places(match=None)
+    result = promote_suggestion(
+        db, places,
+        name="Ghost", address="Calle Falsa 123", city="Nowhere", country="Uruguay",
+    )
+    assert result["outcome"] == "unresolved"
+    db.insert_place_candidate.assert_not_called()
 
 
 def test_promote_defaults_missing_or_bad_category():
@@ -141,8 +186,8 @@ def test_run_promotes_and_marks_suggestion():
 
     summary = SuggestionAgent(db, places, max_per_run=10).run()
 
-    # The stored address is threaded into the geocode query.
-    assert "Av. 18 de Julio 1234" in places.find_place.call_args.args[0]
+    # The stored address is threaded into resolve_location.
+    assert places.resolve_location.call_args.args[1] == "Av. 18 de Julio 1234"
     assert summary["seen"] == 1
     assert summary["promoted"] == 1
     assert summary["geocodes"] == 1
@@ -172,7 +217,7 @@ def test_run_marks_unresolved_as_rejected():
 
 def test_run_counts_geocode_error_and_leaves_suggestion():
     db, places = make_db(), make_places()
-    places.find_place.side_effect = RuntimeError("places down")
+    places.resolve_location.side_effect = RuntimeError("places down")
     db.fetch_new_suggestions.return_value = [make_suggestion()]
 
     summary = SuggestionAgent(db, places, max_per_run=10).run()

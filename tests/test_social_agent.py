@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from agents.clients.google_places import ResolvedLocation
 from agents.social_agent import DEFAULT_CATEGORY, SocialAgent, _canonical_url
 
 TARGETS = {
@@ -26,15 +27,23 @@ def make_match(
     lat=-34.9,
     lng=-56.2,
     business_status="OPERATIONAL",
+    city="Montevideo",
+    country="Uruguay",
     formatted_address="Av. Siempre Viva 123",
+    geocode_method="find_place",
 ):
-    return {
-        "place_id": place_id,
-        "name": name,
-        "formatted_address": formatted_address,
-        "geometry": {"location": {"lat": lat, "lng": lng}},
-        "business_status": business_status,
-    }
+    """A ResolvedLocation as GooglePlacesClient.resolve_location would return."""
+    return ResolvedLocation(
+        place_id=place_id,
+        lat=lat,
+        lng=lng,
+        formatted_address=formatted_address,
+        name=name,
+        city=city,
+        country=country,
+        geocode_method=geocode_method,
+        business_status=business_status,
+    )
 
 
 def make_agent(targets=TARGETS, max_queries=16, max_geocodes=40):
@@ -43,7 +52,7 @@ def make_agent(targets=TARGETS, max_queries=16, max_geocodes=40):
     db.insert_place_candidate.return_value = {"id": "row-1"}
     search_client = MagicMock()
     places = MagicMock()
-    places.find_place.return_value = make_match()
+    places.resolve_location.return_value = make_match()
     llm = MagicMock()
     llm.complete_json.return_value = {
         "name": "Cafe X",
@@ -154,63 +163,65 @@ def test_successful_insert_geocoded_candidate():
     assert candidate["external_id"] == "ext-1"
     assert candidate["lat"] == -34.9 and candidate["lng"] == -56.2
     assert candidate["social_url"] == "https://instagram.com/cafex"
+    assert candidate["geocode_method"] == "find_place"
     assert "validation_notes" not in candidate
 
 
-def test_country_city_derived_from_matched_address_not_query_target():
-    """Regression test: a social post about "Montevideo" can point to a real
-    business anywhere (Tavily has no geographic filter). The candidate's
-    country/city must come from Google's own formatted_address for the
-    geocoded match, not from the Uruguay/Montevideo search target — the same
-    bug class already fixed in the Search agent (see CLAUDE.md)."""
+def test_candidate_propagates_resolved_country_city():
+    """The candidate's country/city come from the ResolvedLocation, which
+    resolve_location derives from Google's own address (a social post about
+    "Montevideo" can point to a business anywhere — Tavily has no geographic
+    filter; the address-vs-target parsing itself is covered in
+    tests/test_google_places.py)."""
     agent, db, search, places, _ = make_agent(max_queries=1)
     search.search.return_value = [
         {"title": "Cafe X | Instagram", "link": "https://instagram.com/cafex",
          "snippet": "sin TACC en Montevideo"}
     ]
-    places.find_place.return_value = make_match(
+    places.resolve_location.return_value = make_match(
         name="CRAIG Bistro",
-        formatted_address="Montevideo 937, C1019 Cdad. Autónoma de Buenos Aires, Argentina",
+        city="Cdad. Autónoma de Buenos Aires",
+        country="Argentina",
     )
 
     agent.run()
 
     candidate = db.insert_place_candidate.call_args.args[0]
     assert candidate["country"] == "Argentina"
-    # find_place only returns formatted_address (no address_components), so
-    # this goes through the string-parse fallback, not the more precise
-    # Details-based city_country_from_components — same limit as
-    # GooglePlacesClient.to_candidate()'s own primary path.
     assert candidate["city"] == "Cdad. Autónoma de Buenos Aires"
+    assert candidate["name"] == "CRAIG Bistro"
 
 
-def test_country_city_falls_back_to_query_target_when_address_unparseable():
-    """When the matched address doesn't parse to a recognized country (this
-    project's scope is only Argentina/Uruguay), fall back to the search
-    target — same fallback contract as GooglePlacesClient.to_candidate()."""
+def test_address_only_geocode_method_propagates():
+    """A lead resolved only by geocoding its address is inserted with
+    geocode_method='address_only' so the Validator can weigh it as weaker."""
     agent, db, search, places, _ = make_agent(max_queries=1)
     search.search.return_value = [
-        {"title": "Cafe X | Instagram", "link": "https://instagram.com/cafex",
-         "snippet": "sin TACC en Montevideo"}
+        {"title": "Bienestar | Instagram", "link": "https://instagram.com/bienestar",
+         "snippet": "productos sin TACC"}
     ]
-    places.find_place.return_value = make_match(formatted_address="Av. Siempre Viva 123")
+    places.resolve_location.return_value = make_match(
+        place_id="addr-1", name=None, geocode_method="address_only"
+    )
 
     agent.run()
 
     candidate = db.insert_place_candidate.call_args.args[0]
-    assert candidate["country"] == "Uruguay"
-    assert candidate["city"] == "Montevideo"
+    assert candidate["geocode_method"] == "address_only"
+    assert candidate["external_id"] == "addr-1"
+    # name falls back to the parsed lead name when the geocode has none.
+    assert candidate["name"] == "Cafe X"
 
 
 # --- Geocode budget cap -----------------------------------------------------
 
 
-def test_geocode_cap_stops_calling_find_place_once_exhausted():
+def test_geocode_cap_stops_calling_resolve_once_exhausted():
     """Regression test for the real 2026-08-19 production incident: a single
     Tavily query returned enough leads to fan out into far more geocode
     calls than the query cap alone would suggest (25 queries -> 102
-    geocodes). max_geocodes must independently stop new find_place calls
-    once hit, within the very first (and only) query here."""
+    geocodes). max_geocodes must independently stop new resolve_location
+    calls once hit, within the very first (and only) query here."""
     agent, db, search, places, _ = make_agent(max_queries=1, max_geocodes=2)
     search.search.return_value = [
         {"title": "A", "link": "https://instagram.com/a", "snippet": "sin TACC"},
@@ -223,16 +234,16 @@ def test_geocode_cap_stops_calling_find_place_once_exhausted():
     # new places, isolating the geocode cap from that unrelated dedup path.
     geocode_calls = {"n": 0}
 
-    def fake_find_place(text, location=None):
+    def fake_resolve(name, address, city, country, location=None):
         geocode_calls["n"] += 1
         return make_match(place_id=f"ext-{geocode_calls['n']}", name=f"Place {geocode_calls['n']}")
 
-    places.find_place.side_effect = fake_find_place
+    places.resolve_location.side_effect = fake_resolve
 
     summary = agent.run()
 
     # Only 2 of the 3 leads ever reach the paid Google API call.
-    assert places.find_place.call_count == 2
+    assert places.resolve_location.call_count == 2
     assert summary["inserted"] == 2
     assert summary["skipped"] == 1
 
@@ -242,7 +253,7 @@ def test_geocode_cap_stops_calling_find_place_once_exhausted():
 
 def test_geocode_cap_does_not_limit_query_count():
     """The geocode cap and the query cap are independent: a low geocode cap
-    must not stop Tavily queries from running, only Find Place calls — even
+    must not stop Tavily queries from running, only geocoding calls — even
     across queries, once the geocode budget is spent, later queries' leads
     are still parsed but never geocoded."""
     agent, db, search, places, _ = make_agent(max_queries=3, max_geocodes=1)
@@ -257,8 +268,8 @@ def test_geocode_cap_does_not_limit_query_count():
         }]
 
     search.search.side_effect = fake_search
-    places.find_place.side_effect = lambda text, location=None: make_match(
-        place_id=text, name=text
+    places.resolve_location.side_effect = lambda name, address, city, country, location=None: make_match(
+        place_id=name, name=name
     )
 
     summary = agent.run()
@@ -266,7 +277,7 @@ def test_geocode_cap_does_not_limit_query_count():
     # All 3 queries ran (independent Tavily cap), but only the first lead
     # across them ever got geocoded.
     assert summary["queries"] == 3
-    assert places.find_place.call_count == 1
+    assert places.resolve_location.call_count == 1
 
 
 # --- Dedup ----------------------------------------------------------------
@@ -305,7 +316,7 @@ def test_existing_external_id_is_skipped():
 
 def test_unresolved_lead_is_skipped():
     agent, db, search, places, _ = make_agent(max_queries=1)
-    places.find_place.return_value = None
+    places.resolve_location.return_value = None
     search.search.return_value = [
         {"title": "A", "link": "https://instagram.com/cafex", "snippet": "sin TACC"}
     ]
@@ -319,7 +330,7 @@ def test_unresolved_lead_is_skipped():
 
 def test_closed_place_is_skipped():
     agent, db, search, places, _ = make_agent(max_queries=1)
-    places.find_place.return_value = make_match(business_status="CLOSED_PERMANENTLY")
+    places.resolve_location.return_value = make_match(business_status="CLOSED_PERMANENTLY")
     search.search.return_value = [
         {"title": "A", "link": "https://instagram.com/cafex", "snippet": "sin TACC"}
     ]
@@ -346,7 +357,7 @@ def test_tavily_search_error_is_counted_and_does_not_crash():
 
 def test_geocode_error_is_counted():
     agent, db, search, places, _ = make_agent(max_queries=1)
-    places.find_place.side_effect = RuntimeError("places down")
+    places.resolve_location.side_effect = RuntimeError("places down")
     search.search.return_value = [
         {"title": "A", "link": "https://instagram.com/cafex", "snippet": "sin TACC"}
     ]

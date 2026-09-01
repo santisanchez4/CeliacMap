@@ -7,10 +7,12 @@ needs the secret Google key (which must never reach the browser). This agent run
 inside the daily pipeline, reads each new suggestion, and promotes it exactly like
 the MCP ``suggest_place`` tool does:
 
-1. Geocode the lead with Google Find Place (``name + city``) to obtain real
-   coordinates and a canonical Google ``place_id``. Leads that cannot be resolved
-   are marked ``rejected`` (a strong natural spam filter: junk that isn't a real
-   place never reaches the map).
+1. Resolve the lead via ``GooglePlacesClient.resolve_location`` — Find Place on
+   ``name + address + city``, falling back to the Geocoding API on the street
+   address alone (``geocode_method='address_only'``) for a real GF business that
+   only exists on Instagram/Facebook. Leads that resolve to neither a Google
+   business nor a real UY/AR address are marked ``rejected`` (still a strong
+   natural spam filter: junk with no real address never reaches the map).
 2. Dedup against any existing place sharing that ``place_id`` (a place suggested by
    a user that the Search/Social/Web agents already found) → ``duplicate``.
 3. Otherwise insert a ``places`` candidate (``source='user'``, ``status='pending'``)
@@ -54,25 +56,26 @@ def promote_suggestion(
 ) -> dict[str, Any]:
     """Geocode a suggested lead and promote it into ``places`` as a pending candidate.
 
-    The Find Place query combines ``name``, ``address`` and ``city`` so the lead
-    resolves to the right place_id; the street address is the strongest geocoding
-    signal, so a suggestion without one often cannot be placed on the map. ``address``
-    is optional only so the MCP ``suggest_place`` tool can call this without one.
+    Delegates resolution to ``GooglePlacesClient.resolve_location`` (Find Place on
+    ``name + address + city``, then a Geocoding-API address-only fallback). The
+    street address is the strongest signal, so a suggestion without one often
+    cannot be placed on the map; ``address`` is optional only so the MCP
+    ``suggest_place`` tool can call this without one.
 
     Shared by the MCP ``suggest_place`` tool (on-demand) and :class:`SuggestionAgent`
-    (daily batch). Always makes exactly one Google Find Place call.
+    (daily batch). Makes at most one Find Place call plus, if it misses, one
+    Geocoding call.
 
     Returns a result dict::
 
         {"outcome": "promoted" | "duplicate" | "unresolved" | "insert_failed",
          "place_id": <uuid|None>, "external_id": <google place_id|None>, "name": name}
     """
-    query = " ".join(part for part in (name, address, city) if part).strip()
-    resolved = places.find_place(query)
-    if not resolved or not resolved.get("place_id"):
+    resolved = places.resolve_location(name, address, city, country)
+    if resolved is None:
         return {"outcome": "unresolved", "place_id": None, "external_id": None, "name": name}
 
-    external_id = resolved["place_id"]
+    external_id = resolved.place_id
     if db.place_exists_by_external_id(external_id):
         return {
             "outcome": "duplicate",
@@ -81,18 +84,25 @@ def promote_suggestion(
             "name": name,
         }
 
-    candidate = GooglePlacesClient.to_candidate(resolved, country=country, city=city)
-    candidate.update(
-        {
-            "source": "user",
-            "category": category if category in ALLOWED_CATEGORIES else DEFAULT_CATEGORY,
-            "safety_level": DEFAULT_SAFETY_LEVEL,
-            # Keep the user's reference URL apart from validation_notes (which the
-            # Validator overwrites with its rationale), like the Social/Web agents.
-            "social_url": evidence_url,
-            "validation_notes": notes,
-        }
-    )
+    candidate = {
+        "name": resolved.name or name,
+        "lat": resolved.lat,
+        "lng": resolved.lng,
+        "address": resolved.formatted_address or address,
+        "external_id": external_id,
+        "source": "user",
+        "country": resolved.country or country,
+        "city": resolved.city or city,
+        "category": category if category in ALLOWED_CATEGORIES else DEFAULT_CATEGORY,
+        "safety_level": DEFAULT_SAFETY_LEVEL,
+        # Keep the user's reference URL apart from validation_notes (which the
+        # Validator overwrites with its rationale), like the Social/Web agents.
+        "social_url": evidence_url,
+        "validation_notes": notes,
+        # 'find_place' (matched a real Google business) or 'address_only' (only
+        # the street address geocoded — the Validator treats it as weaker).
+        "geocode_method": resolved.geocode_method,
+    }
 
     inserted = db.insert_place_candidate(candidate)
     if inserted:
@@ -156,7 +166,7 @@ class SuggestionAgent(BaseAgent):
                 )
                 continue
 
-            geocodes += 1  # promote_suggestion always made one Find Place call
+            geocodes += 1  # promote_suggestion made at least one geocoding call
             outcome = result["outcome"]
 
             if outcome == "promoted":

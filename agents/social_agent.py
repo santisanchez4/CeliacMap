@@ -11,10 +11,11 @@ then turn each promising result into a real ``places`` candidate:
    ``max_queries`` and the pipeline's shared budget).
 3. Parse each result's title/snippet with ``claude-haiku-4-5`` into
    ``{name, city, category, address}``.
-4. Geocode the lead with Google Find Place (``name + city``) to obtain real
-   coordinates and a canonical Google ``place_id`` — social URLs have no
-   coordinates, and ``places.lat/lng`` are NOT NULL. Leads that cannot be resolved
-   are skipped and logged.
+4. Resolve the lead via ``GooglePlacesClient.resolve_location`` (Find Place on
+   ``name + address + city``, then a Geocoding-API address-only fallback) to
+   obtain real coordinates and a canonical Google ``place_id`` — social URLs
+   have no coordinates, and ``places.lat/lng`` are NOT NULL. Leads that resolve
+   to neither are skipped and logged (``social_unresolved``).
 5. Insert as ``status='pending'``, ``source='social'``, ``external_id`` = the
    Google ``place_id`` (so a place found both via Search and via Social is not
    duplicated), recording the social profile URL in its own ``social_url`` column
@@ -213,7 +214,7 @@ class SocialAgent(BaseAgent):
                 lead_city = lead["city"] or q["city"]
 
                 # Independent geocode budget: max_queries only bounds Tavily
-                # searches, not the Find Place calls each query's leads can
+                # searches, not the geocoding calls each query's leads can
                 # fan out into. Stop geocoding once the cap is hit; the rest
                 # of this run's leads are skipped, not inserted ungeocoded.
                 if geocode_attempts >= self.max_geocodes:
@@ -227,13 +228,16 @@ class SocialAgent(BaseAgent):
                 geocode_attempts += 1
 
                 try:
-                    match = self.places.find_place(
-                        f"{lead['name']} {lead_city}".strip(),
+                    resolved = self.places.resolve_location(
+                        lead["name"],
+                        lead["address"],
+                        lead_city,
+                        q["country"],
                         location=q["location"],
                     )
                 except Exception as exc:  # noqa: BLE001
                     errors += 1
-                    logger.exception("find_place failed for %r", lead["name"])
+                    logger.exception("resolve_location failed for %r", lead["name"])
                     self.log(
                         "social_geocode_failed",
                         {"name": lead["name"], "url": url, "error": str(exc)},
@@ -241,12 +245,8 @@ class SocialAgent(BaseAgent):
                     )
                     continue
 
-                external_id = (match or {}).get("place_id")
-                loc = ((match or {}).get("geometry") or {}).get("location") or {}
-                lat, lng = loc.get("lat"), loc.get("lng")
-
-                # No geocode -> no coordinates -> cannot place it on the map.
-                if not external_id or lat is None or lng is None:
+                # No business match and no geocodable address -> not mappable.
+                if resolved is None:
                     skipped += 1
                     self.log(
                         "social_unresolved",
@@ -255,10 +255,11 @@ class SocialAgent(BaseAgent):
                     )
                     continue
 
-                if (match or {}).get("business_status") == "CLOSED_PERMANENTLY":
+                if resolved.business_status == "CLOSED_PERMANENTLY":
                     skipped += 1
                     continue
 
+                external_id = resolved.place_id
                 geocoded += 1
 
                 # Dedup: within the run, and against any place already in the DB
@@ -274,27 +275,26 @@ class SocialAgent(BaseAgent):
                 except Exception:  # noqa: BLE001 - dedup check must not crash run
                     logger.exception("dedup check failed for %s", external_id)
 
-                # q["country"]/lead_city are the SEARCH TARGET and only a fallback:
-                # a social post mentioning the target city can point to a business
-                # located anywhere (see CLAUDE.md's Search agent city/country bug),
-                # so prefer Google's own formatted_address for the geocoded match.
-                parsed_city, parsed_country = GooglePlacesClient.parse_city_country_from_address(
-                    (match or {}).get("formatted_address")
-                )
+                # resolve_location already prefers Google's own formatted_address
+                # over the search target (q["country"]/lead_city) — a social post
+                # mentioning the target city can point to a business located
+                # anywhere (see CLAUDE.md's Search agent city/country bug).
                 candidate = {
-                    "name": (match or {}).get("name") or lead["name"],
-                    "lat": lat,
-                    "lng": lng,
-                    "address": (match or {}).get("formatted_address") or lead["address"],
+                    "name": resolved.name or lead["name"],
+                    "lat": resolved.lat,
+                    "lng": resolved.lng,
+                    "address": resolved.formatted_address or lead["address"],
                     "category": lead["category"],
                     "safety_level": DEFAULT_SAFETY_LEVEL,
-                    "country": parsed_country or q["country"],
-                    "city": parsed_city or lead_city,
+                    "country": resolved.country or q["country"],
+                    "city": resolved.city or lead_city,
                     "source": "social",
                     "external_id": external_id,
                     # Stored in its own column so the Validator (which overwrites
                     # validation_notes with its rationale) can't clobber it.
                     "social_url": url,
+                    # 'find_place' or 'address_only' (see resolve_location).
+                    "geocode_method": resolved.geocode_method,
                 }
                 try:
                     row = self.db.insert_place_candidate(candidate)
