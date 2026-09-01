@@ -1293,8 +1293,14 @@ a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
   `resolve_location` mis-matched it to "víaSana", see the risk above),
   inserted as `places` id `4300ad15-2f6f-4881-a902-b2ac5990464c`,
   `status='pending'`, `source='user'`, `geocode_method='address_only'`;
-  `suggestions` `9985e250-…` flipped `rejected → promoted`. Left `pending`
-  for the next normal Validator run (not run inline).
+  `suggestions` `9985e250-…` flipped `rejected → promoted`.
+  **Validator run (standalone, 1 pending) confirmed the RUBRIC change works
+  end-to-end:** verdict `needs_review`, `validation_confidence=0.52`, and the
+  model's own `validation_notes` explicitly cite *"la dirección fue solo
+  geocodificada sin ficha de Google Places que confirme la existencia y
+  operación del negocio"* — with `"sin ficha de Google Places verificada"`
+  among the flags. Held out of the public map (`needs_review`), awaiting a
+  human confirming the shop is real + celiac-safe before `approved`.
 
 ### Build status (phases)
 
@@ -1777,11 +1783,13 @@ a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
   enabled in GCP + added to the `GOOGLE_MAPS_API_KEY` restrictions this
   session; the `geocode_method` migration was applied to production
   (read-only verified: column + CHECK present, all 1296 existing rows NULL).
-  **Manual recovery done:** "Bienestar Gluten Free" (Fray Bentos) inserted as
-  `places` id `4300ad15-2f6f-4881-a902-b2ac5990464c`, `status='pending'`,
-  `geocode_method='address_only'` — left for the next normal Validator run
-  (not run inline). **Surfaced (not fixed):** the Find Place false-positive
-  risk — see **Key risks to keep in mind** above.
+  **Manual recovery done + validated:** "Bienestar Gluten Free" (Fray Bentos)
+  inserted as `places` id `4300ad15-2f6f-4881-a902-b2ac5990464c`,
+  `geocode_method='address_only'`; the standalone Validator (1 pending)
+  returned `needs_review` @ confidence 0.52, its reasoning explicitly citing
+  the address-only geocode — the RUBRIC change verified end-to-end on real
+  data. **Surfaced (not fixed):** the Find Place false-positive risk — see
+  **Key risks to keep in mind** above.
 
 ### GitHub Pages deploy decision
 
