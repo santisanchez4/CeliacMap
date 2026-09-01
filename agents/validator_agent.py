@@ -90,6 +90,13 @@ términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca de
 que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es \
 escasa, mantente conservador.
 
+Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la \
+dirección de texto del candidato: NO hay una ficha de Google Places que confirme \
+que el negocio existe y opera en ese lugar (sin reseñas de Google, sin \
+verificación de existencia). Tratá esto como evidencia debilitada — NO asignes \
+"approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", \
+reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, \
 exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",
@@ -129,6 +136,16 @@ class ValidatorAgent(BaseAgent):
         }
         lines = [f"{k}: {v}" for k, v in fields.items() if v is not None]
         prompt = "Candidate place:\n" + "\n".join(lines)
+
+        # Health-sensitive: a candidate resolved only by geocoding its street
+        # address has no Google Place backing it — the RUBRIC tells the model to
+        # treat this as weaker evidence (see CLAUDE.md Decisions Log / prompts.md).
+        if place.get("geocode_method") == "address_only":
+            prompt += (
+                "\n\nubicacion_geocode: SOLO se geocodificó la dirección de texto "
+                "de este candidato — NO existe una ficha de Google Places que "
+                "confirme que el negocio opera en ese lugar."
+            )
 
         snippets = [
             (r.get("text") or "").strip() for r in (reviews or []) if (r.get("text") or "").strip()

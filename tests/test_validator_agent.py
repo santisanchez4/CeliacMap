@@ -252,6 +252,25 @@ def test_user_prompt_without_reviews_has_no_signals_section():
     assert "Community review signals:" not in prompt
 
 
+def test_user_prompt_flags_address_only_geocode():
+    """A candidate resolved only by geocoding its address must carry the
+    ubicacion_geocode weakness note (the RUBRIC keys off it — CLAUDE.md
+    Decisions Log: geocode-gate address fallback)."""
+    weak = ValidatorAgent._build_user_prompt(
+        {"name": "Bienestar", "geocode_method": "address_only"}, []
+    )
+    assert "ubicacion_geocode:" in weak
+
+    strong = ValidatorAgent._build_user_prompt(
+        {"name": "Bienestar", "geocode_method": "find_place"}, []
+    )
+    assert "ubicacion_geocode:" not in strong
+    # Absent entirely (rows predating the column, Search agent) -> no note.
+    assert "ubicacion_geocode:" not in ValidatorAgent._build_user_prompt(
+        {"name": "Bienestar"}, []
+    )
+
+
 def test_run_feeds_reviews_into_prompt():
     db = MagicMock()
     db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
