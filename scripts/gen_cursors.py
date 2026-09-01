@@ -11,7 +11,7 @@ Why PNG and not an inline SVG cursor: Chrome re-rasterises an SVG `cursor:`
 image every time the cursor value changes — grab<->grabbing on every drag, and
 grab<->pointer whenever the pointer skims a marker — and paints the native
 fallback hand for those frames, which reads as a flicker on fast mouse
-movement. A pre-rasterised 32px PNG is decoded once and cached by URL, so the
+movement. A pre-rasterised PNG is decoded once and cached by URL, so the
 switch is instant. (Same reason index.html ships PNG favicons.)
 
 Rendering matches scripts/gen_favicons.py: svglib + reportlab renderPM (the
@@ -20,8 +20,10 @@ rlPyCairo backend), 4x supersample, Pillow Lanczos downscale. Install with:
     pip install svglib reportlab rlPyCairo pillow
 
 Hand shapes are the Lucide "hand" (open) and "grab" (curled) icons, ISC
-license — white fill + dark-green #1a3a2a outline + a white halo so they stay
-legible over darker basemap tiles and labels.
+license — drawn as thin line icons (no fill) to match the site's pin / line-
+icon weight: a dark-green #1a3a2a stroke ~1.75/24 (same as the brand mark's
+check badge) over a thin white halo so they stay legible on any basemap tile.
+Rendered small (22px) so the cursor stays discreet, like Google Maps / Mapbox.
 """
 from __future__ import annotations
 
@@ -36,8 +38,11 @@ from svglib.svglib import svg2rlg
 
 TRANSPARENT = Color(1, 1, 1, alpha=0)
 SUPERSAMPLE = 4
-SIZE = 32
-HOTSPOT = "13 12"
+SIZE = 22
+HOTSPOT = "11 10"
+HALO_WIDTH = "3.25"
+LINE_WIDTH = "1.75"
+LINE_COLOR = "#1a3a2a"
 
 # Lucide icon paths (24x24 viewBox).
 HAND = (
@@ -57,11 +62,13 @@ GRAB = (
 
 
 def svg(paths: str) -> str:
+    # Line icon, no fill: a thin white halo behind a thin dark stroke.
     return (
         "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' "
-        "viewBox='0 0 24 24' stroke-linecap='round' stroke-linejoin='round'>"
-        f"<g fill='none' stroke='#ffffff' stroke-width='3.5'>{paths}</g>"
-        f"<g fill='#ffffff' stroke='#1a3a2a' stroke-width='2'>{paths}</g>"
+        "viewBox='0 0 24 24' fill='none' stroke-linecap='round' "
+        "stroke-linejoin='round'>"
+        f"<g stroke='#ffffff' stroke-width='{HALO_WIDTH}'>{paths}</g>"
+        f"<g stroke='{LINE_COLOR}' stroke-width='{LINE_WIDTH}'>{paths}</g>"
         "</svg>"
     )
 

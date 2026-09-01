@@ -832,20 +832,22 @@ h1, h2, h3 {
    cursor was the browser's native light hand — invisible against the pale
    CartoDB Positron basemap. Override .leaflet-grab (on #cm-map) and the
    .leaflet-dragging state (Leaflet adds that class to <body>) with a
-   dark-outlined white hand; the native keyword stays as the fallback.
+   thin-line hand (dark #1a3a2a stroke + white halo, no fill — the site's
+   line-icon weight, 22px so it stays discreet); the native keyword stays as
+   the fallback.
    PNG, not inline SVG: Chrome re-rasterises an SVG cursor every time the
    cursor value changes (grab<->grabbing on drag, grab<->pointer when the
    pointer skims a marker) and shows the native fallback for those frames —
-   a visible flicker on fast movement. A pre-rasterised 32px PNG is decoded
-   once and cached by URL, so the switch is instant. Regenerate with
+   a visible flicker on fast movement. A pre-rasterised PNG is decoded once
+   and cached by URL, so the switch is instant. Regenerate with
    `python scripts/gen_cursors.py`; shapes are the Lucide "hand" / "grab"
    icons (ISC). */
 #cm-map.leaflet-grab {
-  cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAwFBMVEX9/f0AAAAHKRgWNiYpRzj////9+/zm6ef7+vr9+vyImZGruLHO1tL7+fpnfXJ3jIK9yMLEzcg3U0V9koe2wryoqKj8+fq6urqSoprp5eiZqaFJY1ZDXVDe5OFddGjb4N1/f39uhHkOMB/r6uvMyMwxTkDExMT/7v/Z2dnj39+Wlpbk39/5+fnR0dHi2+JSbGDV1dXk5ORcXFw4VTjIv784ODivuK8AGAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAf5UHAAAAQHRSTlP+APz+/gKv99FR/v/+kv/+///+/v8JdCP/Lf////7//wr+/Y4P/yAPOkAQMCtfJP8ffQsJHAkd+AAAAAAAAAAArHpJ0QAAAcZJREFUeNptk+di4yAQhBeWLrC63GuSS7te3//NbkGybDmePxLsx9AGYKOkZG2nVNfGv1FwqTL2apq6bszruX0FxObzO8w4aQbvz0PXCEj2qzMaHEchkDvQpvvDZCvPgJStKdfVRqDw/gnFpvpWmkPv0gNMNdEcyZ6mwfjfKGsPVIFUX2oavKvOQLWLXqWHjskesB7RgUe+S4CPqyGtdTc42IJjAyB6BwHQEHBCLvTyAmSgL0CGWGUz5Fm4BsjhaOBI4yDjPLVzdQPUD6HmlQ7baqMvwKO8AIEAAQaSBoBOY1xDHoKjk4QJwL7bUCaH9b8svGw9TADJgi6KBRJgtDfzB4ApwJQX8VR4Edhn+8XALWC3mMS9ZW/Xw8+Aqjm6TCDO4AfAHcDseAXgUwxuRLtyBBw5lgD7p48AXd4qQOdpiUTo5rYOK34qLLyZRU981Lq/zU/G3Scy5LVi0LL5fWJLO9OWAiMHopjW9xTAlUqRk8Msi4m/iAH9LYdMztNKK1fqtH+/2GCsL4dU0+evaUTMvUiKuccVvIzvgrXsZ9CuSg8i6iTyvZozOXmbS6XLzNV5nrtVoZWNw25e96MNKinYr9RzSIX/7+IZ93olzG4AAAAASUVORK5CYII=") 13 12, grab;
+  cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAMAAADzapwJAAAAwFBMVEUAAAD///8WNyb+/v6suLIqSDhtg3k0UkP//f79/Pz49/fa3NvS19QFKRdMZlnY2tiqtrBac2eImZHk5uXO1dJnfXJBXlDp6urEy8fd3d2/v7+qqqqbqqPj5OQhPy/Ey8e3wbx///8AGAaVpZ1/f3++xsK8xcG////b29sxT0Df4t/f4N/m5uYOMR/r6Ov9+vsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQZPrbAAAAQHRSTlMABP1Q8v7//ixrkLHO/v+Y2/7/qen+/5fpCgQD/8H91O8C+P8C1PsEK/9zqTP/TqIAAAAAAAAAAAAAAAAAAAAAJnf4nwAAAR5JREFUeNpFkVeWwyAMRUGIasAG4pI2KdP7/nc3Mo4z+uBwrp46Y7NxfmGiFMEunLO7zV+LWqOtkjsVxWOIMaCniJuDKGoAfTzOLwq+hD9xL3WGoW0HyBpesJgq5hjQJVmKTA4Bgp7MgqETSretVqL7TgjJrdgu2HaAVslmrltxT1j2hCmQ8Fz3vKhH9SgwdIvajNQzmufzz3b84Cd1qmozRXgAXIf7cm8Vlwh5CFiHe62uij1k6yP4m5pvOfX6yUZCojm064Y4czE6ZjZSbozZsgXvOZ9CppRm80Cc8R0NsCPfb6KMJKp6sS7Z5etcf+FwaKwQwropXbOrCYn7FGRSSvUxALr7HbjDfniXUsfsBfu/GjPWNWSObrNnjP0BY1EPEctMo1EAAAAASUVORK5CYII=") 11 10, grab;
 }
 .leaflet-dragging #cm-map,
 #cm-map.leaflet-dragging {
-  cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAwFBMVEUAAAD9/f0HKhkVNiX///8pRzj8+vvl6Oeqt7H8+/x3jIL5+fn+/v4OMB7O1tI3U0VmfHGZqaHDzcjn4uR9fX28yML7+PlJY1aHmJBuhHm2wryVpJ2rq6tedWnb4N7b2tpBW07t6ux9kYc1NTXIyMhVbWHp6enq6ure4+Du7++0tLTMzMzQ0NDi2+K3t7ewnJw4VTj69vozAAAAEwEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADhz86AAAAQHRSTlMA/fz+Av6w+f9P/syQ/f7+////KAj/dP///v//Bv//Ov9M/gcc/3K2/9gfQRYkIA0JOQX5AAAAAAAAAAAAAAAAno6A8gAAAaxJREFUeNq9U9eS3CAQZGaIQjmvtPHynbP9///mgZVv13vyq7tKJaAbJtAI8b/RStn+k5RCyvjnwQp7Xmuca67nV7v5+9mmpq5N2t7LZemK/957471VRMr6V+P7eyG38nL+1tdDMWwoYjMUj7Vvr06RQk8YQDTPRHE4aefaRSFFYxSpXUHZDmCXUbHjaV7n0IulLpcTjZATlgAlUg4jhliD6ZcKTh3SBKCyxyBQABMLMkJlmsB/dmmNZFnwK/F+EwSWqLAloU2Z76HuRgqCegOntMPSa4sYNmCihUhNkXE8nOBTr0/im8/hWUNxNIvgh1HI4QhrFxI6PD3DO6IgnZFKyxV27vCk4S9EwZJUjHmLKNB3XAyYY4h5Aw4+cogqNGYV3LgqFX2XYbUuqJATC9eAw7pgOHeSkyC7xlvCO+6TcIZN8vKRf2HzGBe9wGkW+1t+X3CKOjr5IdywuonC5uO7fwjeZbsEBQ1zvrTC5PORAt8sfhEHqILPSC2IkwoOfzwpxZveJyrDd2Qq2euvF+dvuRZtumpMIsaqM9rF5cuTDI8q1QtS94XPPT/S3+pfFzZV84VfAAAAAElFTkSuQmCC") 13 12, grabbing;
+  cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAMAAADzapwJAAAAwFBMVEUAAAD//////v749/gVNyYKLRuImpGota4tSzxKZVhvhXr6+fnZ29o1U0TDy8fj5ORke28AGQdbdGjT2dbs7ey+x8P39vaSo5qqqqq3wLyuubO/v7/Gzcn////fz8/f4+GXqaDM089//396jIPM/8zp6el/f3/U1NTn5+dBXU/i5OTP09EfQS/f4N8NMB/////c3dwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4kzuRAAAAQHRSTlMABk+O/v799f7+/2+w/uip/fn+zJbvpf8D5d0E0C0Q3v/mAvYFGAISQf51fPup/8aLAAAAAAAAAAAAAAAAAAAAFUw9qwAAAQhJREFUeNqFkIluwyAMhm2DIYRCyN2k7e77fv+nm0PUrpom7UfC4tNvfAD8J8Q/0ALX+4z+uPGXu5umbnHjFo9eH21MzEmCPyWDv2LWbIxcPKoDLhx3uNepL8IwhKJPPJp+ybgBsHr2zVtVFcnPmrW2JJxU/zHTWHZVKP3Mt5fhuQKsRue0xZfu8el6f5j0RGWxAW/qIGnHzr/ia8ZV4T5NbRHv8pxyVhxK2ph2HT5zKsM7KOfUBd2fhsZMgAzHsz1sESMbAmx1M+ShRDsxDI1uJZCtjTr5UUl9yn+ZuonKk8ir2IhpKSzcanapFCXH2qp18w9ArXGhEAVnWjo2tZVe1SZLEcoT4BuHqwzvreaCpQAAAABJRU5ErkJggg==") 11 10, grabbing;
 }
 
 /* Brand-colored markers (Leaflet divIcon) */
