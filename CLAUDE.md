@@ -203,6 +203,38 @@ GEOGRAPHIC SCOPE
   the 15 confirmed above were corrected separately via a one-off SQL script
   (`db/fixes/2026-08-08-border-city-country-mismatch.sql`, run manually
   against production — see that file's own commit).
+- **`GooglePlacesClient.resolve_location()` can return the WRONG business when
+  Find Place mis-matches `name + address + city` — unresolved, pending a
+  future fix.** Find Place always returns *a* candidate if it can match
+  *anything* in the query string, and takes the first one with no
+  name-similarity check. Confirmed live 2026-09-01 while recovering
+  "Bienestar Gluten Free" (Fray Bentos, UY): the query
+  `"Bienestar Gluten Free Rivera 1967 Fray Bentos"` matched **"víaSana"** —
+  a *different* business, in the city of **Rivera** (~250 km away), on a
+  street called "Rivera" — returned with `geocode_method='find_place'` and a
+  real (wrong) `place_id`. It compounds with the city/country bug above:
+  víaSana's short `formatted_address` ("…Departamento de Rivera", no country
+  segment) doesn't parse, so `parse_city_country_from_address` returns
+  `(None, None)` and the candidate is then stamped with the *query's*
+  `city='Fray Bentos'` — a wrong business at a plausible-looking location.
+  **Not a regression from the Phase 20 refactor** — the old inline
+  `find_place(f"{name} {city}")` calls in Social/Web and the
+  `find_place(name+address+city)` in `promote_suggestion` had the exact same
+  "trust the first candidate" behavior. It matters more now only because
+  `resolve_location()` is the single centralized path all three discovery
+  agents use. The address-only fallback added in Phase 20 does **not** catch
+  this: it only fires when Find Place returns *nothing*, not when it returns
+  something *wrong*. The Sonnet Validator is still the backstop (a candidate
+  whose name/address/city don't cohere should not reach `approved`), and
+  `verified` stays `false`. **Pending future fix** (not done — deliberately
+  out of scope for Phase 20): before trusting a `find_place` match, check the
+  returned `name` has reasonable similarity to the searched name (e.g. token
+  overlap / normalized edit distance over a threshold), and/or that the
+  match's own parsed city agrees with the target city; on a mismatch, fall
+  through to `_geocode_address` (address-only) or return `None` instead of
+  accepting the wrong business. The manually-recovered row
+  (`4300ad15-2f6f-4881-a902-b2ac5990464c`) sidestepped this by calling
+  `_geocode_address` directly.
 - **`VALIDATOR_RESERVE=80` (in `scripts/run_agents.py`) was sized for the old
   daily cadence, not the current monthly one — unresolved, the `pending`
   backlog is now structurally growing, not just occasionally spiking.**
@@ -1249,6 +1281,20 @@ a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
   suite green (252). The two Social/Web "country from matched address"
   regression tests were reframed as propagation tests (the parsing itself
   now lives in — and is tested in — `test_google_places.py`).
+- **Known limitation surfaced during the "Bienestar Gluten Free" recovery
+  (2026-09-01):** the address fallback only fires when Find Place returns
+  *nothing* — it does **not** catch a *wrong* Find Place match. See the
+  "`resolve_location()` can return the WRONG business" risk under **Key risks
+  to keep in mind** above (pending future fix: name-similarity check on the
+  Find Place match).
+- **First real `address_only` row:** "Bienestar Gluten Free" (Fray Bentos,
+  UY) — the user suggestion auto-rejected 2026-06-10 — was manually recovered
+  2026-09-01: geocoded via `_geocode_address` directly (the full
+  `resolve_location` mis-matched it to "víaSana", see the risk above),
+  inserted as `places` id `4300ad15-2f6f-4881-a902-b2ac5990464c`,
+  `status='pending'`, `source='user'`, `geocode_method='address_only'`;
+  `suggestions` `9985e250-…` flipped `rejected → promoted`. Left `pending`
+  for the next normal Validator run (not run inline).
 
 ### Build status (phases)
 
@@ -1695,7 +1741,7 @@ a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
   moved from "Propuesto" to "Aceptado" with a **Verificación** section
   recording the live end-to-end test above — both Fase 2 and Fase 3 are
   now confirmed end-to-end in production.
-- 🚧 **Phase 20 — Geocode-gate address fallback (`resolve_location`).**
+- ✅ **Phase 20 — Geocode-gate address fallback (`resolve_location`).**
   New shared `GooglePlacesClient.resolve_location` helper: Find Place first,
   then the **Geocoding API** on the street address alone
   (`geocode_method='address_only'`) so a real GF business that only exists on
@@ -1709,10 +1755,13 @@ a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
   **The Core Prompt** section, and prompts.md §24. Full offline suite green
   (252 tests, +11; `tests/test_google_places.py` is new). Geocoding API
   enabled in GCP + added to the `GOOGLE_MAPS_API_KEY` restrictions this
-  session. **Next:** apply the `geocode_method` migration to the live DB,
-  then the manual recovery of "Bienestar Gluten Free" (Fray Bentos) as the
-  first real `address_only` row — insert as `pending`, left for the next
-  Validator run (not run inline).
+  session; the `geocode_method` migration was applied to production
+  (read-only verified: column + CHECK present, all 1296 existing rows NULL).
+  **Manual recovery done:** "Bienestar Gluten Free" (Fray Bentos) inserted as
+  `places` id `4300ad15-2f6f-4881-a902-b2ac5990464c`, `status='pending'`,
+  `geocode_method='address_only'` — left for the next normal Validator run
+  (not run inline). **Surfaced (not fixed):** the Find Place false-positive
+  risk — see **Key risks to keep in mind** above.
 
 ### GitHub Pages deploy decision
 
