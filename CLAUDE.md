@@ -1302,6 +1302,32 @@ a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
   among the flags. Held out of the public map (`needs_review`), awaiting a
   human confirming the shop is real + celiac-safe before `approved`.
 
+### Manual Validator overrides — allowed, but never silent
+
+A manual override of the Validator's verdict — including approving a
+`needs_review` candidate — is acceptable **when a human has direct, first-hand
+knowledge** the model could not have (e.g. the platform admin personally knows
+the business and its owner and can vouch for the products). The Validator only
+ever weighs *public* evidence; "no verified Google Place" is a real evidence
+limitation, not a real safety signal on its own.
+
+**Rule: every manual override must be recorded explicitly in
+`places.validation_notes`** — stating that it *is* an override, who made it,
+the nature of the direct knowledge, and what the Validator had said. Never a
+silent `status` change. And **`validation_confidence` is not inflated** to
+match — it stays at whatever the Validator produced (or `null`), so the number
+keeps reflecting the real public evidence, not the human's private certainty.
+(`verified` is a separate, non-user-facing flag; left as-is unless a human
+also explicitly vouches for it.)
+
+First case / precedent: **"Bienestar Gluten Free"** (`4300ad15-…`, Fray
+Bentos, the first `address_only` row) — Validator verdict `needs_review` @
+`validation_confidence=0.52`. Approved manually 2026-09-01 by Santiago on
+direct personal knowledge of the shop and its owner; `validation_notes`
+rewritten to state the override, the retained evidence limitation, and the
+original user note; `validation_confidence` left at `0.52`; `verified` left
+`false`.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
