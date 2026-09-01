@@ -1217,6 +1217,23 @@ pass over the existing editorial redesign, not a rebuild:
   force a mobile viewport for screenshotting, so the safe-area / bottom-sheet
   CSS was verified by inspection rather than a mobile screenshot.
 
+### Map drag cursor (`#cm-map.leaflet-grab`)
+
+Leaflet's default `.leaflet-grab` / `.leaflet-dragging .leaflet-grab` rules only
+set the bare `cursor: grab` / `grabbing` keywords, so the pan cursor was the
+browser's native light hand — which disappears against the pale CartoDB Positron
+basemap. `css/styles.css` now overrides both with a data-URI SVG hand (Lucide
+`hand` / `grab` shapes, ISC): white fill + dark-green `#1a3a2a` outline + a
+white halo for contrast over darker tiles/labels, hotspot `13 11`, falling back
+to the native `grab` / `grabbing` keywords. Selectors are `#cm-map.leaflet-grab`
+(idle) and `.leaflet-dragging #cm-map, #cm-map.leaflet-dragging` (active pan —
+Leaflet adds `leaflet-dragging` to `<body>`); both are `(1 id, 1 class)` to beat
+Leaflet's defaults, and the dragging rule is placed second to win the
+specificity tie. `js/map.js` untouched; marker hover stays `cursor: pointer`.
+Verified via `getComputedStyle` on the real map (the OS cursor itself can't be
+screenshotted) — idle and simulated-drag both resolve to the right data URI,
+both SVGs parse and load, zero console errors.
+
 ### Geocode-gate — address fallback (`resolve_location`)
 
 The discovery agents used to resolve a lead **only** via Google Find Place
