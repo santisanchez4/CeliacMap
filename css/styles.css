@@ -828,19 +828,24 @@ h1, h2, h3 {
   #cm-map { height: 400px; }
 }
 
-/* Drag cursor. The browser's native grab/grabbing hand is a thin, light glyph
-   that vanishes against the pale CartoDB Positron basemap. Override Leaflet's
-   defaults (.leaflet-grab lives on the #cm-map container; .leaflet-dragging is
-   added to <body> during a pan) with a dark-outlined white hand — the white
-   halo underneath keeps it legible over darker tiles/labels — and fall back to
-   the native grab/grabbing keywords where data-URI cursors aren't supported.
-   Hand shapes: Lucide "hand" / "grab" icons (ISC license). */
+/* Drag cursor. Leaflet only sets the bare grab/grabbing keywords, so the pan
+   cursor was the browser's native light hand — invisible against the pale
+   CartoDB Positron basemap. Override .leaflet-grab (on #cm-map) and the
+   .leaflet-dragging state (Leaflet adds that class to <body>) with a
+   dark-outlined white hand; the native keyword stays as the fallback.
+   PNG, not inline SVG: Chrome re-rasterises an SVG cursor every time the
+   cursor value changes (grab<->grabbing on drag, grab<->pointer when the
+   pointer skims a marker) and shows the native fallback for those frames —
+   a visible flicker on fast movement. A pre-rasterised 32px PNG is decoded
+   once and cached by URL, so the switch is instant. Regenerate with
+   `python scripts/gen_cursors.py`; shapes are the Lucide "hand" / "grab"
+   icons (ISC). */
 #cm-map.leaflet-grab {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='3.5'%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2'/%3E%3Cpath d='M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2'/%3E%3Cpath d='M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8'/%3E%3Cpath d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/g%3E%3Cg fill='%23ffffff' stroke='%231a3a2a' stroke-width='2'%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2'/%3E%3Cpath d='M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2'/%3E%3Cpath d='M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8'/%3E%3Cpath d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/g%3E%3C/svg%3E") 13 11, grab;
+  cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAwFBMVEX9/f0AAAAHKRgWNiYpRzj////9+/zm6ef7+vr9+vyImZGruLHO1tL7+fpnfXJ3jIK9yMLEzcg3U0V9koe2wryoqKj8+fq6urqSoprp5eiZqaFJY1ZDXVDe5OFddGjb4N1/f39uhHkOMB/r6uvMyMwxTkDExMT/7v/Z2dnj39+Wlpbk39/5+fnR0dHi2+JSbGDV1dXk5ORcXFw4VTjIv784ODivuK8AGAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAf5UHAAAAQHRSTlP+APz+/gKv99FR/v/+kv/+///+/v8JdCP/Lf////7//wr+/Y4P/yAPOkAQMCtfJP8ffQsJHAkd+AAAAAAAAAAArHpJ0QAAAcZJREFUeNptk+di4yAQhBeWLrC63GuSS7te3//NbkGybDmePxLsx9AGYKOkZG2nVNfGv1FwqTL2apq6bszruX0FxObzO8w4aQbvz0PXCEj2qzMaHEchkDvQpvvDZCvPgJStKdfVRqDw/gnFpvpWmkPv0gNMNdEcyZ6mwfjfKGsPVIFUX2oavKvOQLWLXqWHjskesB7RgUe+S4CPqyGtdTc42IJjAyB6BwHQEHBCLvTyAmSgL0CGWGUz5Fm4BsjhaOBI4yDjPLVzdQPUD6HmlQ7baqMvwKO8AIEAAQaSBoBOY1xDHoKjk4QJwL7bUCaH9b8svGw9TADJgi6KBRJgtDfzB4ApwJQX8VR4Edhn+8XALWC3mMS9ZW/Xw8+Aqjm6TCDO4AfAHcDseAXgUwxuRLtyBBw5lgD7p48AXd4qQOdpiUTo5rYOK34qLLyZRU981Lq/zU/G3Scy5LVi0LL5fWJLO9OWAiMHopjW9xTAlUqRk8Msi4m/iAH9LYdMztNKK1fqtH+/2GCsL4dU0+evaUTMvUiKuccVvIzvgrXsZ9CuSg8i6iTyvZozOXmbS6XLzNV5nrtVoZWNw25e96MNKinYr9RzSIX/7+IZ93olzG4AAAAASUVORK5CYII=") 13 12, grab;
 }
 .leaflet-dragging #cm-map,
 #cm-map.leaflet-dragging {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='3.5'%3E%3Cpath d='M18 11.5V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1.4'/%3E%3Cpath d='M14 10V8a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2'/%3E%3Cpath d='M10 9.9V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v5'/%3E%3Cpath d='M6 14a2 2 0 0 0-2-2a2 2 0 0 0-2 2'/%3E%3Cpath d='M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-4a8 8 0 0 1-8-8 2 2 0 1 1 4 0'/%3E%3C/g%3E%3Cg fill='%23ffffff' stroke='%231a3a2a' stroke-width='2'%3E%3Cpath d='M18 11.5V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1.4'/%3E%3Cpath d='M14 10V8a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2'/%3E%3Cpath d='M10 9.9V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v5'/%3E%3Cpath d='M6 14a2 2 0 0 0-2-2a2 2 0 0 0-2 2'/%3E%3Cpath d='M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-4a8 8 0 0 1-8-8 2 2 0 1 1 4 0'/%3E%3C/g%3E%3C/svg%3E") 13 11, grabbing;
+  cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAwFBMVEUAAAD9/f0HKhkVNiX///8pRzj8+vvl6Oeqt7H8+/x3jIL5+fn+/v4OMB7O1tI3U0VmfHGZqaHDzcjn4uR9fX28yML7+PlJY1aHmJBuhHm2wryVpJ2rq6tedWnb4N7b2tpBW07t6ux9kYc1NTXIyMhVbWHp6enq6ure4+Du7++0tLTMzMzQ0NDi2+K3t7ewnJw4VTj69vozAAAAEwEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADhz86AAAAQHRSTlMA/fz+Av6w+f9P/syQ/f7+////KAj/dP///v//Bv//Ov9M/gcc/3K2/9gfQRYkIA0JOQX5AAAAAAAAAAAAAAAAno6A8gAAAaxJREFUeNq9U9eS3CAQZGaIQjmvtPHynbP9///mgZVv13vyq7tKJaAbJtAI8b/RStn+k5RCyvjnwQp7Xmuca67nV7v5+9mmpq5N2t7LZemK/957471VRMr6V+P7eyG38nL+1tdDMWwoYjMUj7Vvr06RQk8YQDTPRHE4aefaRSFFYxSpXUHZDmCXUbHjaV7n0IulLpcTjZATlgAlUg4jhliD6ZcKTh3SBKCyxyBQABMLMkJlmsB/dmmNZFnwK/F+EwSWqLAloU2Z76HuRgqCegOntMPSa4sYNmCihUhNkXE8nOBTr0/im8/hWUNxNIvgh1HI4QhrFxI6PD3DO6IgnZFKyxV27vCk4S9EwZJUjHmLKNB3XAyYY4h5Aw4+cogqNGYV3LgqFX2XYbUuqJATC9eAw7pgOHeSkyC7xlvCO+6TcIZN8vKRf2HzGBe9wGkW+1t+X3CKOjr5IdywuonC5uO7fwjeZbsEBQ1zvrTC5PORAt8sfhEHqILPSC2IkwoOfzwpxZveJyrDd2Qq2euvF+dvuRZtumpMIsaqM9rF5cuTDI8q1QtS94XPPT/S3+pfFzZV84VfAAAAAElFTkSuQmCC") 13 12, grabbing;
 }
 
 /* Brand-colored markers (Leaflet divIcon) */

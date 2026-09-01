@@ -1222,17 +1222,37 @@ pass over the existing editorial redesign, not a rebuild:
 Leaflet's default `.leaflet-grab` / `.leaflet-dragging .leaflet-grab` rules only
 set the bare `cursor: grab` / `grabbing` keywords, so the pan cursor was the
 browser's native light hand — which disappears against the pale CartoDB Positron
-basemap. `css/styles.css` now overrides both with a data-URI SVG hand (Lucide
+basemap. `css/styles.css` overrides both with a dark-outlined white hand (Lucide
 `hand` / `grab` shapes, ISC): white fill + dark-green `#1a3a2a` outline + a
-white halo for contrast over darker tiles/labels, hotspot `13 11`, falling back
+white halo for contrast over darker tiles/labels, hotspot `13 12`, falling back
 to the native `grab` / `grabbing` keywords. Selectors are `#cm-map.leaflet-grab`
 (idle) and `.leaflet-dragging #cm-map, #cm-map.leaflet-dragging` (active pan —
 Leaflet adds `leaflet-dragging` to `<body>`); both are `(1 id, 1 class)` to beat
 Leaflet's defaults, and the dragging rule is placed second to win the
 specificity tie. `js/map.js` untouched; marker hover stays `cursor: pointer`.
-Verified via `getComputedStyle` on the real map (the OS cursor itself can't be
-screenshotted) — idle and simulated-drag both resolve to the right data URI,
-both SVGs parse and load, zero console errors.
+
+**PNG, not inline SVG (fixes a flicker).** The first cut shipped the hand as an
+inline-SVG data URI and showed a flicker: on fast mouse movement or at drag
+start the native light hand flashed for a few frames before the custom outline
+drew. Root cause (investigated, not guessed): Chrome re-rasterises an SVG
+`cursor:` image every time the cursor *value* changes — `grab`↔`grabbing` on
+every drag, and `grab`↔`pointer` whenever the pointer skims a marker
+(`.leaflet-interactive`) — and paints the keyword fallback during the decode.
+Known Chromium behaviour (issue 41031275, "cursor doesn't change when
+mouse-idling"), not a CSS bug. Ruled out: Leaflet toggling `.leaflet-dragging`
+per frame — `Draggable.js` adds it once at drag start, removes it once at drag
+end, so the cursor value changes exactly twice per drag. Fix: pre-rasterise the
+same hand design to a **32px quantised PNG** (~1 KB each) via
+`scripts/gen_cursors.py` (same svglib + reportlab + Pillow toolchain as
+`scripts/gen_favicons.py`). A raster cursor is decoded once and cached by URL,
+so the switch is instant — the approach Google Maps uses (`.cur` files) and
+consistent with this repo shipping PNG favicons for the same reason. A
+simplified/lighter SVG (~500 chars, half the elements) was tried first but only
+shrinks the decode, doesn't remove the per-switch re-rasterisation.
+Verified via `getComputedStyle` on the real map (the OS cursor can't be
+screenshotted): idle + simulated-drag resolve to the right 32×32 PNG, both
+load, marker hover stays `pointer`, zero console errors. Final flicker check is
+manual (mouse moved fast + repeated drags) — Santiago's call.
 
 ### Geocode-gate — address fallback (`resolve_location`)
 
