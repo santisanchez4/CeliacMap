@@ -482,6 +482,8 @@ Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la d
 
 También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantente conservador.
 
+Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",
  "confidence_score": <número entre 0.0 y 1.0>,
@@ -491,6 +493,9 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdo
  "flags": ["<flag detectado>", ...],
  "recommendation": "<acción concreta sugerida para el operador>"}
 ```
+
+> The `ubicacion_geocode` paragraph was added later (geocode-gate address
+> fallback) — see **§24** for that deliberate rubric change.
 
 **Input variables** (the `RUBRIC` above is the fixed, cached **system** block; the
 per-candidate data is interpolated into the **user** message, same shape the MCP
@@ -1262,3 +1267,53 @@ Outreach. Produced
 (backend: Edge Function, workflow, `agents/review_handler.py`) and Fase 3
 (frontend form) are still unbuilt — see `docs/plans/PLAN-community-reviews.md`
 for the full remaining plan.
+
+---
+
+## 24. Geocode-gate address fallback — deliberate RUBRIC change
+
+**Prompt (summary):** "Implementar el fallback de geocodificación por
+dirección (ya investigado y aprobado): un helper `resolve_location` centralizado
+en `GooglePlacesClient` que, cuando Find Place por nombre no encuentra el
+negocio, geocodifica la **dirección** vía la Geocoding API y acepta el candidato
+con un marcador `geocode_method='address_only'`. Social, Web y el Suggestion
+promoter usan el helper. El Validator recibe una línea de contexto extra y su
+RUBRIC pide cautela para esos candidatos. Documentar el cambio de RUBRIC."
+
+**Why:** Small gluten-free businesses that only exist on Instagram/Facebook have
+no Google Place, so Find Place returned nothing and the candidate was rejected
+before ever reaching the Validator (real case: "Bienestar Gluten Free", Fray
+Bentos — a user suggestion auto-rejected 2026-06-10). The address fallback trades
+a little precision for recall: a candidate whose *address* geocodes to a real
+point in UY/AR now reaches the Validator, but **marked** as weaker evidence.
+
+**The deliberate RUBRIC change (added to the `RUBRIC` constant in
+`agents/validator_agent.py`, and to the verbatim copies in §12 above and
+CLAUDE.md's Core Prompt section):**
+
+```text
+Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la
+dirección de texto del candidato: NO hay una ficha de Google Places que confirme
+que el negocio existe y opera en ese lugar (sin reseñas de Google, sin
+verificación de existencia). Tratá esto como evidencia debilitada — NO asignes
+"approved" salvo que el resto de la evidencia (mención explícita de "sin TACC",
+reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda,
+"needs_review".
+```
+
+`ValidatorAgent._build_user_prompt` appends the corresponding
+`ubicacion_geocode: ...` line to the **user** message only when the candidate's
+`places.geocode_method == 'address_only'` (absent for rows predating the column
+and for the Search agent, which always resolves to a real Google Place). The
+confidence gates in `_decide_status` are unchanged — the model is asked to be
+conservative, not forced by code; the existing 0.85 auto-approval floor already
+backstops it.
+
+**Worked example.** Candidate: `Bienestar Gluten Free`, `Rivera 1967`, Fray
+Bentos, `source='user'`, `geocode_method='address_only'`, no Google reviews. User
+message carries the `ubicacion_geocode:` note. Expected verdict: `needs_review`
+(the address is real, "sin TACC" is claimed in the user's notes, but nothing
+external confirms the business operates there) — not `approved`.
+
+**Full rationale + investigation:** CLAUDE.md Decisions Log,
+"Geocode-gate — address fallback (`resolve_location`)".

@@ -18,8 +18,9 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - ✅ **Search agent** — discovers places via Google Places, inserts candidates as
   `pending`, and enriches them with gluten-free review snippets.
 - ✅ **Social agent** — discovers public Instagram / Facebook pages via the Tavily
-  Search API, parses each lead with `claude-haiku-4-5`, geocodes it via Google
-  Find Place, and inserts candidates as `pending`. _(Live: a run inserted 30 social
+  Search API, parses each lead with `claude-haiku-4-5`, resolves it via
+  `GooglePlacesClient.resolve_location` (Find Place, then a Geocoding-API address
+  fallback), and inserts candidates as `pending`. _(Live: a run inserted 30 social
   candidates; the Validator approved 23.)_
 - ✅ **Web agent (v3, autonomous)** — hands `claude-sonnet-4-6` the Anthropic web
   search tool and a single city, letting it reason freely about where to find
@@ -30,9 +31,11 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - ✅ **Suggest a Place form** — a public form (no login) lets anyone submit a
   gluten-free / sin TACC place that isn't on the map yet. The browser writes raw
   input (no coordinates) into a `suggestions` table via the anon key (RLS:
-  INSERT-only); the daily **Suggestion promoter** geocodes each via Google Find
-  Place, dedups, and promotes it into `places` as `pending` (`source='user'`) for
-  the Validator to judge. Honeypot + timing + cooldown guard against spam.
+  INSERT-only); the daily **Suggestion promoter** resolves each via
+  `resolve_location` (Find Place, then a Geocoding-API address fallback so a
+  GF business that only exists on Instagram still lands on the map), dedups, and
+  promotes it into `places` as `pending` (`source='user'`) for the Validator to
+  judge. Honeypot + timing + cooldown guard against spam.
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.

@@ -305,6 +305,8 @@ Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la d
 
 También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantente conservador.
 
+Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",
  "confidence_score": <número entre 0.0 y 1.0>,
@@ -321,7 +323,10 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdo
 > unsure" rule directly affects which places are approved for celiac users — treat
 > changes as a deliberate design decision, test them, and record them in this
 > Decisions Log. (The Jun 2026 move from the `approve`/`discard` rubric to this
-> three-tier rubric is recorded under **AI Toolkit** in the Decisions Log.)
+> three-tier rubric is recorded under **AI Toolkit** in the Decisions Log; the
+> later `ubicacion_geocode` paragraph — cautioning against `approved` for a
+> candidate resolved only by geocoding its address — is recorded under
+> **Geocode-gate — address fallback** there and in prompts.md §24.)
 
 ## Technical Scope
 
@@ -1180,6 +1185,71 @@ pass over the existing editorial redesign, not a rebuild:
   force a mobile viewport for screenshotting, so the safe-area / bottom-sheet
   CSS was verified by inspection rather than a mobile screenshot.
 
+### Geocode-gate — address fallback (`resolve_location`)
+
+The discovery agents used to resolve a lead **only** via Google Find Place
+(`name + city`): if Google had no business matching that, the lead was
+dropped (`social_unresolved` / `web_unresolved`) or the suggestion rejected.
+Small gluten-free businesses that live only on Instagram/Facebook have **no
+Google Place**, so real places were being filtered out before the Validator
+ever saw them. Confirmed live: **"Bienestar Gluten Free"** (Fray Bentos, UY),
+a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
+
+- **New shared helper `GooglePlacesClient.resolve_location(name, address,
+  city, country, *, location=None) -> ResolvedLocation | None`.** Step 1: Find
+  Place on `name + address + city` (a real business). Step 2, only if that
+  misses: the **Geocoding API** (`googlemaps.Client.geocode`, a different
+  Google API from Places — had to be **enabled in GCP + added to the
+  `GOOGLE_MAPS_API_KEY` restrictions**, same one-time step as the legacy
+  Places API in Phase 10) on the street address alone, restricted server-side
+  to the country (`components={"country": "UY"|"AR"}`). An address-only match
+  is returned with `geocode_method="address_only"`; a real business match is
+  `geocode_method="find_place"`. Returns `None` (→ lead still
+  unresolved/rejected, unchanged) when neither yields a point, when the
+  address is missing, on a geocode error, on an `APPROXIMATE` (centroid-level)
+  `location_type`, or when the result lands outside UY/AR.
+  `RANGE_INTERPOLATED` / `GEOMETRIC_CENTER` are accepted.
+- **Replaced three near-identical inline blocks.** `agents/social_agent.py`,
+  `agents/web_agent.py` and `agents/suggestion_agent.py::promote_suggestion`
+  all now call `resolve_location` and propagate `resolved.geocode_method`
+  into the candidate. Their `CLOSED_PERMANENTLY` skip, dedup
+  (`place_exists_by_external_id`), per-run geocode budget and
+  country/city-from-address preference are unchanged (the last now lives
+  inside the helper). **The Search agent is untouched** — it uses Places
+  Text Search, whose results are always real Google Places with coordinates,
+  so it has no "unresolved" path and never needs the fallback (its rows keep
+  `geocode_method = NULL`).
+- **Dedup across runs kept.** `external_id` stores the Geocoding API's
+  `place_id` for the address/`premise` (not a business id). Two businesses at
+  the same street address would collide on `(source, external_id)` — accepted
+  as a rare edge case, softened by `insert_place_candidate`'s
+  `ignore_duplicates=True`.
+- **Schema — `places.geocode_method`** (`text`, nullable,
+  `check (… in ('find_place','address_only'))`), idempotent
+  `add column if not exists` in `db/schema.sql`. NULL = a row predating the
+  column or a Search-agent row.
+- **Deliberate RUBRIC change (health gate).** `ValidatorAgent._build_user_prompt`
+  appends an `ubicacion_geocode: …` line to the **user** message when
+  `geocode_method == 'address_only'`, and the `RUBRIC` gains a paragraph
+  telling the model there is no Google Place confirming the business exists —
+  treat it as weaker evidence, don't `approve` unless the rest of the
+  evidence is strong on its own, else `needs_review`. The **code** confidence
+  gates in `_decide_status` are unchanged (the 0.85 auto-approval floor
+  already backstops it). Full text + worked example: **The Core Prompt** section
+  above and **prompts.md §24**. This is the precision-for-recall trade-off:
+  an `address_only` candidate could be a closed or nonexistent business at a
+  real address — the Validator (marked) plus the human `needs_review` queue
+  are the mitigations.
+- **Tests:** `tests/test_google_places.py` (new, 8 — `resolve_location`:
+  find_place wins, address-only fallback (the Bienestar case), out-of-scope
+  reject, `APPROXIMATE` reject, `RANGE_INTERPOLATED`/`GEOMETRIC_CENTER`
+  accept, no-address, geocode-error) + `geocode_method` propagation in
+  `test_social_agent` / `test_web_agent` / `test_suggestion_agent` + the
+  `ubicacion_geocode` prompt line in `test_validator_agent`. Full offline
+  suite green (252). The two Social/Web "country from matched address"
+  regression tests were reframed as propagation tests (the parsing itself
+  now lives in — and is tested in — `test_google_places.py`).
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
@@ -1625,6 +1695,24 @@ pass over the existing editorial redesign, not a rebuild:
   moved from "Propuesto" to "Aceptado" with a **Verificación** section
   recording the live end-to-end test above — both Fase 2 and Fase 3 are
   now confirmed end-to-end in production.
+- 🚧 **Phase 20 — Geocode-gate address fallback (`resolve_location`).**
+  New shared `GooglePlacesClient.resolve_location` helper: Find Place first,
+  then the **Geocoding API** on the street address alone
+  (`geocode_method='address_only'`) so a real GF business that only exists on
+  Instagram/Facebook still reaches the Validator instead of being dropped
+  pre-gate. Migrated the three inline call sites (Social, Web, Suggestion
+  promoter); Search untouched (no unresolved path). New nullable
+  `places.geocode_method` column (`db/schema.sql`, idempotent). Deliberate
+  RUBRIC change: an `address_only` candidate carries an `ubicacion_geocode:`
+  note and the model is told to hold it to `needs_review` unless the rest of
+  the evidence is strong — see **Geocode-gate — address fallback** above,
+  **The Core Prompt** section, and prompts.md §24. Full offline suite green
+  (252 tests, +11; `tests/test_google_places.py` is new). Geocoding API
+  enabled in GCP + added to the `GOOGLE_MAPS_API_KEY` restrictions this
+  session. **Next:** apply the `geocode_method` migration to the live DB,
+  then the manual recovery of "Bienestar Gluten Free" (Fray Bentos) as the
+  first real `address_only` row — insert as `pending`, left for the next
+  Validator run (not run inline).
 
 ### GitHub Pages deploy decision
 

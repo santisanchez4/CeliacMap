@@ -69,6 +69,20 @@ Cada flag detectado reduce el score y puede bajar el veredicto:
 | Reseñas negativas de celíacos | Alto — prioridad inmediata |
 | Descripción ambigua ("apto para dietas especiales") | Moderado |
 | Establecimiento sin presencia verificable online | Alto |
+| Señal `ubicacion_geocode` en el input (ver abajo) | Alto |
+
+---
+
+## Señal `ubicacion_geocode` — ubicación resuelta solo por dirección
+
+Algunos candidatos llegan con una línea `ubicacion_geocode` en el mensaje: sus
+coordenadas se obtuvieron **geocodificando la dirección de texto**, no de una
+ficha de Google Places. No hay reseñas de Google ni confirmación de que el
+negocio exista y opere ahí — solo que la dirección es real y está en UY/AR.
+
+Tratar esto como **evidencia debilitada**: no asignar `approved` salvo que el
+resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la
+comunidad) alcance el umbral por sí sola. Ante la duda, `needs_review`.
 
 ---
 
