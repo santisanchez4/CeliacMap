@@ -9,11 +9,15 @@ agents, not here.
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
+from dataclasses import dataclass
 from typing import Any
 
 import googlemaps
+
+logger = logging.getLogger("celiacmap.agent")
 
 # Fields requested for a place-details lookup (keep minimal to limit cost).
 # NOTE: the Place Details endpoint wants the field name "type" (singular); the
@@ -78,6 +82,16 @@ GF_KEYWORDS = (
 # geocoder. Revisit when the project scope expands beyond these two countries.
 SUPPORTED_COUNTRIES = {"argentina": "Argentina", "uruguay": "Uruguay"}
 
+# ISO country codes for the Geocoding API `components` filter (address-only
+# fallback in resolve_location). Same Phase 1 scope as SUPPORTED_COUNTRIES.
+COUNTRY_CODES = {"argentina": "AR", "uruguay": "UY"}
+
+# Geocoding API `location_type` values we refuse for the address-only fallback:
+# an APPROXIMATE match is a city/region centroid, too coarse to trust for a
+# place whose existence we cannot otherwise verify. RANGE_INTERPOLATED and
+# GEOMETRIC_CENTER are accepted (decision: CLAUDE.md Decisions Log).
+_REJECTED_LOCATION_TYPES = {"APPROXIMATE"}
+
 AR_PROVINCES = {
     "buenos aires", "catamarca", "chaco", "chubut", "cordoba", "corrientes",
     "entre rios", "formosa", "jujuy", "la pampa", "la rioja", "mendoza",
@@ -125,6 +139,34 @@ def _normalize_text(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text)
     stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
     return stripped.lower()
+
+
+@dataclass(frozen=True)
+class ResolvedLocation:
+    """A discovered lead resolved to real coordinates, plus how we got there.
+
+    ``geocode_method``:
+      - ``"find_place"``   — matched a real Google Place (a business): the
+        ``place_id`` is that business's, Google-hosted reviews may exist, and
+        the location is confirmed to *be* that business.
+      - ``"address_only"`` — Find Place matched no business, but the free-text
+        street address geocoded to a real point inside Uruguay/Argentina. The
+        ``place_id`` is the address / ``premise`` id, **not** a business — there
+        is no confirmation any place operates there. The Validator is told to
+        treat this as materially weaker evidence (see the RUBRIC).
+
+    ``name`` / ``business_status`` are only populated for ``"find_place"``.
+    """
+
+    place_id: str
+    lat: float
+    lng: float
+    formatted_address: str | None
+    name: str | None
+    city: str | None
+    country: str | None
+    geocode_method: str
+    business_status: str | None
 
 
 class GooglePlacesClient:
@@ -177,6 +219,107 @@ class GooglePlacesClient:
         resp = self._client.find_place(**kwargs)
         candidates = resp.get("candidates") or []
         return candidates[0] if candidates else None
+
+    def resolve_location(
+        self,
+        name: str,
+        address: str | None,
+        city: str | None,
+        country: str | None,
+        *,
+        location: tuple[float, float] | None = None,
+    ) -> ResolvedLocation | None:
+        """Resolve a discovered lead to coordinates + a canonical ``place_id``.
+
+        Shared by the Social, Web and Suggestion agents (each used to inline its
+        own ``find_place`` + extraction). Two steps:
+
+        1. **Find Place** on ``name + address + city`` — a real Google business.
+        2. If that matches nothing, **Geocoding API** on the street address
+           alone: a small GF business that only exists on Instagram/Facebook
+           often has no Google Place, but its address is real. Returned as
+           ``geocode_method='address_only'`` so the Validator knows the business
+           itself is unconfirmed. Only accepted inside Uruguay/Argentina and not
+           for an ``APPROXIMATE`` (centroid-level) match.
+
+        Returns ``None`` when neither step yields a usable point — the caller
+        then treats the lead as unresolved/rejected, exactly as before.
+        """
+        query = " ".join(part for part in (name, address, city) if part).strip()
+        match = self.find_place(query, location=location) if query else None
+        if match and match.get("place_id"):
+            loc = (match.get("geometry") or {}).get("location") or {}
+            lat, lng = loc.get("lat"), loc.get("lng")
+            if lat is not None and lng is not None:
+                parsed_city, parsed_country = self.parse_city_country_from_address(
+                    match.get("formatted_address")
+                )
+                return ResolvedLocation(
+                    place_id=match["place_id"],
+                    lat=lat,
+                    lng=lng,
+                    formatted_address=match.get("formatted_address"),
+                    name=match.get("name"),
+                    city=parsed_city or city,
+                    country=parsed_country or country,
+                    geocode_method="find_place",
+                    business_status=match.get("business_status"),
+                )
+
+        return self._geocode_address(address, city, country)
+
+    def _geocode_address(
+        self, address: str | None, city: str | None, country: str | None
+    ) -> ResolvedLocation | None:
+        """Geocoding API fallback: free-text address -> point, address-only.
+
+        Only used when Find Place found no business. Rejects (returns ``None``)
+        a match with no address, a geocode error, an ``APPROXIMATE`` match, or
+        one that lands outside the supported countries.
+        """
+        if not address:
+            return None
+        query = ", ".join(part for part in (address, city, country) if part)
+        kwargs: dict[str, Any] = {}
+        code = COUNTRY_CODES.get(_normalize_text(country or ""))
+        if code:
+            kwargs["components"] = {"country": code}
+        try:
+            results = self._client.geocode(query, **kwargs)
+        except Exception:  # noqa: BLE001 - a geocode failure just means unresolved
+            logger.exception("geocode failed for %r", query)
+            return None
+        if not results:
+            return None
+
+        top = results[0]
+        geometry = top.get("geometry") or {}
+        loc = geometry.get("location") or {}
+        lat, lng = loc.get("lat"), loc.get("lng")
+        place_id = top.get("place_id")
+        if lat is None or lng is None or not place_id:
+            return None
+        if geometry.get("location_type") in _REJECTED_LOCATION_TYPES:
+            return None
+
+        parsed_city, parsed_country = self.city_country_from_components(
+            top.get("address_components")
+        )
+        canonical = SUPPORTED_COUNTRIES.get(_normalize_text(parsed_country or ""))
+        if not canonical:
+            return None
+
+        return ResolvedLocation(
+            place_id=place_id,
+            lat=lat,
+            lng=lng,
+            formatted_address=top.get("formatted_address"),
+            name=None,
+            city=parsed_city or city,
+            country=canonical,
+            geocode_method="address_only",
+            business_status=None,
+        )
 
     @staticmethod
     def parse_city_country_from_address(formatted_address: str | None) -> tuple[str | None, str | None]:

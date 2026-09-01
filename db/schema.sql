@@ -97,6 +97,15 @@ alter table public.places add column if not exists social_url text;
 alter table public.places add column if not exists flags jsonb;
 alter table public.places add column if not exists recommendation text;
 
+-- How a discovery agent (Social / Web / Suggestion promoter) resolved this
+-- candidate's coordinates. 'find_place' = matched a real Google Place (a
+-- business). 'address_only' = Find Place found no business, but the street
+-- address geocoded to a real point in UY/AR (the place_id is the address, not a
+-- business — the Validator treats this as weaker evidence). NULL for rows
+-- predating this column and for the Search agent (always a real Google Place).
+alter table public.places add column if not exists geocode_method text
+  check (geocode_method is null or geocode_method in ('find_place', 'address_only'));
+
 -- Rich Place Details fields the Search agent already fetches per candidate
 -- (agents/clients/google_places.py DEFAULT_DETAIL_FIELDS: formatted_phone_number,
 -- website, opening_hours, rating, user_ratings_total) and has attempted to
