@@ -1370,6 +1370,62 @@ rewritten to state the override, the retained evidence limitation, and the
 original user note; `validation_confidence` left at `0.52`; `verified` left
 `false`.
 
+### Brazil out-of-scope places — Curitiba cluster (2026-09-01)
+
+**Finding.** A public-map audit turned up **5 approved places physically in
+Brazil** (`source='google_places'`, inserted 2026-06-05), plus **1 more**
+already in `needs_review` (Confeitaria Glúten Free Cascavel, `269a239e`,
+which the Validator itself flagged as out-of-scope on 2026-06-22):
+`f732f905` Glúten Pra Quê?, `15eb48e3` LEVAIN GLÚTEN FREE, `a7fec799` Sem
+Culpa - Sem Gluten (all Curitiba, PR), `e3d18b5e` Senza Glutine (Pinhais,
+PR), `985fd078` Empório Celíaco (União da Vitória, PR), `269a239e`
+Confeitaria Glúten Free Cascavel (Cascavel, PR). No approved place outside
+Uruguay/Argentina remains after the correction; the ~17 other far-flung
+rows found in the sweep are all Social-agent Find Place mis-geocodes that
+the Validator already `discarded` / `needs_review`'d (never on the map).
+
+**Root cause — the known "trust the query target, not the result" Search
+bug, out-of-scope variant** (see the Search-agent bullet under **Key risks
+to keep in mind**). `config/targets.yaml` has a city **Paraná** (capital of
+Entre Ríos, Argentina). The Search agent queries `"<term> Paraná"` biased to
+`(-31.73, -60.53)`; Google Places Text Search is location-*biased*, not
+*bounded*, and "Paraná" is ambiguous (AR city vs the Brazilian *state* whose
+capital Curitiba has a large GF scene), so Google returned Curitiba/Pinhais
+businesses. `GooglePlacesClient.to_candidate()` then stamped
+`country='Argentina'` / `city='Paraná'` from the **search target**, because
+`parse_city_country_from_address()` returns `(None, None)` for a Brazilian
+address (out of the AR/UY `SUPPORTED_COUNTRIES` scope) and the code fell back
+to the target. Google's real coordinates were kept → pin in Curitiba,
+labelled Argentina. (Empório Celíaco leaked the same way from a **Fray
+Bentos** query, ~600 km.) The **old binary Validator rubric** (pre
+three-tier, pre `needs_review`) approved them on GF merits even though 3 of
+the 5 `validation_notes` explicitly noted the country mismatch.
+
+**Why earlier cleanups missed it.**
+`db/fixes/2026-08-08-border-city-country-mismatch.sql` swept only for AR
+businesses mislabelled as *Uruguay*, not a third country. There is no
+geographic gate anywhere in the pipeline — not in `to_candidate()`, not in
+the Validator `RUBRIC`, not in the frontend `status=eq.approved` query.
+
+**Correction (data) — `db/fixes/2026-09-01-brazil-out-of-scope-places.sql`,
+run manually against production 2026-09-01.** All 6: `status='needs_review'`
+(editorial exclusion — the tier the current Validator already assigns
+Cascavel-type cases), `country='Brasil'` + real `city` (fix the data, don't
+just hide it), `outreach_opt_out=true` (`needs_review` is also the
+live-mode Outreach queue — an out-of-scope business must never receive a
+confirmation email), and a `CORRECCIÓN MANUAL:` note **prepended** to
+`validation_notes` (original Validator text kept). `lat`/`lng` and
+`validation_confidence` (0.85–0.95, and Cascavel's 0.52) left unchanged —
+the places are real and the GF-quality judgement was sound; only the
+geography is out of scope (same "never inflate/deflate confidence to match a
+human decision" rule as **Manual Validator overrides** above).
+
+**Prevention (code) — 3 further layers, in their own commits:** discard in
+`to_candidate()` when the result's own address doesn't resolve to a
+supported country (Part 2); an approximate UY+AR bounding-box gate in
+`insert_place_candidate()` (Part 3 — defense in depth, source-agnostic); and
+disambiguating the "Paraná" search term in `config/targets.yaml` (Part 4).
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
