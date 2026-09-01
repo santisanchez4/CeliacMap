@@ -1585,6 +1585,26 @@ a community suggestion auto-rejected 2026-06-10 with `suggestion_unresolved`.
   real business will be sent by the scheduled monthly cron run on
   2026-10-01**; the live-send end-to-end verification (delivery/bounce,
   opt-out reply, normal reply) still applies to that run.
+
+  **First real live-mode send — verified delivered (2026-09-01).** Rather
+  than wait for the 2026-10-01 cron, one email was sent via a standalone
+  `OUTREACH_MONTHLY_LIMIT=1 python -m agents.outreach_agent` run (live mode
+  already set in the local `.env`). The 2026-09-01 monthly cron had run
+  ~2 h *before* the `gh secret set`, so it still test-mailed its 3
+  candidates (Ketolovers / Tiben Sin Gluten / C'est Bon — all now
+  `outreach_status='sent'`, none re-contactable); the 3 approved live-mode
+  candidates were untouched. The standalone run selected **Niter Alimentos
+  Naturales** (`4aba4cf6-…`, oldest by `created_at`), drafted with Haiku,
+  and sent from `outreach@celiacmap.org` to `niter@niter.com.uy` with
+  `reply_to = outreach+4aba4cf6-…@celiacmap.org`. Resend `last_event:
+  delivered`, `bounced_at`/`complained_at` null; `agent_log` 3× `success`,
+  0 errors; `places.outreach_status='sent'` + `outreach_channel='email'`;
+  new `outreach_messages` row (`044558e5-…`, `direction='sent'`). **Still
+  pending live confirmation:** a real reply (→ `outreach_reply_handler.py`
+  Etapa 2) and an opt-out reply — left running (no more sends) to see
+  whether Niter replies. Minor gap noted: `OutreachAgent` discards the
+  Resend message id (`send()` returns it) instead of also storing it in
+  `outreach_messages.external_id` for the `sent` row.
 - ✅ **Phase 19 — Community reports (`place_reports`), live and verified
   end-to-end in production.**
   `db/schema.sql` gained the `place_reports` table (`report_type`
