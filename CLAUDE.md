@@ -1449,6 +1449,26 @@ pass over the existing editorial redesign, not a rebuild:
   not been observed end-to-end (bounce/delivery, opt-out reply, and a normal
   reply all still need a live confirmation) — the standalone verification
   called for in Phase 15/16 now applies specifically to live mode.
+
+  **ADR-003 fully activated 2026-09-01 — not just implemented.** Despite the
+  "CI wiring completed" note above, the 2026-09-01 monthly cron run still
+  delivered to `OUTREACH_TEST_RECIPIENT`: the `OUTREACH_LIVE_MODE` repo
+  secret existed (since 2026-08-08) but was not set to an effective `true`
+  value. On **2026-09-01** it was (re)set to `true` via `gh secret set`
+  (confirmed in `gh secret list` with a 2026-09-01 timestamp; values not
+  shown) after a fresh re-verification — `outreach_live_mode` default
+  `false` intact in `config/settings.py`, the `contact_email` selection
+  filter + `outreach_send_missing_contact_email` defense-in-depth skip
+  intact in `agents/outreach_agent.py`, `OUTREACH_MONTHLY_LIMIT="3"` in
+  `agents-monthly.yml`, full offline suite green (241 tests). Santiago
+  reviewed and approved the exact first three live-mode candidates
+  (read-only Supabase query replicating `_select_candidates()`'s filter +
+  `created_at` order): **Niter Alimentos Naturales** (Montevideo),
+  **Sentite Listo** (Mendoza), **Yo soy SIN GLUTEN** (Córdoba). No manual
+  `workflow_dispatch` was triggered — **the first real outreach email to a
+  real business will be sent by the scheduled monthly cron run on
+  2026-10-01**; the live-send end-to-end verification (delivery/bounce,
+  opt-out reply, normal reply) still applies to that run.
 - ✅ **Phase 19 — Community reports (`place_reports`), live and verified
   end-to-end in production.**
   `db/schema.sql` gained the `place_reports` table (`report_type`
