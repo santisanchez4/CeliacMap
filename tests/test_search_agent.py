@@ -161,6 +161,48 @@ def test_search_uncapped_when_zero():
     assert summary["queries"] == 6  # all jobs run
 
 
+def test_search_query_uses_search_as_override_when_present():
+    # A city whose plain name is ambiguous ("Paraná" = an Argentine city AND
+    # a Brazilian state) can carry a `search_as` in targets.yaml that
+    # disambiguates the Text Search query, while `name` stays the label.
+    targets = {
+        "search_terms": ["sin tacc"],
+        "countries": [
+            {
+                "name": "Argentina",
+                "cities": [
+                    {
+                        "name": "Paraná",
+                        "search_as": "Paraná, Entre Ríos, Argentina",
+                        "lat": -31.7333,
+                        "lng": -60.5333,
+                        "radius_m": 10000,
+                    }
+                ],
+            }
+        ],
+        "categories": {},
+    }
+    agent, db, places = make_agent(targets)
+    places.text_search.return_value = {
+        "results": [
+            make_result(
+                "P",
+                formatted_address="San Martín 100, Paraná, Entre Ríos, Argentina",
+                lat=-31.73,
+                lng=-60.53,
+            )
+        ]
+    }
+
+    agent.run()
+
+    assert places.text_search.call_args.kwargs["query"] == "sin tacc Paraná, Entre Ríos, Argentina"
+    inserted = db.insert_place_candidate.call_args.args[0]
+    assert inserted["city"] == "Paraná"          # from the result's own address
+    assert inserted["country"] == "Argentina"
+
+
 # --- Category mapping -----------------------------------------------------
 
 

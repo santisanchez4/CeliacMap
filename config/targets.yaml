@@ -199,6 +199,11 @@ countries:
         lng: -58.5228
         radius_m: 8000
       - name: Paraná
+        # "Paraná" alone is also a Brazilian state (capital Curitiba); an
+        # unqualified Text Search returns businesses there. search_as
+        # disambiguates the query without changing the "Paraná" label.
+        # See CLAUDE.md "Brazil out-of-scope places — Curitiba cluster".
+        search_as: "Paraná, Entre Ríos, Argentina"
         lat: -31.7333
         lng: -60.5333
         radius_m: 10000

@@ -1433,11 +1433,18 @@ the places are real and the GF-quality judgement was sound; only the
 geography is out of scope (same "never inflate/deflate confidence to match a
 human decision" rule as **Manual Validator overrides** above).
 
-**Prevention (code) — 3 further layers, in their own commits:** discard in
-`to_candidate()` when the result's own address doesn't resolve to a
-supported country (Part 2); an approximate UY+AR bounding-box gate in
-`insert_place_candidate()` (Part 3 — defense in depth, source-agnostic); and
-disambiguating the "Paraná" search term in `config/targets.yaml` (Part 4).
+**Prevention (code) — 3 further layers, each its own commit:** (Part 2)
+`to_candidate()` returns `None` — dropped, not stamped to the target — when
+the result's own address doesn't resolve to a supported country; (Part 3) an
+approximate UY+AR bounding-box gate in `insert_place_candidate()` (defense in
+depth, source-agnostic — see **Geographic scope guard** below); (Part 4) a
+`search_as` field on the `config/targets.yaml` Paraná entry
+(`"Paraná, Entre Ríos, Argentina"`) that disambiguates the Text Search query
+while `name` stays the "Paraná" label — `SearchAgent` uses
+`city.get("search_as") or city["name"]` for the query only. (Córdoba, AR is
+the next-most-ambiguous entry — shares its name with Córdoba, Spain — but its
+`location` bias has held so far; left as-is unless the Search logs show
+Spanish results.)
 
 ### Geographic scope guard — `insert_place_candidate()` bounding box (2026-09-01)
 

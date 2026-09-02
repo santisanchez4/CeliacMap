@@ -151,7 +151,10 @@ class SearchAgent(BaseAgent):
             city_name = city.get("name")
             location = (city.get("lat"), city.get("lng"))
             radius_m = city.get("radius_m")
-            query = f"{term} {city_name}".strip()
+            # `search_as` (optional) disambiguates the query for a city whose
+            # bare name is ambiguous (e.g. "Paraná" -- an Argentine city AND a
+            # Brazilian state); `city_name` stays the label.
+            query = f"{term} {city.get('search_as') or city_name}".strip()
             queries += 1
             try:
                 resp = self.places.text_search(
