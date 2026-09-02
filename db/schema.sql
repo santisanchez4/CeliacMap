@@ -444,9 +444,22 @@ create trigger places_set_updated_at
 -- ---------------------------------------------------------------------
 -- Trigger: keep places.vote_count in sync with place_votes (ADR-005)
 -- ---------------------------------------------------------------------
+-- SECURITY DEFINER is REQUIRED, not optional: an AFTER INSERT fired by the
+-- anon role runs this function as anon (SECURITY INVOKER is the default), and
+-- its "update public.places" is then subject to the places RLS for anon —
+-- which has a SELECT policy but NO update policy, so Postgres silently
+-- filters the UPDATE to 0 rows instead of erroring. Result without DEFINER:
+-- every community vote inserts a place_votes row but vote_count never moves.
+-- As DEFINER the function runs as its owner (postgres), which owns places and
+-- bypasses its (non-forced) RLS. It only ever touches vote_count for the
+-- place_id of a row that already passed place_votes' own RLS with-check, so
+-- this is not a privilege-escalation surface. set search_path pins name
+-- resolution (SECURITY DEFINER best practice).
 create or replace function public.sync_place_vote_count()
 returns trigger
 language plpgsql
+security definer
+set search_path = public, pg_temp
 as $$
 begin
   if (tg_op = 'INSERT') then
