@@ -1063,7 +1063,9 @@ h1, h2, h3 {
   text-align: center;
 }
 .rk-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
-.rk-name { font-weight: 600; font-size: 1.0625rem; color: var(--color-text); }
+/* Name always on its own line so every row reads city + badge on line 2 —
+   uniform rhythm regardless of name length. */
+.rk-name { flex-basis: 100%; font-weight: 600; font-size: 1.0625rem; color: var(--color-text); }
 .rk-city { color: var(--color-text-muted); font-size: 0.9rem; }
 .rk-info .pp-badge { font-size: 0.7rem; padding: 3px 9px; }
 .rk-actions { display: flex; align-items: center; gap: 14px; flex: none; }

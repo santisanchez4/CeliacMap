@@ -186,8 +186,8 @@ serif display headings over a clean sans body, and generous spacing.
 
 ## Features
 
-- 11 sections: Hero, Problem, Solution, Features, Interactive Map, Suggest a Place,
-  Reviews, AI & Agents, About, Call to Action, Footer.
+- 12 sections: Hero, Problem, Solution, Features, Interactive Map, Community Ranking,
+  Suggest a Place, Reviews, AI & Agents, About, Call to Action, Footer.
 - Bilingual interface: Spanish (default, "sin TACC") with a client-side ES/EN
   toggle (remembered via `localStorage`).
 - Conceptual interactive map built entirely with HTML/CSS (no map library).
@@ -202,8 +202,10 @@ serif display headings over a clean sans body, and generous spacing.
 ├── js/
 │   ├── main.js                 # i18n, nav, reveal
 │   ├── config.js               # Supabase URL + anon key (public)
-│   ├── map.js                  # Leaflet + Supabase data + filters
-│   └── suggest.js              # public "Suggest a Place" form → suggestions table
+│   ├── map.js                  # Leaflet + Supabase data + filters + place panel
+│   ├── suggest.js              # public "Suggest a Place" form → suggestions table
+│   ├── report.js               # public "recommend / report" form → place_reports
+│   └── ranking.js              # community ranking (#ranking) + place_votes voting
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
 │   ├── base.py                 # shared base + agent_log helper
@@ -226,8 +228,9 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── check_setup.py          # connectivity / config preflight
 │   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
-│   ├── schema.sql              # tables (+ suggestions), constraints, indexes, RLS, triggers
-│   └── seed.sql                # manual seed (UY/AR)
+│   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers
+│   ├── seed.sql                # manual seed (UY/AR) + community-ranking seed (15 places)
+│   └── checks/                 # non-destructive BEGIN;…ROLLBACK; verification scripts
 ├── tests/                      # offline unit tests (all external calls mocked)
 ├── .github/workflows/          # agents-monthly cron + Pages deploy
 ├── requirements.txt
