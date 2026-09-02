@@ -186,8 +186,8 @@ serif display headings over a clean sans body, and generous spacing.
 
 ## Features
 
-- 12 sections: Hero, Problem, Solution, Features, Interactive Map, Suggest a Place,
-  Reviews, AI & Agents, Roadmap, About, Call to Action, Footer.
+- 11 sections: Hero, Problem, Solution, Features, Interactive Map, Suggest a Place,
+  Reviews, AI & Agents, About, Call to Action, Footer.
 - Bilingual interface: Spanish (default, "sin TACC") with a client-side ES/EN
   toggle (remembered via `localStorage`).
 - Conceptual interactive map built entirely with HTML/CSS (no map library).

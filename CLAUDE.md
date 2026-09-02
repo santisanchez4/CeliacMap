@@ -517,7 +517,10 @@ The landing page should include:
 6. **Suggest a Place** — how users can contribute new locations.
 7. **Reviews** — user experiences and community feedback.
 8. **AI & Agents** — future use of AI to find, validate, and update information.
-9. **Roadmap** — product growth plan.
+9. ~~**Roadmap** — product growth plan.~~ _Removed from the public site 2026-09-01
+   — the copy had gone stale (described shipped work as "future"). See the
+   **Public site — Roadmap section & GitHub links removed** entry in the
+   Decisions Log._
 10. **About** — information about the project and its author.
 11. **Call to Action** — invite users to explore or get involved.
 12. **Footer** — links, credits, and repository.
@@ -1478,6 +1481,33 @@ with a real `place_id` — the address-only country check never runs for it).
   (BA/Montevideo + the four UY/AR extremes accepted; Curitiba + far-flung
   geocode errors + missing/non-numeric rejected) and the wiring
   (out-of-scope → `None`, `_db` untouched; in-scope → normal upsert). Suite 262.
+
+### Public site — Roadmap section & GitHub links removed (2026-09-01)
+
+Two owner-decided content changes to the public landing page (`celiacmap.org`),
+frontend-only — no backend, agent, or schema impact:
+
+- **Roadmap section deleted, not updated.** The `#roadmap` section (4 phase
+  cards) described already-shipped work (Community Reports, the agent pipeline)
+  as "future," so it had become misleading. Removed the `<section id="roadmap">`
+  from `index.html`, the `Roadmap` link from both the header `#main-nav` (one
+  entry, shared desktop/mobile) and the `.footer-nav`, the 15 orphaned
+  `nav.roadmap` / `roadmap.*` EN keys from `js/main.js`, and the now-dead
+  `.timeline*` rules from `css/styles.css`. The AI section eyebrow
+  ("Visión futura · Roadmap" / "Future vision · Roadmap") was trimmed to just
+  "Visión futura" / "Future vision" since its Roadmap reference no longer
+  pointed at anything.
+- **All GitHub links removed from the public site.** The project was already
+  evaluated academically and the owner does not want the code surfaced from the
+  site. Removed the `GitHub` link from the About author card (LinkedIn stays),
+  the `Ver en GitHub` / "View on GitHub" ghost button from the dark CTA band
+  (`.cta-actions` already `justify-content: center`, so the lone "Explorar el
+  mapa" button centers with no CSS change), the `GitHub` link from
+  `.footer-social` (LinkedIn stays), and the orphaned `cta.secondary` EN key.
+  **Scope:** the public site only — the repo stays on
+  `github.com/santisanchez4/CeliacMap`, and GitHub Actions / Pages / repo-URL
+  references in `README.md` (infrastructure docs, not the site) were left
+  intact.
 
 ### Build status (phases)
 

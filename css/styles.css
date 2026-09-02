@@ -1105,30 +1105,6 @@ h1, h2, h3 {
   50% { opacity: 0.85; }
 }
 
-/* ------------------------------ Timeline --------------------------- */
-.timeline {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(24px, 3vw, 32px);
-}
-.timeline-item {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 34px 30px;
-  box-shadow: var(--shadow-sm);
-  border-top: 3px solid var(--color-primary);
-}
-.timeline-phase {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-primary);
-  margin-bottom: 12px;
-}
-
 /* ------------------------------- About ----------------------------- */
 .about-layout { max-width: 760px; margin: 0 auto; text-align: center; }
 .author-card {
@@ -1188,7 +1164,6 @@ h1, h2, h3 {
 
 @media (min-width: 900px) {
   .grid-3 { grid-template-columns: repeat(3, 1fr); }
-  .timeline { grid-template-columns: repeat(4, 1fr); }
 
   .hero-inner { grid-template-columns: 1.05fr 0.95fr; }
   .ai-layout { grid-template-columns: 1.1fr 0.9fr; }

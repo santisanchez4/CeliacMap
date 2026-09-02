@@ -90,7 +90,6 @@
     "nav.solution": "Solution",
     "nav.features": "Features",
     "nav.map": "Map",
-    "nav.roadmap": "Roadmap",
     "nav.about": "About",
 
     "lang.current": "EN",
@@ -214,28 +213,12 @@
     "reviews.r3.text": "“I added my favorite café in a minute. I love helping more people discover it.”",
     "reviews.r3.role": "Part of the community",
 
-    "ai.eyebrow": "Future vision · Roadmap",
+    "ai.eyebrow": "Future vision",
     "ai.title": "Artificial intelligence at the service of the community",
     "ai.lead": "Agents that discover, validate and keep every place up to date. Automatically and reliably.",
     "ai.li1": "Automatically discover new safe places.",
     "ai.li2": "Validate and cross-check reviews to detect inconsistencies.",
     "ai.li3": "Keep menus and data always up to date.",
-
-    "roadmap.eyebrow": "Roadmap",
-    "roadmap.title": "How the product will grow",
-    "roadmap.lead": "A phased plan, designed to grow alongside the community.",
-    "roadmap.p1.phase": "Phase 1",
-    "roadmap.p1.title": "Map MVP",
-    "roadmap.p1.text": "Landing page and conceptual map with safe places and safety levels.",
-    "roadmap.p2.phase": "Phase 2",
-    "roadmap.p2.title": "Community",
-    "roadmap.p2.text": "Place suggestions, reviews and collaborative validation.",
-    "roadmap.p3.phase": "Phase 3",
-    "roadmap.p3.title": "AI & agents",
-    "roadmap.p3.text": "Automatic discovery and validation of information with AI.",
-    "roadmap.p4.phase": "Phase 4",
-    "roadmap.p4.title": "Expansion",
-    "roadmap.p4.text": "Mobile app and growth into new cities and countries.",
 
     "about.eyebrow": "About the project",
     "about.title": "An idea with purpose",
@@ -245,7 +228,6 @@
     "cta.title": "Join a safer way to eat out",
     "cta.text": "Explore the map and join the community that makes eating gluten-free simple.",
     "cta.primary": "Explore the map",
-    "cta.secondary": "View on GitHub",
 
     "footer.tagline": "Safe gluten-free places, mapped by the community.",
     "footer.credit": "Made by Santiago Sanchez"
