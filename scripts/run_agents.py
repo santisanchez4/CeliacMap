@@ -29,7 +29,7 @@ from typing import Any
 from agents.clients.google_places import GooglePlacesClient
 from agents.clients.llm import LLMClient
 from agents.clients.resend_client import ResendClient
-from agents.clients.supabase_client import SupabaseClient
+from agents.clients.supabase_client import SupabaseClient, coordinates_in_scope
 from agents.clients.tavily_client import TavilySearchClient
 from agents.clients.website_scraper import WebsiteScraperClient
 from agents.outreach_agent import OutreachAgent
@@ -93,6 +93,16 @@ class DryRunSupabase:
         )
 
     def insert_place_candidate(self, candidate: dict[str, Any]) -> None:
+        # Mirror the real client's out-of-scope guard so a dry run reports
+        # faithfully what production would (not) insert.
+        if not coordinates_in_scope(candidate.get("lat"), candidate.get("lng")):
+            logger.info(
+                "[dry-run] would REJECT out-of-scope candidate %r (%s, %s)",
+                candidate.get("name"),
+                candidate.get("lat"),
+                candidate.get("lng"),
+            )
+            return None
         logger.info("[dry-run] would insert candidate %r", candidate.get("name"))
         return None
 

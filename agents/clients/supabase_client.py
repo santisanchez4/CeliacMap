@@ -7,9 +7,41 @@ server-side (local .env or CI) — never in the browser.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from supabase import Client, create_client
+
+logger = logging.getLogger("celiacmap.agent")
+
+# Approximate bounding box for Uruguay + Argentina at full national extent,
+# with margin for cities not yet in config/targets.yaml. Used as a last-resort,
+# source-agnostic guard in insert_place_candidate() against a place landing far
+# outside the project's geographic scope — e.g. a location-biased Google Text
+# Search, or a mis-matched Find Place result, that slipped past to_candidate()
+# / resolve_location(). NOT a precise border test: Argentina's shape means a
+# rectangle cannot exclude Chile / Paraguay / Brazilian border towns — the
+# address-country checks upstream and the Validator handle those.
+UY_AR_LAT_MIN = -56.0   # south of Tierra del Fuego
+UY_AR_LAT_MAX = -21.0   # north of Jujuy / the Argentina–Bolivia border
+UY_AR_LNG_MIN = -74.5   # west of the Andes / the Argentina–Chile border
+UY_AR_LNG_MAX = -53.0   # east of Misiones and the Uruguayan Atlantic coast
+
+
+def coordinates_in_scope(lat: Any, lng: Any) -> bool:
+    """True if (lat, lng) falls inside the approximate Uruguay+Argentina box.
+
+    A missing or non-numeric coordinate is treated as out of scope: places.lat
+    / places.lng are NOT NULL, so such a candidate could not be inserted anyway.
+    """
+    if isinstance(lat, bool) or isinstance(lng, bool):
+        return False
+    if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+        return False
+    return (
+        UY_AR_LAT_MIN <= lat <= UY_AR_LAT_MAX
+        and UY_AR_LNG_MIN <= lng <= UY_AR_LNG_MAX
+    )
 
 
 class SupabaseClient:
@@ -27,7 +59,23 @@ class SupabaseClient:
     # --- places -------------------------------------------------------
     def insert_place_candidate(self, candidate: dict[str, Any]) -> dict | None:
         """Insert a new candidate as status='pending'. Relies on the unique
-        (source, external_id) index for dedup; conflicts are ignored."""
+        (source, external_id) index for dedup; conflicts are ignored.
+
+        Returns ``None`` (nothing written) for a candidate whose coordinates
+        fall outside the approximate Uruguay+Argentina bounding box — a
+        source-agnostic backstop, see ``coordinates_in_scope``.
+        """
+        lat, lng = candidate.get("lat"), candidate.get("lng")
+        if not coordinates_in_scope(lat, lng):
+            logger.warning(
+                "rejecting out-of-scope place candidate %r (source=%s): "
+                "(%s, %s) is outside the Uruguay/Argentina bounding box",
+                candidate.get("name"),
+                candidate.get("source"),
+                lat,
+                lng,
+            )
+            return None
         payload = {**candidate, "status": "pending"}
         res = (
             self._db.table("places")

@@ -1439,6 +1439,39 @@ supported country (Part 2); an approximate UY+AR bounding-box gate in
 `insert_place_candidate()` (Part 3 — defense in depth, source-agnostic); and
 disambiguating the "Paraná" search term in `config/targets.yaml` (Part 4).
 
+### Geographic scope guard — `insert_place_candidate()` bounding box (2026-09-01)
+
+**Part 3 of the Curitiba-cluster fix — a source-agnostic last-resort net.**
+Every discovery agent (Search / Social / Web / Suggestion) funnels new places
+through `SupabaseClient.insert_place_candidate()`, so an approximate
+Uruguay+Argentina bounding box there catches a place with grossly wrong
+coordinates regardless of which agent (or future agent) produced it, and
+regardless of whether the upstream address checks fired. It specifically
+backstops the **`resolve_location()` Find Place "wrong business"** risk (a
+Find Place match in another country still returns `geocode_method='find_place'`
+with a real `place_id` — the address-only country check never runs for it).
+
+- **`coordinates_in_scope(lat, lng) -> bool`** + module constants
+  `UY_AR_LAT_MIN/MAX = -56.0 / -21.0`, `UY_AR_LNG_MIN/MAX = -74.5 / -53.0`
+  (full national extent of both countries + margin; a missing / non-numeric /
+  bool coordinate is out of scope). `insert_place_candidate()` returns `None`
+  (nothing written) and logs a `WARNING` with the name + source + coords when
+  the check fails — the same "return `None`" contract callers already handle
+  for a dedup conflict.
+- **Deliberately NOT a precise border test.** Argentina's shape means a
+  rectangle can't exclude Chile, Paraguay, western Bolivia, or Brazilian
+  border towns like Cascavel (`lng ≈ -53.47`, inside the box) — those are
+  handled by the address-country parse in `to_candidate()` / the
+  address-only geocode gate / the Validator. The box's job is the *gross*
+  errors: Curitiba, and the ~14 Social-agent Find Place mis-geocodes to the
+  USA / Europe / Asia the audit turned up (all already `discarded`).
+- `DryRunSupabase.insert_place_candidate` mirrors the guard so `--dry-run`
+  reports faithfully ("would REJECT out-of-scope candidate …").
+- **Tests:** `tests/test_supabase_client.py` (new, 7) — the pure bbox check
+  (BA/Montevideo + the four UY/AR extremes accepted; Curitiba + far-flung
+  geocode errors + missing/non-numeric rejected) and the wiring
+  (out-of-scope → `None`, `_db` untouched; in-scope → normal upsert). Suite 262.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
