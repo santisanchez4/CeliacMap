@@ -203,6 +203,19 @@ GEOGRAPHIC SCOPE
   the 15 confirmed above were corrected separately via a one-off SQL script
   (`db/fixes/2026-08-08-border-city-country-mismatch.sql`, run manually
   against production — see that file's own commit).
+
+  **Hardening (2026-09-01):** the 2026-08-08 fix still *fell back to the
+  search target* when the address didn't parse to Uruguay/Argentina — which
+  for a well-formed Google address means it is in some *other* country. That
+  gap is exactly how the Curitiba cluster (see **Brazil out-of-scope
+  places** in the Decisions Log) reached the map. `to_candidate()` now
+  returns **`None`** in that case — the `country` parameter is gone, the
+  country is always taken from the result's own address, and `city` is the
+  only value that still falls back to the target once the country is
+  confirmed in scope. `SearchAgent.run()` counts a `None` as
+  `skipped` + a new `out_of_scope` summary field and logs a `WARNING` with
+  the query and dropped address (a high `out_of_scope` count flags an
+  ambiguous city in `targets.yaml`). `tests/test_search_agent.py` +4/−1.
 - **`GooglePlacesClient.resolve_location()` can return the WRONG business when
   Find Place mis-matches `name + address + city` — unresolved, pending a
   future fix.** Find Place always returns *a* candidate if it can match

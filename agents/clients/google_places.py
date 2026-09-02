@@ -390,20 +390,28 @@ class GooglePlacesClient:
         return city or admin_area_2, country
 
     @staticmethod
-    def to_candidate(result: dict[str, Any], *, country: str, city: str) -> dict:
+    def to_candidate(result: dict[str, Any], *, city: str) -> dict | None:
         """Map a raw Places result to a `places` candidate (no category yet).
 
-        `country`/`city` are the SEARCH TARGET (from config/targets.yaml) and
-        are only a fallback: Google's Text Search can legitimately return a
-        result located elsewhere (most visibly across an international
-        border near a bridge crossing -- see CLAUDE.md's "Key risks"), so the
-        result's own `formatted_address` is preferred whenever it parses to a
-        recognized country.
+        Returns ``None`` when the result's own ``formatted_address`` does not
+        parse to a supported country (Uruguay/Argentina). Google's Text Search
+        is location-*biased*, not *bounded*, so a query for an ambiguous city
+        name (e.g. "Paraná" -- an Argentine city AND a Brazilian state) can
+        return a business in another country entirely; trusting the search
+        target would then stamp it with a false city/country (see CLAUDE.md's
+        "Brazil out-of-scope places -- Curitiba cluster"). The caller counts a
+        ``None`` as skipped / out-of-scope.
+
+        ``city`` is the SEARCH TARGET (from config/targets.yaml) and is only a
+        fallback for the city label once the country is confirmed in scope --
+        the country itself is always taken from the result's own address.
         """
-        loc = (result.get("geometry") or {}).get("location") or {}
         parsed_city, parsed_country = GooglePlacesClient.parse_city_country_from_address(
             result.get("formatted_address")
         )
+        if parsed_country is None:
+            return None
+        loc = (result.get("geometry") or {}).get("location") or {}
         return {
             "name": result.get("name"),
             "lat": loc.get("lat"),
@@ -411,7 +419,7 @@ class GooglePlacesClient:
             "address": result.get("formatted_address") or result.get("vicinity"),
             "external_id": result.get("place_id"),
             "source": "google_places",
-            "country": parsed_country or country,
+            "country": parsed_country,
             "city": parsed_city or city,
         }
 

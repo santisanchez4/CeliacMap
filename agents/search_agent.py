@@ -128,6 +128,7 @@ class SearchAgent(BaseAgent):
         candidates_found = 0
         inserted = 0
         skipped = 0
+        out_of_scope = 0
         errors = 0
         details_fetched = 0
         rich_updated = 0
@@ -177,9 +178,22 @@ class SearchAgent(BaseAgent):
                     skipped += 1
                     continue
 
-                candidate = GooglePlacesClient.to_candidate(
-                    result, country=country_name, city=city_name
-                )
+                candidate = GooglePlacesClient.to_candidate(result, city=city_name)
+                if candidate is None:
+                    # Result's own address is not in Uruguay/Argentina (or is
+                    # unparseable): a location-biased Text Search leaked across
+                    # a border. Never fall back to the query target.
+                    skipped += 1
+                    out_of_scope += 1
+                    logger.warning(
+                        "out-of-scope result dropped: %r @ %r (queried as %r under %s/%s)",
+                        result.get("name"),
+                        result.get("formatted_address"),
+                        query,
+                        country_name,
+                        city_name,
+                    )
+                    continue
                 if not candidate.get("name") or candidate.get("lat") is None:
                     skipped += 1
                     continue
@@ -224,6 +238,7 @@ class SearchAgent(BaseAgent):
             "unique_candidates": len(seen),
             "inserted": inserted,
             "skipped": skipped,
+            "out_of_scope": out_of_scope,
             "errors": errors,
             "details_fetched": details_fetched,
             "rich_updated": rich_updated,

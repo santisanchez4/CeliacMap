@@ -34,14 +34,19 @@ def make_result(
     business_status="OPERATIONAL",
     lat=-34.9,
     lng=-56.2,
+    formatted_address="Sarandí 600, Ciudad Vieja, Montevideo, Uruguay",
 ):
+    # Default address is a parseable in-scope (Uruguay) one: to_candidate()
+    # now discards a result whose own address does not resolve to
+    # Uruguay/Argentina, so every result that should be inserted needs a
+    # real UY/AR address.
     return {
         "place_id": place_id,
         "name": name,
         "types": types if types is not None else ["restaurant"],
         "business_status": business_status,
         "geometry": {"location": {"lat": lat, "lng": lng}},
-        "formatted_address": "Av. Siempre Viva 123",
+        "formatted_address": formatted_address,
     }
 
 
@@ -225,6 +230,30 @@ def test_text_search_error_is_counted_and_does_not_crash():
     db.insert_place_candidate.assert_not_called()
 
 
+def test_run_discards_out_of_scope_result_and_counts_it():
+    # A biased "Paraná" query returns a Curitiba (Brazil) business alongside a
+    # legitimate in-scope one -- only the in-scope one is inserted.
+    agent, db, places = make_agent()
+    places.text_search.return_value = {
+        "results": [
+            make_result(
+                "BR",
+                formatted_address="R. Schiller, 1960 - Hugo Lange, Curitiba - PR, 80040-160, Brazil",
+                lat=-25.4178097,
+                lng=-49.2490747,
+            ),
+            make_result("UY"),  # default address is a real Montevideo one
+        ]
+    }
+
+    summary = agent.run()
+
+    assert db.insert_place_candidate.call_count == 1
+    assert db.insert_place_candidate.call_args.args[0]["external_id"] == "UY"
+    assert summary["out_of_scope"] == 1
+    assert summary["inserted"] == 1
+
+
 # --- Gluten-free review snippet filtering ---------------------------------
 
 
@@ -271,7 +300,7 @@ def test_to_candidate_derives_country_from_result_address_not_target():
         "place_id": "ChIJ_test_san_felipa",
     }
 
-    candidate = GooglePlacesClient.to_candidate(result, country="Uruguay", city="Fray Bentos")
+    candidate = GooglePlacesClient.to_candidate(result, city="Fray Bentos")
 
     assert candidate["country"] == "Argentina"
     assert candidate["city"] == "Gualeguaychú"
@@ -309,15 +338,48 @@ def test_parse_address_returns_none_for_empty_address():
     assert GooglePlacesClient.parse_city_country_from_address(None) == (None, None)
 
 
-def test_to_candidate_falls_back_to_target_when_address_unparseable():
-    # make_result()'s default formatted_address ("Av. Siempre Viva 123") has
-    # no recognizable country segment -- to_candidate must behave exactly
-    # like before this fix, so every other existing test using make_result()
-    # is unaffected.
-    result = make_result("X")
-    candidate = GooglePlacesClient.to_candidate(result, country="Uruguay", city="Montevideo")
+def test_to_candidate_discards_result_outside_uy_ar():
+    # CLAUDE.md "Brazil out-of-scope places — Curitiba cluster": Google Text
+    # Search is location-BIASED, not bounded, so a query for an ambiguous
+    # city name ("Paraná" = an Argentine city AND a Brazilian state) can
+    # return a business in another country. to_candidate() must DISCARD it,
+    # never fall back to the search target's city/country.
+    result = {
+        "name": "LEVAIN GLÚTEN FREE",
+        "formatted_address": "R. Ver. Washington Mansur, 332 - Ahú, Curitiba - PR, 80540-210, Brazil",
+        "geometry": {"location": {"lat": -25.4011981, "lng": -49.2592645}},
+        "place_id": "ChIJ_curitiba_levain",
+    }
+    assert GooglePlacesClient.to_candidate(result, city="Paraná") is None
+
+
+def test_to_candidate_discards_result_with_unparseable_address():
+    # No recognizable country segment at all -> we cannot confirm the result
+    # is in Uruguay/Argentina, so it is dropped rather than trusted to the
+    # (possibly wrong) search target.
+    result = {
+        "name": "X",
+        "formatted_address": "Av. Siempre Viva 123",
+        "geometry": {"location": {"lat": -34.9, "lng": -56.2}},
+        "place_id": "X",
+    }
+    assert GooglePlacesClient.to_candidate(result, city="Montevideo") is None
+
+
+def test_to_candidate_keeps_normal_uy_ar_result():
+    # Regression guard: an in-scope result is unaffected by the discard rule
+    # and still derives its country/city from its own address.
+    result = {
+        "name": "Café Sano",
+        "formatted_address": "Sarandí 600, Ciudad Vieja, Montevideo, Uruguay",
+        "geometry": {"location": {"lat": -34.9055, "lng": -56.201}},
+        "place_id": "ok-1",
+    }
+    candidate = GooglePlacesClient.to_candidate(result, city="Montevideo")
+    assert candidate is not None
     assert candidate["country"] == "Uruguay"
-    assert candidate["city"] == "Montevideo"
+    assert candidate["city"] == "Ciudad Vieja"
+    assert candidate["name"] == "Café Sano"
 
 
 # --- Review enrichment in the run -----------------------------------------
