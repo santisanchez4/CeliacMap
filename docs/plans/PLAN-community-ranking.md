@@ -122,9 +122,21 @@ create index if not exists places_country_vote_count_idx
 **Trigger que mantiene `vote_count` (molde: `set_updated_at`):**
 
 ```sql
+-- SECURITY DEFINER es OBLIGATORIO (no opcional): un AFTER INSERT disparado
+-- por el rol anon corre esta función como anon (SECURITY INVOKER es el
+-- default), y su "update public.places" queda sujeto a la RLS de places para
+-- anon — que tiene policy de SELECT pero NO de UPDATE, así que Postgres filtra
+-- el UPDATE a 0 filas en silencio en vez de errorear. Sin DEFINER: cada voto
+-- inserta una fila en place_votes pero vote_count nunca se mueve. Como DEFINER
+-- corre como su dueño (postgres), que es dueño de places y bypasea su RLS (no
+-- forzada). Solo toca vote_count del place_id de una fila que ya pasó el
+-- with-check de place_votes → no es superficie de escalada de privilegios.
+-- (Encontrado y corregido en la Fase B — commit fix(db): ...)
 create or replace function public.sync_place_vote_count()
 returns trigger
 language plpgsql
+security definer
+set search_path = public, pg_temp
 as $$
 begin
   if (tg_op = 'INSERT') then
@@ -203,38 +215,55 @@ create policy "public can cast a vote"
 
 ### API — contrato de inserción de voto (sin código de servidor nuevo)
 
-Igual que `place_reports`: `POST` directo a PostgREST con la anon key. La
-única diferencia es el manejo del duplicado, que se resuelve del lado del
-servidor con un header, **no** con un catch de `23505` en el cliente:
+**`POST` plano** a PostgREST con la anon key, exactamente el mismo patrón
+que `js/report.js` → `place_reports`:
 
 ```
-POST {SUPABASE_URL}/rest/v1/place_votes?on_conflict=place_id,voter_token
+POST {SUPABASE_URL}/rest/v1/place_votes
 Headers:
   apikey: {ANON}
   Authorization: Bearer {ANON}
   Content-Type: application/json
-  Prefer: return=minimal, resolution=ignore-duplicates
+  Prefer: return=minimal
 Body:
   { "place_id": "<uuid>", "voter_token": "<token>" }
 ```
 
-- **`?on_conflict=place_id,voter_token` + `Prefer: resolution=ignore-duplicates`**
-  → PostgREST hace `INSERT ... ON CONFLICT (place_id, voter_token) DO NOTHING`.
-  Un voto repetido del mismo browser para el mismo lugar devuelve **200 /
-  201 con cuerpo vacío**, sin error — el cliente no tiene que
-  special-casear un 409. `DO NOTHING` no actualiza, así que el `grant
-  insert` (sin `update`) alcanza.
-- **Fallback documentado:** si esa versión de PostgREST no respeta
-  `resolution=ignore-duplicates` como se espera, el cliente trata un
-  `409` (código `23505`) como éxito silencioso — mismo espíritu que el
-  honeypot de `report.js`. Se confirma cuál de los dos aplica en la Fase
-  B (smoke test real).
+**Confirmado en la Fase B (smoke test real contra la API, 2026-09-02):**
+
+| Caso | Resultado |
+| --- | --- |
+| voto nuevo, lugar `approved` | **HTTP 201**, cuerpo vacío |
+| mismo `POST` exacto de nuevo (duplicado) | **HTTP 409** · `{"code":"23505", "message":"duplicate key value violates unique constraint \"place_votes_place_voter_key\""}` |
+| lugar no `approved` (`needs_review`) | **HTTP 401** · `{"code":"42501", "message":"new row violates row-level security policy for table \"place_votes\""}` |
+| end-to-end: `POST` → `GET places?...&select=vote_count` | `0 → 1` (el trigger `SECURITY DEFINER` corre por el path anon de PostgREST); `GET place_votes` como anon → **401/42501** (no legible) |
+
+- **El approach de dedup del ADR (`?on_conflict=...` +
+  `Prefer: resolution=ignore-duplicates`) NO sirve acá.** El path de
+  upsert de PostgREST exige `SELECT` sobre la tabla
+  (`GRANT SELECT ON public.place_votes TO anon`), que el diseño retiene a
+  propósito para que `place_votes` no sea legible → PostgREST devuelve
+  **401 / 42501** en vez de hacer el `ON CONFLICT DO NOTHING`. Se descarta.
+- **El duplicado NO es un no-op silencioso: es un `409` / `23505`.**
+  `ranking.js` (Fase C) hace el `POST` plano y trata el `409`
+  explícitamente como éxito — mismo espíritu que el honeypot de
+  `report.js`:
+
+  ```js
+  if (res.ok || res.status === 409) { markVotedLocally(); showThanks(); }
+  else { showGenericError(); }   // cubre el 401/42501 sobre un place_id no aprobado
+  ```
+
+  El set de votados en `localStorage` igual evita la mayoría de los
+  `POST` repetidos; el `409` es el backstop del servidor.
 - **`source` no se manda** — la RLS lo fuerza a `'community'` vía el
   default de columna + el `with check`.
-- Un `POST` para un `place_id` no aprobado → la RLS lo rechaza con **403**
-  (`new row violates row-level security policy`). El cliente lo trata como
-  error genérico; por la UI no debería pasar nunca (el botón de voto solo
-  se renderiza para lugares aprobados del ranking / del panel).
+- Un `POST` para un `place_id` no aprobado → la RLS lo rechaza con **401**
+  (código `42501`, `new row violates row-level security policy` — Supabase
+  devuelve `401` con `WWW-Authenticate: Bearer` para violaciones de RLS
+  con la anon key, no `403`). El cliente lo trata como error genérico; por
+  la UI no debería pasar nunca (el botón de voto solo se renderiza para
+  lugares aprobados del ranking / del panel).
 
 ### Lectura del ranking (mismo endpoint que el mapa)
 
@@ -284,12 +313,16 @@ GET {SUPABASE_URL}/rest/v1/places
   cada fila = número de posición + `.pp-title` (nombre) + `.pp-meta`
   (ciudad) + badge `.pp-badge--safe` / `--options` (según `safety_level`,
   misma lógica que `map.js`) + conteo de votos + botón de voto.
-- **Click de voto:** valida set-de-votados y cooldown → `POST` (contrato
-  de arriba) → en éxito (200/201/o 409-como-éxito): agrega el `place_id`
-  al set local, escribe `celiacmap-vote-last`, incrementa
-  **optimísticamente** el conteo mostrado (solo si no estaba ya en el set
-  — evita doble-conteo si el usuario ya votó desde el panel), pone el
-  botón en "✓ Votado". En error real: inline "No se pudo votar".
+- **Click de voto:** valida set-de-votados y cooldown → `POST` plano
+  (contrato de arriba) → en éxito, que es **`res.ok || res.status === 409`**
+  (un `409`/`23505` = "ya votaste", se trata como éxito, confirmado en la
+  Fase B): agrega el `place_id` al set local, escribe
+  `celiacmap-vote-last`, incrementa **optimísticamente** el conteo
+  mostrado **solo si el `POST` fue `2xx` y el lugar no estaba ya en el set**
+  (un `409` no incrementa — la fila ya existía; esto evita doble-conteo si
+  el usuario ya votó desde el panel), pone el botón en "✓ Votado". En
+  cualquier otro no-2xx (p. ej. el `401/42501` sobre un lugar no aprobado):
+  inline "No se pudo votar".
 - **Texto dinámico:** `MSG = {es:{...}, en:{...}}` propio (como
   `map.js` / `report.js`) + listener de `document.addEventListener(
   "celiacmap:lang", ...)` para re-renderizar en el toggle de idioma.
@@ -409,42 +442,57 @@ on conflict (place_id, voter_token) do nothing;
 Cada fase = un commit separado, mismo patrón que la sesión de hoy. La
 `Fase D` está **bloqueada** hasta que Santiago pase la lista de lugares.
 
-### Fase A — Schema
+### Fase A — Schema  ✅ HECHA
 
-- `db/schema.sql`: tabla `place_votes` (+ índice + `unique`), columna
-  `places.vote_count` (+ índice), función `sync_place_vote_count()` +
+- `db/schema.sql`: tabla `place_votes` (+ `place_votes_place_id_idx` +
+  `unique (place_id, voter_token)`), columna `places.vote_count` (+
+  `places_country_vote_count_idx`), función `sync_place_vote_count()` +
   trigger `place_votes_sync_count` (after insert or delete), RLS
   (INSERT-only, `with check` con el `exists(status='approved')`), y el
   snippet de reconciliación como comentario.
-- Aplicar el SQL en el **SQL Editor de Supabase** (mismo flujo manual que
-  cada migración anterior del proyecto).
-- Verificación read-only post-apply (`supabase db query --linked`): la
-  tabla existe, la columna existe con default 0, el trigger existe, las
-  588 filas de `places` tienen `vote_count = 0`.
-- **Commit:** `feat(db): place_votes table + denormalized places.vote_count`
+- Aplicada a producción vía `supabase db query --linked`, luego
+  sincronizada verbatim en `db/schema.sql`.
+- Verificación read-only post-apply: tabla / columna / función / trigger /
+  constraints / índices / policy / grants todos presentes; las 1297 filas
+  de `places` (588 `approved`) con `vote_count = 0`.
+- **`sync_place_vote_count()` corregida a `SECURITY DEFINER` en la Fase B**
+  (ver abajo) — sin DEFINER, un `INSERT` disparado por `anon` corre el
+  `update places` como `anon`, que no tiene policy de UPDATE → 0 filas en
+  silencio → `vote_count` nunca se movía. Commit aparte:
+  `fix(db): sync_place_vote_count must be SECURITY DEFINER (anon vote path)`.
+- **Commits:** `feat(db): place_votes table + denormalized places.vote_count`
+  y `fix(db): sync_place_vote_count must be SECURITY DEFINER (anon vote path)`
 
-### Fase B — API / verificación de base de datos
+### Fase B — API / verificación de base de datos  ✅ HECHA
 
-- `db/checks/2026-XX-XX-place-votes.sql` (molde: `db/fixes/*.sql`) — un
-  script que corre **dentro de `begin; ... rollback;`** en el SQL Editor
-  (nada persiste) y verifica:
-  1. `insert` de un voto para un lugar approved conocido → `places.vote_count`
-     pasa de N a N+1.
-  2. `insert` de un `(place_id, voter_token)` duplicado → `unique`
-     violation (o `on conflict do nothing` → conteo sin cambios).
-  3. `delete` del voto → `vote_count` vuelve a N.
-  4. `greatest(vote_count-1, 0)`: forzar `vote_count=0` y borrar → no baja
-     a -1.
-  5. `set role anon; insert` para un `place_id` **no** approved → RLS lo
-     rechaza (`with check`). `reset role`.
-- **Smoke test del contrato PostgREST** (documentado en el propio script
-  o en la sección Verificación): `curl` real con la anon key →
-  (a) voto nuevo → 201; (b) `places.vote_count` subió (read-only check);
-  (c) voto duplicado con `?on_conflict=...` + `Prefer:
-  resolution=ignore-duplicates` → 200/201 sin error **o** 409/23505
-  (documentar cuál aplica → define el manejo en `ranking.js`);
-  (d) voto para un `place_id` no approved → 403. Borrar la fila de prueba
-  al terminar (o usar un `place_id` de prueba y limpiar).
+- `db/checks/2026-09-01-place-votes.sql` (molde: `db/fixes/*.sql`) — corre
+  **dentro de `begin; ... rollback;`** (nada persiste). 6 checks, todos
+  **PASS**:
+  1. `INSERT` de un voto → `places.vote_count` `0 → 1`.
+  2. `DELETE` del voto → `vote_count` vuelve a `0`.
+  3. `greatest(vote_count-1, 0)`: forzar `vote_count=0` y borrar → queda
+     en `0`, no `-1`.
+  4. `INSERT` de un `(place_id, voter_token)` duplicado → `23505
+     unique_violation`.
+  5. `set local role anon; insert` para un `place_id` **no** approved →
+     RLS lo rechaza (`42501`, "new row violates row-level security
+     policy").
+  6. Control positivo: `set local role anon; insert` para un `place_id`
+     approved → inserta y el trigger `SECURITY DEFINER` bumpea
+     (`vote_count 0 → 1`).
+- **Smoke test PostgREST real** (persistió filas, limpiadas después —
+  producción quedó prístina; resultados documentados dentro del `.sql`):
+  - El approach de dedup del ADR (`?on_conflict=...` +
+    `Prefer: resolution=ignore-duplicates`) **NO sirve** — el path de
+    upsert de PostgREST exige `GRANT SELECT ON place_votes TO anon`, que el
+    diseño retiene a propósito → `401 / 42501`.
+  - `POST` plano (patrón `report.js` → `place_reports`): voto nuevo →
+    **201**; duplicado exacto → **409 / 23505** (no un no-op silencioso);
+    lugar no approved → **401 / 42501**; end-to-end `POST` → `GET
+    places?select=vote_count` `0 → 1`; `GET place_votes` como anon → 401.
+  - **Implicación para `ranking.js`:** `POST` plano y tratar `res.ok ||
+    res.status === 409` como éxito (el `409` = "ya votaste"). Sección Fase
+    C del plan actualizada.
 - **Commit:** `test(db): place_votes trigger + RLS + PostgREST contract checks`
 
 ### Fase C — Frontend
@@ -525,13 +573,14 @@ Cada fase = un commit separado, mismo patrón que la sesión de hoy. La
 **No hay runner de tests para SQL ni para JS en el proyecto** (toda la
 suite Python mockea Supabase; `supabase/` no tiene config local). Por eso:
 
-- **Trigger + RLS:** el script `db/checks/2026-XX-XX-place-votes.sql` de
+- **Trigger + RLS:** el script `db/checks/2026-09-01-place-votes.sql` de
   la Fase B, corrido en `begin; ... rollback;` — verificación manual
   reproducible y commiteada, no un test automatizado. Cubre: increment on
   insert, decrement on delete, `greatest()` underflow guard, `unique`
-  violation, RLS `with check` rechaza lugar no-approved.
-- **Contrato PostgREST:** `curl` documentado en la Fase B (201 / dedup /
-  403).
+  violation, RLS `with check` rechaza lugar no-approved, RLS permite lugar
+  approved vía el path anon.
+- **Contrato PostgREST:** `curl` documentado dentro del mismo `.sql` de la
+  Fase B (201 nuevo / 409-23505 duplicado / 401-42501 no-approved).
 - **Frontend:** sin test automatizado (mismo criterio que `js/suggest.js`
   / `js/report.js`) — verificación manual en Chrome (Fase E) + e2e en
   vivo con cleanup de la fila de prueba.
@@ -555,5 +604,17 @@ suite Python mockea Supabase; `supabase/` no tiene config local). Por eso:
 
 ## TODO — deuda técnica detectada al implementar
 
-_(a completar durante la implementación, mismo criterio que
-PLAN-community-reviews.md)_
+- **Fase B — `sync_place_vote_count()` necesitaba `SECURITY DEFINER`.** El
+  trigger se creó `SECURITY INVOKER` (default): un `AFTER INSERT` disparado
+  por `anon` corría el `update places` como `anon`, que solo tiene `SELECT`
+  sobre `places` (approved-only), nunca `UPDATE` → Postgres filtraba el
+  `UPDATE` a 0 filas en silencio, así que cada voto insertaba una fila pero
+  `vote_count` no se movía. Detectado en la Fase B (`begin; ... rollback;`,
+  nada persistió) antes de tráfico real. Corregido: `SECURITY DEFINER SET
+  search_path = public, pg_temp` (commit `fix(db): ...`). Seguro: la
+  función solo toca `vote_count` del `place_id` de una fila que ya pasó el
+  `with check` de `place_votes`.
+- **Fase B — el dedup del ADR (`resolution=ignore-duplicates`) no es
+  usable.** El path de upsert de PostgREST exige `GRANT SELECT` sobre
+  `place_votes`, que el diseño retiene. `ranking.js` usa `POST` plano y
+  trata el `409 / 23505` como éxito. Sección API + Fase C actualizadas.
