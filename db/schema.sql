@@ -204,6 +204,20 @@ alter table public.places add column if not exists contact_email_checked_at time
 alter table public.places add column if not exists outreach_opt_out boolean
   not null default false;
 
+-- Community ranking (ADR-005 / docs/plans/PLAN-community-ranking.md): a
+-- denormalized vote counter, kept in sync with the place_votes table by the
+-- sync_place_vote_count trigger below. Same denormalized-column pattern as
+-- rating / user_ratings_total / outreach_status above. The frontend reads the
+-- ranking straight off this column via the existing "public read approved
+-- places" policy — place_votes itself is never exposed for read.
+alter table public.places add column if not exists vote_count integer not null default 0;
+
+-- Supports the ranking query (status='approved' & country=X order by
+-- vote_count desc). Optional at 1.3k rows, but cheap and consistent with the
+-- other places indexes.
+create index if not exists places_country_vote_count_idx
+  on public.places (country, vote_count desc);
+
 -- ---------------------------------------------------------------------
 -- Table: reviews
 -- ---------------------------------------------------------------------
@@ -382,6 +396,33 @@ create index if not exists place_reports_place_id_idx on public.place_reports (p
 create index if not exists place_reports_status_idx   on public.place_reports (status);
 
 -- ---------------------------------------------------------------------
+-- Table: place_votes  (community "recommend / upvote" — the ranking signal)
+-- ---------------------------------------------------------------------
+-- One row per (place, browser). A vote is a single click, no text — the
+-- qualitative channel stays place_reports 'positive' (ADR-004). The public
+-- anon key may only INSERT here (never read back); the ranking count is read
+-- via the denormalized places.vote_count column above, which the existing
+-- "public read approved places" policy already exposes. Votes have NO
+-- authority over places.status — the ranking only orders places the Validator
+-- already approved. See ADR-005 / docs/plans/PLAN-community-ranking.md.
+create table if not exists public.place_votes (
+  id          uuid primary key default gen_random_uuid(),
+  place_id    uuid not null references public.places(id) on delete cascade,
+  -- Random client-minted dedup key (crypto.randomUUID or fallback). Not a
+  -- secret — just prevents the same browser double-counting one place.
+  voter_token text not null check (char_length(voter_token) between 8 and 64),
+  source      text not null default 'community'
+                check (source in ('community', 'seed')),
+  created_at  timestamptz not null default now(),
+  -- FULL (non-partial) unique constraint, same reasoning as
+  -- places_source_external_id_key: PostgREST's on_conflict needs the plain
+  -- column list. One vote per browser per place.
+  constraint place_votes_place_voter_key unique (place_id, voter_token)
+);
+
+create index if not exists place_votes_place_id_idx on public.place_votes (place_id);
+
+-- ---------------------------------------------------------------------
 -- Trigger: keep places.updated_at fresh on UPDATE
 -- ---------------------------------------------------------------------
 create or replace function public.set_updated_at()
@@ -401,6 +442,40 @@ create trigger places_set_updated_at
   execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------
+-- Trigger: keep places.vote_count in sync with place_votes (ADR-005)
+-- ---------------------------------------------------------------------
+create or replace function public.sync_place_vote_count()
+returns trigger
+language plpgsql
+as $$
+begin
+  if (tg_op = 'INSERT') then
+    update public.places set vote_count = vote_count + 1 where id = new.place_id;
+    return new;
+  elsif (tg_op = 'DELETE') then
+    -- greatest(): never let vote_count go negative, even if it drifts.
+    update public.places set vote_count = greatest(vote_count - 1, 0) where id = old.place_id;
+    return old;
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists place_votes_sync_count on public.place_votes;
+create trigger place_votes_sync_count
+  after insert or delete on public.place_votes
+  for each row
+  execute function public.sync_place_vote_count();
+
+-- Reconciliation (NOT run automatically — run by hand only if vote_count ever
+-- drifts, e.g. after bulk-deleting fraudulent rows):
+--   update public.places p set vote_count = coalesce(v.n, 0)
+--     from (select place_id, count(*) n from public.place_votes group by place_id) v
+--     where v.place_id = p.id;
+--   update public.places set vote_count = 0
+--     where vote_count <> 0 and id not in (select place_id from public.place_votes);
+
+-- ---------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------
 alter table public.places      enable row level security;
@@ -409,6 +484,7 @@ alter table public.agent_log   enable row level security;
 alter table public.suggestions enable row level security;
 alter table public.outreach_messages enable row level security;
 alter table public.place_reports enable row level security;
+alter table public.place_votes enable row level security;
 
 -- Table-level privileges (RLS still gates rows).
 grant select on public.places  to anon, authenticated;
@@ -427,6 +503,10 @@ grant insert on public.suggestions to anon, authenticated;
 -- submit a report but never read back others' submissions, update or delete.
 revoke all on public.place_reports from anon, authenticated;
 grant insert on public.place_reports to anon, authenticated;
+-- place_votes: same INSERT-only shape — the public casts a vote but never
+-- reads back place_votes rows (the count is read via places.vote_count).
+revoke all on public.place_votes from anon, authenticated;
+grant insert on public.place_votes to anon, authenticated;
 
 -- places: anyone may read ONLY approved rows.
 drop policy if exists "public read approved places" on public.places;
@@ -493,4 +573,26 @@ create policy "public can submit place reports"
     status = 'new'
     and (place_id is not null or place_name_text is not null)
     and char_length(description) between 5 and 2000
+  );
+
+-- place_votes: the public may only INSERT a community vote. The WITH CHECK
+-- forces source='community', bounds the token length, and — crucially —
+-- requires the target place to be 'approved': the subquery runs as the anon
+-- role, subject to the places RLS, so a non-approved place_id is rejected at
+-- the DB level, not just hidden in the client (ADR-005 point 3). No SELECT/
+-- UPDATE/DELETE policy => those are denied to anon; the ranking count is read
+-- via places.vote_count.
+drop policy if exists "public can cast a vote" on public.place_votes;
+create policy "public can cast a vote"
+  on public.place_votes
+  for insert
+  to anon, authenticated
+  with check (
+    source = 'community'
+    and char_length(voter_token) between 8 and 64
+    and exists (
+      select 1 from public.places p
+      where p.id = place_votes.place_id
+        and p.status = 'approved'
+    )
   );
