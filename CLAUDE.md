@@ -2021,6 +2021,34 @@ quality-correlated — surfaced two data issues in `places`:
   the address-only geocode — the RUBRIC change verified end-to-end on real
   data. **Surfaced (not fixed):** the Find Place false-positive risk — see
   **Key risks to keep in mind** above.
+- ✅ **Phase 21 — Community ranking (ADR-005), live and verified in
+  production.** A "Los favoritos de la comunidad" section after `#map`:
+  the top-12 `approved` places per country (Uruguay / Argentina tabs) by a
+  community **vote** — one anonymous click, no text. New anon-INSERT-only
+  `place_votes` table (`unique (place_id, voter_token)`), a denormalized
+  `places.vote_count` kept in sync by the `sync_place_vote_count` trigger
+  (**must be `SECURITY DEFINER`** — see the trigger comment in
+  `db/schema.sql` and ADR-005 Verificación), and RLS whose `with check`
+  requires the target place to be `approved` (subquery under the anon
+  `places` RLS) so a vote never lands on a non-public place. Votes have
+  **zero authority over `places.status`** — same principle as ADR-002 /
+  ADR-004; the ranking only *orders* places the Validator already approved.
+  Frontend: `js/ranking.js` (fetch + render reusing `.pp-*`, `.chip`
+  country tabs, `voter_token` / voted-set / 10 s cooldown in
+  `localStorage`), a `.pp-vote` button also in the map panel via the
+  `celiacmap:panel-open` event. **No server code** beyond the trigger — no
+  LLM, no agent, no pipeline stage, no `agent_log` widening. Contract:
+  plain `POST` to `place_votes`, a `409/23505` duplicate is treated as
+  success (PostgREST's `resolution=ignore-duplicates` needs a `SELECT`
+  grant the design withholds — confirmed in Fase B). Seeded with **15
+  objectively-selected** real approved places (`validation_confidence >=
+  0.85`, Google `rating >= 4.5` with `>= 30` ratings, geographic spread,
+  vote counts 3–15) so both tabs are alive from day one — see **Community
+  ranking seed — data-quality findings** above. Full design + phase-by-phase
+  verification: `docs/architecture/ADR-005-community-ranking.md` and
+  `docs/plans/PLAN-community-ranking.md`. Commits: `df8376b` / `6af819d`
+  (schema + `SECURITY DEFINER` fix) · `7ffa728` (checks) · `1904901`
+  (frontend) · `95097e3` (seed).
 
 ### GitHub Pages deploy decision
 
@@ -2067,3 +2095,12 @@ quality-correlated — surfaced two data issues in `places`:
   pasa a listar sus 7 etapas reales en orden (`search → social → web
   → suggestion → validator → updater → outreach`) más el Reply
   Handler on-demand. Ver docs/architecture/C4-diagrams.md.
+- Ranking comunitario: el voto ordena, no aprueba — la seguridad la
+  sigue decidiendo solo el Validator; ver
+  docs/architecture/ADR-005-community-ranking.md.
+- C4 diagrams — Nivel 2 agrega el contenedor frontend `js/ranking.js`
+  (lee el ranking del endpoint anon existente, escribe votos a
+  `place_votes`), la tabla `place_votes` y la columna denormalizada
+  `places.vote_count` mantenida por el trigger `sync_place_vote_count`.
+  No hay sistema externo ni agente nuevo (sin LLM, sin GitHub Actions).
+  Ver docs/architecture/C4-diagrams.md.

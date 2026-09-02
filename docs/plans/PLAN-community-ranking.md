@@ -1,6 +1,8 @@
 # Plan — Ranking comunitario de lugares (voto simple, filtrado por país)
 
-**Estado:** Propuesto
+**Estado:** Completado (2026-09-02 — Fases A–F, verificado end-to-end en
+producción; ver `## Verificación` en el ADR-005 y la Phase 21 del build
+status de CLAUDE.md)
 **ADR relacionado:** `docs/architecture/ADR-005-community-ranking.md` (Aceptado)
 
 ## Objetivo
@@ -495,7 +497,7 @@ Cada fase = un commit separado, mismo patrón que la sesión de hoy. La
     C del plan actualizada.
 - **Commit:** `test(db): place_votes trigger + RLS + PostgREST contract checks`
 
-### Fase C — Frontend
+### Fase C — Frontend  ✅ HECHA (commit `1904901`)
 
 - `js/ranking.js` nuevo (fetch top-12 por país, render con `.pp-*`,
   pestañas `.chip`, `voter_token` + set-de-votados + cooldown en
@@ -514,19 +516,21 @@ Cada fase = un commit separado, mismo patrón que la sesión de hoy. La
   `.pp-vote` / `.rk-vote`, `.ranking-status`, `.ranking-note`).
 - **Commit:** `feat(ranking): #ranking section + js/ranking.js + panel vote button`
 
-### Fase D — Seed de datos  🚫 BLOQUEADA
+### Fase D — Seed de datos  ✅ HECHA (commit `95097e3`)
 
-- **BLOQUEADA hasta que Santiago pase la lista de 8–15 lugares reales**
-  (`place_id` o nombre exacto + conteo de voto inicial deseado para cada
-  uno). **No generar ni inventar la lista.**
-- Una vez desbloqueada: bloque `insert into place_votes (... source='seed')`
-  al final de `db/seed.sql` (o `db/seed-ranking.sql`), N filas por lugar
-  = conteo deseado, `voter_token` `'seed:<slug>:<nn>'`, `on conflict do
-  nothing`. Aplicar en el SQL Editor. Verificar `vote_count` vs conteo
-  real con el snippet de reconciliación.
-- **Commit:** `feat(db): seed community ranking with curated real places`
+- Desbloqueada: se seleccionaron **15** lugares por criterio objetivo
+  (`validation_confidence >= 0.85`, Google `rating >= 4.5` con `>= 30`
+  reseñas, uno por ciudad, 9 provincias/metros AR + 6 departamentos UY),
+  conteos 3–15 quality-correlated. Bloque `insert into place_votes (...
+  source='seed')` en `db/seed.sql` vía `generate_series` (15 filas de
+  datos → **124 filas** de votos), `voter_token` `'seed:<slug>:<nn>'`,
+  `on conflict do nothing`. Aplicado a producción; los 15 `vote_count`
+  coinciden exactamente con lo planeado vía el trigger.
+- De paso: corrección puntual de `places.city` de "Marce Cakes® Gluten
+  Free" (`Paraná` → `Santa Fe`); duplicado de "JANA GLUTEN FREE"
+  registrado como deuda de datos (CLAUDE.md).
 
-### Fase E — Tests + verificación
+### Fase E — Tests + verificación  ✅ HECHA
 
 - **Python:** cero código Python nuevo → suite sin cambios (263 tests).
   Se anota explícitamente, no se agregan tests.
@@ -550,9 +554,17 @@ Cada fase = un commit separado, mismo patrón que la sesión de hoy. La
   de prueba" que la verificación de ADR-004).
 - `README.md`: subir el conteo de secciones (11 → 12), agregar el ranking
   a la lista de features y a la lista de secciones.
-- **Commit:** `test(ranking): visual + live e2e verification; README sections`
+- **Polish detectado en la revisión visual:** `.rk-name { flex-basis: 100% }`
+  — el nombre siempre en su propia línea, así cada fila del ranking lee
+  `nombre / (ciudad · badge)` de forma uniforme sin importar el largo del
+  nombre.
+- **Resultado:** ambos tabs renderizan los 15 lugares seedeados en orden
+  correcto; un voto de prueba (`voter_token` fijo) subió el conteo `3 → 4`,
+  se borró y el trigger de `DELETE` lo devolvió a `3`; tabs, persistencia,
+  toggle EN, media queries mobile, 0 errores de consola. Deploy de
+  producción (`celiacmap.org`) confirmado.
 
-### Fase F — Documentación y cierre
+### Fase F — Documentación y cierre  ✅ HECHA
 
 - `docs/architecture/ADR-005-community-ranking.md`: agregar una sección
   `## Verificación` con los resultados del e2e en vivo (mismo patrón que

@@ -1346,3 +1346,65 @@ count 12→11, this entry, and the CLAUDE.md Decisions Log entry **"Public site
 — Roadmap section & GitHub links removed (2026-09-01)"** (full rationale +
 scope note there). GitHub Actions / Pages / repo-URL mentions in `README.md`
 were deliberately left — they document infrastructure, not the public site.
+
+---
+
+## 26. Community ranking (ADR-005) — research → ADR → phased build
+
+**Prompt (paraphrased, across several turns):**
+
+> "Investigate what infrastructure could be reused for a community ranking
+> of the most-voted/recommended places, filtered by country, next to the
+> map — research + ADR draft only, no code. … Accept the ADR, write a
+> phased implementation plan (each phase its own commit). … Execute Fase A
+> (schema), then B (DB/API checks), then C (frontend), then D (seed — I'll
+> give you the list), then E (verification + README), then F (docs). Show
+> me the diff / verification before each commit."
+
+**What was built.** A "Los favoritos de la comunidad" section after
+`#map`: top-12 `approved` places per country by a one-click anonymous
+**vote**. Design principle (ADR-005, same as ADR-002/004): the vote
+**orders** the ranking, it has **zero authority** over `places.status` —
+only the Validator decides safety, and the ranking sits strictly on top of
+already-approved places.
+
+- **Research findings:** no votes/likes table existed; `place_reports`
+  positive (ADR-004) requires a text `description` so it can't be a
+  textless "upvote"; `places.rating` / `user_ratings_total` are 100% Google
+  Places, not community. → new dedicated `place_votes` table.
+- **Fase A** (`df8376b`) — `place_votes` (anon-INSERT-only,
+  `unique (place_id, voter_token)`, token CHECK 8–64), denormalized
+  `places.vote_count` + index, `sync_place_vote_count` trigger, RLS whose
+  `with check` requires an `approved` target (subquery under the anon
+  `places` RLS).
+- **`6af819d`** — the trigger needed `SECURITY DEFINER`: as `INVOKER` an
+  anon-fired `INSERT` ran `update places` as `anon` (no UPDATE policy) and
+  Postgres silently filtered it to 0 rows, so `vote_count` never moved.
+  Caught in Fase B with `BEGIN; … ROLLBACK;` test data before any real
+  traffic.
+- **Fase B** (`7ffa728`) — `db/checks/2026-09-01-place-votes.sql`
+  (6 rollback'd checks, all PASS) + a real PostgREST smoke test. Key
+  finding: the ADR's `resolution=ignore-duplicates` dedup **isn't usable**
+  (PostgREST's upsert path needs a `SELECT` grant the design withholds);
+  `ranking.js` uses a plain `POST` and treats a `409/23505` as success.
+- **Fase C** (`1904901`) — `js/ranking.js` (fetch + render reusing
+  `.pp-*`, `.chip` country tabs default Argentina remembered in
+  `localStorage`, `voter_token` / voted-set / 10 s cooldown), `#ranking`
+  section (2-col grid cloning `.features-layout`), a `.pp-vote` button in
+  the map panel wired via a new `celiacmap:panel-open` event, zebra flip
+  on the 4 sections below. No nav link (v1).
+- **Fase D** (`95097e3`) — 15 objectively-selected real approved places
+  (`validation_confidence >= 0.85`, Google `rating >= 4.5` with `>= 30`
+  ratings, one per city, 9 AR provinces/metros + 6 UY departments), vote
+  counts 3–15 quality-correlated → 124 seed rows via `generate_series`.
+  Also fixed "Marce Cakes® Gluten Free" `city` (`Paraná` → `Santa Fe`) and
+  flagged the "JANA GLUTEN FREE" duplicate as data debt.
+- **Fase E + F** — end-to-end verification against the real seed (both tabs,
+  vote → count bump → test vote deleted → trigger decrements), a
+  `.rk-name { flex-basis: 100% }` polish so every row reads name /
+  (city · badge) uniformly, README structure update, ADR-005 `## Verificación`
+  section, CLAUDE.md Phase 21 + ADR pointer + C4 note, this entry, and
+  `PLAN-community-ranking.md` → Completado.
+
+**Full design + phase detail:** `docs/architecture/ADR-005-community-ranking.md`
+and `docs/plans/PLAN-community-ranking.md`.

@@ -48,15 +48,16 @@ flowchart TB
     github_actions[["GitHub Actions<br/><i>Cron mensual +<br/>repository_dispatch</i>"]]
 
     subgraph celiacmap["CeliacMap [SYSTEM]"]
-        frontend["<b>Frontend estático</b><br/><i>HTML/CSS/JS + Leaflet.js</i><br/>Mapa interactivo, servido por<br/>GitHub Pages, sin build step"]
+        frontend["<b>Frontend estático</b><br/><i>HTML/CSS/JS + Leaflet.js</i><br/>Mapa interactivo + ranking<br/>comunitario, servido por<br/>GitHub Pages, sin build step"]
         pipeline["<b>Pipeline de agentes</b><br/><i>Python</i><br/>Search, Social, Web, Suggestion,<br/>Validator, Updater y Outreach<br/>(7 etapas) + Reply Handler<br/>(on-demand, vía dispatch)"]
         edge_function["<b>Edge Function</b><br/><i>Deno/TypeScript</i><br/>outreach-reply: recibe webhooks<br/>de Resend, dispara repository_dispatch"]
         mcp["<b>MCP Server</b><br/><i>Python/FastMCP</i><br/>Expone 6 tools para interactuar<br/>con los datos validados"]
-        db[("<b>Base de datos</b><br/><i>Supabase (PostgreSQL)</i><br/>Lugares validados, sugerencias,<br/>estado del rubric de 3 niveles")]
+        db[("<b>Base de datos</b><br/><i>Supabase (PostgreSQL)</i><br/>Lugares validados, sugerencias,<br/>reportes, votos comunitarios,<br/>estado del rubric de 3 niveles")]
     end
 
     usuario -->|"Navega el mapa<br/>HTTPS"| frontend
-    usuario -->|"Envía sugerencia<br/>Formulario"| frontend
+    usuario -->|"Envía sugerencia / reporte<br/>Formulario"| frontend
+    usuario -->|"Vota un lugar<br/>1 click"| frontend
     frontend -->|"Lee/escribe<br/>REST"| db
 
     pipeline -->|"Lee/escribe lugares<br/>y estado, REST"| db
@@ -85,3 +86,13 @@ flowchart TB
     style resend fill:#999,color:#fff
     style github_actions fill:#999,color:#fff
 ```
+
+**Nota — ranking comunitario (ADR-005).** El ranking "Los favoritos de la
+comunidad" (`js/ranking.js`, dentro del contenedor *Frontend estático*) lee el
+top-12 por país del **mismo endpoint anon de `places`** que ya usa el mapa
+(vía la columna denormalizada `places.vote_count`) y escribe un voto como un
+`POST` plano a la tabla `place_votes` (anon, INSERT-only). El contador se
+mantiene con un trigger de base de datos (`sync_place_vote_count`,
+`SECURITY DEFINER`) — **sin agente, sin LLM, sin GitHub Actions, sin Edge
+Function**: en el diagrama, el borde `frontend → db` simplemente pasa a cubrir
+también la escritura de votos.

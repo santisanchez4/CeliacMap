@@ -281,6 +281,60 @@ el bloque CSS, los tests y las fases de verificación se redactan en un
 PLAN de implementación después de aceptar este ADR — mismo flujo que
 ADR-004 → `docs/plans/PLAN-community-reviews.md`.
 
+## Verificación
+
+Implementado y verificado end-to-end en producción, 2026-09-02
+(`docs/plans/PLAN-community-ranking.md`, Fases A–E):
+
+- **Schema (Fase A, commits `df8376b` + `6af819d`).** `place_votes`
+  (anon-INSERT-only, `unique (place_id, voter_token)`, `voter_token` CHECK
+  8–64), `places.vote_count` denormalizado + índice, y el trigger
+  `sync_place_vote_count` aplicados a producción y sincronizados en
+  `db/schema.sql`. **Corrección durante la Fase B:** el trigger necesitaba
+  `SECURITY DEFINER` — como `INVOKER` (default), un `INSERT` disparado por
+  `anon` corría el `update places` como `anon` (sin policy de UPDATE) y
+  Postgres filtraba el UPDATE a 0 filas en silencio, así que `vote_count`
+  nunca se movía. Encontrado con datos de prueba en `BEGIN; … ROLLBACK;`,
+  antes de tráfico real.
+- **Trigger + RLS (Fase B, commit `7ffa728`).**
+  `db/checks/2026-09-01-place-votes.sql` — 6 checks en `BEGIN; … ROLLBACK;`,
+  todos PASS: `INSERT` bumpea, `DELETE` decrementa, `greatest()` clamp en 0,
+  duplicado → `23505`, RLS rechaza voto sobre lugar no `approved` (`42501`),
+  RLS permite voto sobre `approved` vía el path `anon`. **Contrato
+  PostgREST** (smoke test real): el approach de dedup del ADR
+  (`resolution=ignore-duplicates`) **no es usable** — exige `GRANT SELECT`
+  sobre `place_votes`, que el diseño retiene; se usa `POST` plano y un
+  `409/23505` se trata como éxito ("ya votaste").
+- **Frontend (Fase C, commit `1904901`).** Sección `#ranking` después de
+  `#map` (grid 2 columnas clonando `.features-layout`), `js/ranking.js`
+  (fetch top-12 por país, render con `.pp-*`, tabs `.chip` con default
+  Argentina recordado en `localStorage`, `voter_token` + set de votados +
+  cooldown 10 s), botón de voto también en el `.pp-footer` del panel del
+  mapa vía el evento `celiacmap:panel-open`. Sin link en la nav (v1).
+  Verificado en Chrome contra la Supabase real: voto → `201` → conteo +1
+  optimista → "✓ Votado"; `409` en un revoto; tabs AR/UY; toggle EN;
+  0 errores de consola. Deployado a `celiacmap.org` (GitHub Pages).
+- **Seed (Fase D, commit `95097e3`).** 15 lugares `approved` elegidos por
+  criterio objetivo (`validation_confidence >= 0.85`, Google `rating >= 4.5`
+  con `>= 30` reseñas, uno por ciudad, 9 provincias/metros argentinos +
+  6 departamentos uruguayos), `source='seed'`, conteos 3–15
+  quality-correlated. **124 filas** insertadas; los 15 `vote_count`
+  coinciden exactamente con lo planeado (JANA=15 … Celisano=4) vía el
+  trigger. De paso se corrigió el `city` de "Marce Cakes® Gluten Free"
+  (`Paraná` → `Santa Fe`, residuo de la ambigüedad de "Paraná") y se
+  registró el duplicado de "JANA GLUTEN FREE" como deuda de datos.
+- **Fase E (visual + e2e en vivo).** Ambos tabs renderizan los 15 lugares
+  reales en orden correcto; un voto de prueba contra un lugar seedeado
+  (`voter_token` fijo) subió el conteo `3 → 4`, se borró después y el
+  trigger de `DELETE` lo devolvió a `3`. Media queries mobile verificadas
+  por inspección de stylesheet (limitación conocida del harness). Deploy de
+  producción confirmado (`js/ranking.js` HTTP 200, sección + i18n en el HTML
+  servido).
+
+Costo total de infraestructura: **cero** — sin LLM, sin APIs pagas, sin
+GitHub Actions, sin Edge Function. Un `INSERT` + un `UPDATE` de trigger por
+voto.
+
 ## Consecuencias
 
 **Positivas:**
