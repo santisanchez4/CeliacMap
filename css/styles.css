@@ -677,14 +677,32 @@ h1, h2, h3 {
 }
 
 /* ---------------------------- Map demo ----------------------------- */
+/* Single column by default; a narrow Top-3 widget joins on the right only
+   where the map still has room (>=1000px — wider than the 900px the text
+   2-col sections use, because the map needs the width). At 240px the widget
+   costs the map ~160px of width; with the detail panel open the map still
+   shows ~420px, enough for the selected pin + local context. */
+.map-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+  max-width: 940px;
+  margin: 0 auto;
+}
 .map-demo {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 22px;
-  max-width: 940px;
-  margin: 0 auto;
+  min-width: 0;              /* let the map card shrink inside the grid track */
+}
+@media (min-width: 1000px) {
+  .map-layout { grid-template-columns: minmax(0, 1fr) 240px; max-width: none; }
+}
+@media (max-width: 999px) {
+  .map-top3 { display: none; }
 }
 .map-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
 .chip {
@@ -891,6 +909,64 @@ h1, h2, h3 {
 .dot-safe { background: var(--color-safe); }
 .dot-options { background: var(--color-options); }
 .dot-mid { background: var(--color-mid); }  /* legacy */
+
+/* --------------------- Map "Top 3" widget (aside) ------------------ */
+/* Populated by js/ranking.js from the same rows it fetches for #ranking
+   (rows.slice(0,3)); stays [hidden] until data is ready / hides on error.
+   The 288px grid track is reserved from first paint, so revealing it
+   causes no layout shift. */
+.map-top3 {
+  align-self: start;
+  position: sticky;
+  top: calc(var(--header-h) + 24px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 22px 20px;
+}
+.map-top3-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+.map-top3-list { display: flex; flex-direction: column; }
+.map-top3-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  animation: mt3In 0.25s ease both;
+}
+.map-top3-item:first-child { padding-top: 0; }
+.map-top3-item:last-child { border-bottom: none; padding-bottom: 0; }
+@keyframes mt3In { from { opacity: 0; } to { opacity: 1; } }
+.mt3-rank {
+  grid-row: span 2;
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  align-self: start;
+}
+.mt3-name { font-weight: 600; font-size: 0.9375rem; line-height: 1.3; color: var(--color-text); }
+.mt3-meta { margin-top: 2px; font-size: 0.8125rem; color: var(--color-text-muted); }
+.map-top3-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.map-top3-link:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) {
+  .map-top3-item { animation: none; }
+}
 
 /* ----------------------- Place detail side panel ------------------- */
 .place-panel {

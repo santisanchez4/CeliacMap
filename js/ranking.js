@@ -148,9 +148,17 @@
   var listEl = document.getElementById("ranking-list");
   var statusEl = document.getElementById("ranking-status");
   var tabs = Array.prototype.slice.call(document.querySelectorAll(".ranking-tabs .chip"));
+  // The "Top 3" widget next to the map — same data (rows.slice(0,3)), no
+  // country selector of its own, hidden until data is ready / on error.
+  var top3El = document.getElementById("map-top3");
+  var top3ListEl = document.getElementById("map-top3-list");
   var country = lsGet(COUNTRY_KEY) || DEFAULT_COUNTRY;
   var rows = [];
   var flashTimer;
+
+  function metaText(p) {
+    return (p.city ? esc(p.city) + " · " : "") + votesLabel(p.vote_count || 0);
+  }
 
   function setStatus(msg) {
     if (!statusEl) return;
@@ -186,18 +194,38 @@
   }
 
   function bumpCount(placeId) {
-    if (!listEl) return;
     for (var i = 0; i < rows.length; i++) {
       if (rows[i].id !== placeId) continue;
       rows[i].vote_count = (rows[i].vote_count || 0) + 1;
-      var c = listEl.querySelector('.rk-count[data-place-id="' + placeId + '"]');
-      if (c) c.textContent = votesLabel(rows[i].vote_count);
-      paintVoted(listEl.querySelector('.rk-vote[data-place-id="' + placeId + '"]'));
+      if (listEl) {
+        var c = listEl.querySelector('.rk-count[data-place-id="' + placeId + '"]');
+        if (c) c.textContent = votesLabel(rows[i].vote_count);
+        paintVoted(listEl.querySelector('.rk-vote[data-place-id="' + placeId + '"]'));
+      }
+      if (top3ListEl) {
+        var m = top3ListEl.querySelector('.mt3-meta[data-place-id="' + placeId + '"]');
+        if (m) m.textContent = metaText(rows[i]);
+      }
       return;
     }
   }
 
+  function top3RowHtml(p, rank) {
+    return (
+      '<li class="map-top3-item">' +
+        '<span class="mt3-rank">' + rank + "</span>" +
+        '<span class="mt3-name">' + esc(p.name) + "</span>" +
+        '<span class="mt3-meta" data-place-id="' + esc(p.id) + '">' + metaText(p) + "</span>" +
+      "</li>"
+    );
+  }
+
   function render() {
+    renderList();
+    renderTop3();
+  }
+
+  function renderList() {
     if (!listEl) return;
     if (!rows.length) {
       listEl.innerHTML = '<li class="ranking-empty">' + esc(t("empty")) + "</li>";
@@ -213,6 +241,14 @@
     });
   }
 
+  function renderTop3() {
+    if (!top3ListEl) return;
+    if (!rows.length) { if (top3El) top3El.hidden = true; return; }
+    top3ListEl.innerHTML = rows.slice(0, 3)
+      .map(function (p, i) { return top3RowHtml(p, i + 1); }).join("");
+    if (top3El) top3El.hidden = false;
+  }
+
   function load() {
     if (!listEl) return;
     setStatus("");
@@ -223,7 +259,12 @@
     fetch(url, { headers: AUTH })
       .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function (data) { rows = Array.isArray(data) ? data : []; render(); })
-      .catch(function () { rows = []; if (listEl) listEl.innerHTML = ""; setStatus(t("loadError")); });
+      .catch(function () {
+        rows = [];
+        if (listEl) listEl.innerHTML = "";
+        if (top3El) top3El.hidden = true;   // no error clutter next to the map
+        setStatus(t("loadError"));
+      });
   }
 
   function selectCountry(c) {

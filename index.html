@@ -351,6 +351,7 @@
           </p>
         </header>
 
+        <div class="map-layout">
         <div class="map-demo reveal">
           <div class="map-chips" role="group" aria-label="Filtros del mapa">
             <button type="button" class="chip chip-active" data-category="all"
@@ -438,6 +439,15 @@
             <li><span class="dot dot-safe"></span><span data-i18n="map.legend1">Sin TACC</span></li>
             <li><span class="dot dot-options"></span><span data-i18n="map.legend2">Tiene opciones sin TACC</span></li>
           </ul>
+        </div>
+
+        <aside class="map-top3" id="map-top3" hidden aria-labelledby="map-top3-title">
+          <h3 class="map-top3-title" id="map-top3-title"
+            data-i18n="ranking.top3.title">Top 3 de la comunidad</h3>
+          <ol class="map-top3-list" id="map-top3-list"></ol>
+          <a class="map-top3-link" href="#ranking"
+            data-i18n="ranking.top3.link">Ver ranking completo →</a>
+        </aside>
         </div>
       </div>
     </section>

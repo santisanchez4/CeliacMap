@@ -161,6 +161,8 @@
     "ranking.title": "Community favorites",
     "ranking.lead": "The places the community ate at safely. Vote for yours.",
     "ranking.note": "Verified places only. Votes order the ranking — they don't approve places.",
+    "ranking.top3.title": "Community top 3",
+    "ranking.top3.link": "See the full ranking →",
 
     "suggest.eyebrow": "Add a place",
     "suggest.title": "The community grows the map",
