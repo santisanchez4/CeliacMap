@@ -157,6 +157,11 @@
     "map.allCities": "All cities",
     "map.searchPlaceholder": "Search a gluten-free place…",
 
+    "ranking.eyebrow": "Ranking",
+    "ranking.title": "Community favorites",
+    "ranking.lead": "The places the community ate at safely. Vote for yours.",
+    "ranking.note": "Verified places only. Votes order the ranking — they don't approve places.",
+
     "suggest.eyebrow": "Add a place",
     "suggest.title": "The community grows the map",
     "suggest.lead": "Know a safe place that isn't on the map yet? Adding it will be this simple.",

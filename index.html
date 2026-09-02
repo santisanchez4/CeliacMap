@@ -442,8 +442,38 @@
       </div>
     </section>
 
+    <!-- =============================== RANKING ============================== -->
+    <section class="section" id="ranking">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="ranking.eyebrow">Ranking</span>
+          <h2 class="section-title" data-i18n="ranking.title">Los favoritos de la comunidad</h2>
+          <p class="section-lead" data-i18n="ranking.lead">
+            Los lugares donde la comunidad comió seguro. Votá los tuyos.
+          </p>
+        </header>
+
+        <div class="ranking-layout">
+          <ol class="ranking-list reveal" id="ranking-list"></ol>
+          <aside class="ranking-aside reveal">
+            <div class="ranking-tabs" role="group" aria-label="País del ranking">
+              <button type="button" class="chip chip-active" data-country="Argentina"
+                aria-pressed="true">Argentina</button>
+              <button type="button" class="chip" data-country="Uruguay"
+                aria-pressed="false">Uruguay</button>
+            </div>
+            <p class="ranking-note" data-i18n="ranking.note">
+              Solo lugares ya verificados. El voto ordena el ranking, no aprueba lugares.
+            </p>
+          </aside>
+        </div>
+
+        <p class="ranking-status" id="ranking-status" role="status" aria-live="polite" hidden></p>
+      </div>
+    </section>
+
     <!-- ============================ SUGERIR LUGAR =========================== -->
-    <section class="section" id="suggest">
+    <section class="section section-alt" id="suggest">
       <div class="container">
         <header class="section-head reveal">
           <span class="eyebrow" data-i18n="suggest.eyebrow">Sumá un lugar</span>
@@ -627,7 +657,7 @@
     </section>
 
     <!-- =============================== RESEÑAS ============================== -->
-    <section class="section section-alt" id="reviews">
+    <section class="section" id="reviews">
       <div class="container">
         <header class="section-head reveal">
           <span class="eyebrow" data-i18n="reviews.eyebrow">Reseñas</span>
@@ -687,7 +717,7 @@
     </section>
 
     <!-- ============================== IA & AGENTES ========================== -->
-    <section class="section" id="ai">
+    <section class="section section-alt" id="ai">
       <div class="container">
         <div class="ai-layout">
           <div class="ai-content reveal">
@@ -728,7 +758,7 @@
     </section>
 
     <!-- =============================== ACERCA =============================== -->
-    <section class="section section-alt" id="about">
+    <section class="section" id="about">
       <div class="container">
         <div class="about-layout">
           <div class="about-content reveal">
@@ -811,5 +841,6 @@
   <script src="js/map.js"></script>
   <script src="js/suggest.js"></script>
   <script src="js/report.js"></script>
+  <script src="js/ranking.js"></script>
 </body>
 </html>

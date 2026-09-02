@@ -44,7 +44,8 @@
       social: { es: "Redes sociales", en: "Social media" },
       visit: { es: "Visitar sitio", en: "Visit website" },
       report: { es: "Reportar un error", en: "Report an error" },
-      reviews: { es: "reseñas", en: "reviews" }
+      reviews: { es: "reseñas", en: "reviews" },
+      vote: { es: "Votar", en: "Vote" }
     },
     source: {
       google_places: { es: "Verificado por Google", en: "Verified by Google" },
@@ -279,7 +280,13 @@
       html += '<div class="pp-badges"><span class="pp-badge pp-badge--source">' + esc(srcLabel) + "</span></div>";
     }
 
-    html += '<div class="pp-footer"><a class="pp-report" href="#" data-pp-report>' + esc(P.report[l]) + "</a></div>";
+    // The vote button carries only markup + label; js/ranking.js owns all
+    // vote logic and wires it on the celiacmap:panel-open event below.
+    html += '<div class="pp-footer">' +
+      '<a class="pp-report" href="#" data-pp-report>' + esc(P.report[l]) + "</a>" +
+      '<button type="button" class="pp-vote" data-place-id="' + esc(p.id) + '">' +
+        esc(P.vote[l]) + "</button>" +
+      "</div>";
     return html;
   }
 
@@ -287,6 +294,10 @@
     panelBody.innerHTML = panelHtml(p);
     panelEl.classList.add("is-open");
     panelEl.setAttribute("aria-hidden", "false");
+    // Let js/ranking.js wire the .pp-vote button and reflect the voted state.
+    try {
+      document.dispatchEvent(new CustomEvent("celiacmap:panel-open", { detail: p.id }));
+    } catch (e) {}
   }
 
   function closePanel() {
