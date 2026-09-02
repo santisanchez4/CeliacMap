@@ -1509,6 +1509,30 @@ frontend-only — no backend, agent, or schema impact:
   references in `README.md` (infrastructure docs, not the site) were left
   intact.
 
+### Community ranking seed — data-quality findings (ADR-005 Fase D, 2026-09-02)
+
+Seeding `place_votes` (`db/seed.sql`) with 15 objectively-selected approved
+places — `validation_confidence >= 0.85`, Google `rating >= 4.5` with
+`>= 30` ratings, one per city, geographic spread (9 Argentine
+provinces/metros + 6 Uruguayan departments), vote counts 3–15
+quality-correlated — surfaced two data issues in `places`:
+
+- **"Marce Cakes® Gluten Free" (`c17a38ac-…`) `city` mislabelled.** Was
+  `city='Paraná'`, but its address (`S3000FTM Santa Fe, Argentina`) and
+  coordinates (`-31.648, -60.708` — the west bank of the Paraná river)
+  place it in the **city of Santa Fe**. Residue of the "Paraná" name
+  ambiguity fixed 2026-09-01 in `config/targets.yaml` (`search_as`).
+  Corrected in place (`city='Santa Fe'`); `country='Argentina'`, `lat`/
+  `lng`, `status`, `validation_confidence` unchanged; `validation_notes`
+  prepended with a `CORRECCIÓN MANUAL 2026-09-02:` line. Excluded from the
+  seed.
+- **"JANA GLUTEN FREE | Pizzeria" duplicated in `places`.** Two `approved`
+  rows at the same address (`Remedios 3400, CABA`): `6797f10b-…` (cafe,
+  rating 4.8/792) and `27e34f52-…` (restaurant, no rating). Same pattern as
+  the **Il Porto** duplicate found during the Phase 18 outreach review —
+  **data debt, not blocking**, left for a future dedup sweep. The seed uses
+  `6797f10b` (the row with real rating data).
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
