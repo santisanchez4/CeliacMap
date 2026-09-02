@@ -1317,3 +1317,32 @@ external confirms the business operates there) — not `approved`.
 
 **Full rationale + investigation:** CLAUDE.md Decisions Log,
 "Geocode-gate — address fallback (`resolve_location`)".
+
+---
+
+## 25. Public site — remove Roadmap section & all GitHub links
+
+**Prompt (paraphrased, owner's final decision):**
+
+> "Two content changes to the public site. **(1)** Delete the Roadmap section
+> entirely — the copy is stale (describes shipped work as 'future'). Remove the
+> section, the nav link (desktop + mobile), any orphaned Roadmap i18n keys (EN
+> dict too), and confirm no broken `#roadmap` anchors remain. **(2)** Remove
+> every GitHub link from the public site — the GitHub button in the About author
+> card (keep LinkedIn), the 'Ver en GitHub' button in the CTA band (keep
+> 'Explorar el mapa', fix the centering for one button), any other
+> `github.com/santisanchez4` reference, and orphaned 'Ver en GitHub' i18n keys.
+> Verify with desktop + real-device-emulation mobile screenshots and 0 console
+> errors. Show the full diff before committing. This is only about what the
+> public site shows — we keep pushing to GitHub for version control."
+
+**What was done.** Frontend-only edit — `index.html` (6 removals + the AI
+eyebrow trimmed from "Visión futura · Roadmap" to "Visión futura"),
+`js/main.js` (15 orphaned `nav.roadmap` / `roadmap.*` keys + `cta.secondary`
+removed, `ai.eyebrow` EN trimmed), `css/styles.css` (dead `.timeline*` rules
+removed). No CSS change was needed for the lone CTA button — `.cta-actions`
+was already `justify-content: center`. Docs kept in sync: `README.md` section
+count 12→11, this entry, and the CLAUDE.md Decisions Log entry **"Public site
+— Roadmap section & GitHub links removed (2026-09-01)"** (full rationale +
+scope note there). GitHub Actions / Pages / repo-URL mentions in `README.md`
+were deliberately left — they document infrastructure, not the public site.
