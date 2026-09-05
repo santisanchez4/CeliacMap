@@ -93,3 +93,34 @@ def test_insert_place_candidate_inserts_in_scope_candidate():
 
     assert row == {"id": "row-1"}
     client._db.table.assert_called_once_with("places")
+
+
+# --- delete_expired_google_reviews (Google Places ToS: 30-day expiration) -----
+
+
+def test_delete_expired_google_reviews_returns_distinct_place_ids():
+    client = _client_with_mock_db()
+    chain = client._db.table.return_value.delete.return_value.eq.return_value.lt
+    chain.return_value.execute.return_value = MagicMock(
+        data=[
+            {"place_id": "p1"},
+            {"place_id": "p2"},
+            {"place_id": "p1"},  # duplicate row for the same place -> deduped
+        ]
+    )
+
+    place_ids = client.delete_expired_google_reviews()
+
+    assert place_ids == ["p1", "p2"]
+    client._db.table.assert_called_once_with("reviews")
+    client._db.table.return_value.delete.return_value.eq.assert_called_once_with(
+        "source", "google"
+    )
+
+
+def test_delete_expired_google_reviews_returns_empty_when_nothing_expired():
+    client = _client_with_mock_db()
+    chain = client._db.table.return_value.delete.return_value.eq.return_value.lt
+    chain.return_value.execute.return_value = MagicMock(data=[])
+
+    assert client.delete_expired_google_reviews() == []

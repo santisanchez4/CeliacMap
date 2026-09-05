@@ -4,8 +4,9 @@
 -- Idempotent: safe to re-run (uses IF NOT EXISTS / DROP POLICY IF EXISTS).
 --
 -- Security model:
---   * Frontend uses the public ANON key and may only read APPROVED places
---     (and reviews of approved places). No anon writes; no anon access to logs.
+--   * Frontend uses the public ANON key and may only read APPROVED places.
+--     No anon writes; no anon access to logs. reviews is server-only (Google
+--     Places ToS -- see CLAUDE.md Decisions Log "Google Places reviews").
 --   * Python agents use the SERVICE_ROLE key (server-side only), which
 --     bypasses RLS, to insert candidates, change status and write logs.
 -- =====================================================================
@@ -501,9 +502,17 @@ alter table public.place_votes enable row level security;
 
 -- Table-level privileges (RLS still gates rows).
 grant select on public.places  to anon, authenticated;
-grant select on public.reviews to anon, authenticated;
 -- agent_log is server-only: make sure public roles cannot touch it.
 revoke all on public.agent_log from anon, authenticated;
+-- reviews is server-only as of 2026-09 (Google Places ToS: only place_id is
+-- exempt from caching restrictions -- reviews must be requested live, not
+-- served indefinitely from our own store. See CLAUDE.md Decisions Log
+-- "Google Places reviews -- ToS-driven access restriction + 30-day
+-- expiration"). The only legitimate reader, ValidatorAgent.fetch_reviews_for_place,
+-- uses the service_role key and bypasses RLS. Explicit revoke (not just
+-- omitting the old grant line) so re-running this file against the
+-- already-migrated production database actually removes the prior access.
+revoke select on public.reviews from anon, authenticated;
 -- outreach_messages is server-only (Outreach Agent), same as agent_log: make
 -- sure public roles cannot touch it.
 revoke all on public.outreach_messages from anon, authenticated;
@@ -529,19 +538,10 @@ create policy "public read approved places"
   to anon, authenticated
   using (status = 'approved');
 
--- reviews: readable only when their place is approved.
+-- reviews: no public read policy (server-only, see the revoke above and
+-- CLAUDE.md Decisions Log). This drop is kept so re-running this file
+-- against a database created before 2026-09 removes the old policy.
 drop policy if exists "public read reviews of approved places" on public.reviews;
-create policy "public read reviews of approved places"
-  on public.reviews
-  for select
-  to anon, authenticated
-  using (
-    exists (
-      select 1 from public.places p
-      where p.id = reviews.place_id
-        and p.status = 'approved'
-    )
-  );
 
 -- agent_log: no policy for anon/authenticated => fully denied to the public.
 -- (service_role bypasses RLS and retains full access.)

@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from agents.clients.google_places import GooglePlacesClient
@@ -109,6 +110,26 @@ class DryRunSupabase:
     def insert_review(self, place_id: str, text: str, **kwargs: Any) -> None:
         logger.info("[dry-run] would insert review for place %s", place_id)
         return None
+
+    def delete_expired_google_reviews(self, cutoff_days: int = 30) -> list[str]:
+        # Read-only: find what WOULD be deleted, without deleting, so the
+        # refresh phase's logic is still exercised end-to-end (same goal as
+        # claim_place_report's dry-run behavior above).
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=cutoff_days)
+        ).isoformat()
+        res = (
+            self._inner._db.table("reviews")
+            .select("place_id")
+            .eq("source", "google")
+            .lt("created_at", cutoff)
+            .execute()
+        )
+        place_ids = sorted({r["place_id"] for r in (res.data or []) if r.get("place_id")})
+        logger.info(
+            "[dry-run] would delete expired google reviews for places: %s", place_ids
+        )
+        return place_ids
 
     def update_place(self, place_id: str, patch: dict[str, Any]) -> None:
         logger.info("[dry-run] would update place %s -> %s", place_id, patch)
@@ -221,11 +242,13 @@ def run_pipeline(
             settings.max_search_queries_per_run,
             max(0, budget.remaining - VALIDATOR_RESERVE),
         ),
+        max_review_refresh=settings.max_review_refresh_per_run,
     )
     summaries["search"] = search.run()
     budget.consume(
         summaries["search"].get("queries", 0)
         + summaries["search"].get("details_fetched", 0)
+        + summaries["search"].get("reviews_refresh_calls", 0)
     )
 
     # 2. Social — Tavily search + Find Place geocoding. Query count (SOCIAL_MAX)

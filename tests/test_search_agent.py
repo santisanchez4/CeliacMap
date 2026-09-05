@@ -55,10 +55,13 @@ def make_agent(
     max_review_enrichments=0,
     max_detail_lookups=0,
     max_queries_per_run=0,
+    max_review_refresh=0,
 ):
     db = MagicMock()
     # A truthy row means "inserted" in the agent's accounting.
     db.insert_place_candidate.return_value = {"id": "row-1"}
+    # No expired reviews by default -- refresh tests override this explicitly.
+    db.delete_expired_google_reviews.return_value = []
     places = MagicMock()
     agent = SearchAgent(
         db,
@@ -67,6 +70,7 @@ def make_agent(
         max_review_enrichments=max_review_enrichments,
         max_detail_lookups=max_detail_lookups,
         max_queries_per_run=max_queries_per_run,
+        max_review_refresh=max_review_refresh,
     )
     return agent, db, places
 
@@ -468,6 +472,68 @@ def test_review_enrichment_error_does_not_crash_run():
     # The candidate is still inserted; enrichment failure is best-effort.
     assert summary["inserted"] == 1
     assert summary["reviews_enriched"] == 0
+
+
+# --- 30-day review expiration + refresh (Google Places ToS) ---------------
+
+
+def test_refresh_deletes_expired_reviews_and_refetches_under_budget():
+    agent, db, places = make_agent(max_review_refresh=5)
+    db.delete_expired_google_reviews.return_value = ["place-1", "place-2"]
+    db.fetch_place_by_id.side_effect = lambda pid: {"external_id": f"ext-{pid}"}
+    places.text_search.return_value = {"results": []}
+    places.place_details_with_reviews.return_value = {
+        "result": {"reviews": [{"text": "Tiene menu sin TACC", "rating": 5}]}
+    }
+
+    summary = agent.run()
+
+    db.delete_expired_google_reviews.assert_called_once_with()
+    assert places.place_details_with_reviews.call_count == 2
+    assert summary["reviews_expired"] == 2
+    assert summary["reviews_refresh_calls"] == 2
+    assert summary["reviews_refreshed"] == 2
+
+
+def test_refresh_respects_max_review_refresh_budget():
+    agent, db, places = make_agent(max_review_refresh=1)
+    db.delete_expired_google_reviews.return_value = ["place-1", "place-2", "place-3"]
+    db.fetch_place_by_id.side_effect = lambda pid: {"external_id": f"ext-{pid}"}
+    places.text_search.return_value = {"results": []}
+    places.place_details_with_reviews.return_value = {"result": {"reviews": []}}
+
+    summary = agent.run()
+
+    # Deletion is unconditional (all 3 expired), but only 1 gets re-fetched.
+    assert summary["reviews_expired"] == 3
+    assert summary["reviews_refresh_calls"] == 1
+    places.place_details_with_reviews.assert_called_once()
+
+
+def test_refresh_skips_place_with_no_external_id():
+    agent, db, places = make_agent(max_review_refresh=5)
+    db.delete_expired_google_reviews.return_value = ["place-1"]
+    db.fetch_place_by_id.return_value = {"external_id": None}
+    places.text_search.return_value = {"results": []}
+
+    summary = agent.run()
+
+    places.place_details_with_reviews.assert_not_called()
+    assert summary["reviews_expired"] == 1
+    assert summary["reviews_refresh_calls"] == 0
+
+
+def test_refresh_disabled_by_default_even_with_expired_rows():
+    agent, db, places = make_agent()  # max_review_refresh=0
+    db.delete_expired_google_reviews.return_value = ["place-1"]
+    places.text_search.return_value = {"results": []}
+
+    summary = agent.run()
+
+    # Deletion still runs (compliance is unconditional); re-fetch does not.
+    places.place_details_with_reviews.assert_not_called()
+    assert summary["reviews_expired"] == 1
+    assert summary["reviews_refresh_calls"] == 0
 
 
 # --- Rich detail fields (phone/website/hours/rating) ----------------------

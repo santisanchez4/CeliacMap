@@ -109,8 +109,11 @@ GEOGRAPHIC SCOPE
 - **`agent_log`** gains `agent`, `status`, `place_id` and a `jsonb result` for
   traceability; `timestamp` is named `created_at` for consistency.
 - **Row Level Security (RLS)** is enabled on all tables: the public **anon** key may
-  only `SELECT` `approved` places (and read reviews); it has **no** write access and
-  **no** access to `agent_log`. Agents use the **service_role** key server-side only.
+  only `SELECT` `approved` places; it has **no** write access and **no** access to
+  `agent_log`. Agents use the **service_role** key server-side only.
+  `reviews` was also anon-readable originally but is now server-only (2026-09,
+  Google Places ToS — see **Google Places reviews — ToS-driven access
+  restriction + 30-day expiration** in the Decisions Log).
 
 ### AI model decisions
 
@@ -155,8 +158,10 @@ GEOGRAPHIC SCOPE
 
 - **Secrets boundary:** never ship the `service_role` key or any API key to the
   browser — only the anon key, made safe by correct RLS.
-- **Google Places** requires billing enabled and has caching/storage ToS limits;
-  cap calls per run.
+- **Google Places** requires billing enabled; cap calls per run. Caching/storage
+  ToS handling (specifically for reviews) is resolved — see **Google Places
+  reviews — ToS-driven access restriction + 30-day expiration** in the
+  Decisions Log.
 - **Health-sensitive false approvals:** `verified` stays `false` until confirmed;
   `status` + `agent_log` act as a human review queue; surface a UI disclaimer that
   `safety_level` is a community/AI estimate, not a medical guarantee.
@@ -1532,6 +1537,75 @@ quality-correlated — surfaced two data issues in `places`:
   the **Il Porto** duplicate found during the Phase 18 outreach review —
   **data debt, not blocking**, left for a future dedup sweep. The seed uses
   `6797f10b` (the row with real rating data).
+
+### Google Places reviews — ToS-driven access restriction + 30-day expiration (2026-09-05)
+
+Found while researching whether to expand review-based enrichment (additional
+sources like TripAdvisor, or wider use of Google reviews already partly used)
+to improve Search/Validator efficiency. Google's own Places API policy
+(`developers.google.com/maps/documentation/places/web-service/policies`)
+states, verbatim: *"the place ID... is exempt from the caching
+restrictions"* — meaning everything else Places API returns (reviews,
+ratings, photos) is **not** exempt; only coordinates get a separate
+documented 30-day caching exception. Reviews specifically must be requested
+live, not stored indefinitely.
+
+**Gap found.** The `reviews` table already held 281 `source='google'`
+snippets (harvested by the Search agent's review enrichment, Phase 10)
+stored with no expiration, and — until this fix — was publicly
+`SELECT`-able via the anon key for any review of an `approved` place (RLS
+policy `"public read reviews of approved places"`), even though no frontend
+code ever actually queried it directly (confirmed by grepping `js/`; the
+only place "reviews" appears is a static i18n label and the aggregate
+`user_ratings_total` count, never review text). `source='seed'` (4
+hand-curated rows) was never a caching concern and is excluded from both
+fixes below.
+
+**Fix — two parts, both implemented:**
+
+1. **Access restricted to server-only**, same pattern already used for
+   `agent_log`: dropped the anon/authenticated `SELECT` policy and revoked
+   the table grant (`db/schema.sql`). The only legitimate reader,
+   `ValidatorAgent.fetch_reviews_for_place()` (via the service_role key,
+   bypasses RLS), is unaffected — confirmed `mcp_server/server.py` also uses
+   only the service_role key.
+2. **30-day expiration + re-fetch, no new infrastructure.** A new
+   `SearchAgent._refresh_expired_reviews()` phase runs at the start of every
+   `SearchAgent.run()`: `SupabaseClient.delete_expired_google_reviews()`
+   unconditionally deletes `source='google'` rows older than 30 days (never
+   `source='seed'`), then up to `MAX_REVIEW_REFRESH_PER_RUN` (default 30) of
+   the affected places are re-fetched via the existing
+   `_apply_place_details(..., store_reviews=True)` — the same call already
+   used to enrich brand-new candidates, now also pointed at existing places.
+   Deletion is unconditional (compliance always holds); re-fetch degrades
+   gracefully under budget, same as every other per-run cap in this agent.
+   The extra Place Details calls this makes are counted into the shared
+   `AGENT_DAILY_BUDGET` (`scripts/run_agents.py`), same as the rest of the
+   Search agent's calls.
+   **Rejected alternatives:** pg_cron (Supabase's free-tier availability is
+   contradictory/in flux across current sources, and this project has zero
+   existing pg_cron usage — every other scheduled task here is GitHub
+   Actions + Python); a new dedicated GitHub Actions workflow (unnecessary —
+   the existing monthly `agents-monthly.yml` cadence already runs the Search
+   agent first); refreshing only when a place is incidentally rediscovered
+   by a normal Text Search query (unreliable — most existing places are
+   never resurfaced by a new query, so their reviews would just age out and
+   never come back).
+   **Accepted trade-off — deliberately monthly-only cadence, no new
+   workflow.** Worst case, a review that turns 30 days old right after a
+   monthly run can survive up to ~30 extra days before the next run purges
+   it (~60 days total in the worst case). Revisit (e.g. also wiring the
+   refresh into `validator-midmonth.yml`) if that window ever matters in
+   practice; not done now since it would mean threading a new
+   `GOOGLE_MAPS_API_KEY` secret into a workflow that currently only needs
+   Supabase + Anthropic credentials.
+
+Full offline suite green (269 tests, +6 this session: 4 new in
+`test_search_agent.py`, 2 new in `test_supabase_client.py`). `db/schema.sql`
+re-validated with
+`pglast` after the edit (0 errors, 76 statements). The RLS change
+(`revoke select` + `drop policy`) was applied live to production via
+`supabase db query --linked`, confirmed read-only afterward.
 
 ### Build status (phases)
 

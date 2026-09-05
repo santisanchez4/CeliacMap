@@ -37,6 +37,7 @@ class SearchAgent(BaseAgent):
         max_review_enrichments: int = 0,
         max_detail_lookups: int = 0,
         max_queries_per_run: int = 0,
+        max_review_refresh: int = 0,
     ):
         super().__init__(db)
         self.places = places
@@ -50,6 +51,10 @@ class SearchAgent(BaseAgent):
         # enrichment. Both are capped per run to stay within the API budget.
         self.max_detail_lookups = max_detail_lookups
         self.max_review_enrichments = max_review_enrichments
+        # Google Places ToS: cached review snippets must expire after 30 days
+        # (only place_id is caching-exempt). Caps how many expired places get a
+        # re-fetch per run; the expired-review deletion itself is unconditional.
+        self.max_review_refresh = max_review_refresh
         self._category_by_type = self._build_type_index(targets.get("categories", {}))
 
     @staticmethod
@@ -121,7 +126,34 @@ class SearchAgent(BaseAgent):
                 )
         return {"rich": applied, "snippets": stored}
 
+    def _refresh_expired_reviews(self) -> dict:
+        """Delete 30-day-expired Google review snippets, re-fetch under budget.
+
+        Deletion is unconditional (Google Places ToS compliance always holds);
+        re-fetch degrades gracefully once max_review_refresh is exhausted, same
+        as every other per-run cap in this agent -- the place simply goes
+        without cached reviews until a later run.
+        """
+        expired_place_ids = self.db.delete_expired_google_reviews()
+        refresh_calls = 0
+        refreshed = 0
+        for place_id in expired_place_ids[: self.max_review_refresh]:
+            place = self.db.fetch_place_by_id(place_id)
+            external_id = place.get("external_id") if place else None
+            if not external_id:
+                continue
+            refresh_calls += 1
+            out = self._apply_place_details(place_id, external_id, store_reviews=True)
+            if out["snippets"]:
+                refreshed += 1
+        return {
+            "expired": len(expired_place_ids),
+            "refresh_calls": refresh_calls,
+            "refreshed": refreshed,
+        }
+
     def run(self) -> dict:
+        review_refresh = self._refresh_expired_reviews()
         search_terms = self.targets.get("search_terms", [])
         seen: set[str] = set()
         queries = 0
@@ -247,6 +279,9 @@ class SearchAgent(BaseAgent):
             "rich_updated": rich_updated,
             "reviews_enriched": reviews_enriched,
             "review_snippets": review_snippets,
+            "reviews_expired": review_refresh["expired"],
+            "reviews_refresh_calls": review_refresh["refresh_calls"],
+            "reviews_refreshed": review_refresh["refreshed"],
         }
         self.log(
             "search_run_complete",
@@ -279,6 +314,7 @@ def main() -> int:
         max_review_enrichments=settings.max_review_enrichments_per_run,
         max_detail_lookups=settings.max_detail_lookups_per_run,
         max_queries_per_run=settings.max_search_queries_per_run,
+        max_review_refresh=settings.max_review_refresh_per_run,
     )
 
     summary = agent.run()

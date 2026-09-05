@@ -8,6 +8,7 @@ server-side (local .env or CI) — never in the browser.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from supabase import Client, create_client
@@ -209,6 +210,31 @@ class SupabaseClient:
             .execute()
         )
         return res.data or []
+
+    def delete_expired_google_reviews(self, cutoff_days: int = 30) -> list[str]:
+        """Delete source='google' review snippets older than cutoff_days.
+
+        Google's Places API policy exempts only the place ID from its caching
+        restrictions -- reviews must be requested live, not stored indefinitely
+        (see CLAUDE.md Decisions Log). source='seed' rows are hand-curated, not
+        cached from the API, and are never touched (the filter is hardcoded to
+        'google', not "everything").
+
+        Returns the distinct place_id values whose reviews were just deleted, so
+        the caller (SearchAgent._refresh_expired_reviews) can re-fetch fresh
+        snippets for them.
+        """
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=cutoff_days)
+        ).isoformat()
+        res = (
+            self._db.table("reviews")
+            .delete()
+            .eq("source", "google")
+            .lt("created_at", cutoff)
+            .execute()
+        )
+        return sorted({r["place_id"] for r in (res.data or []) if r.get("place_id")})
 
     # --- suggestions --------------------------------------------------
     def fetch_new_suggestions(self, limit: int = 50) -> list[dict]:

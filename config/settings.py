@@ -74,6 +74,12 @@ class Settings:
     max_review_enrichments_per_run: int = 30
     # Place Details lookups per Search run (rich panel fields + review enrichment).
     max_detail_lookups_per_run: int = 60
+    # Google Places ToS: only place_id is exempt from caching restrictions, so
+    # cached review snippets (source='google') expire after 30 days and are
+    # re-fetched, not stored indefinitely (see CLAUDE.md Decisions Log). This
+    # caps how many expired places get a re-fetch per Search run; deletion of
+    # expired rows is unconditional regardless of this cap.
+    max_review_refresh_per_run: int = 30
     # Web discovery agent (v3): number of cities researched per run (opt-in via
     # web: true in targets.yaml) and the web-search cap handed to the model per city.
     max_web_cities_per_run: int = 2
@@ -134,6 +140,7 @@ class Settings:
             social_max_geocodes=_int("SOCIAL_MAX_GEOCODES", 40),
             max_review_enrichments_per_run=_int("MAX_REVIEW_ENRICHMENTS_PER_RUN", 30),
             max_detail_lookups_per_run=_int("MAX_DETAIL_LOOKUPS_PER_RUN", 60),
+            max_review_refresh_per_run=_int("MAX_REVIEW_REFRESH_PER_RUN", 30),
             max_web_cities_per_run=_int("MAX_WEB_CITIES_PER_RUN", 2),
             max_web_searches_per_city=_int("MAX_WEB_SEARCHES_PER_CITY", 8),
             max_suggestions_per_run=_int("MAX_SUGGESTIONS_PER_RUN", 30),
