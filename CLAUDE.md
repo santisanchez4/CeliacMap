@@ -1391,6 +1391,77 @@ rewritten to state the override, the retained evidence limitation, and the
 original user note; `validation_confidence` left at `0.52`; `verified` left
 `false`.
 
+### Retroactive re-validation of pre-three-tier-rubric approvals (2026-09-06)
+
+**The gap.** The three-tier Validator rubric and its code-enforced confidence
+gates (0.85 / 0.7 / 0.5, in `ValidatorAgent._decide_status`) were adopted Jun
+2026 (see **AI Toolkit** above). `_decide_status` only ever runs on *new*
+validations — no pass ever re-checked places approved *before* it. A read-only
+audit (2026-09-06) found **176 of 590 `status='approved'` places with
+`validation_confidence < 0.7`**, all approved in June 2026 under the old binary
+`approve`/`discard` rubric, sitting live on the public map. Under today's gates
+every one would be `needs_review` or lower.
+
+**The tool.** `scripts/revalidate_low_confidence.py` (dry-run by default,
+`--apply` to write) re-runs the current `ValidatorAgent.evaluate()` — same
+`RUBRIC`, same review context, same gates — against `status='approved' AND
+validation_confidence < threshold` and moves each row **directly** to its new
+verdict. It never routes through `status='pending'`, so the public map / ranking
+never blink. `ValidatorAgent.evaluate(place, reviews)` was extracted from
+`run()`'s inline loop for this (pure, behaviour-identical; `run()` now calls it);
+dry runs reuse the existing `DryRunSupabase` wrapper. Every touched row gets a
+`RE-VALIDACIÓN RETROACTIVA` header prepended to `validation_notes` (old
+confidence/status + new verdict + "never went back to pending"), the original
+note preserved below, plus an `agent_log` row (`agent='validator'`,
+`action='revalidate_retroactive'`). `validation_confidence` is set to whatever
+the model now produces — never inflated/deflated. `verified` untouched.
+
+**Protected rows.** 3 places carrying a manual-override marker in
+`validation_notes` (`OVERRIDE MANUAL` / `APROBACIÓN MANUAL` / `CORRECCIÓN
+MANUAL`, plus `RE-VALIDACIÓN RETROACTIVA` for idempotency) are skipped, never
+re-evaluated: **Los Leños**, **Dalbertt**, **Bienestar Gluten Free** — human
+calls the model can't reproduce (see **Manual Validator overrides** above).
+
+**Result of the 2026-09-06 `--apply` run.** 173 re-evaluated, 0 errors,
+**138 → `needs_review`, 35 → `discarded`, 0 stayed `approved`**. `places` totals:
+`approved` 590→417, `needs_review` 342→480, `discarded` 364→399. Real cost
+**$0.86** (173 `claude-sonnet-4-6` calls), 23.6 min. Outreach side effect: of the
+138 new `needs_review` rows **0** have a `contact_email` on file (none became
+live-mode eligible); ~30 have their own website and would enter the
+`_scrape_missing_emails` funnel on the next monthly run.
+
+### Validator — parametric knowledge vs. provided evidence (2026-09-06)
+
+**Observed during that re-validation.** The one place the model kept `approved`
+was **"Enharinate Mendoza"** (`ff4da9ce-…`): `approved` @ `confidence 0.87`,
+`safety_level` raised to `celiac_friendly` — **with no reviews in the prompt**.
+Its own reasoning: *"existen múltiples reseñas públicas y referencias en la
+comunidad celíaca argentina que identifican a 'Enharinate' como una cadena
+dedicada a productos sin TACC"*, and its flags admit *"No se adjuntan reseñas de
+la comunidad para este candidato específico"*. It approved on **the model's own
+parametric knowledge of the business**, not on evidence in the message.
+
+**Why it matters.** The RUBRIC is conservative *because* the evidence it usually
+gets is thin (name + address + guessed category). If the model fills that gap
+with what it "knows" about a recognised business, it bypasses the gate: a place
+can land `approved` with no verifiable evidence at all, and the model's knowledge
+may be stale (closed, sold, no longer fully GF) or wrong for a specific branch.
+
+**Mitigation applied.** "Enharinate Mendoza" was force-set to `needs_review` in
+the `--apply` run (`FORCED_NEEDS_REVIEW` in
+`scripts/revalidate_low_confidence.py`), with a `validation_notes` note
+explaining the override; `validation_confidence` left at 0.87 (not deflated —
+same rule as **Manual Validator overrides**).
+
+**Open risk to watch.** We don't know how often this happens in the normal
+pipeline — a knowledge-based approval looks identical to an evidence-based one in
+`agent_log`. Audit signal: `status='approved'` with `validation_confidence >=
+0.85` but **zero rows in `reviews`** for that `place_id` and a `validation_notes`
+that leans on "conocido" / "cadena" / "según referencias públicas" without citing
+prompt evidence. If it recurs: add a line to the RUBRIC forbidding a verdict
+based on prior knowledge of the business and requiring all cited evidence to be
+in the message.
+
 ### Brazil out-of-scope places — Curitiba cluster (2026-09-01)
 
 **Finding.** A public-map audit turned up **5 approved places physically in

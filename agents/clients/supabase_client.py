@@ -113,6 +113,29 @@ class SupabaseClient:
         )
         return res.data or []
 
+    def fetch_places_for_revalidation(
+        self, *, max_confidence: float, limit: int = 500
+    ) -> list[dict]:
+        """Approved places whose stored validation_confidence is below
+        max_confidence, worst first.
+
+        The retroactive re-validation target set: places approved under the old
+        binary rubric, before the three-tier confidence gates existed. NULL
+        confidence is excluded (``< x`` is never true for NULL, and it is a
+        separate cohort anyway — seed / pre-column rows).
+        """
+        res = (
+            self._db.table("places")
+            .select("*")
+            .eq("status", "approved")
+            .lt("validation_confidence", max_confidence)
+            .not_.is_("validation_confidence", "null")
+            .order("validation_confidence")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
     def fetch_place_by_id(self, place_id: str) -> dict | None:
         res = (
             self._db.table("places")

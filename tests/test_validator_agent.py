@@ -290,6 +290,41 @@ def test_run_feeds_reviews_into_prompt():
     assert "menu apto celiacos" in user_prompt
 
 
+def test_evaluate_is_the_single_place_core():
+    """evaluate() == build prompt -> model -> normalize, with no DB access."""
+    db = MagicMock()
+    llm = MagicMock()
+    llm.complete_json.return_value = {
+        "verdict": "needs_review",
+        "confidence_score": 0.6,
+        "category": "cafe",
+        "safety_level": "options_available",
+        "reasoning": "evidencia parcial",
+    }
+    agent = ValidatorAgent(db, llm)
+
+    out = agent.evaluate({"name": "Cafe X", "category": "cafe"}, [{"text": "apto celiacos"}])
+
+    assert out["status"] == "needs_review"
+    assert out["confidence"] == 0.6
+    assert out["reason"] == "evidencia parcial"
+    # No reads or writes — the caller owns I/O.
+    db.fetch_reviews_for_place.assert_not_called()
+    db.update_place_validation.assert_not_called()
+    # Rubric sent as system, review snippet reached the user prompt.
+    sys_prompt, user_prompt = llm.complete_json.call_args.args[:2]
+    assert "Validator Agent de CeliacMap" in sys_prompt
+    assert "apto celiacos" in user_prompt
+
+
+def test_evaluate_propagates_model_errors():
+    llm = MagicMock()
+    llm.complete_json.side_effect = json.JSONDecodeError("boom", "doc", 0)
+    agent = ValidatorAgent(MagicMock(), llm)
+    with pytest.raises(json.JSONDecodeError):
+        agent.evaluate({"name": "Cafe X"}, [])
+
+
 def test_run_survives_review_fetch_failure():
     db = MagicMock()
     db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]

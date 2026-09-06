@@ -172,6 +172,22 @@ class ValidatorAgent(BaseAgent):
             return []
         return [s.strip() for item in raw if (s := str(item).strip())]
 
+    def evaluate(self, place: dict, reviews: list[dict] | None = None) -> dict:
+        """Run the full model evaluation for a single place and return the
+        normalized verdict dict (``verdict``, ``status``, ``category``,
+        ``safety_level``, ``confidence``, ``reason``, ``flags``,
+        ``recommendation``).
+
+        Pure: no DB reads or writes — the caller supplies any review context and
+        persists the result. This is the single-place core of ``run()``; the
+        retroactive re-validation script (``scripts/revalidate_low_confidence.py``)
+        reuses it so batch and one-off re-evaluation share one code path.
+        """
+        raw = self.llm.complete_json(
+            RUBRIC, self._build_user_prompt(place, reviews), model=self.model
+        )
+        return self._normalize(raw, place)
+
     @staticmethod
     def _decide_status(verdict: str, confidence: float | None) -> str:
         """Map the model verdict + confidence to a DB status, code-enforced.
@@ -233,12 +249,7 @@ class ValidatorAgent(BaseAgent):
                 logger.exception("fetching review context failed for %s", place_id)
                 reviews = []
             try:
-                raw_verdict = self.llm.complete_json(
-                    RUBRIC,
-                    self._build_user_prompt(place, reviews),
-                    model=self.model,
-                )
-                v = self._normalize(raw_verdict, place)
+                v = self.evaluate(place, reviews)
             except Exception as exc:  # noqa: BLE001
                 errors += 1
                 logger.exception("validation failed for %s", place_id)

@@ -85,6 +85,13 @@ class DryRunSupabase:
     def fetch_place_by_id(self, place_id: str) -> dict | None:
         return self._inner.fetch_place_by_id(place_id)
 
+    def fetch_places_for_revalidation(
+        self, *, max_confidence: float, limit: int = 500
+    ) -> list[dict]:
+        return self._inner.fetch_places_for_revalidation(
+            max_confidence=max_confidence, limit=limit
+        )
+
     # --- writes become no-ops ----------------------------------------
     def update_suggestion_status(
         self, suggestion_id: str, status: str, promoted_place_id: str | None = None
