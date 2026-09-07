@@ -1462,6 +1462,46 @@ prompt evidence. If it recurs: add a line to the RUBRIC forbidding a verdict
 based on prior knowledge of the business and requiring all cited evidence to be
 in the message.
 
+### Cola de needs_review sin salida automática — 71 lugares huérfanos de contacto (2026-09-06)
+
+**Contexto:** tras el barrido de re-validación retroactiva (173 lugares, commit
+`4f50390`), se auditó la contactabilidad de los 138 que quedaron en
+`needs_review`:
+
+- 0 con `contact_email` real
+- 56 con solo teléfono (29 de esos también con web propia)
+- 11 con solo redes sociales (Instagram/Facebook) como único canal
+- 71 SIN ningún dato de contacto (ni email, ni teléfono, ni web, ni redes)
+
+**Hallazgo estructural:** un lugar en `needs_review` no es re-evaluado por ningún
+proceso automático — ni Search/Social/Web (el dedup por `(source, external_id)`
+lo skipea), ni Updater (solo procesa `approved`), ni `place_reports` (el Edge
+Function exige `status=approved`). El scraper de emails
+(`OutreachAgent._scrape_missing_emails`, corrida mensual) solo cubre lugares con
+website propio — de los 138, apenas 29 califican, y empíricamente el scraper
+encuentra email en ~1/3 de esos casos.
+
+Los 71 sin ningún contacto quedan efectivamente congelados hasta que un humano
+los revise manualmente uno por uno. No hay proceso que los rescate, ni siquiera
+resetear a `pending` (el Validator daría el mismo veredicto sin evidencia nueva).
+
+**Ideas para resolver** (ninguna decidida, para evaluar cuando haya
+tiempo/prioridad):
+
+1. Canal comunitario para aportar evidencia sobre lugares específicos en
+   `needs_review` — posible sinergia con el chatbot RAG planeado en el ADR de 90
+   días (`docs/plans/PLAN-chatbot-monetizacion-90-dias.md`), o una versión en
+   WhatsApp (más accesible para la comunidad que completar un formulario web).
+2. Revisión manual periódica por lotes (ej. Santiago revisa 10-15 lugares por
+   semana, googleando/visitando cuando sea posible).
+3. Ampliar qué agentes pueden re-evaluar `needs_review` (hoy solo pasa si un
+   humano lo mueve a `pending` manualmente) — requiere pensar con cuidado para no
+   reabrir la puerta a aprobaciones automáticas débiles que el barrido de hoy
+   justamente corrigió.
+
+No implementar nada de esto ahora — queda como registro para retomar cuando se
+priorice.
+
 ### Brazil out-of-scope places — Curitiba cluster (2026-09-01)
 
 **Finding.** A public-map audit turned up **5 approved places physically in
