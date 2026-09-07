@@ -79,6 +79,130 @@
       .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   }
 
+  /* --------------------- Fuzzy name matching ----------------------- */
+  // The place-search box tolerates typos: an exact substring still wins,
+  // then a small edit (scaled to query length) against one distinctive word
+  // of the name, then a multi-word typo matched over a sliding window. Runs
+  // client-side on every keystroke over the ~400 loaded places — bounded
+  // Damerau-Levenshtein with early exit keeps it sub-millisecond.
+
+  // Generic words that would fuzzy-match almost every place. They still count
+  // for an exact substring hit, just never as the sole reason for a fuzzy one.
+  var NAME_STOPWORDS = {
+    gluten: 1, free: 1, glutenfree: 1, sin: 1, tacc: 1, con: 1,
+    celiaco: 1, celiacos: 1, celiaca: 1, celiacas: 1, apto: 1, libre: 1,
+    cocina: 1, dietetica: 1, almacen: 1, bakery: 1, pasteleria: 1,
+    panaderia: 1, mercado: 1, tienda: 1, market: 1
+  };
+
+  // Bounded Damerau-Levenshtein (optimal string alignment): the edit distance
+  // between a and b, or max + 1 as soon as it is provably above max. An
+  // adjacent transposition counts as a single edit.
+  function editDistance(a, b, max) {
+    var al = a.length, bl = b.length, j;
+    if (Math.abs(al - bl) > max) return max + 1;
+    if (al === 0) return bl;
+    if (bl === 0) return al;
+    var prev2 = [], prev = [], cur = [];
+    for (j = 0; j <= bl; j++) prev[j] = j;
+    for (var i = 1; i <= al; i++) {
+      cur[0] = i;
+      var best = i;
+      for (j = 1; j <= bl; j++) {
+        var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+        var v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        if (i > 1 && j > 1 &&
+            a.charAt(i - 1) === b.charAt(j - 2) &&
+            a.charAt(i - 2) === b.charAt(j - 1)) {
+          v = Math.min(v, prev2[j - 2] + 1);
+        }
+        cur[j] = v;
+        if (v < best) best = v;
+      }
+      if (best > max) return max + 1;
+      for (j = 0; j <= bl; j++) { prev2[j] = prev[j]; prev[j] = cur[j]; }
+    }
+    return prev[bl];
+  }
+
+  // Edits allowed for a string (query or word) of the given length.
+  function maxEditsFor(len) {
+    if (len <= 3) return 0;
+    if (len <= 6) return 1;
+    if (len <= 10) return 2;
+    return 3;
+  }
+
+  // True when the whole query IS a generic word, or one typo from one
+  // ("mercadoo"): fuzzing it would flood the map, so fall back to substring.
+  function queryIsGeneric(q) {
+    if (NAME_STOPWORDS[q] === 1) return true;
+    for (var k in NAME_STOPWORDS) {
+      if (NAME_STOPWORDS.hasOwnProperty(k) &&
+          Math.abs(k.length - q.length) <= 1 &&
+          editDistance(q, k, 1) <= 1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Score a place name against the query. Higher = better; null = no match.
+  // `normName` is already normalize()-d (as stored on each entry); the query
+  // is normalized here so callers can pass raw or pre-normalized text.
+  function nameScore(query, normName) {
+    var q = normalize(query).replace(/^\s+|\s+$/g, "");
+    if (q.length < 2) return null;
+
+    // 1. Exact substring — the current behavior, always beats any fuzzy hit.
+    var idx = normName.indexOf(q);
+    if (idx !== -1) return 1000 - idx - (normName.length - q.length) * 0.1;
+
+    if (q.length < 3) return null;            // 2-char queries: substring only
+    var qMax = maxEditsFor(q.length);
+    if (qMax < 1) return null;
+    if (queryIsGeneric(q)) return null;
+
+    // 2. Typo against one distinctive word of the name.
+    var toks = normName.split(/[^a-z0-9]+/);
+    var bestWord = Infinity;
+    for (var t = 0; t < toks.length; t++) {
+      var w = toks[t];
+      if (w.length < 3 || NAME_STOPWORDS[w] === 1) continue;
+      var cap = Math.min(
+        qMax,
+        maxEditsFor(w.length),
+        Math.floor(Math.min(q.length, w.length) * 0.34)
+      );
+      if (cap < 1) continue;
+      var dWord = editDistance(q, w, cap);
+      // Also try the word's leading (q.length + 1) chars, so "selkis" reaches
+      // "selkkis" even when the full word is longer than the query.
+      var dPrefix = w.length > q.length
+        ? editDistance(q, w.slice(0, q.length + 1), cap)
+        : cap + 1;
+      var d = Math.min(dWord, dPrefix);
+      if (d <= cap && d < bestWord) bestWord = d;
+    }
+    if (bestWord !== Infinity) return 500 - bestWord * 60;
+
+    // 3. Multi-word typo ("casa dispnsa") — slide the query over the name.
+    if (q.length >= 5 && q.indexOf(" ") !== -1) {
+      var wMax = Math.min(qMax, Math.floor(q.length * 0.25));
+      if (wMax >= 1) {
+        var best = Infinity;
+        var win = q.length + wMax;
+        for (var s = 0; s + q.length - wMax <= normName.length; s++) {
+          var dd = editDistance(q, normName.slice(s, s + win), wMax);
+          if (dd < best) best = dd;
+          if (best === 0) break;
+        }
+        if (best <= wMax) return 300 - best * 60;
+      }
+    }
+    return null;
+  }
+
   function setStatus(key) {
     if (!statusEl) return;
     if (!key) {
@@ -359,7 +483,7 @@
   function matches(e) {
     if (currentCategory !== "all" && e.category !== currentCategory) return false;
     if (currentCity !== "all" && e.city !== currentCity) return false;
-    if (currentQuery.length >= 2 && e.name.indexOf(currentQuery) === -1) return false;
+    if (currentQuery.length >= 2 && nameScore(currentQuery, e.name) === null) return false;
     return true;
   }
 
@@ -524,16 +648,20 @@
     }
   }
 
-  // Build the dropdown from the already-loaded markers (no extra API calls).
+  // Build the dropdown from the already-loaded markers (no extra API calls),
+  // ranked by fuzzy score so the closest name comes first.
   function renderSuggest() {
     if (!suggestEl) return;
     if (currentQuery.length < 2) { closeSuggest(); return; }
     var l = lang();
-    var found = [];
-    for (var i = 0; i < entries.length && found.length < 8; i++) {
-      if (entries[i].name.indexOf(currentQuery) !== -1) found.push(entries[i]);
+    var scored = [];
+    for (var i = 0; i < entries.length; i++) {
+      var sc = nameScore(currentQuery, entries[i].name);
+      if (sc !== null) scored.push({ entry: entries[i], score: sc });
     }
-    if (!found.length) { closeSuggest(); return; }
+    if (!scored.length) { closeSuggest(); return; }
+    scored.sort(function (a, b) { return b.score - a.score; });
+    var found = scored.slice(0, 8).map(function (x) { return x.entry; });
 
     suggestEl.innerHTML = "";
     suggItems = found.map(function (entry, idx) {
