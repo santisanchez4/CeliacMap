@@ -291,6 +291,37 @@ GEOGRAPHIC SCOPE
   calls, and there's no reason to allow that when preventing it is free.
   `VALIDATOR_RESERVE` and `AGENT_DAILY_BUDGET` are unchanged — this solution
   avoids them by design rather than retuning either.
+- **`validation_notes` is invisible to the Validator, and every validation
+  overwrites it — so it is the wrong place to keep evidence you want the
+  Validator to weigh, and routing a well-evidenced place back through
+  `pending` destroys that evidence.** `ValidatorAgent._build_user_prompt` sends
+  the model **only** `name` / `address` / `city` / `country` /
+  `guessed_category` / `source` (plus community review snippets from the
+  `reviews` table, and the `ubicacion_geocode` line for `address_only` rows) —
+  it does **not** read `places.validation_notes`. And `_persist` /
+  `update_place_validation` writes `notes = v["reason"]`, i.e. it **replaces**
+  `validation_notes` with the model's fresh reasoning on every run.
+  (`social_url` is deliberately exempt — the discovery agents keep the source
+  URL there precisely because the Validator can't clobber it; `validation_notes`
+  has no such protection.) Confirmed live 2026-09-07: the 16
+  recovered/added Montevideo places (`db/fixes/2026-09-07-montevideo-manual-places.sql`)
+  were set to `status='pending'` each carrying a detailed `REVISIÓN MANUAL`
+  note (findmeglutenfree / ACELU / viajosingluten evidence that these are
+  100% GF / dedicated). A standalone `python -m agents.validator_agent` run
+  then put **16/16 in `needs_review`** at confidence 0.50–0.72 — judging on
+  name + address alone ("no explicit sin-TACC signal", the same call June's
+  binary rubric made) — and **overwrote all 16 notes**. Recovered via manual
+  overrides (`db/fixes/2026-09-07-montevideo-overrides.sql`, per **Manual
+  Validator overrides**); the gathered evidence now survives only in the
+  committed `…-manual-places.sql`. **Practical rule:** to bring back a
+  `discarded` / `needs_review` place that has real evidence the prompt can't
+  see, approve it directly with a transparent manual override — don't send it
+  through `pending` expecting the Validator to "re-check with the new
+  context", because it can't see the context and re-judges from scratch.
+  (A cleaner future fix — deferred, the override path is auditable and works:
+  a separate `curator_notes` column the Validator's prompt includes but
+  `_persist` never touches, or an admin-supplied `evidence` field threaded
+  into `_build_user_prompt`.)
 
 ## The Core Prompt — Validator Rubric
 
