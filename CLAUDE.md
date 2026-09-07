@@ -1462,6 +1462,57 @@ prompt evidence. If it recurs: add a line to the RUBRIC forbidding a verdict
 based on prior knowledge of the business and requiring all cited evidence to be
 in the message.
 
+### Validator — interpretación heurística de un substring del nombre sin verificar su significado real (2026-09-07)
+
+**Lo observado.** Una fila `source='social'` llamada **"Serendipia-cea"**
+(`d9fd1d57`) estuvo **aprobada como `gluten_free_100` y visible en el mapa
+público desde el 2026-06-09 hasta el 2026-09-07**. No es un negocio de comida:
+es **"Serendipia - CEA"**, un centro educativo para personas con **Condición
+del Espectro Autista** (CEA), en Bulevar Gral. Artigas 2193 (IG `@serendipia_cea`).
+El Validator la aprobó con este razonamiento textual: *"El nombre 'Serendipia-cea'
+incorpora el sufijo '-cea' que es una referencia directa y explícita a 'sin TACC'
+(celiaquía) … Esta denominación es una convención conocida en Uruguay y Argentina
+para identificar locales orientados a la comunidad celíaca."* — **una convención
+lingüística inventada**: "-cea" acá significa "espectro autista", no "celíaco",
+y no existe tal convención de nombres.
+
+**El patrón (por qué merece su propia entrada).** Es primo del fallo de
+**parametric knowledge vs. provided evidence** (2026-09-06), pero peor: allí el
+modelo *recordaba* datos de un negocio real; acá **fabricó una regla del idioma**
+para derivar un veredicto de seguridad desde un fragmento del nombre, sin ninguna
+evidencia en el mensaje que la respaldara. La evidencia real era mínima (nombre +
+un punto geocodificado; el lead venía de un post de un concurso de cocina interno,
+"Serendichef") y el geocode de Find Place cayó en la dirección real del centro
+educativo, lo que le dio una coherencia falsa al conjunto.
+
+**Hallazgo de segundo orden — `resolve_location` / Find Place para "Serendipia".**
+Al buscar el negocio real, Find Place devolvió **cinco negocios equivocados
+distintos** según la variante del nombre: el centro de autismo, "Selkkis Gluten
+Free", "ChocAra MVD" y "Delirio Sin Gluten". Caso extremo del riesgo ya
+documentado (**"`resolve_location()` can return the WRONG business"**, en *Key
+risks*). El negocio real (**"Serendipia Gluten Free"**, `@serendipia.glutenfree`,
+alimentos artesanales 100% sin gluten, pick-up con agenda de 48 h en Parque
+Batlle) **no tiene ficha de Google**; se agregó geocodificando la dirección sola
+—confirmada directamente por el administrador— vía Geocoding API
+(`geocode_method='address_only'`, ROOFTOP), fila `82fd31e9`, `status='pending'`.
+"Serendipia Café" (Dr. Mario Cassinoni 1686) es un tercer negocio homónimo, no
+relacionado, descartado como identidad. La fila de La Plata, Argentina
+(`d8c3faee`, "Serendipia Gluten Free", approved) es correcta y sin relación.
+
+**Mitigación aplicada (2026-09-07).** `d9fd1d57` → `discarded` con nota
+`CORRECCIÓN MANUAL` (falso positivo, centro educativo, verificado por Santiago
+contra la cuenta de Instagram real del post). `validation_confidence` se dejó en
+0.88 (no se infla/desinfla — misma regla que **Manual Validator overrides**).
+
+**Riesgo abierto / señal de auditoría.** Un veredicto que se apoya en
+interpretar el nombre —*"el nombre indica…"*, *"el sufijo … significa…"*, *"es
+una convención conocida…"*, *"la denominación sugiere…"*— sin citar evidencia del
+mensaje. Es el mismo agujero que la entrada de *parametric knowledge*: si
+cualquiera de los dos reaparece, la corrección es una línea en el RUBRIC que
+prohíba un veredicto de seguridad derivado de conocimiento previo **o de la
+interpretación del nombre/substring**, exigiendo que toda evidencia citada esté
+en el mensaje.
+
 ### Cola de needs_review sin salida automática — 71 lugares huérfanos de contacto (2026-09-06)
 
 **Contexto:** tras el barrido de re-validación retroactiva (173 lugares, commit
