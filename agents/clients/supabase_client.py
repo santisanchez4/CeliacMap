@@ -389,3 +389,26 @@ class SupabaseClient:
                 "place_id": place_id,
             }
         ).execute()
+
+    def delete_chatbot_logs(self, cutoff_days: int = 30) -> int:
+        """Delete agent_log rows for agent='chatbot' older than cutoff_days.
+
+        Marked chatbot turns can carry raw user/bot text (ADR-006 decision 10),
+        so this is the only mechanism that removes it -- the filter is
+        hardcoded to 'chatbot' and must never widen to "everything in
+        agent_log", a table shared by every other agent. See
+        scripts/purge_chat_logs.py and .github/workflows/chat-log-purge.yml.
+
+        Returns the number of rows deleted.
+        """
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=cutoff_days)
+        ).isoformat()
+        res = (
+            self._db.table("agent_log")
+            .delete()
+            .eq("agent", "chatbot")
+            .lt("created_at", cutoff)
+            .execute()
+        )
+        return len(res.data or [])

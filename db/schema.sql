@@ -265,13 +265,15 @@ create index if not exists agent_log_agent_idx      on public.agent_log (agent);
 -- agent_log.agent was widened incrementally over time as new agents shipped:
 -- base (search/validator/updater/social/web/pipeline/suggestion) -> +outreach
 -- (Phase 15) -> +outreach_reply (Etapa 2) -> +review_handler (ADR-004,
--- docs/plans/PLAN-community-reviews.md). Collapsed into a single widening
--- here instead of that chain of separate DO blocks: applied one at a time,
--- incrementally, each was always safe — but with real production rows
--- already using 'outreach' (19) and 'outreach_reply' (6) (confirmed live via
--- `supabase db query --linked`), re-running the OLDER, narrower intermediate
--- blocks against a fully-populated table fails outright on a full fresh
--- apply — the same bug class found and fixed in places_status_check above.
+-- docs/plans/PLAN-community-reviews.md) -> +chatbot (ADR-006,
+-- docs/plans/PLAN-chatbot-rag.md — the chat Edge Function's turn log).
+-- Collapsed into a single widening here instead of a chain of separate DO
+-- blocks: applied one at a time, incrementally, each was always safe — but
+-- with real production rows already using 'outreach' (19) and
+-- 'outreach_reply' (6) (confirmed live via `supabase db query --linked`),
+-- re-running the OLDER, narrower intermediate blocks against a
+-- fully-populated table fails outright on a full fresh apply — the same bug
+-- class found and fixed in places_status_check above.
 do $$
 begin
   alter table public.agent_log drop constraint if exists agent_log_agent_check;
@@ -279,7 +281,7 @@ begin
     add constraint agent_log_agent_check
     check (agent in
       ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion',
-       'outreach', 'outreach_reply', 'review_handler'));
+       'outreach', 'outreach_reply', 'review_handler', 'chatbot'));
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -424,6 +426,29 @@ create table if not exists public.place_votes (
 create index if not exists place_votes_place_id_idx on public.place_votes (place_id);
 
 -- ---------------------------------------------------------------------
+-- Table: chat_usage  (Chatbot RAG rate-limiting counters, ADR-006 / 2f)
+-- ---------------------------------------------------------------------
+-- One row per (bucket, day). The chat Edge Function (supabase/functions/chat/)
+-- reads/increments this with the service_role key to enforce
+-- CHAT_MAX_MESSAGES_PER_SESSION / CHAT_MAX_MESSAGES_PER_IP_DAY /
+-- CHAT_DAILY_CALL_CAP before calling the model -- never exposed to anon (see
+-- RLS + the function privilege revoke below). No PII: bucket_key is either
+-- 'session:<localStorage token>', 'ip:<sha256 hash>' (never the raw IP), or
+-- the literal 'global'.
+create table if not exists public.chat_usage (
+  bucket_key  text not null,   -- 'session:<token>' | 'ip:<sha256-hex>' | 'global'
+  day         date not null,
+  count       integer not null default 0,
+  updated_at  timestamptz not null default now(),
+  primary key (bucket_key, day)
+);
+
+-- Manual retention (NOT PII -- just counters; unlike agent_log's chatbot rows
+-- below, no automated purge is required, but this keeps the table from
+-- growing forever if anyone bothers to run it):
+--   delete from public.chat_usage where day < current_date - 7;
+
+-- ---------------------------------------------------------------------
 -- Trigger: keep places.updated_at fresh on UPDATE
 -- ---------------------------------------------------------------------
 create or replace function public.set_updated_at()
@@ -490,6 +515,40 @@ create trigger place_votes_sync_count
 --     where vote_count <> 0 and id not in (select place_id from public.place_votes);
 
 -- ---------------------------------------------------------------------
+-- Function: bump_chat_usage (ADR-006 / 2b — chat_usage rate-limit counters)
+-- ---------------------------------------------------------------------
+-- SECURITY DEFINER + search_path pinned, same mold as sync_place_vote_count
+-- above -- not because the caller lacks privilege (the chat Edge Function
+-- always calls this with the service_role key, which already bypasses RLS),
+-- but so the increment (chat_usage.count = chat_usage.count + 1) is atomic
+-- under concurrent turns without depending on the client to read-modify-write.
+create or replace function public.bump_chat_usage(p_keys text[], p_day date)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.chat_usage (bucket_key, day, count)
+    select k, p_day, 1 from unnest(p_keys) as k
+  on conflict (bucket_key, day)
+    do update set count = chat_usage.count + 1, updated_at = now();
+end;
+$$;
+
+-- Postgres grants EXECUTE on every new function to PUBLIC by default, which
+-- anon/authenticated inherit -- unlike sync_place_vote_count (a trigger
+-- function, not directly callable via SQL/RPC), bump_chat_usage takes plain
+-- arguments and Supabase auto-exposes it at POST /rest/v1/rpc/bump_chat_usage.
+-- Left ungranted, anon could call it directly to pre-exhaust the shared
+-- 'global' bucket (or forge session/ip keys), denying the chat to everyone --
+-- bypassing the Edge Function's actual rate-limit-then-bump order entirely.
+-- Revoke explicitly; only the service_role-authenticated Edge Function calls
+-- this. Confirmed against the real anon role, not just checked by reading the
+-- code -- see db/checks/2026-09-16-chat-usage.sql.
+revoke execute on function public.bump_chat_usage(text[], date) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------
 alter table public.places      enable row level security;
@@ -499,6 +558,7 @@ alter table public.suggestions enable row level security;
 alter table public.outreach_messages enable row level security;
 alter table public.place_reports enable row level security;
 alter table public.place_votes enable row level security;
+alter table public.chat_usage enable row level security;
 
 -- Table-level privileges (RLS still gates rows).
 grant select on public.places  to anon, authenticated;
@@ -529,6 +589,11 @@ grant insert on public.place_reports to anon, authenticated;
 -- reads back place_votes rows (the count is read via places.vote_count).
 revoke all on public.place_votes from anon, authenticated;
 grant insert on public.place_votes to anon, authenticated;
+-- chat_usage is server-only (Chatbot RAG rate limiting), same pattern as
+-- agent_log / outreach_messages: no grant, no policy => fully denied to the
+-- public. Only the chat Edge Function (service_role key, bypasses RLS) reads
+-- or writes it, via bump_chat_usage (itself EXECUTE-revoked from anon above).
+revoke all on public.chat_usage from anon, authenticated;
 
 -- places: anyone may read ONLY approved rows.
 drop policy if exists "public read approved places" on public.places;
@@ -545,9 +610,23 @@ drop policy if exists "public read reviews of approved places" on public.reviews
 
 -- agent_log: no policy for anon/authenticated => fully denied to the public.
 -- (service_role bypasses RLS and retains full access.)
+--
+-- agent_log rows with agent='chatbot' can carry raw user/bot text on marked
+-- turns (ADR-006 decision 10 -- refusals, rate-limit hits, out-of-scope
+-- attempts). That is health-adjacent PII, so it is NOT left to a manual
+-- delete snippet like chat_usage above: it is purged automatically at 30
+-- days by .github/workflows/chat-log-purge.yml (weekly schedule +
+-- workflow_dispatch), which runs `python scripts/purge_chat_logs.py`. The
+-- DELETE is hardcoded to agent='chatbot' -- it must never touch any other
+-- agent's rows in this shared audit table.
 
 -- outreach_messages: no policy for anon/authenticated => fully denied to the
 -- public, same as agent_log. (service_role bypasses RLS and retains full access.)
+
+-- chat_usage: no policy for anon/authenticated => fully denied to the public,
+-- same as agent_log / outreach_messages. (service_role bypasses RLS and
+-- retains full access; bump_chat_usage is additionally EXECUTE-revoked from
+-- anon/authenticated above, so there is no RPC path around this either.)
 
 -- suggestions: the public may only INSERT a fresh submission. The WITH CHECK
 -- forces a safe initial state (status='new', not pre-promoted), requires a

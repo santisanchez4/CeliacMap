@@ -124,3 +124,30 @@ def test_delete_expired_google_reviews_returns_empty_when_nothing_expired():
     chain.return_value.execute.return_value = MagicMock(data=[])
 
     assert client.delete_expired_google_reviews() == []
+
+
+# --- delete_chatbot_logs (ADR-006 decision 10: 30-day purge of agent='chatbot') --
+
+
+def test_delete_chatbot_logs_returns_row_count():
+    client = _client_with_mock_db()
+    chain = client._db.table.return_value.delete.return_value.eq.return_value.lt
+    chain.return_value.execute.return_value = MagicMock(
+        data=[{"id": "log-1"}, {"id": "log-2"}]
+    )
+
+    deleted = client.delete_chatbot_logs()
+
+    assert deleted == 2
+    client._db.table.assert_called_once_with("agent_log")
+    client._db.table.return_value.delete.return_value.eq.assert_called_once_with(
+        "agent", "chatbot"
+    )
+
+
+def test_delete_chatbot_logs_returns_zero_when_nothing_expired():
+    client = _client_with_mock_db()
+    chain = client._db.table.return_value.delete.return_value.eq.return_value.lt
+    chain.return_value.execute.return_value = MagicMock(data=[])
+
+    assert client.delete_chatbot_logs() == 0

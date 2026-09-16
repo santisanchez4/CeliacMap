@@ -1,0 +1,38 @@
+# Chatbot log purge - weekly.
+# Deletes agent_log rows with agent='chatbot' older than 30 days. Marked
+# chatbot turns can carry raw user/bot text (ADR-006 decision 10), so this
+# cannot depend on someone remembering to run a manual delete - see CLAUDE.md
+# "Logging y privacidad" in ADR-006 and scripts/purge_chat_logs.py.
+name: Chatbot log purge
+
+on:
+  schedule:
+    # Weekly is enough: chat volume is low, and the 30-day retention window
+    # tolerates a few days of slack before the next run.
+    - cron: '0 8 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Purge expired chatbot logs
+        run: python scripts/purge_chat_logs.py
