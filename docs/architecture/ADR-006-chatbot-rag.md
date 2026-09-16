@@ -518,6 +518,23 @@ testing de jailbreak (fase de endurecimiento) muestra que Haiku cede el
 alcance bajo presión, `CHAT_MODEL` se sube a Sonnet en una línea, sin
 cambio de código — mismo patrón que `WEB_SEARCH_MODEL`.
 
+**Alternativa de costo evaluada y descartada para v1 — DeepSeek V4.1 Flash
+(2026-09-08).** A precios de septiembre 2026, DeepSeek V4.1 Flash es ~6-8x
+más barato que Haiku 4.5 en lista ($0.15/$0.60 por 1M tokens fuera de pico
+vs. ~$1/$5 de Haiku), y sus horarios de precio reducido (01–04h y 06–10h
+UTC) caen de madrugada en Argentina/Uruguay, lo que favorece aún más el uso
+real esperado del chat. Descartado para v1 por tres razones: (1) requiere
+cambiar el SDK de la Edge Function (`@anthropic-ai/sdk` → un cliente
+compatible con la API de OpenAI), no es un cambio de configuración; (2) todo
+el testing de jailbreak/seguridad de este diseño ya aprobado se calibró
+específicamente contra el comportamiento de Claude — no se puede asumir que
+se traslada igual a otro proveedor; (3) consideración de residencia de datos
+para un chatbot que maneja información de salud. Decisión: lanzar v1 con
+Haiku, medir el costo real en producción, y evaluar la migración a DeepSeek
+después con datos reales — mismo criterio de "medir antes de decidir" que el
+resto del proyecto usa (p. ej. la revalidación retroactiva del 2026-09-06, o
+la decisión de no escalar `VALIDATOR_RESERVE` sin ver el backlog real).
+
 ## Los prompts del chatbot
 
 > **Por qué estos prompts importan tanto como el `RUBRIC`:** son la única
