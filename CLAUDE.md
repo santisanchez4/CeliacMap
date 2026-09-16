@@ -897,6 +897,34 @@ Validator) is not yet built.
   monthly cron run sends real email to real businesses** — this has not yet
   been verified live end-to-end (the standalone verification called for in
   Phase 15/16 below still applies, now for live mode specifically).
+- **Orchestrator wiring gap — the monthly cron never actually reached live
+  mode (found + fixed 2026-09-16).** The claim above ("the next monthly cron
+  run sends real email") was wrong: `scripts/run_agents.py`'s Outreach stage
+  built `OutreachAgent(...)` without passing `live_mode=` (or
+  `sender_email=`) at all, so it always fell through to the constructor's own
+  `live_mode: bool = False` default — regardless of `OUTREACH_LIVE_MODE` being
+  `true` in the environment. Only the standalone `python -m
+  agents.outreach_agent` entrypoint (`main()`) ever wired `live_mode`
+  correctly. Net effect: every scheduled `agents-monthly.yml` run (including
+  2026-09-01, per its `agent_log`) sent outreach mail to
+  `OUTREACH_TEST_RECIPIENT` only, never to a real business — Phase 18's "first
+  real live-mode send" was real, but only because it was triggered by the
+  standalone command, not the cron. Fixed by passing both
+  `live_mode=settings.outreach_live_mode` and
+  `sender_email=settings.outreach_sender_email` in the orchestrator's
+  `OutreachAgent(...)` call, so the scheduled pipeline now matches the
+  standalone entrypoint. **Side effect caught during the fix:** the
+  orchestrator's `ResendClient` was constructed unconditionally, even under
+  `--dry-run` — a dry run has never actually been a no-send rehearsal for the
+  Outreach stage, since `DryRunSupabase` only wraps Supabase writes, not the
+  Resend call. Added a matching `DryRunResend` (`scripts/run_agents.py`, same
+  "[dry-run] would …" logging convention as `DryRunSupabase`), swapped in for
+  `dry_run=True`, so `--dry-run` no longer sends a real email regardless of
+  `OUTREACH_LIVE_MODE`. Full offline suite green (284 tests, unchanged — no
+  test previously covered the orchestrator's outreach construction, consistent
+  with the Phase 15 note that `run_pipeline()` has no dedicated committed
+  test). Not yet re-verified live (no pipeline run since the fix); the next
+  scheduled or manual `agents-monthly.yml` run is the real end-to-end check.
 - **Opt-out mechanism (ADR-003 condition 2).** Every Etapa 1 email appends a
   fixed, literal (non-AI-generated) `OPT_OUT_FOOTER` telling the business how
   to decline further contact. `places.outreach_opt_out` (bool) is excluded
@@ -2109,6 +2137,18 @@ re-validated with
   whether Niter replies. Minor gap noted: `OutreachAgent` discards the
   Resend message id (`send()` returns it) instead of also storing it in
   `outreach_messages.external_id` for the `sent` row.
+
+  **Correction (2026-09-16): the "2026-10-01 cron sends real email" claim
+  above was wrong — the cron path was never actually wired to live mode.**
+  `scripts/run_agents.py` built `OutreachAgent(...)` without passing
+  `live_mode=`, so every scheduled `agents-monthly.yml` run (2026-09-01
+  included) silently fell back to the constructor's `live_mode=False`
+  default and mailed `OUTREACH_TEST_RECIPIENT`, never a real business —
+  regardless of the `OUTREACH_LIVE_MODE` secret. The one real send recorded
+  above happened only because it went through the standalone
+  `python -m agents.outreach_agent` entrypoint, which did wire `live_mode`
+  correctly. Fixed (see the new bullet under **Outreach agent design
+  decisions** above); not yet re-verified live.
 - ✅ **Phase 19 — Community reports (`place_reports`), live and verified
   end-to-end in production.**
   `db/schema.sql` gained the `place_reports` table (`report_type`

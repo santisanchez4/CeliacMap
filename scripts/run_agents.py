@@ -165,6 +165,28 @@ class DryRunSupabase:
         logger.info("[dry-run] would set place_report %s -> %s", report_id, status)
 
 
+class DryRunResend:
+    """Send-suppressing stand-in for :class:`ResendClient`.
+
+    ``--dry-run`` promises "no writes" for the whole pipeline; an actual email
+    send is an external side effect, not a Supabase write, so it isn't covered
+    by :class:`DryRunSupabase`. Without this, a dry run would still send a real
+    email through Resend on every invocation.
+    """
+
+    def send(
+        self,
+        *,
+        to: str,
+        subject: str,
+        text: str,
+        from_address: str | None = None,
+        reply_to: str | None = None,
+    ) -> str:
+        logger.info("[dry-run] would send outreach email to %s (subject: %r)", to, subject)
+        return "dry-run"
+
+
 class Budget:
     """A single combined cap on paid API calls, shared across the pipeline."""
 
@@ -356,12 +378,14 @@ def run_pipeline(
         summaries["updater"] = {"skipped": "budget exhausted"}
 
     # 7. Outreach — draft + send one confirmation email per needs_review place
-    #    with phone/website on file, via Resend (test-recipient only for now —
-    #    see CLAUDE.md's Outreach agent design decisions). Runs last: nothing
-    #    follows it, so it takes whatever budget remains like the Updater.
+    #    with phone/website on file, via Resend. Recipient depends on
+    #    OUTREACH_LIVE_MODE (ADR-003): the test recipient by default, or the
+    #    place's own contact_email when live mode is on — see CLAUDE.md's
+    #    Outreach agent design decisions. Runs last: nothing follows it, so it
+    #    takes whatever budget remains like the Updater.
     out_cap = budget.allow(settings.outreach_monthly_limit)
     if out_cap > 0 and settings.resend_api_key and settings.outreach_test_recipient and haiku:
-        resend_client = ResendClient(settings.resend_api_key)
+        resend_client = DryRunResend() if dry_run else ResendClient(settings.resend_api_key)
         scraper = WebsiteScraperClient()
         outreach = OutreachAgent(
             db,
@@ -373,6 +397,8 @@ def run_pipeline(
             max_per_run=out_cap,
             max_scrapes_per_run=settings.max_email_scrapes_per_run,
             inbound_domain=settings.outreach_inbound_domain,
+            sender_email=settings.outreach_sender_email,
+            live_mode=settings.outreach_live_mode,
         )
         summaries["outreach"] = outreach.run()
         budget.consume(
