@@ -17,12 +17,17 @@ other Edge Functions — these are only ever needed inside this function):
 | `CHAT_MODEL` | Model id, default `claude-haiku-4-5` (escape hatch to Sonnet — ADR-006 decision 12). |
 | `CHAT_MAX_MESSAGES_PER_SESSION` | Per-session-token cap (default 15). |
 | `CHAT_MAX_MESSAGES_PER_IP_DAY` | Per-IP-hash daily cap (default 40). |
-| `CHAT_DAILY_CALL_CAP` | Global model-call cap per day (default 1000). |
+| `CHAT_DAILY_CALL_CAP` | Global cap per day (default **500**), enforced against `chat_usage`'s TURN counter, not raw model calls — see the comment above `isRateLimited`'s call site in `index.ts` for why this diverges from the `1000` figure in ADR-006's original budget table (that number assumed a calls-based counter; applying it to the turns-based counter `bump_chat_usage` actually maintains would silently double the approved ~US$2-3/day spend ceiling to ~US$4-6/day). |
 | `CHAT_MAX_HISTORY_TURNS` | History turns forwarded to the model (default 8). |
 
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-injected by the
-platform (same as every other Edge Function in this project) — not set by
-hand.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
+auto-injected by the platform (same as every other Edge Function in this
+project) — not set by hand. Unlike `outreach-reply/` and
+`place-report-created/` (service_role only), this function also uses the
+**anon** key for Módulo 1's RAG query against `places` — deliberately, so the
+`public read approved places` RLS is the structural backstop (ADR-006
+decision 9). `SUPABASE_SERVICE_ROLE_KEY` is used only for `chat_usage`
+(rate limiting) and, from Fase C onward, the Módulo 4 `needs_review` lookup.
 
 ## Why this function is different from `outreach-reply/` and `place-report-created/`
 

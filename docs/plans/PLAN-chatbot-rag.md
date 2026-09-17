@@ -38,7 +38,9 @@ y acotado, y un widget flotante (primer control `position: fixed`
 del mapa y el nav mobile, ambos transitorios).
 
 **Decisiones ya cerradas en ADR-006** (no se re-litigan acá): Módulo 4
-solo recolecta; presupuesto `15 / 40 / 1000`; Módulo 3 sin RAG documental;
+solo recolecta; presupuesto `15 / 40 / 500` (`CHAT_DAILY_CALL_CAP` corregido
+de 1000 a 500 durante Fase B — ver "Control de gasto / alcance" más abajo);
+Módulo 3 sin RAG documental;
 activación de Módulo 4 no proactiva; logging a `agent_log` con minimización
 por defecto (texto crudo solo en turnos marcados, purga automática a 30
 días); v1 sin streaming; `CHAT_MODEL` default `claude-haiku-4-5`.
@@ -396,10 +398,18 @@ como constantes en `supabase/functions/chat/` (TS).
 - **Presupuesto propio, separado de `AGENT_DAILY_BUDGET`.** Env / secrets
   de la Edge Function:
   `CHAT_MAX_MESSAGES_PER_SESSION=15`, `CHAT_MAX_MESSAGES_PER_IP_DAY=40`,
-  `CHAT_DAILY_CALL_CAP=1000` (~500 turnos/día ≈ ~US$2–3/día de techo a
-  precio Haiku 4.5 $1/$5 por M tokens, con system blocks cacheados;
-  ~US$0.005/turno sin caché), `CHAT_MODEL=claude-haiku-4-5`,
-  `CHAT_MAX_HISTORY_TURNS=8`.
+  `CHAT_DAILY_CALL_CAP=500` (~US$2–3/día de techo a precio Haiku 4.5 $1/$5
+  por M tokens, con system blocks cacheados; ~US$0.005/turno sin caché),
+  `CHAT_MODEL=claude-haiku-4-5`, `CHAT_MAX_HISTORY_TURNS=8`.
+  **Corrección (Fase B):** este valor era `1000` en el diseño original de
+  ADR-006, bajo el supuesto de que era un techo de llamadas-modelo/día
+  (~500 turnos). Al implementar, `bump_chat_usage` resultó incrementar cada
+  bucket en +1 por turno, no por llamada (no tiene parámetro de cantidad
+  variable) — así que este cap limita turnos/día, no llamadas. Aplicar el
+  mismo `1000` a un contador de turnos habría duplicado en silencio el techo
+  aprobado a ~US$4–6/día; `500` (turnos) es el valor que preserva el techo
+  original de ~US$2–3/día bajo el comportamiento real del contador. Ver
+  ADR-006 decisión 8.
 - **2 llamadas Haiku por turno** (router + redactor). Un turno de rate
   limit = **0 llamadas**.
 - **Sin techo de conversaciones por lugar / IP más fino** en v1 — mismo
