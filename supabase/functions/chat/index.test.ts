@@ -17,6 +17,7 @@ import {
   buildRouterUserMessage,
   computeBucketKeys,
   decideMatchFromRows,
+  decideReportarDraft,
   filterPlaceFields,
   getClientIp,
   getReply,
@@ -31,6 +32,7 @@ import {
   trimHistory,
   validatePendingSubmission,
   validateRequestBody,
+  type ReportarDraftResult,
 } from "./index.ts";
 
 // ---------------------------------------------------------------------------
@@ -598,4 +600,71 @@ Deno.test("decideMatchFromRows - more than one row is no match (ambiguous)", () 
     { id: "def", name: "X", city: "Z" },
   ];
   assertEquals(decideMatchFromRows(rows), null);
+});
+
+// ---------------------------------------------------------------------------
+// Módulo 2 turn-1 decision (decideReportarDraft) — Task 3
+// ---------------------------------------------------------------------------
+
+function match() {
+  return { id: "4300ad15-2f6f-4881-a902-b2ac5990464c", name: "La Panera", city: "Adrogué" };
+}
+
+Deno.test("decideReportarDraft - too-short texto asks for more detail", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "La Panera", ciudad: null, reporteTexto: "ok" });
+  assertEquals(r, { kind: "ask_more_detail" });
+});
+
+Deno.test("decideReportarDraft - null texto asks for more detail", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "La Panera", ciudad: null, reporteTexto: null });
+  assertEquals(r, { kind: "ask_more_detail" });
+});
+
+Deno.test("decideReportarDraft - missing lugar_nombre asks which place", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: null, ciudad: null, reporteTexto: "Muy buena atención" });
+  assertEquals(r, { kind: "ask_which_place" });
+});
+
+Deno.test("decideReportarDraft - matched place, positive -> draft_ready as report", () => {
+  const r = decideReportarDraft({ match: match(), reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: "Excelente, todo sin TACC" });
+  assertEquals(r, {
+    kind: "draft_ready",
+    pending: { kind: "report", place_id: match().id, place_name_text: null, report_type: "positive", description: "Excelente, todo sin TACC" },
+  });
+});
+
+Deno.test("decideReportarDraft - matched place, negative -> draft_ready as report", () => {
+  const r = decideReportarDraft({ match: match(), reporteTipo: "negative", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: "Me contaminaron la comida" });
+  assertEquals(r, {
+    kind: "draft_ready",
+    pending: { kind: "report", place_id: match().id, place_name_text: null, report_type: "negative", description: "Me contaminaron la comida" },
+  });
+});
+
+Deno.test("decideReportarDraft - no match, negative -> draft_ready with place_name_text, no place_id", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: "negative", lugarNombre: "Lugar Fantasma", ciudad: "Salto", reporteTexto: "Dijeron sin TACC pero no lo era" });
+  assertEquals(r, {
+    kind: "draft_ready",
+    pending: { kind: "report", place_id: null, place_name_text: "Lugar Fantasma", report_type: "negative", description: "Dijeron sin TACC pero no lo era" },
+  });
+});
+
+Deno.test("decideReportarDraft - no match, positive -> needs_address for a suggestion draft", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "Bienestar Gluten Free", ciudad: "Fray Bentos", reporteTexto: "100% sin gluten, muy bueno" });
+  assertEquals(r, {
+    kind: "needs_address",
+    pending: { kind: "suggestion", name: "Bienestar Gluten Free", city: "Fray Bentos", country: null, address: null, category: null, notes: "100% sin gluten, muy bueno" },
+  });
+});
+
+Deno.test("decideReportarDraft - no match, positive, reporte_tipo null defaults to positive", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: null, lugarNombre: "Bienestar Gluten Free", ciudad: null, reporteTexto: "Muy bueno" });
+  assertEquals(r.kind, "needs_address");
+});
+
+Deno.test("decideReportarDraft - description clamps to 2000 chars", () => {
+  const long = "a".repeat(2500);
+  const r = decideReportarDraft({ match: match(), reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: long });
+  assertEquals(r.kind, "draft_ready");
+  if (r.kind === "draft_ready") assertEquals(r.pending.description.length, 2000);
 });

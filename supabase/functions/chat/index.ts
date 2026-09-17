@@ -329,6 +329,71 @@ export async function fetchPlaceMatch(
   return decideMatchFromRows(rows);
 }
 
+// ---------------------------------------------------------------------------
+// Módulo 2 turn-1 decision (reportar/recommend) — Task 3
+// ---------------------------------------------------------------------------
+
+export type ReportarDraftResult =
+  | { kind: "ask_more_detail" }
+  | { kind: "ask_which_place" }
+  | { kind: "draft_ready"; pending: PendingReportSubmission }
+  | { kind: "needs_address"; pending: PendingSuggestionSubmission };
+
+export function decideReportarDraft(input: {
+  match: PlaceMatch | null;
+  reporteTipo: "positive" | "negative" | null;
+  lugarNombre: string | null;
+  ciudad: string | null;
+  reporteTexto: string | null;
+}): ReportarDraftResult {
+  const texto = input.reporteTexto?.trim() ?? "";
+  if (texto.length < 5) return { kind: "ask_more_detail" };
+  if (!input.lugarNombre) return { kind: "ask_which_place" };
+
+  const reporteTipo = input.reporteTipo ?? "positive";
+  const description = texto.slice(0, 2000);
+
+  if (input.match) {
+    return {
+      kind: "draft_ready",
+      pending: {
+        kind: "report",
+        place_id: input.match.id,
+        place_name_text: null,
+        report_type: reporteTipo,
+        description,
+      },
+    };
+  }
+
+  if (reporteTipo === "negative") {
+    return {
+      kind: "draft_ready",
+      pending: {
+        kind: "report",
+        place_id: null,
+        place_name_text: input.lugarNombre.slice(0, 120),
+        report_type: "negative",
+        description,
+      },
+    };
+  }
+
+  // positive + no match -> route into a suggestion draft, address still unknown
+  return {
+    kind: "needs_address",
+    pending: {
+      kind: "suggestion",
+      name: input.lugarNombre.slice(0, 120),
+      city: (input.ciudad ?? "").slice(0, 80),
+      country: null,
+      address: null,
+      category: null,
+      notes: description,
+    },
+  };
+}
+
 export function parseContentRange(header: string | null): number | null {
   if (!header) return null;
   const match = /\/(\d+|\*)$/.exec(header.trim());
