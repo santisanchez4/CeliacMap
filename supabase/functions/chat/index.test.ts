@@ -27,6 +27,7 @@ import {
   deriveCityFromAddress,
   filterPlaceFields,
   getClientIp,
+  insertIntakeRow,
   getReply,
   isAllowedOrigin,
   isRateLimited,
@@ -971,4 +972,104 @@ Deno.test("buildSuggestionInsertPayload - matches suggest.js's exact shape, orig
     notes: "info",
     origin: "community",
   });
+});
+
+// ---------------------------------------------------------------------------
+// insertIntakeRow (Task 7) — the res.ok gate on every place_reports /
+// suggestions write. A failed write must NEVER come back as a success: the
+// caller sets `action` and tells the person "listo, lo envié" only on
+// `{ ok: true }`. These are the only tests in this file that touch the
+// network, so fetch is stubbed and always restored in a `finally` — a leaked
+// stub would silently corrupt every later test.
+// ---------------------------------------------------------------------------
+
+async function withStubbedFetch<T>(
+  stub: (input: string | URL | Request, init?: RequestInit) => Promise<Response>,
+  run: () => Promise<T>,
+): Promise<T> {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = stub as typeof globalThis.fetch;
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+Deno.test("insertIntakeRow - a 201 is a success, and the request mirrors report.js exactly", async () => {
+  let seenUrl: string | null = null;
+  let seenInit: RequestInit | undefined;
+
+  const result = await withStubbedFetch(
+    (input, init) => {
+      seenUrl = String(input);
+      seenInit = init;
+      return Promise.resolve(new Response(null, { status: 201 }));
+    },
+    () =>
+      insertIntakeRow("https://proj.supabase.co", "anon-key-123", "place_reports", {
+        place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
+        report_type: "positive",
+        description: "Muy bueno",
+      }),
+  );
+
+  assertEquals(result, { ok: true });
+  assertEquals(seenUrl, "https://proj.supabase.co/rest/v1/place_reports");
+  assertEquals(seenInit?.method, "POST");
+  assertEquals(seenInit?.headers, {
+    apikey: "anon-key-123",
+    Authorization: "Bearer anon-key-123",
+    "Content-Type": "application/json",
+    Prefer: "return=minimal",
+  });
+  // A bare object, not an array — same body form both browser forms use.
+  assertEquals(
+    seenInit?.body,
+    '{"place_id":"4300ad15-2f6f-4881-a902-b2ac5990464c","report_type":"positive","description":"Muy bueno"}',
+  );
+});
+
+Deno.test("insertIntakeRow - a non-2xx is a failure, with table/status/body captured for the log", async () => {
+  const result = await withStubbedFetch(
+    () =>
+      Promise.resolve(
+        new Response('{"message":"new row violates row-level security policy"}', { status: 400 }),
+      ),
+    () => insertIntakeRow("https://proj.supabase.co", "anon-key-123", "suggestions", { name: "X" }),
+  );
+
+  assertEquals(result.ok, false);
+  if (result.ok) return;
+  assertEquals(result.error.message, "suggestions insert failed: 400");
+  assertEquals(result.extra, {
+    table: "suggestions",
+    status: 400,
+    body: '{"message":"new row violates row-level security policy"}',
+  });
+});
+
+Deno.test("insertIntakeRow - a logged error body is truncated to 500 chars", async () => {
+  const result = await withStubbedFetch(
+    () => Promise.resolve(new Response("z".repeat(900), { status: 500 })),
+    () => insertIntakeRow("https://proj.supabase.co", "anon-key-123", "place_reports", {}),
+  );
+
+  assertEquals(result.ok, false);
+  if (result.ok) return;
+  assertEquals((result.extra.body as string).length, 500);
+});
+
+Deno.test("insertIntakeRow - a transport failure is a failure, not a thrown turn", async () => {
+  // fetch itself rejecting (DNS, TLS, connection reset) must degrade to the
+  // redactor's "error_envio" state, never bubble out and 500 the whole turn.
+  const result = await withStubbedFetch(
+    () => Promise.reject(new TypeError("error sending request: connection reset")),
+    () => insertIntakeRow("https://proj.supabase.co", "anon-key-123", "place_reports", { description: "x" }),
+  );
+
+  assertEquals(result.ok, false);
+  if (result.ok) return;
+  assertEquals(result.error.message, "error sending request: connection reset");
+  assertEquals(result.extra, { table: "place_reports", status: null });
 });

@@ -617,7 +617,7 @@ export function buildSuggestionInsertPayload(p: PendingSuggestionSubmission) {
 // `throw new Error(...)` like the buscar-path fetches: those 500 the turn,
 // which for a write would leave the person with no reply at all instead of an
 // honest "hubo un problema, ¿lo intento de nuevo?".
-async function insertIntakeRow(
+export async function insertIntakeRow(
   supabaseUrl: string,
   anonKey: string,
   table: "place_reports" | "suggestions",
