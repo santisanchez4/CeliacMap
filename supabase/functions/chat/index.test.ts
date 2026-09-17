@@ -38,6 +38,7 @@ import {
   validateRequestBody,
   type ConfirmarResult,
   type ConfirmTurnResult,
+  type EnvioContext,
   type PendingReportSubmission,
   type PendingSuggestionSubmission,
   type ReportarDraftResult,
@@ -232,6 +233,34 @@ Deno.test("buildResponderUserMessage includes <datos_cercanos> only when provide
 
   const withoutNearby = buildResponderUserMessage({ modulo: "buscar", userMessage: "algo en X", datos: [] });
   assertEquals(withoutNearby.includes("<datos_cercanos>"), false);
+});
+
+// ---------------------------------------------------------------------------
+// Módulo 2/4 — <envio> context block (Task 8: deliberate REDACTOR extension)
+// ---------------------------------------------------------------------------
+
+Deno.test("buildResponderUserMessage includes an <envio> block with the serialized draft state when provided", () => {
+  const envio: EnvioContext = {
+    estado: "borrador_listo",
+    lugar_nombre: "La Panera Sin TACC",
+    ciudad: "Adrogué",
+    report_type: "negative",
+    texto: "me contaminaron la comida",
+  };
+  const message = buildResponderUserMessage({
+    modulo: "reportar",
+    userMessage: "dale, mandalo",
+    envio,
+  });
+  assertMatch(message, /<envio>.*<\/envio>/s);
+  const envioBlock = message.match(/<envio>(.*)<\/envio>/s)?.[1] ?? "";
+  assertEquals(envioBlock.includes('"estado":"borrador_listo"'), true);
+  assertEquals(envioBlock.includes('"lugar_nombre":"La Panera Sin TACC"'), true);
+});
+
+Deno.test("buildResponderUserMessage omits <envio> entirely when not provided (no regression for buscar/celiaquia)", () => {
+  const message = buildResponderUserMessage({ modulo: "buscar", userMessage: "algo en Palermo", datos: [] });
+  assertEquals(message.includes("<envio>"), false);
 });
 
 // ---------------------------------------------------------------------------

@@ -632,17 +632,41 @@ export function buildRouterUserMessage(history: ChatMessage[]): string {
 // buscar passes exactly the (already-filtered) query rows as <datos>; every
 // other module omits it, so the model structurally cannot "find" a place it
 // wasn't given (the Enharinate Mendoza guard from CLAUDE.md's Decisions Log).
+//
+// EnvioContext is the reportar/confirmar (Módulo 2/4) analogue of <datos>: it
+// carries the in-progress report/suggestion draft's state so the redactor can
+// ask for a missing address, show a draft for confirmation, or report a send
+// outcome — without ever inventing what was or wasn't actually sent.
+// "error_envio" exists so a failed place_reports/suggestions write (network
+// error, RLS/CHECK rejection) can be surfaced honestly instead of the model
+// claiming "listo, lo envié" when nothing was written.
 // ---------------------------------------------------------------------------
+
+export interface EnvioContext {
+  estado:
+    | "necesita_mas_detalle"
+    | "necesita_lugar"
+    | "necesita_direccion"
+    | "borrador_listo"
+    | "enviado"
+    | "error_envio";
+  lugar_nombre?: string | null;
+  ciudad?: string | null;
+  report_type?: "positive" | "negative" | null;
+  texto?: string | null;
+}
 
 export function buildResponderUserMessage(args: {
   modulo: RouterOutput["modulo"];
   userMessage: string;
   datos?: Record<string, unknown>[];
   datosCercanos?: { city: string; count: number } | null;
+  envio?: EnvioContext;
 }): string {
   const parts = [`modulo: ${args.modulo}`];
   if (args.datos) parts.push(`<datos>${JSON.stringify(args.datos)}</datos>`);
   if (args.datosCercanos) parts.push(`<datos_cercanos>${JSON.stringify(args.datosCercanos)}</datos_cercanos>`);
+  if (args.envio) parts.push(`<envio>${JSON.stringify(args.envio)}</envio>`);
   parts.push(`Mensaje del usuario: ${args.userMessage}`);
   return parts.join("\n");
 }
