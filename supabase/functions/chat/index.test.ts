@@ -18,6 +18,7 @@ import {
   computeBucketKeys,
   continueSuggestionCollection,
   decideConfirmarSubmission,
+  decideConfirmTurn,
   decideMatchFromRows,
   decideReportarDraft,
   deriveCityFromAddress,
@@ -36,6 +37,8 @@ import {
   validatePendingSubmission,
   validateRequestBody,
   type ConfirmarResult,
+  type ConfirmTurnResult,
+  type PendingReportSubmission,
   type PendingSuggestionSubmission,
   type ReportarDraftResult,
 } from "./index.ts";
@@ -807,4 +810,32 @@ Deno.test("decideConfirmarSubmission - description clamps to 2000 chars", () => 
   const r = decideConfirmarSubmission({ match: null, lugarNombre: "X", reporteTexto: long });
   assertEquals(r.kind, "insert_now");
   if (r.kind === "insert_now") assertEquals(r.payload.description.length, 2000);
+});
+
+// ---------------------------------------------------------------------------
+// Módulo 2 confirmation dispatch (Task 6)
+// ---------------------------------------------------------------------------
+
+Deno.test("decideConfirmTurn - confirma_envio false is never this function's concern (caller gate)", () => {
+  // decideConfirmTurn assumes the caller already checked confirma_envio === true;
+  // documented via the function's own doc comment, not re-tested here.
+});
+
+Deno.test("decideConfirmTurn - no pending_submission -> nothing_pending", () => {
+  assertEquals(decideConfirmTurn(null), { kind: "nothing_pending" });
+});
+
+Deno.test("decideConfirmTurn - report pending, complete -> insert_report", () => {
+  const pending: PendingReportSubmission = { kind: "report", place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c", place_name_text: null, report_type: "positive", description: "Muy bueno" };
+  assertEquals(decideConfirmTurn(pending), { kind: "insert_report", payload: pending });
+});
+
+Deno.test("decideConfirmTurn - suggestion pending, address/country complete -> insert_suggestion", () => {
+  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "X", city: "Y", country: "Uruguay", address: "Calle 123", category: null, notes: null };
+  assertEquals(decideConfirmTurn(pending), { kind: "insert_suggestion", payload: pending });
+});
+
+Deno.test("decideConfirmTurn - suggestion pending, address still missing -> nothing_pending (not confirmable yet)", () => {
+  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "X", city: "Y", country: null, address: null, category: null, notes: null };
+  assertEquals(decideConfirmTurn(pending), { kind: "nothing_pending" });
 });

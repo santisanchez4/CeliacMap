@@ -510,6 +510,41 @@ export function decideConfirmarSubmission(input: {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Módulo 2 confirmation dispatch (Task 6) — decideConfirmTurn
+// ---------------------------------------------------------------------------
+//
+// Consumes: confirma_envio (router output), and a pending_submission that has
+// already been validated by validatePendingSubmission (Task 1), so we trust
+// its shape.
+//
+// Produces: ConfirmTurnResult — either insert_report, insert_suggestion, or
+// nothing_pending (the fallback if there's no usable pending submission to
+// confirm).
+//
+// Key rule: a suggestion is only confirmable if BOTH address AND country are
+// non-null. If either is still missing, return nothing_pending — the upstream
+// Task 4 (continueSuggestionCollection) is responsible for collecting those.
+
+export type ConfirmTurnResult =
+  | { kind: "nothing_pending" }
+  | { kind: "insert_report"; payload: PendingReportSubmission }
+  | { kind: "insert_suggestion"; payload: PendingSuggestionSubmission };
+
+/**
+ * Caller must only invoke this when the router's confirma_envio === true.
+ * pending must already be the output of validatePendingSubmission (trusted shape).
+ */
+export function decideConfirmTurn(pending: PendingSubmission | null): ConfirmTurnResult {
+  if (!pending) return { kind: "nothing_pending" };
+  if (pending.kind === "report") return { kind: "insert_report", payload: pending };
+  if (pending.kind === "suggestion") {
+    if (!pending.address || !pending.country) return { kind: "nothing_pending" };
+    return { kind: "insert_suggestion", payload: pending };
+  }
+  return { kind: "nothing_pending" };
+}
+
 export function parseContentRange(header: string | null): number | null {
   if (!header) return null;
   const match = /\/(\d+|\*)$/.exec(header.trim());
