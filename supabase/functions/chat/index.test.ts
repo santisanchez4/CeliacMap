@@ -17,6 +17,7 @@ import {
   buildRouterUserMessage,
   computeBucketKeys,
   continueSuggestionCollection,
+  decideConfirmarSubmission,
   decideMatchFromRows,
   decideReportarDraft,
   deriveCityFromAddress,
@@ -34,6 +35,7 @@ import {
   trimHistory,
   validatePendingSubmission,
   validateRequestBody,
+  type ConfirmarResult,
   type PendingSuggestionSubmission,
   type ReportarDraftResult,
 } from "./index.ts";
@@ -764,4 +766,45 @@ Deno.test("continueSuggestionCollection - backfills city from an already-known a
     assertEquals(r.pending.city, "Fray Bentos");
     assertEquals(r.pending.country, "Uruguay");
   }
+});
+
+// ---------------------------------------------------------------------------
+// Módulo 4 decision (confirmar) — Task 5, single-turn flow
+// ---------------------------------------------------------------------------
+
+Deno.test("decideConfirmarSubmission - too-short texto asks for more detail", () => {
+  const r = decideConfirmarSubmission({ match: null, lugarNombre: "Algún lugar", reporteTexto: "ok" });
+  assertEquals(r, { kind: "ask_more_detail" });
+});
+
+Deno.test("decideConfirmarSubmission - missing lugar_nombre asks which place", () => {
+  const r = decideConfirmarSubmission({ match: null, lugarNombre: null, reporteTexto: "Es 100% sin gluten, lo conozco bien" });
+  assertEquals(r, { kind: "ask_which_place" });
+});
+
+Deno.test("decideConfirmarSubmission - matched needs_review place -> insert_now with place_id", () => {
+  const r = decideConfirmarSubmission({
+    match: { id: "82fd31e9-0000-0000-0000-000000000000", name: "Serendipia Gluten Free", city: "Montevideo" },
+    lugarNombre: "Serendipia",
+    reporteTexto: "Es artesanal, 100% sin gluten, hace pickup",
+  });
+  assertEquals(r, {
+    kind: "insert_now",
+    payload: { place_id: "82fd31e9-0000-0000-0000-000000000000", place_name_text: null, report_type: "positive", description: "Es artesanal, 100% sin gluten, hace pickup" },
+  });
+});
+
+Deno.test("decideConfirmarSubmission - no match (0 or ambiguous) -> insert_now with place_name_text, no place_id", () => {
+  const r = decideConfirmarSubmission({ match: null, lugarNombre: "Un lugar nuevo", reporteTexto: "Sin TACC, muy recomendable" });
+  assertEquals(r, {
+    kind: "insert_now",
+    payload: { place_id: null, place_name_text: "Un lugar nuevo", report_type: "positive", description: "Sin TACC, muy recomendable" },
+  });
+});
+
+Deno.test("decideConfirmarSubmission - description clamps to 2000 chars", () => {
+  const long = "b".repeat(2500);
+  const r = decideConfirmarSubmission({ match: null, lugarNombre: "X", reporteTexto: long });
+  assertEquals(r.kind, "insert_now");
+  if (r.kind === "insert_now") assertEquals(r.payload.description.length, 2000);
 });

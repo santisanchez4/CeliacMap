@@ -475,6 +475,41 @@ export function continueSuggestionCollection(
   return { kind: "still_collecting", pending: updated, askFor };
 }
 
+// ---------------------------------------------------------------------------
+// Módulo 4 decision (confirmar) — Task 5, single-turn flow
+// Módulo 4 is a person volunteering evidence about a place under review
+// (status='needs_review'). Unlike Módulo 2, this is SINGLE-TURN — the
+// function immediately decides whether to insert a place_report or ask
+// for clarification, never returning a pending submission to echo to the
+// client for a later confirm turn (decision 1 in the brief).
+// ---------------------------------------------------------------------------
+
+export type ConfirmarResult =
+  | { kind: "ask_more_detail" }
+  | { kind: "ask_which_place" }
+  | { kind: "insert_now"; payload: { place_id: string | null; place_name_text: string | null; report_type: "positive"; description: string } };
+
+export function decideConfirmarSubmission(input: {
+  match: PlaceMatch | null;
+  lugarNombre: string | null;
+  reporteTexto: string | null;
+}): ConfirmarResult {
+  const texto = input.reporteTexto?.trim() ?? "";
+  if (texto.length < 5) return { kind: "ask_more_detail" };
+  if (!input.lugarNombre) return { kind: "ask_which_place" };
+
+  const description = texto.slice(0, 2000);
+  return {
+    kind: "insert_now",
+    payload: {
+      place_id: input.match?.id ?? null,
+      place_name_text: input.match ? null : input.lugarNombre.slice(0, 120),
+      report_type: "positive",
+      description,
+    },
+  };
+}
+
 export function parseContentRange(header: string | null): number | null {
   if (!header) return null;
   const match = /\/(\d+|\*)$/.exec(header.trim());
