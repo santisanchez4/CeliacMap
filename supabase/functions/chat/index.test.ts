@@ -12,8 +12,10 @@ import {
   buildCorsHeaders,
   buildNearbyCountUrl,
   buildPlaceLookupUrl,
+  buildPlaceReportInsertPayload,
   buildPlacesSearchUrl,
   buildResponderUserMessage,
+  buildSuggestionInsertPayload,
   buildRouterUserMessage,
   computeBucketKeys,
   continueSuggestionCollection,
@@ -867,4 +869,47 @@ Deno.test("decideConfirmTurn - suggestion pending, address/country complete -> i
 Deno.test("decideConfirmTurn - suggestion pending, address still missing -> nothing_pending (not confirmable yet)", () => {
   const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "X", city: "Y", country: null, address: null, category: null, notes: null };
   assertEquals(decideConfirmTurn(pending), { kind: "nothing_pending" });
+});
+
+// ---------------------------------------------------------------------------
+// Intake insert payloads (Task 7) — the exact PostgREST row shapes the chatbot
+// writes, mirroring js/report.js and js/suggest.js.
+// ---------------------------------------------------------------------------
+
+Deno.test("buildPlaceReportInsertPayload - matches report.js's exact shape", () => {
+  const payload = buildPlaceReportInsertPayload({
+    kind: "report",
+    place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
+    place_name_text: null,
+    report_type: "positive",
+    description: "Muy bueno",
+  });
+  assertEquals(payload, {
+    place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
+    place_name_text: null,
+    report_type: "positive",
+    description: "Muy bueno",
+  });
+});
+
+Deno.test("buildSuggestionInsertPayload - matches suggest.js's exact shape, origin always community", () => {
+  const payload = buildSuggestionInsertPayload({
+    kind: "suggestion",
+    name: "X",
+    city: "Y",
+    country: "Uruguay",
+    address: "Calle 123",
+    category: "cafe",
+    notes: "info",
+  });
+  assertEquals(payload, {
+    name: "X",
+    address: "Calle 123",
+    city: "Y",
+    country: "Uruguay",
+    category: "cafe",
+    evidence_url: null,
+    notes: "info",
+    origin: "community",
+  });
 });

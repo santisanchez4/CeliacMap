@@ -19,14 +19,17 @@
 //      choke point.
 //   2. REDACTOR — drafts the reply using ONLY the <datos> / <datos_cercanos>
 //      this function passes it for this turn.
-// fuera_de_alcance and the reportar/confirmar stub (Módulos 2/4 ship in Fase
-// C) skip the redactor entirely and use a canned reply instead — cheaper, and
-// it means a hostile fuera_de_alcance message is never even shown to the
-// second call.
+// fuera_de_alcance skips the redactor entirely and uses a canned reply
+// instead — cheaper, and it means a hostile message is never even shown to
+// the second call.
 //
-// Fase B scope: Módulo 1 (buscar) and Módulo 3 (celiaquia) are fully wired.
-// Módulo 2 (reportar) and Módulo 4 (confirmar) return a fixed "not yet"
-// reply — writing to place_reports/suggestions ships in Fase C.
+// All four modules are wired (Fase C): Módulo 1 (buscar) and Módulo 3
+// (celiaquia) answer from the redactor; Módulo 2 (reportar/recomendar) and
+// Módulo 4 (confirmar) additionally write into the SAME public intake tables
+// the browser forms use — place_reports and suggestions, through the anon key,
+// under the same RLS. The chatbot is a third writer into that existing
+// pipeline; it never touches `places`, so a chat message can no more publish a
+// place than a form submission can.
 //
 // Required secrets (`supabase secrets set`, see README.md): ANTHROPIC_API_KEY,
 // CHAT_MODEL, CHAT_MAX_MESSAGES_PER_SESSION, CHAT_MAX_MESSAGES_PER_IP_DAY,
@@ -545,6 +548,84 @@ export function decideConfirmTurn(pending: PendingSubmission | null): ConfirmTur
   return { kind: "nothing_pending" };
 }
 
+// ---------------------------------------------------------------------------
+// Intake insert payloads (Task 7) — the exact PostgREST row shapes written to
+// place_reports / suggestions, mirroring js/report.js and js/suggest.js
+// verbatim (same tables, same anon key, same RLS `with check`). The chatbot
+// is just a third writer into the SAME intake pipeline the public forms
+// already use — it never touches `places`, and has zero authority over
+// places.status (ADR-006).
+// ---------------------------------------------------------------------------
+
+export function buildPlaceReportInsertPayload(p: PendingReportSubmission) {
+  return {
+    place_id: p.place_id,
+    place_name_text: p.place_name_text,
+    report_type: p.report_type,
+    description: p.description,
+  };
+}
+
+export function buildSuggestionInsertPayload(p: PendingSuggestionSubmission) {
+  return {
+    name: p.name,
+    address: p.address,
+    city: p.city,
+    country: p.country,
+    category: p.category,
+    evidence_url: null,
+    notes: p.notes,
+    origin: "community",
+  };
+}
+
+// A failed intake write must never be reported to the user as a success (the
+// person would believe their report was recorded when it wasn't), so this
+// returns an outcome instead of throwing: both a transport failure and a
+// non-2xx (an RLS `with check` violation or a column CHECK failure both come
+// back as 4xx here) become `ok: false`, and the caller responds with the
+// redactor's "error_envio" state rather than an ack. Deliberately NOT
+// `throw new Error(...)` like the buscar-path fetches: those 500 the turn,
+// which for a write would leave the person with no reply at all instead of an
+// honest "hubo un problema, ¿lo intento de nuevo?".
+async function insertIntakeRow(
+  supabaseUrl: string,
+  anonKey: string,
+  table: "place_reports" | "suggestions",
+  payload: Record<string, unknown>,
+): Promise<{ ok: true } | { ok: false; error: Error; extra: Record<string, unknown> }> {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/${table}`, {
+      method: "POST",
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) return { ok: true };
+    let body = "";
+    try {
+      body = (await res.text()).slice(0, 500);
+    } catch {
+      // The status code alone is enough to log; a body we can't read is not fatal.
+    }
+    return {
+      ok: false,
+      error: new Error(`${table} insert failed: ${res.status}`),
+      extra: { table, status: res.status, body },
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err : new Error(String(err)),
+      extra: { table, status: null },
+    };
+  }
+}
+
 export function parseContentRange(header: string | null): number | null {
   if (!header) return null;
   const match = /\/(\d+|\*)$/.exec(header.trim());
@@ -725,8 +806,8 @@ export function isRateLimited(
 }
 
 // ---------------------------------------------------------------------------
-// Canned replies — no model call needed (rate limit, scope decline, and the
-// Fase B stub for reportar/confirmar are all deterministic).
+// Canned replies — no model call needed (rate limit and scope decline are both
+// deterministic).
 // ---------------------------------------------------------------------------
 
 type Idioma = (typeof IDIOMAS)[number];
@@ -743,13 +824,6 @@ export const SCOPE_DECLINE_REPLIES: Record<Idioma, string> = {
     "Solo puedo ayudarte a buscar lugares sin TACC en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía.",
   en:
     "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease.",
-};
-
-export const STUB_INTAKE_REPLIES: Record<Idioma, string> = {
-  es:
-    'Todavía no puedo enviar reportes ni sugerencias por acá, pero ya estamos trabajando en eso. Mientras tanto podés usar el formulario de la sección "Sumá un lugar".',
-  en:
-    'I can\'t send reports or suggestions through here just yet, but we\'re working on it. In the meantime you can use the form in the "Add a place" section.',
 };
 
 export function getReply(dict: Record<Idioma, string>, idioma: Idioma): string {
@@ -942,6 +1016,10 @@ export async function handleRequest(req: Request): Promise<Response> {
     return jsonResponse({ error: validated.error }, 400, cors);
   }
   const { messages, session_token: sessionToken } = validated.value;
+  // The client echoes back whatever pending_submission the previous turn
+  // returned; validatePendingSubmission is the trust boundary (Task 1) — every
+  // read below goes through this normalized value, never the raw field.
+  const pendingIn = validatePendingSubmission(validated.value.pending_submission);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -994,7 +1072,15 @@ export async function handleRequest(req: Request): Promise<Response> {
       rawUserMessage: lastUserMessage,
       rawBotReply: reply,
     });
-    return jsonResponse({ reply, pending_submission: null, action: null, rate_limited: true }, 200, cors);
+    // The turn did nothing: no lookup, no draft, no write. The in-progress
+    // draft is echoed back unchanged so a rate-limited turn doesn't silently
+    // destroy a report the person already described (action stays null —
+    // nothing was submitted).
+    return jsonResponse(
+      { reply, pending_submission: pendingIn, action: null, rate_limited: true },
+      200,
+      cors,
+    );
   }
 
   if (!anthropicApiKey) {
@@ -1025,22 +1111,207 @@ export async function handleRequest(req: Request): Promise<Response> {
     return internalErrorResponse(cors);
   }
 
-  let reply: string;
+  // An in-progress suggestion still missing its address owns the turn, no
+  // matter what modulo the router assigned to it: the person is answering the
+  // question the bot just asked, and the router has no address field to
+  // classify that answer with. Checked BEFORE confirma_envio on purpose — a
+  // mis-fired confirmation there would hit decideConfirmTurn's nothing_pending
+  // and fall through to a fresh lookup, silently discarding the name/city/
+  // notes already collected.
+  const collectingSuggestion: PendingSuggestionSubmission | null =
+    router.modulo !== "fuera_de_alcance" && pendingIn?.kind === "suggestion" && pendingIn.address === null
+      ? pendingIn
+      : null;
+
+  // nothing_pending deliberately falls through to the modulo dispatch below
+  // (no dead-end reply): a confirmation with nothing to confirm just becomes a
+  // normal turn, and if the message names a place it can start a fresh draft.
+  const confirmTurn: ConfirmTurnResult = !collectingSuggestion && router.confirma_envio
+    ? decideConfirmTurn(pendingIn)
+    : { kind: "nothing_pending" };
+
+  // "" is never returned: every branch below either assigns `reply` directly
+  // or sets `envio`, and the shared redactor call after the chain assigns
+  // `reply` for every envio branch.
+  let reply = "";
   let redactorUsage: { in: number; out: number } | null = null;
   let marked = false;
   let markedReason: string | null = null;
   let queryLog: Record<string, unknown> | null = null;
   let resultCount: number | null = null;
   let nearbyCount: number | null = null;
+  // Módulo 2/4 state for this turn: what the redactor is told about the draft
+  // or the send outcome, and what the client gets back to echo next turn.
+  let envio: EnvioContext | null = null;
+  let envioModulo: RouterOutput["modulo"] = router.modulo;
+  let responsePending: PendingSubmission | null = null;
+  let responseAction: ChatAction | null = null;
 
   try {
     if (router.modulo === "fuera_de_alcance") {
       reply = getReply(SCOPE_DECLINE_REPLIES, router.idioma);
       marked = true;
       markedReason = "fuera_de_alcance";
-    } else if (router.modulo === "reportar" || router.modulo === "confirmar") {
-      // Módulos 2/4 ship in Fase C (writes to place_reports / suggestions).
-      reply = getReply(STUB_INTAKE_REPLIES, router.idioma);
+    } else if (collectingSuggestion) {
+      // Address/country collection continuation (Task 4). The raw last user
+      // message is the only source for an address — the router never extracts
+      // one. Always presented as REPORTAR: this is the tail of a Módulo 2
+      // flow, whatever the router called this particular turn.
+      envioModulo = "reportar";
+      const collected = continueSuggestionCollection(collectingSuggestion, lastUserMessage);
+      responsePending = collected.pending;
+      envio = {
+        estado: collected.kind === "draft_ready" ? "borrador_listo" : "necesita_direccion",
+        lugar_nombre: collected.pending.name,
+        ciudad: collected.pending.city || null,
+        texto: collected.pending.notes,
+      };
+    } else if (confirmTurn.kind === "insert_report") {
+      envioModulo = "reportar";
+      const inserted = await insertIntakeRow(
+        supabaseUrl,
+        anonKey,
+        "place_reports",
+        buildPlaceReportInsertPayload(confirmTurn.payload),
+      );
+      if (inserted.ok) {
+        responseAction = { type: "report_submitted" };
+        responsePending = null;
+        envio = {
+          estado: "enviado",
+          lugar_nombre: confirmTurn.payload.place_name_text,
+          report_type: confirmTurn.payload.report_type,
+          texto: confirmTurn.payload.description,
+        };
+      } else {
+        await logServerError(supabase, "place_report_insert_failed", inserted.error, inserted.extra);
+        // Nothing was written: no action, and the same draft is echoed back
+        // unchanged so "dale" one more time retries this exact confirm turn.
+        responsePending = confirmTurn.payload;
+        envio = {
+          estado: "error_envio",
+          lugar_nombre: confirmTurn.payload.place_name_text,
+          report_type: confirmTurn.payload.report_type,
+          texto: confirmTurn.payload.description,
+        };
+      }
+    } else if (confirmTurn.kind === "insert_suggestion") {
+      envioModulo = "reportar";
+      const inserted = await insertIntakeRow(
+        supabaseUrl,
+        anonKey,
+        "suggestions",
+        buildSuggestionInsertPayload(confirmTurn.payload),
+      );
+      if (inserted.ok) {
+        responseAction = { type: "suggestion_submitted" };
+        responsePending = null;
+        envio = {
+          estado: "enviado",
+          lugar_nombre: confirmTurn.payload.name,
+          ciudad: confirmTurn.payload.city,
+          texto: confirmTurn.payload.notes,
+        };
+      } else {
+        await logServerError(supabase, "suggestion_insert_failed", inserted.error, inserted.extra);
+        responsePending = confirmTurn.payload;
+        envio = {
+          estado: "error_envio",
+          lugar_nombre: confirmTurn.payload.name,
+          ciudad: confirmTurn.payload.city,
+          texto: confirmTurn.payload.notes,
+        };
+      }
+    } else if (router.modulo === "reportar") {
+      // Módulo 2 turn 1 — the lookup runs against APPROVED places with the
+      // anon key, so the same "public read approved places" RLS that backs
+      // Módulo 1 is the structural backstop here too.
+      const match = router.lugar_nombre
+        ? await fetchPlaceMatch(supabaseUrl, anonKey, router.lugar_nombre, router.ciudad, "approved")
+        : null;
+      const draft = decideReportarDraft({
+        match,
+        reporteTipo: router.reporte_tipo,
+        lugarNombre: router.lugar_nombre,
+        ciudad: router.ciudad,
+        reporteTexto: router.reporte_texto,
+      });
+      if (draft.kind === "ask_more_detail") {
+        envio = {
+          estado: "necesita_mas_detalle",
+          lugar_nombre: router.lugar_nombre,
+          ciudad: router.ciudad,
+          report_type: router.reporte_tipo,
+        };
+      } else if (draft.kind === "ask_which_place") {
+        envio = {
+          estado: "necesita_lugar",
+          ciudad: router.ciudad,
+          report_type: router.reporte_tipo,
+          texto: router.reporte_texto,
+        };
+      } else if (draft.kind === "draft_ready") {
+        responsePending = draft.pending;
+        envio = {
+          estado: "borrador_listo",
+          lugar_nombre: draft.pending.place_name_text ?? router.lugar_nombre,
+          ciudad: router.ciudad,
+          report_type: draft.pending.report_type,
+          texto: draft.pending.description,
+        };
+      } else {
+        // needs_address — a recommendation for a place that isn't on the map
+        // yet, routed into the suggestions pipeline once the address is known.
+        responsePending = draft.pending;
+        envio = {
+          estado: "necesita_direccion",
+          lugar_nombre: draft.pending.name,
+          ciudad: draft.pending.city || null,
+          texto: draft.pending.notes,
+        };
+      }
+    } else if (router.modulo === "confirmar") {
+      // Módulo 4 — single-turn: evidence about a place still under review.
+      // needs_review places are NOT anon-readable (RLS publishes only
+      // approved), so this one lookup is the sole service_role use in the
+      // whole turn; the insert below still goes through the anon key.
+      const match = router.lugar_nombre
+        ? await fetchPlaceMatch(supabaseUrl, serviceRoleKey, router.lugar_nombre, router.ciudad, "needs_review")
+        : null;
+      const decision = decideConfirmarSubmission({
+        match,
+        lugarNombre: router.lugar_nombre,
+        reporteTexto: router.reporte_texto,
+      });
+      if (decision.kind === "ask_more_detail") {
+        envio = { estado: "necesita_mas_detalle", lugar_nombre: router.lugar_nombre, ciudad: router.ciudad };
+      } else if (decision.kind === "ask_which_place") {
+        envio = { estado: "necesita_lugar", ciudad: router.ciudad, texto: router.reporte_texto };
+      } else {
+        // insert_now — payload is already exactly the place_reports row shape.
+        const inserted = await insertIntakeRow(supabaseUrl, anonKey, "place_reports", decision.payload);
+        if (inserted.ok) {
+          responseAction = { type: "report_submitted" };
+          envio = {
+            estado: "enviado",
+            lugar_nombre: decision.payload.place_name_text ?? router.lugar_nombre,
+            ciudad: router.ciudad,
+            report_type: decision.payload.report_type,
+            texto: decision.payload.description,
+          };
+        } else {
+          await logServerError(supabase, "place_report_insert_failed", inserted.error, inserted.extra);
+          // Módulo 4 is single-turn: there is no pending_submission to echo
+          // back, so a retry means the person repeating their message.
+          envio = {
+            estado: "error_envio",
+            lugar_nombre: decision.payload.place_name_text ?? router.lugar_nombre,
+            ciudad: router.ciudad,
+            report_type: decision.payload.report_type,
+            texto: decision.payload.description,
+          };
+        }
+      }
     } else if (router.modulo === "celiaquia") {
       if (router.limite_medico) {
         // Same logging treatment as fuera_de_alcance (ADR-006 decision 10) —
@@ -1094,6 +1365,29 @@ export async function handleRequest(req: Request): Promise<Response> {
       reply = redactorCall.text;
       redactorUsage = redactorCall.usage;
     }
+
+    // One shared redactor call for every Módulo 2/4 branch above — same shape
+    // as the celiaquia/buscar calls, with <envio> in place of <datos>. The
+    // redactor never decides what happened: it only phrases the estado this
+    // function already resolved (and on "error_envio" it says so, instead of
+    // claiming a send that never landed).
+    if (envio) {
+      const redactorCall = await callModel(
+        anthropic,
+        model,
+        RESPONDER_PROMPT,
+        buildResponderUserMessage({ modulo: envioModulo, userMessage: lastUserMessage, envio }),
+        600,
+      );
+      reply = redactorCall.text;
+      redactorUsage = redactorCall.usage;
+      queryLog = {
+        lugar_nombre: router.lugar_nombre,
+        ciudad: router.ciudad,
+        confirma_envio: router.confirma_envio,
+        envio_estado: envio.estado,
+      };
+    }
   } catch (err) {
     await logServerError(supabase, "responder_call_failed", err, { modulo: router.modulo });
     return internalErrorResponse(cors);
@@ -1113,7 +1407,11 @@ export async function handleRequest(req: Request): Promise<Response> {
     rawBotReply: marked ? reply : undefined,
   });
 
-  return jsonResponse({ reply, pending_submission: null, action: null, rate_limited: false }, 200, cors);
+  return jsonResponse(
+    { reply, pending_submission: responsePending, action: responseAction, rate_limited: false },
+    200,
+    cors,
+  );
 }
 
 // Only start the HTTP server when this file is run directly (the real Edge
