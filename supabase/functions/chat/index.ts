@@ -52,7 +52,101 @@ export interface ChatMessage {
 export interface ChatRequestBody {
   messages: ChatMessage[];
   session_token: string;
-  pending_submission: unknown | null;
+  pending_submission: unknown | null; // validated via validatePendingSubmission before use — never trust the shape
+}
+
+// ---------------------------------------------------------------------------
+// PendingSubmission types — discriminated union, produced by browser forms
+// and consumed by Tasks 3-7. The request's pending_submission field is
+// client-echoed and untrusted; validatePendingSubmission is the trust
+// boundary.
+// ---------------------------------------------------------------------------
+
+export type PendingReportSubmission = {
+  kind: "report";
+  place_id: string | null;
+  place_name_text: string | null;
+  report_type: "positive" | "negative";
+  description: string;
+};
+
+export type PendingSuggestionSubmission = {
+  kind: "suggestion";
+  name: string;
+  city: string;
+  country: "Uruguay" | "Argentina" | null;
+  address: string | null; // null while still being collected (Task 4)
+  category: "restaurant" | "cafe" | "shop" | null;
+  notes: string | null;
+};
+
+export type PendingSubmission = PendingReportSubmission | PendingSuggestionSubmission;
+
+export interface ChatAction {
+  type: "report_submitted" | "suggestion_submitted";
+}
+
+export interface ChatResponseBody {
+  reply: string;
+  pending_submission: PendingSubmission | null;
+  action: ChatAction | null;
+  rate_limited: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// PendingSubmission validation (trust boundary)
+// ---------------------------------------------------------------------------
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isNonEmptyString(x: unknown, maxLen: number): x is string {
+  return typeof x === "string" && x.trim().length > 0 && x.length <= maxLen;
+}
+
+export function validatePendingSubmission(x: unknown): PendingSubmission | null {
+  if (x === null || typeof x !== "object") return null;
+  const obj = x as Record<string, unknown>;
+
+  if (obj.kind === "report") {
+    const placeId = obj.place_id;
+    const placeNameText = obj.place_name_text;
+    const placeIdOk = placeId === null || (typeof placeId === "string" && UUID_RE.test(placeId));
+    const placeNameOk = placeNameText === null || isNonEmptyString(placeNameText, 120);
+    if (!placeIdOk || !placeNameOk) return null;
+    if (placeId === null && placeNameText === null) return null; // schema requires one of the two
+    if (obj.report_type !== "positive" && obj.report_type !== "negative") return null;
+    if (!isNonEmptyString(obj.description, 2000)) return null;
+    return {
+      kind: "report",
+      place_id: placeId as string | null,
+      place_name_text: placeNameText as string | null,
+      report_type: obj.report_type,
+      description: obj.description as string,
+    };
+  }
+
+  if (obj.kind === "suggestion") {
+    if (!isNonEmptyString(obj.name, 120)) return null;
+    if (!isNonEmptyString(obj.city, 80)) return null;
+    if (obj.country !== null && obj.country !== "Uruguay" && obj.country !== "Argentina") return null;
+    const address = obj.address;
+    if (address !== null && !isNonEmptyString(address, 200)) return null;
+    const category = obj.category;
+    if (category !== null && category !== "restaurant" && category !== "cafe" && category !== "shop") return null;
+    const notes = obj.notes;
+    if (notes !== null && !isNonEmptyString(notes, 1000)) return null;
+    return {
+      kind: "suggestion",
+      name: obj.name as string,
+      city: obj.city as string,
+      country: (obj.country ?? null) as "Uruguay" | "Argentina" | null,
+      address: (address ?? null) as string | null,
+      category: (category ?? null) as "restaurant" | "cafe" | "shop" | null,
+      notes: (notes ?? null) as string | null,
+    };
+  }
+
+  return null;
 }
 
 const MODULOS = ["buscar", "reportar", "celiaquia", "confirmar", "fuera_de_alcance"] as const;

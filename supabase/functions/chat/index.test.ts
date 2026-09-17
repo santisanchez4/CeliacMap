@@ -26,6 +26,7 @@ import {
   RATE_LIMIT_REPLIES,
   sha256Hex,
   trimHistory,
+  validatePendingSubmission,
   validateRequestBody,
 } from "./index.ts";
 
@@ -437,4 +438,111 @@ Deno.test("validateRequestBody rejects when the last message is not from the use
 Deno.test("validateRequestBody rejects a missing session_token", () => {
   const result = validateRequestBody({ messages: [{ role: "user", content: "hola" }] });
   assertEquals(result.ok, false);
+});
+
+// ---------------------------------------------------------------------------
+// PendingSubmission validation
+// ---------------------------------------------------------------------------
+
+Deno.test("validatePendingSubmission - null passes through", () => {
+  assertEquals(validatePendingSubmission(null), null);
+});
+
+Deno.test("validatePendingSubmission - valid report with place_id", () => {
+  const input = {
+    kind: "report" as const,
+    place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
+    place_name_text: null,
+    report_type: "positive" as const,
+    description: "Excelente atención, todo sin TACC",
+  };
+  assertEquals(validatePendingSubmission(input), input);
+});
+
+Deno.test("validatePendingSubmission - valid report with place_name_text, no place_id", () => {
+  const input = {
+    kind: "report" as const,
+    place_id: null,
+    place_name_text: "La Panera Sin TACC",
+    report_type: "negative" as const,
+    description: "Me contaminaron la comida",
+  };
+  assertEquals(validatePendingSubmission(input), input);
+});
+
+Deno.test("validatePendingSubmission - rejects report with neither place_id nor place_name_text", () => {
+  assertEquals(
+    validatePendingSubmission({
+      kind: "report",
+      place_id: null,
+      place_name_text: null,
+      report_type: "positive",
+      description: "algo",
+    }),
+    null,
+  );
+});
+
+Deno.test("validatePendingSubmission - rejects malformed place_id (not a uuid)", () => {
+  assertEquals(
+    validatePendingSubmission({
+      kind: "report",
+      place_id: "not-a-uuid; DROP TABLE places;",
+      place_name_text: null,
+      report_type: "positive",
+      description: "algo",
+    }),
+    null,
+  );
+});
+
+Deno.test("validatePendingSubmission - valid suggestion, address still null", () => {
+  const input = {
+    kind: "suggestion" as const,
+    name: "Bienestar Gluten Free",
+    city: "Fray Bentos",
+    country: "Uruguay" as const,
+    address: null,
+    category: null,
+    notes: "100% sin gluten según el dueño",
+  };
+  assertEquals(validatePendingSubmission(input), input);
+});
+
+Deno.test("validatePendingSubmission - rejects unknown kind", () => {
+  assertEquals(validatePendingSubmission({ kind: "bogus" }), null);
+});
+
+Deno.test("validatePendingSubmission - rejects non-object", () => {
+  assertEquals(validatePendingSubmission("hello"), null);
+  assertEquals(validatePendingSubmission(42), null);
+  assertEquals(validatePendingSubmission(undefined), null);
+});
+
+Deno.test("validatePendingSubmission - rejects report_type outside enum", () => {
+  assertEquals(
+    validatePendingSubmission({
+      kind: "report",
+      place_id: null,
+      place_name_text: "X",
+      report_type: "neutral",
+      description: "algo",
+    }),
+    null,
+  );
+});
+
+Deno.test("validatePendingSubmission - rejects country outside enum", () => {
+  assertEquals(
+    validatePendingSubmission({
+      kind: "suggestion",
+      name: "X",
+      city: "Y",
+      country: "Brasil",
+      address: null,
+      category: null,
+      notes: null,
+    }),
+    null,
+  );
 });
