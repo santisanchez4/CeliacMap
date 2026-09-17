@@ -549,6 +549,35 @@ export function decideConfirmTurn(pending: PendingSubmission | null): ConfirmTur
 }
 
 // ---------------------------------------------------------------------------
+// Step-3 gate (Task 7) — does an in-progress suggestion own this turn?
+// ---------------------------------------------------------------------------
+//
+// An incomplete suggestion draft owns the turn regardless of the modulo the
+// router assigned, because the person is answering the question the bot just
+// asked and the router has no address/country field to classify that answer
+// with.
+//
+// "Incomplete" is deliberately the SAME test decideConfirmTurn uses to refuse
+// a confirmation (`!address || !country`) and the same one
+// continueSuggestionCollection uses to decide whether it is still collecting:
+// the set of drafts that cannot yet be sent is exactly the set that must keep
+// being collected. Gating on `address === null` alone leaves a hole — once the
+// address lands but the country is still missing, the follow-up "Uruguay"
+// reply falls through to the confirm/modulo dispatch and the half-collected
+// draft is silently dropped.
+//
+// A COMPLETE draft deliberately does not match: it must fall through so the
+// confirm turn can actually send it.
+export function decideCollectingSuggestion(
+  modulo: RouterOutput["modulo"],
+  pending: PendingSubmission | null,
+): PendingSuggestionSubmission | null {
+  if (modulo === "fuera_de_alcance") return null;
+  if (pending?.kind !== "suggestion") return null;
+  return !pending.address || !pending.country ? pending : null;
+}
+
+// ---------------------------------------------------------------------------
 // Intake insert payloads (Task 7) — the exact PostgREST row shapes written to
 // place_reports / suggestions, mirroring js/report.js and js/suggest.js
 // verbatim (same tables, same anon key, same RLS `with check`). The chatbot
@@ -1111,17 +1140,12 @@ export async function handleRequest(req: Request): Promise<Response> {
     return internalErrorResponse(cors);
   }
 
-  // An in-progress suggestion still missing its address owns the turn, no
-  // matter what modulo the router assigned to it: the person is answering the
-  // question the bot just asked, and the router has no address field to
-  // classify that answer with. Checked BEFORE confirma_envio on purpose — a
-  // mis-fired confirmation there would hit decideConfirmTurn's nothing_pending
-  // and fall through to a fresh lookup, silently discarding the name/city/
-  // notes already collected.
-  const collectingSuggestion: PendingSuggestionSubmission | null =
-    router.modulo !== "fuera_de_alcance" && pendingIn?.kind === "suggestion" && pendingIn.address === null
-      ? pendingIn
-      : null;
+  // An in-progress (incomplete) suggestion owns the turn — see
+  // decideCollectingSuggestion for the completeness rule. Checked BEFORE
+  // confirma_envio on purpose: a mis-fired confirmation there would hit
+  // decideConfirmTurn's nothing_pending and fall through to a fresh lookup,
+  // silently discarding the name/city/notes already collected.
+  const collectingSuggestion = decideCollectingSuggestion(router.modulo, pendingIn);
 
   // nothing_pending deliberately falls through to the modulo dispatch below
   // (no dead-end reply): a confirmation with nothing to confirm just becomes a

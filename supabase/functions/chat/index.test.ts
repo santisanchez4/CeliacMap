@@ -19,6 +19,7 @@ import {
   buildRouterUserMessage,
   computeBucketKeys,
   continueSuggestionCollection,
+  decideCollectingSuggestion,
   decideConfirmarSubmission,
   decideConfirmTurn,
   decideMatchFromRows,
@@ -869,6 +870,64 @@ Deno.test("decideConfirmTurn - suggestion pending, address/country complete -> i
 Deno.test("decideConfirmTurn - suggestion pending, address still missing -> nothing_pending (not confirmable yet)", () => {
   const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "X", city: "Y", country: null, address: null, category: null, notes: null };
   assertEquals(decideConfirmTurn(pending), { kind: "nothing_pending" });
+});
+
+// ---------------------------------------------------------------------------
+// Step-3 gate (Task 7) — which turns an in-progress suggestion draft owns.
+// ---------------------------------------------------------------------------
+
+const incompleteSuggestion = (
+  over: Partial<PendingSuggestionSubmission>,
+): PendingSuggestionSubmission => ({
+  kind: "suggestion",
+  name: "Bienestar Gluten Free",
+  city: "Fray Bentos",
+  country: null,
+  address: null,
+  category: null,
+  notes: "es 100% sin gluten",
+  ...over,
+});
+
+Deno.test("decideCollectingSuggestion - address collected but country still missing keeps collecting", () => {
+  // Regression: gating on `address === null` alone dropped the country-only
+  // follow-up turn ("Uruguay"), silently losing the half-collected draft.
+  const pending = incompleteSuggestion({ address: "Rivera 1967, Fray Bentos", country: null });
+  assertEquals(decideCollectingSuggestion("buscar", pending), pending);
+});
+
+Deno.test("decideCollectingSuggestion - nothing collected yet keeps collecting", () => {
+  const pending = incompleteSuggestion({});
+  assertEquals(decideCollectingSuggestion("reportar", pending), pending);
+});
+
+Deno.test("decideCollectingSuggestion - country known but address still missing keeps collecting", () => {
+  const pending = incompleteSuggestion({ country: "Uruguay" });
+  assertEquals(decideCollectingSuggestion("reportar", pending), pending);
+});
+
+Deno.test("decideCollectingSuggestion - complete draft falls through so the confirm turn can send it", () => {
+  const pending = incompleteSuggestion({ address: "Rivera 1967, Fray Bentos", country: "Uruguay" });
+  assertEquals(decideCollectingSuggestion("reportar", pending), null);
+});
+
+Deno.test("decideCollectingSuggestion - fuera_de_alcance is never hijacked, even mid-collection", () => {
+  assertEquals(decideCollectingSuggestion("fuera_de_alcance", incompleteSuggestion({})), null);
+});
+
+Deno.test("decideCollectingSuggestion - a pending report is not a collection turn", () => {
+  const pending: PendingReportSubmission = {
+    kind: "report",
+    place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
+    place_name_text: null,
+    report_type: "negative",
+    description: "me contaminaron la comida",
+  };
+  assertEquals(decideCollectingSuggestion("reportar", pending), null);
+});
+
+Deno.test("decideCollectingSuggestion - no pending submission at all", () => {
+  assertEquals(decideCollectingSuggestion("reportar", null), null);
 });
 
 // ---------------------------------------------------------------------------
