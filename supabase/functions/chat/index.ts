@@ -394,6 +394,87 @@ export function decideReportarDraft(input: {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Módulo 2 turn-2+ — suggestion address-collection continuation (Task 4)
+//
+// Follows a "needs_address" draft from decideReportarDraft (Task 3): the
+// pending PendingSuggestionSubmission is missing `address` (and possibly
+// `country`), and this collects them from the user's next message(s).
+//
+// Ruling folded in on top of the base brief: decideReportarDraft sets
+// city: (input.ciudad ?? "").slice(0, 80) on the needs_address pending --
+// "" when the router never extracted a ciudad. suggestions.city has a DB
+// CHECK requiring >= 2 characters, so an empty city would fail the eventual
+// insert. Rather than reopening Task 3 or adding a whole new conversational
+// "ask for city" round-trip, an invalid city is backfilled deterministically
+// from the address text as soon as one is available this turn -- the user is
+// never asked for city specifically. City is never part of the
+// still_collecting/draft_ready gate below (that stays address+country only);
+// it is always auto-resolved once address exists.
+// ---------------------------------------------------------------------------
+
+export type SuggestionCollectionResult =
+  | { kind: "still_collecting"; pending: PendingSuggestionSubmission; askFor: "address" | "country" | "address_and_country" }
+  | { kind: "draft_ready"; pending: PendingSuggestionSubmission };
+
+export function detectCountryMention(text: string): "Uruguay" | "Argentina" | null {
+  const lower = text.toLowerCase();
+  if (lower.includes("uruguay")) return "Uruguay";
+  if (lower.includes("argentina")) return "Argentina";
+  return null;
+}
+
+function isValidCity(city: string): boolean {
+  return city.trim().length >= 2;
+}
+
+export function deriveCityFromAddress(address: string): string {
+  const parts = address.split(",").map((p) => p.trim()).filter((p) => p.length > 0);
+  if (parts.length >= 2) {
+    const withoutCountry = parts.filter((p) => detectCountryMention(p) === null);
+    const candidates = withoutCountry.length > 0 ? withoutCountry : parts;
+    const candidate = candidates[candidates.length - 1];
+    if (isValidCity(candidate)) return candidate.slice(0, 80);
+  }
+  // No usable comma-separated segment — fall back to the raw address text itself,
+  // guaranteeing a non-empty city rather than leaving the DB's 2-char floor unmet.
+  return address.slice(0, 80);
+}
+
+export function continueSuggestionCollection(
+  pending: PendingSuggestionSubmission,
+  rawReply: string,
+): SuggestionCollectionResult {
+  const text = rawReply.trim();
+  const needsAddress = pending.address === null;
+  const mentionedCountry = detectCountryMention(text);
+
+  let address = pending.address;
+  let country = pending.country;
+
+  if (needsAddress && text.length >= 5) {
+    address = text.slice(0, 200);
+    if (!country && mentionedCountry) country = mentionedCountry;
+  } else if (!needsAddress && !country) {
+    // this turn is answering the country-only question
+    if (mentionedCountry) country = mentionedCountry;
+  }
+
+  let city = pending.city;
+  if (!isValidCity(city) && address) {
+    city = deriveCityFromAddress(address);
+  }
+
+  const updated: PendingSuggestionSubmission = { ...pending, address, country, city };
+
+  if (updated.address && updated.country) {
+    return { kind: "draft_ready", pending: updated };
+  }
+
+  const askFor = !updated.address && !updated.country ? "address_and_country" : !updated.address ? "address" : "country";
+  return { kind: "still_collecting", pending: updated, askFor };
+}
+
 export function parseContentRange(header: string | null): number | null {
   if (!header) return null;
   const match = /\/(\d+|\*)$/.exec(header.trim());

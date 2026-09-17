@@ -16,8 +16,10 @@ import {
   buildResponderUserMessage,
   buildRouterUserMessage,
   computeBucketKeys,
+  continueSuggestionCollection,
   decideMatchFromRows,
   decideReportarDraft,
+  deriveCityFromAddress,
   filterPlaceFields,
   getClientIp,
   getReply,
@@ -32,6 +34,7 @@ import {
   trimHistory,
   validatePendingSubmission,
   validateRequestBody,
+  type PendingSuggestionSubmission,
   type ReportarDraftResult,
 } from "./index.ts";
 
@@ -667,4 +670,98 @@ Deno.test("decideReportarDraft - description clamps to 2000 chars", () => {
   const r = decideReportarDraft({ match: match(), reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: long });
   assertEquals(r.kind, "draft_ready");
   if (r.kind === "draft_ready") assertEquals(r.pending.description.length, 2000);
+});
+
+// ---------------------------------------------------------------------------
+// Módulo 2 address-collection continuation (continueSuggestionCollection) —
+// Task 4, brief's own 6 cases
+// ---------------------------------------------------------------------------
+
+function partial(overrides: Partial<PendingSuggestionSubmission> = {}): PendingSuggestionSubmission {
+  return { kind: "suggestion", name: "Bienestar Gluten Free", city: "Fray Bentos", country: null, address: null, category: null, notes: "100% sin gluten", ...overrides };
+}
+
+Deno.test("continueSuggestionCollection - missing address and country, short reply asks again", () => {
+  const r = continueSuggestionCollection(partial(), "sí");
+  assertEquals(r, { kind: "still_collecting", pending: partial(), askFor: "address_and_country" });
+});
+
+Deno.test("continueSuggestionCollection - missing address and country, plausible reply fills both when parseable", () => {
+  const r = continueSuggestionCollection(partial(), "Rivera 1967, Fray Bentos, Uruguay");
+  assertEquals(r.kind, "draft_ready");
+  if (r.kind === "draft_ready") {
+    assertEquals(r.pending.address, "Rivera 1967, Fray Bentos, Uruguay");
+    assertEquals(r.pending.country, "Uruguay");
+  }
+});
+
+Deno.test("continueSuggestionCollection - address given, country still missing", () => {
+  const r = continueSuggestionCollection(partial(), "Rivera 1967, cerca de la terminal");
+  assertEquals(r.kind, "still_collecting");
+  if (r.kind === "still_collecting") {
+    assertEquals(r.pending.address, "Rivera 1967, cerca de la terminal");
+    assertEquals(r.askFor, "country");
+  }
+});
+
+Deno.test("continueSuggestionCollection - only country was missing, short country reply completes it", () => {
+  const r = continueSuggestionCollection(partial({ address: "Rivera 1967" }), "Uruguay");
+  assertEquals(r, {
+    kind: "draft_ready",
+    pending: partial({ address: "Rivera 1967", country: "Uruguay" }),
+  });
+});
+
+Deno.test("continueSuggestionCollection - country reply not recognized, asks again", () => {
+  const r = continueSuggestionCollection(partial({ address: "Rivera 1967" }), "no sé");
+  assertEquals(r.kind, "still_collecting");
+  if (r.kind === "still_collecting") assertEquals(r.askFor, "country");
+});
+
+Deno.test("continueSuggestionCollection - address clamps to 200 chars", () => {
+  const long = "Calle ".repeat(60);
+  const r = continueSuggestionCollection(partial({ country: "Uruguay" }), long);
+  assertEquals(r.kind, "draft_ready");
+  if (r.kind === "draft_ready") assertEquals(r.pending.address!.length <= 200, true);
+});
+
+// ---------------------------------------------------------------------------
+// Controller ruling on top of the Task 4 brief: decideReportarDraft (Task 3)
+// sets city: "" when the router never extracted a ciudad, but
+// suggestions.city has a DB CHECK requiring >= 2 chars. continueSuggestionCollection
+// backfills an invalid city deterministically from the address text once one
+// is available -- the user is never asked for city specifically.
+// ---------------------------------------------------------------------------
+
+Deno.test("deriveCityFromAddress - extracts the city segment before the country", () => {
+  assertEquals(deriveCityFromAddress("Rivera 1967, Fray Bentos, Uruguay"), "Fray Bentos");
+});
+
+Deno.test("deriveCityFromAddress - falls back to the last segment when no country is mentioned", () => {
+  assertEquals(deriveCityFromAddress("Rivera 1967, Fray Bentos"), "Fray Bentos");
+});
+
+Deno.test("deriveCityFromAddress - falls back to the raw address when it has no comma structure", () => {
+  assertEquals(deriveCityFromAddress("cerca de la terminal de Fray Bentos"), "cerca de la terminal de Fray Bentos");
+});
+
+Deno.test("continueSuggestionCollection - backfills an empty city from the address given this turn", () => {
+  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "Bienestar Gluten Free", city: "", country: null, address: null, category: null, notes: "100% sin gluten" };
+  const r = continueSuggestionCollection(pending, "Rivera 1967, Fray Bentos, Uruguay");
+  assertEquals(r.kind, "draft_ready");
+  if (r.kind === "draft_ready") {
+    assertEquals(r.pending.city, "Fray Bentos");
+    assertEquals(r.pending.address, "Rivera 1967, Fray Bentos, Uruguay");
+    assertEquals(r.pending.country, "Uruguay");
+  }
+});
+
+Deno.test("continueSuggestionCollection - backfills city from an already-known address when only country was still missing", () => {
+  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "Bienestar Gluten Free", city: "", country: null, address: "Rivera 1967, Fray Bentos", category: null, notes: "100% sin gluten" };
+  const r = continueSuggestionCollection(pending, "Uruguay");
+  assertEquals(r.kind, "draft_ready");
+  if (r.kind === "draft_ready") {
+    assertEquals(r.pending.city, "Fray Bentos");
+    assertEquals(r.pending.country, "Uruguay");
+  }
 });
