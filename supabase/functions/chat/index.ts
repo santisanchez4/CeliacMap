@@ -275,6 +275,60 @@ export function buildNearbyCountUrl(supabaseUrl: string, ciudad: string): string
   }*&limit=1`;
 }
 
+// ---------------------------------------------------------------------------
+// Place lookup — shared by Tasks 3 (reportar/recommend) and 5 (confirmar),
+// and Task 11's live verification. Matches exactly one place by name+city or
+// no match (zero or ambiguous multi-match). No inference: if the row count
+// != 1, the user must resolve the ambiguity themselves (Tasks 3/5 have their
+// own no-match flows).
+// ---------------------------------------------------------------------------
+
+export interface PlaceMatch {
+  id: string;
+  name: string;
+  city: string | null;
+}
+
+export function sanitizeIlikeTerm(term: string): string {
+  // PostgREST reserves `,` (list separator) and `*` (ilike wildcard marker) in filter values.
+  return term.replace(/[,*]/g, "").trim();
+}
+
+export function buildPlaceLookupUrl(
+  supabaseUrl: string,
+  nombre: string,
+  ciudad: string | null,
+  status: "approved" | "needs_review",
+): string {
+  const params = new URLSearchParams();
+  params.set("select", "id,name,city");
+  params.set("name", `ilike.*${sanitizeIlikeTerm(nombre)}*`);
+  if (ciudad) params.set("city", `ilike.*${sanitizeIlikeTerm(ciudad)}*`);
+  params.set("status", `eq.${status}`);
+  params.set("limit", "3");
+  return `${supabaseUrl}/rest/v1/places?${params.toString()}`;
+}
+
+export function decideMatchFromRows(rows: PlaceMatch[]): PlaceMatch | null {
+  return rows.length === 1 ? rows[0] : null;
+}
+
+export async function fetchPlaceMatch(
+  supabaseUrl: string,
+  apiKey: string,
+  nombre: string,
+  ciudad: string | null,
+  status: "approved" | "needs_review",
+): Promise<PlaceMatch | null> {
+  const url = buildPlaceLookupUrl(supabaseUrl, nombre, ciudad, status);
+  const res = await fetch(url, {
+    headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) throw new Error(`place lookup failed: ${res.status}`);
+  const rows = (await res.json()) as PlaceMatch[];
+  return decideMatchFromRows(rows);
+}
+
 export function parseContentRange(header: string | null): number | null {
   if (!header) return null;
   const match = /\/(\d+|\*)$/.exec(header.trim());

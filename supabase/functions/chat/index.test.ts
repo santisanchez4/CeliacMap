@@ -11,10 +11,12 @@ import { assertEquals, assertMatch } from "jsr:@std/assert@1";
 import {
   buildCorsHeaders,
   buildNearbyCountUrl,
+  buildPlaceLookupUrl,
   buildPlacesSearchUrl,
   buildResponderUserMessage,
   buildRouterUserMessage,
   computeBucketKeys,
+  decideMatchFromRows,
   filterPlaceFields,
   getClientIp,
   getReply,
@@ -24,6 +26,7 @@ import {
   parseRouterOutput,
   PLACES_SELECT_FIELDS,
   RATE_LIMIT_REPLIES,
+  sanitizeIlikeTerm,
   sha256Hex,
   trimHistory,
   validatePendingSubmission,
@@ -545,4 +548,54 @@ Deno.test("validatePendingSubmission - rejects country outside enum", () => {
     }),
     null,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Place lookup — shared by Tasks 3 (reportar/recommend) and 5 (confirmar)
+// ---------------------------------------------------------------------------
+
+Deno.test("buildPlaceLookupUrl - name and city both present", () => {
+  const url = buildPlaceLookupUrl("https://x.supabase.co", "La Panera", "Adrogué", "approved");
+  const parsed = new URL(url);
+  assertEquals(parsed.pathname, "/rest/v1/places");
+  assertEquals(parsed.searchParams.get("select"), "id,name,city");
+  assertEquals(parsed.searchParams.get("name"), "ilike.*La Panera*");
+  assertEquals(parsed.searchParams.get("city"), "ilike.*Adrogué*");
+  assertEquals(parsed.searchParams.get("status"), "eq.approved");
+  assertEquals(parsed.searchParams.get("limit"), "3");
+});
+
+Deno.test("buildPlaceLookupUrl - no city omits the city filter", () => {
+  const url = buildPlaceLookupUrl("https://x.supabase.co", "La Panera", null, "needs_review");
+  const parsed = new URL(url);
+  assertEquals(parsed.searchParams.has("city"), false);
+  assertEquals(parsed.searchParams.get("status"), "eq.needs_review");
+});
+
+Deno.test("sanitizeIlikeTerm - strips PostgREST filter-reserved characters", () => {
+  assertEquals(sanitizeIlikeTerm("La Panera, Sin TACC*"), "La Panera Sin TACC");
+  assertEquals(sanitizeIlikeTerm("normal name"), "normal name");
+});
+
+Deno.test("buildPlaceLookupUrl - sanitizes name/city before interpolating", () => {
+  const url = buildPlaceLookupUrl("https://x.supabase.co", "Il Porto, Sucursal*", "CABA", "approved");
+  const parsed = new URL(url);
+  assertEquals(parsed.searchParams.get("name"), "ilike.*Il Porto Sucursal*");
+});
+
+Deno.test("decideMatchFromRows - exactly one row is a match", () => {
+  const rows = [{ id: "abc", name: "X", city: "Y" }];
+  assertEquals(decideMatchFromRows(rows), rows[0]);
+});
+
+Deno.test("decideMatchFromRows - zero rows is no match", () => {
+  assertEquals(decideMatchFromRows([]), null);
+});
+
+Deno.test("decideMatchFromRows - more than one row is no match (ambiguous)", () => {
+  const rows = [
+    { id: "abc", name: "X", city: "Y" },
+    { id: "def", name: "X", city: "Z" },
+  ];
+  assertEquals(decideMatchFromRows(rows), null);
 });
