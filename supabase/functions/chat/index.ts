@@ -84,7 +84,14 @@ export type PendingReportSubmission = {
 export type PendingSuggestionSubmission = {
   kind: "suggestion";
   name: string;
-  city: string;
+  // null while still unknown — the router has no address field and often
+  // extracts no ciudad either, so a draft legitimately starts without one.
+  // `null` (never "") is the sentinel, so the producer's own output survives
+  // validatePendingSubmission on the next turn's round-trip; the city is
+  // backfilled from the collected address (deriveCityFromAddress) before the
+  // draft can ever be confirmed, and decideConfirmTurn refuses to send a
+  // suggestion whose city is still null (suggestions.city is NOT NULL).
+  city: string | null;
   country: "Uruguay" | "Argentina" | null;
   address: string | null; // null while still being collected (Task 4)
   category: "restaurant" | "cafe" | "shop" | null;
@@ -141,7 +148,13 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
 
   if (obj.kind === "suggestion") {
     if (!isNonEmptyString(obj.name, 120)) return null;
-    if (!isNonEmptyString(obj.city, 80)) return null;
+    // city is null-or-valid, exactly like address/country below: the draft is
+    // produced before a city is necessarily known, and rejecting that shape
+    // here would silently destroy the whole in-progress draft on the client's
+    // next echo (the producer/validator contract must accept what the producer
+    // emits — "clamp on the way in, never reject silently").
+    const city = obj.city;
+    if (city !== null && !isNonEmptyString(city, 80)) return null;
     if (obj.country !== null && obj.country !== "Uruguay" && obj.country !== "Argentina") return null;
     const address = obj.address;
     if (address !== null && !isNonEmptyString(address, 200)) return null;
@@ -152,7 +165,7 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
     return {
       kind: "suggestion",
       name: obj.name as string,
-      city: obj.city as string,
+      city: (city ?? null) as string | null,
       country: (obj.country ?? null) as "Uruguay" | "Argentina" | null,
       address: (address ?? null) as string | null,
       category: (category ?? null) as "restaurant" | "cafe" | "shop" | null,
@@ -395,17 +408,22 @@ export function decideReportarDraft(input: {
     };
   }
 
-  // positive + no match -> route into a suggestion draft, address still unknown
+  // positive + no match -> route into a suggestion draft, address still unknown.
+  // Every field here must satisfy validatePendingSubmission's suggestion rules:
+  // the client echoes this exact object back next turn and a rejection there
+  // would wipe the whole draft. Hence `null` (not "") for an unknown city, and
+  // a 1000-char `notes` — suggestions.notes' DB bound is stricter than the
+  // 2000 of place_reports.description that `description` was clamped to.
   return {
     kind: "needs_address",
     pending: {
       kind: "suggestion",
       name: input.lugarNombre.slice(0, 120),
-      city: (input.ciudad ?? "").slice(0, 80),
+      city: input.ciudad ? input.ciudad.slice(0, 80) : null,
       country: null,
       address: null,
       category: null,
-      notes: description,
+      notes: description.slice(0, 1000),
     },
   };
 }
@@ -418,13 +436,13 @@ export function decideReportarDraft(input: {
 // `country`), and this collects them from the user's next message(s).
 //
 // Ruling folded in on top of the base brief: decideReportarDraft sets
-// city: (input.ciudad ?? "").slice(0, 80) on the needs_address pending --
-// "" when the router never extracted a ciudad. suggestions.city has a DB
-// CHECK requiring >= 2 characters, so an empty city would fail the eventual
-// insert. Rather than reopening Task 3 or adding a whole new conversational
-// "ask for city" round-trip, an invalid city is backfilled deterministically
-// from the address text as soon as one is available this turn -- the user is
-// never asked for city specifically. City is never part of the
+// city: null on the needs_address pending when the router never extracted a
+// ciudad. suggestions.city is NOT NULL with a DB CHECK requiring >= 2
+// characters, so a null/blank city would fail the eventual insert. Rather
+// than reopening Task 3 or adding a whole new conversational "ask for city"
+// round-trip, an invalid city is backfilled deterministically from the
+// address text as soon as one is available this turn -- the user is never
+// asked for city specifically. City is never part of the
 // still_collecting/draft_ready gate below (that stays address+country only);
 // it is always auto-resolved once address exists.
 // ---------------------------------------------------------------------------
@@ -440,8 +458,8 @@ export function detectCountryMention(text: string): "Uruguay" | "Argentina" | nu
   return null;
 }
 
-function isValidCity(city: string): boolean {
-  return city.trim().length >= 2;
+function isValidCity(city: string | null): boolean {
+  return city !== null && city.trim().length >= 2;
 }
 
 export function deriveCityFromAddress(address: string): string {
@@ -541,6 +559,12 @@ export function decideConfirmarSubmission(input: {
 // Key rule: a suggestion is only confirmable if BOTH address AND country are
 // non-null. If either is still missing, return nothing_pending — the upstream
 // Task 4 (continueSuggestionCollection) is responsible for collecting those.
+//
+// `city` is checked too, as defense in depth: suggestions.city is a NOT NULL
+// column with a >= 2 char CHECK, and continueSuggestionCollection always
+// backfills it from the address before a draft can complete — so a null city
+// here means something upstream went wrong, and refusing is far better than
+// posting a row the database will reject.
 
 export type ConfirmTurnResult =
   | { kind: "nothing_pending" }
@@ -555,7 +579,7 @@ export function decideConfirmTurn(pending: PendingSubmission | null): ConfirmTur
   if (!pending) return { kind: "nothing_pending" };
   if (pending.kind === "report") return { kind: "insert_report", payload: pending };
   if (pending.kind === "suggestion") {
-    if (!pending.address || !pending.country) return { kind: "nothing_pending" };
+    if (!pending.address || !pending.country || !pending.city) return { kind: "nothing_pending" };
     return { kind: "insert_suggestion", payload: pending };
   }
   return { kind: "nothing_pending" };
@@ -581,6 +605,13 @@ export function decideConfirmTurn(pending: PendingSubmission | null): ConfirmTur
 //
 // A COMPLETE draft deliberately does not match: it must fall through so the
 // confirm turn can actually send it.
+//
+// decideConfirmTurn additionally refuses a null `city` (a NOT NULL column) as
+// defense in depth; that clause is deliberately NOT mirrored here, because a
+// draft with an address always has a city (continueSuggestionCollection
+// backfills it), so the only way to reach address+country+null-city is a
+// hand-crafted client echo — which must fail closed at the write, not be
+// handed back to the collector as if the person still owed us an answer.
 export function decideCollectingSuggestion(
   modulo: RouterOutput["modulo"],
   pending: PendingSubmission | null,
@@ -775,6 +806,14 @@ export interface EnvioContext {
     | "error_envio";
   lugar_nombre?: string | null;
   ciudad?: string | null;
+  // Suggestion-draft state only (the "recommend a new place" path): what has
+  // been collected so far, including while still null. Without these the
+  // redactor can't tell that an address already exists — so it re-asks for one
+  // it was given — and, at the confirmation step, has no grounded way to recite
+  // the draft back (history is not passed to the redactor call; <envio> is the
+  // only channel), which is exactly where a model would otherwise invent one.
+  direccion?: string | null;
+  pais?: string | null;
   report_type?: "positive" | "negative" | null;
   texto?: string | null;
 }
@@ -1200,7 +1239,9 @@ export async function handleRequest(req: Request): Promise<Response> {
       envio = {
         estado: collected.kind === "draft_ready" ? "borrador_listo" : "necesita_direccion",
         lugar_nombre: collected.pending.name,
-        ciudad: collected.pending.city || null,
+        ciudad: collected.pending.city,
+        direccion: collected.pending.address,
+        pais: collected.pending.country,
         texto: collected.pending.notes,
       };
     } else if (confirmTurn.kind === "insert_report") {
@@ -1247,6 +1288,8 @@ export async function handleRequest(req: Request): Promise<Response> {
           estado: "enviado",
           lugar_nombre: confirmTurn.payload.name,
           ciudad: confirmTurn.payload.city,
+          direccion: confirmTurn.payload.address,
+          pais: confirmTurn.payload.country,
           texto: confirmTurn.payload.notes,
         };
       } else {
@@ -1256,6 +1299,8 @@ export async function handleRequest(req: Request): Promise<Response> {
           estado: "error_envio",
           lugar_nombre: confirmTurn.payload.name,
           ciudad: confirmTurn.payload.city,
+          direccion: confirmTurn.payload.address,
+          pais: confirmTurn.payload.country,
           texto: confirmTurn.payload.notes,
         };
       }
@@ -1291,7 +1336,10 @@ export async function handleRequest(req: Request): Promise<Response> {
         responsePending = draft.pending;
         envio = {
           estado: "borrador_listo",
-          lugar_nombre: draft.pending.place_name_text ?? router.lugar_nombre,
+          // Same three-way fallback the confirm turn uses, so a matched place's
+          // canonical name is shown consistently on both turns (a matched place
+          // is always `approved`, i.e. already public — never a status leak).
+          lugar_nombre: draft.pending.place_name ?? draft.pending.place_name_text ?? router.lugar_nombre,
           ciudad: router.ciudad,
           report_type: draft.pending.report_type,
           texto: draft.pending.description,
@@ -1303,7 +1351,9 @@ export async function handleRequest(req: Request): Promise<Response> {
         envio = {
           estado: "necesita_direccion",
           lugar_nombre: draft.pending.name,
-          ciudad: draft.pending.city || null,
+          ciudad: draft.pending.city,
+          direccion: draft.pending.address,
+          pais: draft.pending.country,
           texto: draft.pending.notes,
         };
       }

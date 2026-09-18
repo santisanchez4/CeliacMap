@@ -192,16 +192,22 @@ Supabase las exige aunque `verify_jwt` esté OFF).
     "kind": "report",
     "place_id": "<uuid|null>",
     "place_name_text": "<string|null>",
+    "place_name": "<string|null>",     // nombre canónico del lugar matcheado;
+                                       // solo contexto para el redactor, NUNCA
+                                       // se escribe a place_reports
     "report_type": "positive" | "negative",
-    "description": "…"
+    "description": "…"                 // <= 2000 (place_reports.description)
   } | {
     "kind": "suggestion",
     "name": "…",
-    "city": "…",
+    "city": "…|null",                  // null mientras no se conozca; se
+                                       // rellena desde la dirección antes de
+                                       // poder confirmarse (suggestions.city
+                                       // es NOT NULL)
     "country": "Uruguay" | "Argentina" | null,
     "address": "…|null",
     "category": "restaurant" | "cafe" | "shop" | null,
-    "notes": "…|null"
+    "notes": "…|null"                  // <= 1000 (suggestions.notes)
   }
 }
 ```
@@ -262,9 +268,16 @@ Supabase las exige aunque `verify_jwt` esté OFF).
        **con service_role** (para ver `needs_review`), `name=ilike.*<nombre>*`
        + `city=ilike.*<ciudad>*` (mismo criterio que Módulo 2 — ADR-006
        decisión 6). Si hay exactamente un resultado, inserta inmediatamente en
-       `place_reports` con `report_type: 'positive'` y responde `action` de
-       envío. Si cero o más de uno, o si falta el nombre, el `reply` del
-       redactor solicita más detalle sin hacer `POST` alguno. **El `reply` no
+       `place_reports` con `report_type: 'positive'` y `place_id` real, y
+       responde `action` de envío. **Si hay cero o más de uno** (match
+       ambiguo), pero la persona sí dio un nombre y texto descriptivo
+       suficiente, **igual se hace el `POST`**: la fila se inserta con
+       `place_id: null` + `place_name_text` (exactamente lo que define
+       ADR-006 decisión 6, "cero o más de uno → `place_id: null` +
+       `place_name_text`"), y queda para revisión humana sin disparar nada
+       automático. **El único caso sin `POST`** es que falte el nombre del
+       lugar o que el texto sea demasiado corto para ser evidencia: ahí el
+       `reply` del redactor pide ese dato y no escribe nada. **El `reply` no
        le confirma a la persona si el lugar ya está en el sistema.**
 8. Loguear el turno a `agent_log` (`agent='chatbot'`) — **minimización por
    defecto (ADR-006 decisión 10):**

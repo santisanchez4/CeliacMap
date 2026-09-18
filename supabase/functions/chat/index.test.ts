@@ -559,6 +559,43 @@ Deno.test("validatePendingSubmission - valid suggestion, address still null", ()
   assertEquals(validatePendingSubmission(input), input);
 });
 
+Deno.test("validatePendingSubmission - valid suggestion with city still null (the not-yet-known sentinel)", () => {
+  // city is null-or-valid, exactly like address/country: a draft is produced
+  // before a city is necessarily known, and rejecting that shape would discard
+  // the whole in-progress draft on the client's next echo.
+  const input = {
+    kind: "suggestion" as const,
+    name: "Bienestar Gluten Free",
+    city: null,
+    country: null,
+    address: null,
+    category: null,
+    notes: "100% sin gluten según el dueño",
+  };
+  assertEquals(validatePendingSubmission(input), input);
+});
+
+Deno.test("validatePendingSubmission - still rejects a blank or over-long city", () => {
+  const base = { kind: "suggestion", name: "X", country: null, address: null, category: null, notes: null };
+  assertEquals(validatePendingSubmission({ ...base, city: "   " }), null);
+  assertEquals(validatePendingSubmission({ ...base, city: "z".repeat(81) }), null);
+});
+
+Deno.test("validatePendingSubmission - rejects suggestion notes over the 1000-char suggestions.notes bound", () => {
+  assertEquals(
+    validatePendingSubmission({
+      kind: "suggestion",
+      name: "X",
+      city: "Y",
+      country: null,
+      address: null,
+      category: null,
+      notes: "n".repeat(1001),
+    }),
+    null,
+  );
+});
+
 Deno.test("validatePendingSubmission - rejects unknown kind", () => {
   assertEquals(validatePendingSubmission({ kind: "bogus" }), null);
 });
@@ -719,6 +756,31 @@ Deno.test("decideReportarDraft - no match, positive -> needs_address for a sugge
   });
 });
 
+// Regression (root cause of a silently-destroyed draft): when the router
+// extracts no ciudad, the draft's city must be `null` — the sentinel
+// validatePendingSubmission actually accepts — and never "", which it
+// rejected, wiping the whole in-progress draft on the client's next echo.
+Deno.test("decideReportarDraft - no match, positive, no ciudad -> city null (not an empty string)", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "Bienestar Gluten Free", ciudad: null, reporteTexto: "100% sin gluten, muy bueno" });
+  assertEquals(r, {
+    kind: "needs_address",
+    pending: { kind: "suggestion", name: "Bienestar Gluten Free", city: null, country: null, address: null, category: null, notes: "100% sin gluten, muy bueno" },
+  });
+});
+
+// Regression: notes is bound by suggestions.notes (1000), which is STRICTER
+// than the place_reports.description bound (2000) `description` was clamped
+// to — reusing the 2000-char value produced a draft the validator rejected.
+Deno.test("decideReportarDraft - needs_address notes clamps to 1000, not description's 2000", () => {
+  const long = "c".repeat(2500);
+  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "Bienestar Gluten Free", ciudad: "Fray Bentos", reporteTexto: long });
+  assertEquals(r.kind, "needs_address");
+  if (r.kind === "needs_address") {
+    assertEquals(r.pending.notes?.length, 1000);
+    assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(r.pending))), r.pending);
+  }
+});
+
 Deno.test("decideReportarDraft - no match, positive, reporte_tipo null defaults to positive", () => {
   const r = decideReportarDraft({ match: null, reporteTipo: null, lugarNombre: "Bienestar Gluten Free", ciudad: null, reporteTexto: "Muy bueno" });
   assertEquals(r.kind, "needs_address");
@@ -786,10 +848,11 @@ Deno.test("continueSuggestionCollection - address clamps to 200 chars", () => {
 
 // ---------------------------------------------------------------------------
 // Controller ruling on top of the Task 4 brief: decideReportarDraft (Task 3)
-// sets city: "" when the router never extracted a ciudad, but
-// suggestions.city has a DB CHECK requiring >= 2 chars. continueSuggestionCollection
-// backfills an invalid city deterministically from the address text once one
-// is available -- the user is never asked for city specifically.
+// sets city: null when the router never extracted a ciudad, but
+// suggestions.city is NOT NULL with a DB CHECK requiring >= 2 chars.
+// continueSuggestionCollection backfills an invalid city deterministically
+// from the address text once one is available -- the user is never asked for
+// city specifically.
 // ---------------------------------------------------------------------------
 
 Deno.test("deriveCityFromAddress - extracts the city segment before the country", () => {
@@ -804,8 +867,8 @@ Deno.test("deriveCityFromAddress - falls back to the raw address when it has no 
   assertEquals(deriveCityFromAddress("cerca de la terminal de Fray Bentos"), "cerca de la terminal de Fray Bentos");
 });
 
-Deno.test("continueSuggestionCollection - backfills an empty city from the address given this turn", () => {
-  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "Bienestar Gluten Free", city: "", country: null, address: null, category: null, notes: "100% sin gluten" };
+Deno.test("continueSuggestionCollection - backfills a null city from the address given this turn", () => {
+  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "Bienestar Gluten Free", city: null, country: null, address: null, category: null, notes: "100% sin gluten" };
   const r = continueSuggestionCollection(pending, "Rivera 1967, Fray Bentos, Uruguay");
   assertEquals(r.kind, "draft_ready");
   if (r.kind === "draft_ready") {
@@ -816,13 +879,79 @@ Deno.test("continueSuggestionCollection - backfills an empty city from the addre
 });
 
 Deno.test("continueSuggestionCollection - backfills city from an already-known address when only country was still missing", () => {
-  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "Bienestar Gluten Free", city: "", country: null, address: "Rivera 1967, Fray Bentos", category: null, notes: "100% sin gluten" };
+  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "Bienestar Gluten Free", city: null, country: null, address: "Rivera 1967, Fray Bentos", category: null, notes: "100% sin gluten" };
   const r = continueSuggestionCollection(pending, "Uruguay");
   assertEquals(r.kind, "draft_ready");
   if (r.kind === "draft_ready") {
     assertEquals(r.pending.city, "Fray Bentos");
     assertEquals(r.pending.country, "Uruguay");
   }
+});
+
+// ---------------------------------------------------------------------------
+// Producer/validator contract (permanent regression guard)
+//
+// Every pending_submission these functions produce is sent to the client,
+// which echoes it back verbatim on the next turn — where
+// validatePendingSubmission is the trust boundary and a rejection silently
+// discards the whole draft (pendingIn becomes null, decideCollectingSuggestion
+// has nothing to gate on, and the person who just described a place is asked
+// "¿de qué lugar hablás?" as if they'd said nothing). Composing the REAL
+// producer with the REAL validator is the only test that catches that class of
+// mismatch — asserting the two halves separately with hand-written literals,
+// as every other test here does, is exactly how it got shipped.
+// ---------------------------------------------------------------------------
+
+Deno.test("decideReportarDraft's needs_address output survives a JSON round-trip through validatePendingSubmission", () => {
+  const draft = decideReportarDraft({
+    match: null,
+    reporteTipo: "positive",
+    lugarNombre: "Bienestar Gluten Free",
+    ciudad: null, // the exact scenario that broke: no city extracted
+    reporteTexto: "es 100% sin gluten, lo conozco bien y tiene protocolo anti contaminacion",
+  });
+  assertEquals(draft.kind, "needs_address");
+  if (draft.kind !== "needs_address") return;
+  // Simulate the client echoing it back exactly as the wire JSON would carry it.
+  const echoed = JSON.parse(JSON.stringify(draft.pending));
+  assertEquals(validatePendingSubmission(echoed), draft.pending);
+});
+
+Deno.test("decideReportarDraft's draft_ready report output survives the same round-trip", () => {
+  for (
+    const draft of [
+      decideReportarDraft({ match: match(), reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: "Excelente, todo sin TACC" }),
+      decideReportarDraft({ match: null, reporteTipo: "negative", lugarNombre: "Lugar Fantasma", ciudad: null, reporteTexto: "Dijeron sin TACC pero no lo era" }),
+    ]
+  ) {
+    assertEquals(draft.kind, "draft_ready");
+    if (draft.kind !== "draft_ready") continue;
+    assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(draft.pending))), draft.pending);
+  }
+});
+
+Deno.test("continueSuggestionCollection's output survives the same round-trip, mid-collection and complete", () => {
+  // The collection continuation is the other producer of a pending_submission
+  // the client echoes back, and it runs once per turn until the draft is done.
+  const start = decideReportarDraft({
+    match: null,
+    reporteTipo: "positive",
+    lugarNombre: "Bienestar Gluten Free",
+    ciudad: null,
+    reporteTexto: "es 100% sin gluten, lo conozco bien",
+  });
+  assertEquals(start.kind, "needs_address");
+  if (start.kind !== "needs_address") return;
+
+  const midTurn = continueSuggestionCollection(start.pending, "Rivera 1967, cerca de la terminal");
+  assertEquals(midTurn.kind, "still_collecting");
+  assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(midTurn.pending))), midTurn.pending);
+
+  const done = continueSuggestionCollection(midTurn.pending, "Uruguay");
+  assertEquals(done.kind, "draft_ready");
+  assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(done.pending))), done.pending);
+  // ...and the fully-collected draft is actually confirmable (city backfilled).
+  assertEquals(decideConfirmTurn(done.pending), { kind: "insert_suggestion", payload: done.pending });
 });
 
 // ---------------------------------------------------------------------------
@@ -870,11 +999,6 @@ Deno.test("decideConfirmarSubmission - description clamps to 2000 chars", () => 
 // Módulo 2 confirmation dispatch (Task 6)
 // ---------------------------------------------------------------------------
 
-Deno.test("decideConfirmTurn - confirma_envio false is never this function's concern (caller gate)", () => {
-  // decideConfirmTurn assumes the caller already checked confirma_envio === true;
-  // documented via the function's own doc comment, not re-tested here.
-});
-
 Deno.test("decideConfirmTurn - no pending_submission -> nothing_pending", () => {
   assertEquals(decideConfirmTurn(null), { kind: "nothing_pending" });
 });
@@ -891,6 +1015,14 @@ Deno.test("decideConfirmTurn - suggestion pending, address/country complete -> i
 
 Deno.test("decideConfirmTurn - suggestion pending, address still missing -> nothing_pending (not confirmable yet)", () => {
   const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "X", city: "Y", country: null, address: null, category: null, notes: null };
+  assertEquals(decideConfirmTurn(pending), { kind: "nothing_pending" });
+});
+
+Deno.test("decideConfirmTurn - suggestion pending, city still null -> nothing_pending (suggestions.city is NOT NULL)", () => {
+  // Defense in depth: continueSuggestionCollection always backfills city from
+  // the address, so this shape can only come from a hand-crafted client echo.
+  // Refusing here is far better than POSTing a row the database will reject.
+  const pending: PendingSuggestionSubmission = { kind: "suggestion", name: "X", city: null, country: "Uruguay", address: "Calle 123", category: null, notes: null };
   assertEquals(decideConfirmTurn(pending), { kind: "nothing_pending" });
 });
 

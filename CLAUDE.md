@@ -2207,9 +2207,10 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
 
 - **Módulo 4 (`confirmar`) es de un solo turno, no un ciclo de 2 turnos
   borrador→confirmación como Módulo 2.** Busca el lugar, decide, e inserta
-  de inmediato en el mismo turno (`decideConfirmarSubmission`,
-  `supabase/functions/chat/index.ts:495-514`, consumido en
-  `index.ts:1297-1338`) — nunca produce un `pending_submission`. **Por
+  de inmediato en el mismo turno (`decideConfirmarSubmission` en
+  `supabase/functions/chat/index.ts`, consumido en la rama
+  `router.modulo === "confirmar"` de `handleRequest`) — nunca produce un
+  `pending_submission`. **Por
   qué:** la instrucción 5 del prompt del REDACTOR (ya redactada en una fase
   anterior — ver **## The Chatbot System Prompts**) especifica un único
   mensaje de agradecimiento inmediato ("agradecé el aporte... aclaralo que
@@ -2226,8 +2227,8 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   criticidad de Módulo 2 (reportar sobre un lugar ya publicado y en vivo).
 - **Un match ambiguo (más de un resultado) por nombre+ciudad cuenta como
   "sin match" también para Módulo 2, no solo para Módulo 4.** Ambos módulos
-  comparten un único helper (`fetchPlaceMatch` / `decideMatchFromRows`,
-  `index.ts:289-333`, comentado explícitamente "shared by Tasks 3
+  comparten un único helper (`fetchPlaceMatch` / `decideMatchFromRows` en
+  `index.ts`, comentado explícitamente "shared by Tasks 3
   (reportar/recommend) and 5 (confirmar)"): `rows.length === 1 ? rows[0] :
   null`. **Por qué:** ADR-006 decisión 6 (Módulo 4) define la regla
   explícitamente ("con cero o con más de uno se trata como sin match") y
@@ -2249,16 +2250,16 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   líneas 307-308 — y `country`, líneas 309-310) — un vacío entre lo que el
   ROUTER puede extraer y lo que la tabla exige que ni el ADR ni el "wire
   shape" documentado en el plan cubrían. Se agregó un estado dedicado de
-  recolección de dirección (`continueSuggestionCollection`,
-  `index.ts:447-…`) que intercepta la respuesta inmediata siguiente de la
-  persona — sin importar qué `modulo` le asigne el router a esa respuesta
-  — vía `decideCollectingSuggestion` (`index.ts:571-578`: "an incomplete
+  recolección de dirección (`continueSuggestionCollection`) que intercepta
+  la respuesta inmediata siguiente de la persona — sin importar qué
+  `modulo` le asigne el router a esa respuesta — vía
+  `decideCollectingSuggestion` ("an incomplete
   suggestion draft owns the turn regardless of the modulo the router
   assigned, because... the router has no address/country field to
   classify that answer with"). Cuando el router tampoco extrajo nunca una
-  ciudad (dejando `city` vacío, lo que el CHECK de `suggestions.city`
-  rechazaría), la ciudad se deriva automáticamente del texto de la
-  dirección recién recolectada (`deriveCityFromAddress`, `index.ts:434-445`:
+  ciudad (dejando `city` en `null`, lo que el `not null` + CHECK de
+  `suggestions.city` rechazaría), la ciudad se deriva automáticamente del
+  texto de la dirección recién recolectada (`deriveCityFromAddress`:
   separa por comas, prefiere el segmento anterior a cualquier mención
   explícita de país, y si no hay estructura de comas usable cae al texto
   crudo de la dirección completa) — nunca se pregunta como un campo
@@ -2285,10 +2286,15 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   la anon key** — exactamente las mismas RLS y `with check` que ya usan los
   formularios públicos `report.js` / `suggest.js`; el chatbot es un tercer
   escritor sobre el mismo pipeline de intake existente, nunca uno con
-  privilegios especiales. La `service_role` key se usa para exactamente una
-  cosa en toda la funcionalidad: el lookup de Módulo 4 contra lugares
+  privilegios especiales. De lo que agrega Módulo 2/4, la `service_role` key
+  se usa para exactamente una cosa: el lookup de Módulo 4 contra lugares
   `needs_review` (invisibles para la anon key, cuya RLS solo publica
-  `approved`) — `index.ts:1302-1303`. El chatbot nunca gana autoridad sobre
+  `approved`) — el `fetchPlaceMatch(..., serviceRoleKey, ..., "needs_review")`
+  de la rama `confirmar`. (Además del cliente ya existente de `chat_usage` /
+  `agent_log` — Fase B, sin relación con Módulo 2/4 — que también usa
+  `service_role`: ambas tablas son server-only por RLS, así que un `grep`
+  de `serviceRoleKey` en `index.ts` encuentra legítimamente dos usos, no
+  uno.) El chatbot nunca gana autoridad sobre
   `places.status`: solo puede agregar filas a las dos tablas de intake
   existentes que ya alimentan, sin modificación, el pipeline Validator /
   `review_handler.py` / `SuggestionAgent`.
@@ -2304,6 +2310,46 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   `pending_submission`. Que Módulo 4 resultara de un solo turno (primer
   punto arriba) fue un refinamiento de diseño hecho durante la
   implementación, no algo presente en el texto original del plan.
+
+**Hallazgos de la revisión final de rama (pre-merge), corregidos:**
+
+- **El productor y el validador del `pending_submission` tenían contratos
+  distintos, y eso destruía silenciosamente borradores en curso.** La rama
+  `needs_address` de `decideReportarDraft` emitía `city: ""` (cuando el
+  router no extrajo ciudad) y `notes` ya clampeado a **2000** — pero
+  `validatePendingSubmission` exigía `city` no vacío y `notes <= 1000`
+  (el bound real de `suggestions.notes`, más estricto que el de 2000 de
+  `place_reports.description`). Como el cliente re-envía ese objeto tal
+  cual en el turno siguiente y el validador es la frontera de confianza,
+  `pendingIn` quedaba en `null`, `decideCollectingSuggestion` no tenía
+  nada que gatear, y todo el borrador (nombre, ciudad, notas) se perdía:
+  a la persona que acababa de describir un lugar se le preguntaba "¿de
+  qué lugar hablás?" como si no hubiera dicho nada. Además dejaba
+  inalcanzable en producción el backfill de ciudad
+  (`deriveCityFromAddress`), escrito justamente para el caso sin ciudad.
+  **Corregido haciendo `city` genuinamente `string | null`** en todo el
+  camino — el mismo trato que `address`/`country` ya tenían —, clampeando
+  `notes` a 1000 en el productor, y agregando en `decideConfirmTurn` un
+  chequeo de `city` no nulo como defensa en profundidad (`suggestions.city`
+  es `not null`). Viola directamente la Global Constraint del propio
+  proyecto ("Clamp on the way in, never reject silently"), así que la
+  guarda permanente es un test que **compone el productor real con el
+  validador real** a través de un round-trip JSON, en vez de afirmar cada
+  mitad por separado con literales escritos a mano — que es exactamente
+  como se había colado.
+- **El bloque `<envio>` no le pasaba al redactor la `direccion` / el `pais`
+  ya recolectados.** `continueSuggestionCollection` lleva la cuenta del
+  progreso parcial, pero `handleRequest` solo ponía `estado` /
+  `lugar_nombre` / `ciudad` / `texto` en `<envio>`, y a la llamada del
+  redactor **no se le pasa el historial** (solo el último mensaje + los
+  bloques de contexto). Es decir: el modelo podía volver a pedir una
+  dirección que ya le habían dado, y en el paso de confirmación no tenía
+  ninguna forma *groundeada* de recitar el borrador — justo el escenario
+  en el que un modelo inventa. Se agregaron los campos `direccion` / `pais`
+  a `EnvioContext` y se completan en las cuatro construcciones de `<envio>`
+  con forma de suggestion (recolección en curso, borrador listo,
+  `enviado`, `error_envio`). **Sin cambio de prompt**: la instrucción del
+  REDACTOR ya dice usar lo que venga en `<envio>`.
 
 ### Build status (phases)
 
@@ -2833,8 +2879,9 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   `docs/plans/PLAN-community-ranking.md`. Commits: `df8376b` / `6af819d`
   (schema + `SECURITY DEFINER` fix) · `7ffa728` (checks) · `1904901`
   (frontend) · `95097e3` (seed).
-- 🚧 **Phase 22 — Chatbot Fase C: Módulo 2 (reportar/recomendar) + Módulo 4
-  (confirmar), real writes wired in (not yet verified live).** Implements
+- ✅ **Phase 22 — Chatbot Fase C: Módulo 2 (reportar/recomendar) + Módulo 4
+  (confirmar), real writes live and verified end-to-end in production.**
+  Implements
   ADR-006 decisiones 4 y 6: the chatbot's `reportar`/`confirmar` modules now
   write real rows to `place_reports` / `suggestions` instead of the earlier
   `STUB_INTAKE_REPLIES` placeholder. **Módulo 2** is a 2-turn draft-then-
@@ -2855,7 +2902,8 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   `decideMatchFromRows`) and a universal REDACTOR constraint against ever
   claiming a failed write succeeded. See **Chatbot Fase C — Módulo 2
   (reportar/recomendar) + Módulo 4 (confirmar) design decisions** above for
-  the four design decisions this phase surfaced. **No schema changes** —
+  the four design decisions this phase surfaced, plus the two findings the
+  final pre-merge branch review added. **No schema changes** —
   `place_reports` / `suggestions` and their RLS are unchanged from Phase 19
   (Community reports); the chatbot writes through the exact same anon-key
   path the public forms already use, and `place-report-created`'s
@@ -2863,18 +2911,61 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   supabase/functions/place-report-created/` is empty), so Módulo 4 stays
   "solo recolección" per ADR-006 decisión 6's own dependency note. `deno
   check supabase/functions/chat/index.ts supabase/functions/chat/prompts.ts`
-  is clean; `deno test supabase/functions/chat/` is green at **114 tests**
+  is clean; `deno test supabase/functions/chat/` is green at **123 tests**
   (existing Fase A/B coverage plus this phase's new cases for
   `decideReportarDraft`, `continueSuggestionCollection`,
   `deriveCityFromAddress`, `decideConfirmarSubmission`, `decideConfirmTurn`,
-  `decideCollectingSuggestion`, the insert-payload builders, and
-  `insertIntakeRow`). Commits `25d8019`..`e9bcbdc` (11 commits, Tasks 1–11 of
-  the Fase C plan). **Next verification (not done yet):** deploy the `chat`
-  Edge Function and test real turns against Supabase end-to-end — including
-  a real Módulo 2 confirm-turn insert into `place_reports` and a real
-  Módulo 4 insert, both shown and then reverted, the same discipline used
-  for every other live-write verification in this project (ADR-004, Phase
-  17, Phase 19).
+  `decideCollectingSuggestion`, the insert-payload builders,
+  `insertIntakeRow`, and the producer/validator round-trip guards added in
+  the final fix wave). The whole branch is Tasks 1–12 of the Fase C plan
+  plus its post-review fixes: the feature commits from the first
+  `PendingSubmission` types through the `handleRequest` wiring, then the
+  Decisions Log entry, the live-verification bug fix (`d1fdac7`), and the
+  final fix wave below.
+
+  **Verified live end-to-end in production.** The `chat` Edge Function was
+  deployed and exercised against the real Supabase project — not a staging
+  copy — covering both modules: a Módulo 2 report against a **matched**
+  `approved` place (real `place_id`), both no-match paths (a `negative`
+  report stored with `place_name_text` and no `place_id`; a `positive`
+  report routed into the `suggestions` draft), the **2-turn address +
+  country collection** for that suggestion draft through to a real
+  `suggestions` insert, and Módulo 4's **single-turn** evidence flow against
+  a real `needs_review` place. The downstream chain was checked in both
+  directions: a `negative` report on an `approved` place **did** fire the
+  `place_reports` Database Webhook → `place-report-created` →
+  `repository_dispatch` → `review_handler.py` re-evaluation (Phase 19's
+  path, untouched), and a `positive` report on an `approved` place correctly
+  **did not** — `isAutoRevaluationCandidate`'s gate behaving exactly as
+  designed with the chatbot as a third writer. A no-context edge case
+  (a confirmation with nothing pending) degraded gracefully into a normal
+  turn instead of a dead end, and `buscar` / `celiaquia` were spot-checked
+  for regressions since this phase touched the shared dispatch. **One real
+  bug was found live and fixed:** a matched place's `pending_submission`
+  carried no name of its own (`place_name_text` is null for the matched
+  case), so the confirm-turn `<envio>` fell back to `null` and the redactor
+  cast false doubt on a write that had actually succeeded — fixed by
+  round-tripping the canonical `place_name` (`d1fdac7`), redeployed, and
+  re-verified live. Every row created during the verification was a
+  deliberate test row and was **reverted afterwards**, with the exact SQL
+  shown before running and the revert confirmed by read-only queries — the
+  same discipline used for ADR-004 / Phase 17 / Phase 19.
+
+  **Final whole-branch review fix wave (after the live verification, not yet
+  redeployed).** A last pre-merge review — composing the real exported
+  functions instead of asserting each half with hand-written literals —
+  found that `decideReportarDraft`'s `needs_address` output could violate
+  `validatePendingSubmission`'s own rules (`city: ""`, `notes` clamped to
+  2000 instead of `suggestions.notes`' 1000), which silently destroyed the
+  whole in-progress draft on the client's next echo and made the city
+  backfill unreachable in production. Fixed by making `city` genuinely
+  `string | null` end to end, clamping `notes` to 1000, and refusing a null
+  `city` in `decideConfirmTurn`; `<envio>` also gained `direccion` / `pais`
+  so the redactor is never asked to recite a draft it wasn't given. See
+  **Hallazgos de la revisión final de rama** under **Chatbot Fase C** above.
+  **The deployed function predates this fix wave** — a redeploy (and a
+  short re-run of the Módulo 2 "recomendar un lugar nuevo" path, which is
+  the one this changes) is the remaining step.
 
 ### GitHub Pages deploy decision
 

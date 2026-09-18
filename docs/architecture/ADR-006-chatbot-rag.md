@@ -918,6 +918,15 @@ Pendiente. Se completará con los resultados del soft-launch y el testing de
 jailbreak una vez ejecutado el PLAN (mismo patrón que ADR-004 / ADR-005:
 esta sección se llena al pasar el ADR a "Aceptado").
 
+Avance parcial, sin cerrar esta sección: la **Fase C** (Módulo 2 y Módulo 4,
+las escrituras reales a `place_reports` / `suggestions` — decisiones 4 y 6)
+ya fue verificada end-to-end en producción, incluido que un reporte
+`negative` sobre un lugar `approved` dispara la cadena de re-evaluación de
+Phase 19 y uno `positive` no, con todas las filas de prueba revertidas
+después. El detalle está en **Phase 22** del build-status de `CLAUDE.md`.
+Esta sección se llena cuando estén también el soft-launch y la batería de
+jailbreak (Fase E), que son las que mueven el ADR a "Aceptado".
+
 ## Consecuencias
 
 **Positivas:**
