@@ -510,6 +510,69 @@ export function continueSuggestionCollection(
 }
 
 // ---------------------------------------------------------------------------
+// Cancel-intent detection — an explicit, deterministic escape hatch for an
+// in-progress suggestion collection (decideSuggestionTurn below).
+//
+// Finding: decideCollectingSuggestion intercepts EVERY message while a
+// suggestion draft is incomplete, regardless of what the router classifies
+// it as — by design, since the router has no address/country field and a
+// raw address reply can't reliably be told apart from anything else. But
+// that meant the ONLY way out of an in-progress collection was the router
+// happening to classify the person's message as fuera_de_alcance, which is
+// not guaranteed for a natural cancellation phrase ("dejalo", "cancelá",
+// "mejor no") — those read as plausible free text, not obviously
+// out-of-scope, so the router could keep routing them back into collection.
+// This keyword check is a second, independent, deterministic escape that
+// doesn't depend on the router's classification at all — same
+// "small function, no LLM needed" style as detectCountryMention.
+// ---------------------------------------------------------------------------
+
+const CANCEL_PHRASES = [
+  "cancela", // cancelar, cancelá (accent-stripped)
+  "dejalo", // dejalo, dejalo así
+  "olvidalo", // olvidalo, olvídalo (accent-stripped)
+  "no importa",
+  "ya no",
+  "mejor no",
+  "cancel",
+  "never mind",
+  "forget it",
+];
+
+/**
+ * Deliberately a coarse keyword match, same spirit as detectCountryMention: a
+ * message containing an unrelated use of one of these words/phrases (e.g.
+ * "cancelar mi tarjeta" mid-address) would false-positive. Accepted as a
+ * low-risk edge case given the chat's narrow scope — not worth a heavier
+ * intent classifier for this.
+ */
+export function detectCancelIntent(text: string): boolean {
+  const normalized = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  return CANCEL_PHRASES.some((phrase) => normalized.includes(phrase));
+}
+
+export type SuggestionTurnDecision =
+  | { kind: "cancelled" }
+  | { kind: "collecting"; result: SuggestionCollectionResult };
+
+/**
+ * Wraps continueSuggestionCollection with the cancel-intent check, so the
+ * cancel check always runs BEFORE the raw reply is ever treated as an
+ * address/country answer — same turn-ownership priority principle already
+ * used for collectingSuggestion vs. confirma_envio in handleRequest.
+ */
+export function decideSuggestionTurn(
+  pending: PendingSuggestionSubmission,
+  rawReply: string,
+): SuggestionTurnDecision {
+  if (detectCancelIntent(rawReply)) return { kind: "cancelled" };
+  return { kind: "collecting", result: continueSuggestionCollection(pending, rawReply) };
+}
+
+// ---------------------------------------------------------------------------
 // Módulo 4 decision (confirmar) — Task 5, single-turn flow
 // Módulo 4 is a person volunteering evidence about a place under review
 // (status='needs_review'). Unlike Módulo 2, this is SINGLE-TURN — the
@@ -612,6 +675,14 @@ export function decideConfirmTurn(pending: PendingSubmission | null): ConfirmTur
 // backfills it), so the only way to reach address+country+null-city is a
 // hand-crafted client echo — which must fail closed at the write, not be
 // handed back to the collector as if the person still owed us an answer.
+//
+// This function's own `fuera_de_alcance` check is not the only way to exit
+// an in-progress collection: it depends on the router happening to classify
+// the message as out-of-scope, which a natural cancellation phrase ("dejalo",
+// "mejor no") is not guaranteed to trigger. decideSuggestionTurn (below)
+// layers a second, explicit, router-independent escape on top via
+// detectCancelIntent — checked before the raw reply is ever treated as an
+// address/country answer.
 export function decideCollectingSuggestion(
   modulo: RouterOutput["modulo"],
   pending: PendingSubmission | null,
@@ -905,6 +976,15 @@ export const SCOPE_DECLINE_REPLIES: Record<Idioma, string> = {
     "Solo puedo ayudarte a buscar lugares sin TACC en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía.",
   en:
     "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease.",
+};
+
+// Deterministic ack for an explicit cancel-intent mid-suggestion-collection
+// (decideSuggestionTurn) — no redactor call needed, same reasoning as the two
+// dicts above: the outcome is fully known in code, so paying for an LLM call
+// to phrase it would be pure cost with no judgment call to make.
+export const CANCEL_REPLIES: Record<Idioma, string> = {
+  es: "Listo, no sigo con esa recomendación. ¿Te ayudo con otra cosa?",
+  en: "Got it, I won't continue with that recommendation. Can I help you with something else?",
 };
 
 export function getReply(dict: Record<Idioma, string>, idioma: Idioma): string {
@@ -1229,21 +1309,30 @@ export async function handleRequest(req: Request): Promise<Response> {
       marked = true;
       markedReason = "fuera_de_alcance";
     } else if (collectingSuggestion) {
-      // Address/country collection continuation (Task 4). The raw last user
-      // message is the only source for an address — the router never extracts
-      // one. Always presented as REPORTAR: this is the tail of a Módulo 2
-      // flow, whatever the router called this particular turn.
+      // Address/country collection continuation (Task 4), with an explicit
+      // cancel-intent escape checked first (decideSuggestionTurn) — the raw
+      // last user message is the only source for an address, since the
+      // router never extracts one, so this is also the only reliable place
+      // to catch "never mind, forget it" before it's misread as an address.
+      // Always presented as REPORTAR: this is the tail of a Módulo 2 flow,
+      // whatever the router called this particular turn.
       envioModulo = "reportar";
-      const collected = continueSuggestionCollection(collectingSuggestion, lastUserMessage);
-      responsePending = collected.pending;
-      envio = {
-        estado: collected.kind === "draft_ready" ? "borrador_listo" : "necesita_direccion",
-        lugar_nombre: collected.pending.name,
-        ciudad: collected.pending.city,
-        direccion: collected.pending.address,
-        pais: collected.pending.country,
-        texto: collected.pending.notes,
-      };
+      const turnDecision = decideSuggestionTurn(collectingSuggestion, lastUserMessage);
+      if (turnDecision.kind === "cancelled") {
+        reply = getReply(CANCEL_REPLIES, router.idioma);
+        responsePending = null;
+      } else {
+        const collected = turnDecision.result;
+        responsePending = collected.pending;
+        envio = {
+          estado: collected.kind === "draft_ready" ? "borrador_listo" : "necesita_direccion",
+          lugar_nombre: collected.pending.name,
+          ciudad: collected.pending.city,
+          direccion: collected.pending.address,
+          pais: collected.pending.country,
+          texto: collected.pending.notes,
+        };
+      }
     } else if (confirmTurn.kind === "insert_report") {
       envioModulo = "reportar";
       const inserted = await insertIntakeRow(

@@ -17,6 +17,7 @@ import {
   buildResponderUserMessage,
   buildSuggestionInsertPayload,
   buildRouterUserMessage,
+  CANCEL_REPLIES,
   computeBucketKeys,
   continueSuggestionCollection,
   decideCollectingSuggestion,
@@ -24,7 +25,9 @@ import {
   decideConfirmTurn,
   decideMatchFromRows,
   decideReportarDraft,
+  decideSuggestionTurn,
   deriveCityFromAddress,
+  detectCancelIntent,
   filterPlaceFields,
   getClientIp,
   insertIntakeRow,
@@ -952,6 +955,111 @@ Deno.test("continueSuggestionCollection's output survives the same round-trip, m
   assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(done.pending))), done.pending);
   // ...and the fully-collected draft is actually confirmable (city backfilled).
   assertEquals(decideConfirmTurn(done.pending), { kind: "insert_suggestion", payload: done.pending });
+});
+
+// ---------------------------------------------------------------------------
+// Cancel-intent detection (detectCancelIntent) + decideSuggestionTurn —
+// explicit, router-independent escape from an in-progress suggestion
+// collection. Finding: decideCollectingSuggestion's only prior escape was
+// the router classifying the message fuera_de_alcance, not guaranteed for a
+// natural cancellation phrase.
+// ---------------------------------------------------------------------------
+
+Deno.test("detectCancelIntent - recognizes Spanish cancellation phrases", () => {
+  assertEquals(detectCancelIntent("cancelar"), true);
+  assertEquals(detectCancelIntent("mejor cancelá esto"), true);
+  assertEquals(detectCancelIntent("dejalo"), true);
+  assertEquals(detectCancelIntent("dejalo así"), true);
+  assertEquals(detectCancelIntent("olvidalo"), true);
+  assertEquals(detectCancelIntent("olvídalo"), true);
+  assertEquals(detectCancelIntent("no importa, dejemoslo"), true);
+  assertEquals(detectCancelIntent("ya no quiero seguir"), true);
+  assertEquals(detectCancelIntent("mejor no"), true);
+});
+
+Deno.test("detectCancelIntent - recognizes English cancellation phrases", () => {
+  assertEquals(detectCancelIntent("cancel"), true);
+  assertEquals(detectCancelIntent("please cancel"), true);
+  assertEquals(detectCancelIntent("never mind"), true);
+  assertEquals(detectCancelIntent("nevermind, forget it"), true);
+  assertEquals(detectCancelIntent("forget it"), true);
+});
+
+Deno.test("detectCancelIntent - is case-insensitive", () => {
+  assertEquals(detectCancelIntent("CANCELAR"), true);
+  assertEquals(detectCancelIntent("Mejor No"), true);
+});
+
+Deno.test("detectCancelIntent - does not fire on ordinary collection replies", () => {
+  assertEquals(detectCancelIntent("Rivera 1967, Fray Bentos, Uruguay"), false);
+  assertEquals(detectCancelIntent("Uruguay"), false);
+  assertEquals(detectCancelIntent("es un café muy lindo, cerca de la plaza"), false);
+  assertEquals(detectCancelIntent(""), false);
+});
+
+Deno.test("detectCancelIntent - known accepted false positive: an unrelated use of the same word", () => {
+  // "cancelar" inside "cancelar mi tarjeta" mid-conversation still fires.
+  // Documented, accepted as low-risk given the chat's narrow scope (per the
+  // finding this function was added to fix) — not asserting the opposite,
+  // just recording the known limitation so it isn't rediscovered as a bug.
+  assertEquals(detectCancelIntent("necesito cancelar mi tarjeta antes de pagar"), true);
+});
+
+function suggestionPending(over: Partial<PendingSuggestionSubmission> = {}): PendingSuggestionSubmission {
+  return {
+    kind: "suggestion",
+    name: "Bienestar Gluten Free",
+    city: "Fray Bentos",
+    country: null,
+    address: null,
+    category: null,
+    notes: "es 100% sin gluten",
+    ...over,
+  };
+}
+
+Deno.test("decideSuggestionTurn - cancel intent short-circuits before continueSuggestionCollection runs", () => {
+  const pending = suggestionPending();
+  const r = decideSuggestionTurn(pending, "mejor dejalo, no importa");
+  assertEquals(r, { kind: "cancelled" });
+});
+
+Deno.test("decideSuggestionTurn - cancel intent wins even when the reply also looks like a plausible address", () => {
+  // If cancel-intent detection ran after continueSuggestionCollection instead
+  // of before it, this reply could be swallowed as an address. It must not be.
+  const pending = suggestionPending();
+  const r = decideSuggestionTurn(pending, "cancelalo, no sigas con Rivera 1967");
+  assertEquals(r, { kind: "cancelled" });
+});
+
+Deno.test("decideSuggestionTurn - full flow: in-progress draft + cancel message -> cancelled, draft discarded", () => {
+  const start = decideReportarDraft({
+    match: null,
+    reporteTipo: "positive",
+    lugarNombre: "Bienestar Gluten Free",
+    ciudad: null,
+    reporteTexto: "es 100% sin gluten, lo conozco bien",
+  });
+  assertEquals(start.kind, "needs_address");
+  if (start.kind !== "needs_address") return;
+
+  const cancelled = decideSuggestionTurn(start.pending, "dejalo así, olvidalo");
+  assertEquals(cancelled, { kind: "cancelled" });
+  // handleRequest maps a "cancelled" decision to responsePending = null and a
+  // canned CANCEL_REPLIES ack (not exercised here — orchestration is
+  // live-verified, not unit-tested, per this file's own convention) — the
+  // decision itself, which drives that mapping, is what this test pins.
+});
+
+Deno.test("decideSuggestionTurn - no cancel intent delegates to continueSuggestionCollection unchanged", () => {
+  const pending = suggestionPending();
+  const r = decideSuggestionTurn(pending, "Rivera 1967, Fray Bentos, Uruguay");
+  assertEquals(r, { kind: "collecting", result: continueSuggestionCollection(pending, "Rivera 1967, Fray Bentos, Uruguay") });
+  if (r.kind === "collecting") assertEquals(r.result.kind, "draft_ready");
+});
+
+Deno.test("CANCEL_REPLIES - matches the exact requested Spanish acknowledgment", () => {
+  assertEquals(getReply(CANCEL_REPLIES, "es"), "Listo, no sigo con esa recomendación. ¿Te ayudo con otra cosa?");
 });
 
 // ---------------------------------------------------------------------------

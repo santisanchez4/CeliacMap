@@ -2380,6 +2380,38 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   con forma de suggestion (recolección en curso, borrador listo,
   `enviado`, `error_envio`). **Sin cambio de prompt**: la instrucción del
   REDACTOR ya dice usar lo que venga en `<envio>`.
+- **`decideCollectingSuggestion` interceptaba cualquier mensaje mientras
+  hubiera un borrador de suggestion incompleto, sin ningún mecanismo
+  explícito de cancelación — la única salida era que el router clasificara
+  el mensaje como `fuera_de_alcance`, algo no garantizado para una frase
+  natural de cancelación.** Hallazgo de una revisión post-merge de
+  Santiago (commit `a3afab4`, después de cerrada la Fase C): una frase
+  como "dejalo", "cancelá" o "mejor no" se lee como texto libre plausible,
+  no obviamente fuera de alcance, así que el router podía seguir
+  clasificándola dentro del flujo y `continueSuggestionCollection` la
+  trataría como intento de dirección/país en vez de como un pedido de
+  cancelar. **Arreglado con `detectCancelIntent(text): boolean`**
+  (`supabase/functions/chat/index.ts`), un chequeo de palabras clave
+  determinístico — mismo estilo que `detectCountryMention`, normaliza a
+  minúsculas y sin acentos — que reconoce frases en español ("cancelar",
+  "cancelá", "dejalo", "dejalo así", "olvidalo", "olvídalo", "no importa",
+  "ya no", "mejor no") e inglés ("cancel", "never mind", "forget it").
+  `decideSuggestionTurn(pending, rawReply)` envuelve
+  `continueSuggestionCollection` con el chequeo corriendo primero —
+  mismo principio de prioridad ya aplicado con `collectingSuggestion` vs.
+  `confirma_envio` en `handleRequest` — así que el texto nunca llega a
+  tratarse como dirección si hay intención de cancelar. Ante un
+  `{kind: "cancelled"}`, `handleRequest` limpia `responsePending` a `null`
+  y responde con un nuevo diccionario `CANCEL_REPLIES` (mismo patrón que
+  `RATE_LIMIT_REPLIES`/`SCOPE_DECLINE_REPLIES`, sin llamar al redactor —
+  el resultado es determinístico, no hay juicio que pedirle al modelo).
+  Es un falso-positivo aceptado y documentado en el propio test
+  (`detectCancelIntent - known accepted false positive`): un uso no
+  relacionado de la misma palabra ("necesito cancelar mi tarjeta") también
+  dispara — riesgo bajo dado el alcance acotado del chat, no bloqueante.
+  10 tests nuevos, suite 123 → 133. **Pendiente de deploy y verificación en
+  vivo** (implementado, no desplegado — Santiago pidió revisar el diff
+  antes de deployar o commitear).
 
 ### Build status (phases)
 
