@@ -499,6 +499,7 @@ Deno.test("validatePendingSubmission - valid report with place_id", () => {
     kind: "report" as const,
     place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
     place_name_text: null,
+    place_name: "La Panera Sin TACC",
     report_type: "positive" as const,
     description: "Excelente atención, todo sin TACC",
   };
@@ -510,6 +511,7 @@ Deno.test("validatePendingSubmission - valid report with place_name_text, no pla
     kind: "report" as const,
     place_id: null,
     place_name_text: "La Panera Sin TACC",
+    place_name: null,
     report_type: "negative" as const,
     description: "Me contaminaron la comida",
   };
@@ -522,6 +524,7 @@ Deno.test("validatePendingSubmission - rejects report with neither place_id nor 
       kind: "report",
       place_id: null,
       place_name_text: null,
+      place_name: null,
       report_type: "positive",
       description: "algo",
     }),
@@ -535,6 +538,7 @@ Deno.test("validatePendingSubmission - rejects malformed place_id (not a uuid)",
       kind: "report",
       place_id: "not-a-uuid; DROP TABLE places;",
       place_name_text: null,
+      place_name: null,
       report_type: "positive",
       description: "algo",
     }),
@@ -571,6 +575,7 @@ Deno.test("validatePendingSubmission - rejects report_type outside enum", () => 
       kind: "report",
       place_id: null,
       place_name_text: "X",
+      place_name: null,
       report_type: "neutral",
       description: "algo",
     }),
@@ -670,7 +675,7 @@ Deno.test("decideReportarDraft - matched place, positive -> draft_ready as repor
   const r = decideReportarDraft({ match: match(), reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: "Excelente, todo sin TACC" });
   assertEquals(r, {
     kind: "draft_ready",
-    pending: { kind: "report", place_id: match().id, place_name_text: null, report_type: "positive", description: "Excelente, todo sin TACC" },
+    pending: { kind: "report", place_id: match().id, place_name_text: null, place_name: match().name, report_type: "positive", description: "Excelente, todo sin TACC" },
   });
 });
 
@@ -678,15 +683,31 @@ Deno.test("decideReportarDraft - matched place, negative -> draft_ready as repor
   const r = decideReportarDraft({ match: match(), reporteTipo: "negative", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: "Me contaminaron la comida" });
   assertEquals(r, {
     kind: "draft_ready",
-    pending: { kind: "report", place_id: match().id, place_name_text: null, report_type: "negative", description: "Me contaminaron la comida" },
+    pending: { kind: "report", place_id: match().id, place_name_text: null, place_name: match().name, report_type: "negative", description: "Me contaminaron la comida" },
   });
+});
+
+// Regression: place_name is the real matched-place name, carried forward so
+// the confirm turn's redactor ack can name the place even when the person's
+// confirmation message ("dale, mandalo") doesn't repeat it. Before this
+// fix, a matched place's pending submission never carried its own name at
+// all (place_name_text is null for the matched case), so the confirm-turn
+// envio fell back to null and the redactor cast false doubt on a
+// successful insert — confirmed live in production.
+Deno.test("decideReportarDraft - matched place carries the real place name in place_name (regression)", () => {
+  const r = decideReportarDraft({ match: match(), reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Adrogué", reporteTexto: "Excelente, todo sin TACC" });
+  assertEquals(r.kind, "draft_ready");
+  if (r.kind === "draft_ready") {
+    assertEquals(r.pending.place_name, "La Panera");
+    assertEquals(r.pending.place_name, match().name);
+  }
 });
 
 Deno.test("decideReportarDraft - no match, negative -> draft_ready with place_name_text, no place_id", () => {
   const r = decideReportarDraft({ match: null, reporteTipo: "negative", lugarNombre: "Lugar Fantasma", ciudad: "Salto", reporteTexto: "Dijeron sin TACC pero no lo era" });
   assertEquals(r, {
     kind: "draft_ready",
-    pending: { kind: "report", place_id: null, place_name_text: "Lugar Fantasma", report_type: "negative", description: "Dijeron sin TACC pero no lo era" },
+    pending: { kind: "report", place_id: null, place_name_text: "Lugar Fantasma", place_name: null, report_type: "negative", description: "Dijeron sin TACC pero no lo era" },
   });
 });
 
@@ -859,7 +880,7 @@ Deno.test("decideConfirmTurn - no pending_submission -> nothing_pending", () => 
 });
 
 Deno.test("decideConfirmTurn - report pending, complete -> insert_report", () => {
-  const pending: PendingReportSubmission = { kind: "report", place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c", place_name_text: null, report_type: "positive", description: "Muy bueno" };
+  const pending: PendingReportSubmission = { kind: "report", place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c", place_name_text: null, place_name: null, report_type: "positive", description: "Muy bueno" };
   assertEquals(decideConfirmTurn(pending), { kind: "insert_report", payload: pending });
 });
 
@@ -921,6 +942,7 @@ Deno.test("decideCollectingSuggestion - a pending report is not a collection tur
     kind: "report",
     place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
     place_name_text: null,
+    place_name: null,
     report_type: "negative",
     description: "me contaminaron la comida",
   };
@@ -941,6 +963,7 @@ Deno.test("buildPlaceReportInsertPayload - matches report.js's exact shape", () 
     kind: "report",
     place_id: "4300ad15-2f6f-4881-a902-b2ac5990464c",
     place_name_text: null,
+    place_name: "La Panera",
     report_type: "positive",
     description: "Muy bueno",
   });
@@ -950,6 +973,10 @@ Deno.test("buildPlaceReportInsertPayload - matches report.js's exact shape", () 
     report_type: "positive",
     description: "Muy bueno",
   });
+  // place_name is a UI/prompt-context-only field (round-tripped so the
+  // confirm-turn redactor ack can name the place) — there is no such
+  // column on place_reports, so it must never leak into the insert payload.
+  assertEquals("place_name" in payload, false);
 });
 
 Deno.test("buildSuggestionInsertPayload - matches suggest.js's exact shape, origin always community", () => {

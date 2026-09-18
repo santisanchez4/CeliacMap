@@ -69,6 +69,14 @@ export type PendingReportSubmission = {
   kind: "report";
   place_id: string | null;
   place_name_text: string | null;
+  // The real place name when matched (place_id set); null for the
+  // no-match/free-text case (place_name_text carries the name there
+  // instead). Round-tripped across the draft -> confirm turn cycle purely
+  // so the confirm turn's redactor ack can name the place even when the
+  // person doesn't repeat it in their confirmation message (e.g. "dale,
+  // mandalo") — never written to place_reports, there is no such column.
+  // See buildPlaceReportInsertPayload, which deliberately excludes it.
+  place_name: string | null;
   report_type: "positive" | "negative";
   description: string;
 };
@@ -113,9 +121,11 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
   if (obj.kind === "report") {
     const placeId = obj.place_id;
     const placeNameText = obj.place_name_text;
+    const placeName = obj.place_name ?? null;
     const placeIdOk = placeId === null || (typeof placeId === "string" && UUID_RE.test(placeId));
     const placeNameOk = placeNameText === null || isNonEmptyString(placeNameText, 120);
-    if (!placeIdOk || !placeNameOk) return null;
+    const placeNameFieldOk = placeName === null || isNonEmptyString(placeName, 120);
+    if (!placeIdOk || !placeNameOk || !placeNameFieldOk) return null;
     if (placeId === null && placeNameText === null) return null; // schema requires one of the two
     if (obj.report_type !== "positive" && obj.report_type !== "negative") return null;
     if (!isNonEmptyString(obj.description, 2000)) return null;
@@ -123,6 +133,7 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
       kind: "report",
       place_id: placeId as string | null,
       place_name_text: placeNameText as string | null,
+      place_name: placeName as string | null,
       report_type: obj.report_type,
       description: obj.description as string,
     };
@@ -363,6 +374,7 @@ export function decideReportarDraft(input: {
         kind: "report",
         place_id: input.match.id,
         place_name_text: null,
+        place_name: input.match.name,
         report_type: reporteTipo,
         description,
       },
@@ -376,6 +388,7 @@ export function decideReportarDraft(input: {
         kind: "report",
         place_id: null,
         place_name_text: input.lugarNombre.slice(0, 120),
+        place_name: null,
         report_type: "negative",
         description,
       },
@@ -1203,7 +1216,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         responsePending = null;
         envio = {
           estado: "enviado",
-          lugar_nombre: confirmTurn.payload.place_name_text,
+          lugar_nombre: confirmTurn.payload.place_name ?? confirmTurn.payload.place_name_text,
           report_type: confirmTurn.payload.report_type,
           texto: confirmTurn.payload.description,
         };
@@ -1214,7 +1227,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         responsePending = confirmTurn.payload;
         envio = {
           estado: "error_envio",
-          lugar_nombre: confirmTurn.payload.place_name_text,
+          lugar_nombre: confirmTurn.payload.place_name ?? confirmTurn.payload.place_name_text,
           report_type: confirmTurn.payload.report_type,
           texto: confirmTurn.payload.description,
         };
