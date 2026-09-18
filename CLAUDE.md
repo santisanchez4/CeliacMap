@@ -322,6 +322,36 @@ GEOGRAPHIC SCOPE
   a separate `curator_notes` column the Validator's prompt includes but
   `_persist` never touches, or an admin-supplied `evidence` field threaded
   into `_build_user_prompt`.)
+- **A redactor-call failure occurring AFTER a successful `place_reports`/
+  `suggestions` insert can 500 the chat turn, and a client retry can then
+  insert a duplicate row — confirmed real, deliberately left unfixed.**
+  `handleRequest`'s Módulo 2/4 branches (`supabase/functions/chat/index.ts`)
+  write via `insertIntakeRow` *before* the shared post-chain redactor call
+  that phrases the acknowledgment (`index.ts:1461-1477`). If that call
+  throws — an Anthropic API error/timeout, not a write failure — the outer
+  `catch` (`index.ts:1478-1481`) returns a 500 `internal_error`; the client
+  never receives the real `action`/`pending_submission: null` the write
+  already earned. Worse, the **confirm-turn** branches leave
+  `pending_submission` populated with the same payload on a *write* failure
+  (`index.ts:1268`, `:1297` — deliberately, so a failed write can be
+  retried) — but that field is never reached when the *redactor* is what
+  failed, since the response body is never sent at all. In practice this
+  means: on a write success + redactor failure, the person sees a 500 with
+  no `action` and (client-side) still holds the pending draft they had
+  before confirming, so a natural retry ("dale" again) re-attempts a real
+  INSERT that already succeeded once, producing a duplicate row. Identified
+  during the Fase C (Phase 22) final whole-branch review; confirmed not a
+  spec violation (the write-before-reply ordering is this phase's own
+  design). **Deliberately parked, not fixed in Phase 22**: harm judged
+  bounded — `place_reports` rows are evidence for `review_handler.py`, not a
+  direct status change (ADR-004), and a duplicate `suggestions` row gets
+  deduped downstream by the promoter's geocode/dedup logic. **Pending
+  future fix** (not done): when `responseAction !== null` (the write
+  already succeeded) and the subsequent redactor call fails, return 200
+  with a canned "listo, lo envié" acknowledgment + the real `action` +
+  `pending_submission: null`, instead of falling through to the generic
+  `internal_error` 500 — closing the duplicate-retry window without
+  changing the write-before-reply ordering.
 
 ## The Core Prompt — Validator Rubric
 
