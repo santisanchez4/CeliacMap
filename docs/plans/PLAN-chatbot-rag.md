@@ -188,12 +188,20 @@ Supabase las exige aunque `verify_jwt` esté OFF).
     {"role": "assistant", "content": "…"}
   ],
   "session_token": "<uuid de localStorage>",
-  "pending_submission": null | {       // eco del turno anterior (Módulo 2/4)
-    "kind": "report" | "suggestion",
+  "pending_submission": null | {       // eco del turno anterior (Módulo 2 solamente)
+    "kind": "report",
     "place_id": "<uuid|null>",
-    "report_type": "positive" | "negative" | null,
-    "description": "…",
-    "name": "…", "city": "…", "country": "…"   // para suggestion
+    "place_name_text": "<string|null>",
+    "report_type": "positive" | "negative",
+    "description": "…"
+  } | {
+    "kind": "suggestion",
+    "name": "…",
+    "city": "…",
+    "country": "Uruguay" | "Argentina" | null,
+    "address": "…|null",
+    "category": "restaurant" | "cafe" | "shop" | null,
+    "notes": "…|null"
   }
 }
 ```
@@ -236,26 +244,28 @@ Supabase las exige aunque `verify_jwt` esté OFF).
      `<datos_cercanos>`. Llamada 2 (redactor) con `<datos>` / `<datos_cercanos>`.
    - **`celiaquia`** → llamada 2 (redactor) con la lista de `<fuentes>`,
      sin datos de la base.
-   - **`reportar`** / **`confirmar`**:
+   - **`reportar`** (Módulo 2):
      - Si `confirma_envio && pending_submission` → validar, hacer el
        `POST` plano a `/rest/v1/place_reports` o `/rest/v1/suggestions`
        con la **anon key**, responder `action` + un `reply` de
        agradecimiento (llamada 2 o texto fijo).
      - Si no → lookup de `place_id`:
-       - `reportar`: `places?name=ilike.*<nombre>*&city=ilike.*<ciudad>*`
-         con **anon key** (lugares `approved`). Si hay match → armar
-         `pending_submission` (kind `report`). Sin match → asimetría por
-         tipo: `positive` → `pending_submission` kind `suggestion`;
-         `negative` → `pending_submission` con `place_id: null` +
-         `place_name_text` (queda para revisión manual, no dispara nada).
-       - `confirmar`: lookup **con service_role** (para ver `needs_review`),
-         `name=ilike.*<nombre>*` + `city=ilike.*<ciudad>*` (mismo criterio
-         que Módulo 2 — ADR-006 decisión 6). **Exactamente un** resultado →
-         `pending_submission` kind `report` (`report_type: 'positive'`) con
-         ese `place_id`. Cero o más de uno → `pending_submission` kind
-         `report` con `place_id: null` + `place_name_text`. **El `reply` no
-         le confirma a la persona si el lugar ya está en el sistema.**
+       `places?name=ilike.*<nombre>*&city=ilike.*<ciudad>*` con **anon key**
+       (lugares `approved`). Si hay match → armar `pending_submission` (kind
+       `report`). Sin match → asimetría por tipo: `positive` →
+       `pending_submission` kind `suggestion`; `negative` → `pending_submission`
+       con `place_id: null` + `place_name_text` (queda para revisión manual, no
+       dispara nada).
      - Llamada 2 (redactor) para redactar la propuesta + "¿Lo envío así?".
+   - **`confirmar`** (Módulo 4):
+     - **Single-turn flow — no produce `pending_submission`.** Lookup
+       **con service_role** (para ver `needs_review`), `name=ilike.*<nombre>*`
+       + `city=ilike.*<ciudad>*` (mismo criterio que Módulo 2 — ADR-006
+       decisión 6). Si hay exactamente un resultado, inserta inmediatamente en
+       `place_reports` con `report_type: 'positive'` y responde `action` de
+       envío. Si cero o más de uno, o si falta el nombre, el `reply` del
+       redactor solicita más detalle sin hacer `POST` alguno. **El `reply` no
+       le confirma a la persona si el lugar ya está en el sistema.**
 8. Loguear el turno a `agent_log` (`agent='chatbot'`) — **minimización por
    defecto (ADR-006 decisión 10):**
    - **Turno normal** → solo metadata: `modulo`, query estructurada, conteo
