@@ -104,8 +104,11 @@
   var openedAt = 0;          // first time the panel opened (MIN_FILL_MS clock)
   var introEl = null;
   var waitEl = null;
+  var backgroundNodes = Array.prototype.map.call(document.querySelectorAll("main, .site-header, .site-footer"), function (node) {
+    return { node: node, originallyInert: node.hasAttribute("inert") };
+  });
 
-  var mobileMq = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
+  var mobileMq = window.matchMedia ? window.matchMedia("(max-width: 767px)") : null;
   function isMobile() { return !!(mobileMq && mobileMq.matches); }
 
   function clamp(s) {
@@ -126,6 +129,7 @@
     eachNode("[data-chat-aria]", function (n) { n.setAttribute("aria-label", t(n.getAttribute("data-chat-aria"))); });
     eachNode("[data-chat-placeholder]", function (n) { n.setAttribute("placeholder", t(n.getAttribute("data-chat-placeholder"))); });
     if (introEl) introEl.firstChild.textContent = t("intro");
+    renderPrompts();
     syncFab();
   }
 
@@ -160,6 +164,27 @@
     log.appendChild(el);
     scrollToEnd();
     return el;
+  }
+
+  function addPlaceReferences(parent, places) {
+    if (!parent || !Array.isArray(places) || !places.length) return;
+    var list = document.createElement("div");
+    list.className = "chat-place-links";
+    places.slice(0, 8).forEach(function (place) {
+      if (!place || typeof place.id !== "string" || typeof place.name !== "string") return;
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "chat-place-link";
+      button.textContent = place.name + (place.city ? " · " + place.city : "");
+      button.addEventListener("click", function (event) {
+        event.stopPropagation();
+        try { document.dispatchEvent(new CustomEvent("celiacmap:open-place", { detail: { id: place.id } })); } catch (e) {}
+        if (isMobile()) setOpen(false, false);
+      });
+      list.appendChild(button);
+    });
+    if (list.childNodes.length) parent.appendChild(list);
+    scrollToEnd();
   }
 
   function showThinking() {
@@ -203,14 +228,46 @@
     panel.hidden = !open;
     fab.setAttribute("aria-expanded", open ? "true" : "false");
     syncFab();
+    syncViewport();
     if (open) {
+      document.dispatchEvent(new CustomEvent("celiacmap:chat-open"));
       if (!openedAt) openedAt = Date.now();
       scrollToEnd();
-      input.focus({ preventScroll: true });
+      // On a phone, opening a conversation should not immediately cover the
+      // map with the virtual keyboard. The user can opt into typing naturally.
+      if (!isMobile()) input.focus({ preventScroll: true });
+      else closeBtn.focus({ preventScroll: true });
     } else if (returnFocus) {
       fab.focus();
     }
   }
+
+  function syncViewport() {
+    document.body.classList.toggle("chat-mobile-open", isOpen && isMobile());
+    backgroundNodes.forEach(function (entry) {
+      if (isOpen && isMobile()) entry.node.setAttribute("inert", "");
+      else if (!entry.originallyInert) entry.node.removeAttribute("inert");
+    });
+    panel.setAttribute("aria-modal", String(isMobile()));
+    if (window.visualViewport) {
+      panel.style.setProperty("--chat-viewport-height", window.visualViewport.height + "px");
+      panel.style.setProperty("--chat-viewport-top", window.visualViewport.offsetTop + "px");
+    }
+  }
+  window.addEventListener("resize", syncViewport);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncViewport);
+    window.visualViewport.addEventListener("scroll", syncViewport);
+  }
+  panel.addEventListener("keydown", function (event) {
+    if (event.key !== "Tab" || !isMobile()) return;
+    var nodes = Array.prototype.filter.call(panel.querySelectorAll("button, textarea, a[href]"), function (node) {
+      return !node.disabled && node.getClientRects().length;
+    });
+    var first = nodes[0], last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
 
   fab.addEventListener("click", function () { setOpen(!isOpen, true); });
   closeBtn.addEventListener("click", function () { setOpen(false, true); });
@@ -271,7 +328,8 @@
         (data.action.type === "report_submitted" || data.action.type === "suggestion_submitted")) {
       mods.push("sent");
     }
-    addMessage(kind, data.reply, mods);
+    var replyEl = addMessage(kind, data.reply, mods);
+    if (!data.rate_limited) addPlaceReferences(replyEl, data.places);
     turns.push({ role: "assistant", content: clamp(data.reply) });
   }
 
@@ -302,6 +360,7 @@
     eachNode(".chat-msg--error", removeNode);
 
     turns.push({ role: "user", content: clamp(text) });
+    renderPrompts();
     var userEl = addMessage("user", text);
     input.value = "";
     autosize();
@@ -322,7 +381,7 @@
       .then(function () {
         removeNode(thinkingEl);
         setBusy(false);
-        if (isOpen) input.focus({ preventScroll: true });
+        if (isOpen && !isMobile()) input.focus({ preventScroll: true });
       });
   }
 
@@ -343,7 +402,29 @@
   });
 
   /* -------------------------------- Init -------------------------- */
+  var promptsEl = document.createElement("div");
+  promptsEl.className = "chat-prompts";
+  function renderPrompts() {
+    if (!promptsEl) return;
+    promptsEl.hidden = turns.length > 0;
+    promptsEl.innerHTML = "";
+    var prompts = lang() === "en" ? ["Gluten-free cafés in Montevideo", "Places in Buenos Aires", "How can I suggest a place?"] : ["Cafés sin TACC en Montevideo", "Lugares en Buenos Aires", "¿Cómo sugiero un lugar?"];
+    prompts.forEach(function (prompt) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "chat-place-link";
+      button.textContent = prompt;
+      button.addEventListener("click", function () {
+        input.value = prompt;
+        autosize();
+        updateSendState();
+        input.focus({ preventScroll: true });
+      });
+      promptsEl.appendChild(button);
+    });
+  }
   introEl = addMessage("intro", t("intro"));
+  log.appendChild(promptsEl);
   document.addEventListener("celiacmap:lang", applyChrome);
   applyChrome();
   updateSendState();

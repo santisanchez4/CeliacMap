@@ -104,11 +104,22 @@ export interface ChatAction {
   type: "report_submitted" | "suggestion_submitted";
 }
 
+/** A deliberately small, public map reference. It is never included in the
+ * model context; the browser uses it only to open an already-approved place. */
+export interface ChatPlaceReference {
+  id: string;
+  name: string;
+  city: string | null;
+  category: string | null;
+  safety_level: string | null;
+}
+
 export interface ChatResponseBody {
   reply: string;
   pending_submission: PendingSubmission | null;
   action: ChatAction | null;
   rate_limited: boolean;
+  places: ChatPlaceReference[];
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +295,9 @@ interface PlacesQueryParams {
 }
 
 export function buildPlacesSearchUrl(supabaseUrl: string, params: PlacesQueryParams): string {
-  const parts = [`select=${PLACES_SELECT_FIELDS.join(",")}`, "status=eq.approved"];
+  // `id` is selected only for the client-side map reference below. filterPlaceFields
+  // still excludes it, so the redactor receives exactly the audited allowlist.
+  const parts = [`select=id,${PLACES_SELECT_FIELDS.join(",")}`, "status=eq.approved"];
   if (params.ciudad) parts.push(`city=ilike.*${encodeURIComponent(params.ciudad)}*`);
   if (params.zona) parts.push(`address=ilike.*${encodeURIComponent(params.zona)}*`);
   if (params.category) parts.push(`category=eq.${encodeURIComponent(params.category)}`);
@@ -292,6 +305,19 @@ export function buildPlacesSearchUrl(supabaseUrl: string, params: PlacesQueryPar
   parts.push("order=vote_count.desc,rating.desc.nullslast,name.asc");
   parts.push(`limit=${PLACES_SEARCH_LIMIT}`);
   return `${supabaseUrl}/rest/v1/places?${parts.join("&")}`;
+}
+
+export function toChatPlaceReferences(rows: Record<string, unknown>[]): ChatPlaceReference[] {
+  return rows.flatMap((row) => {
+    if (typeof row.id !== "string" || typeof row.name !== "string") return [];
+    return [{
+      id: row.id,
+      name: row.name,
+      city: typeof row.city === "string" ? row.city : null,
+      category: typeof row.category === "string" ? row.category : null,
+      safety_level: typeof row.safety_level === "string" ? row.safety_level : null,
+    }];
+  }).slice(0, PLACES_SEARCH_LIMIT);
 }
 
 // <datos_cercanos> — deliberate simplification (TODO in PLAN-chatbot-rag.md
@@ -1361,7 +1387,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     // destroy a report the person already described (action stays null —
     // nothing was submitted).
     return jsonResponse(
-      { reply, pending_submission: pendingIn, action: null, rate_limited: true },
+      { reply, pending_submission: pendingIn, action: null, rate_limited: true, places: [] },
       200,
       cors,
     );
@@ -1426,6 +1452,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   let envioModulo: RouterOutput["modulo"] = router.modulo;
   let responsePending: PendingSubmission | null = null;
   let responseAction: ChatAction | null = null;
+  let responsePlaces: ChatPlaceReference[] = [];
 
   try {
     if (router.modulo === "fuera_de_alcance") {
@@ -1655,6 +1682,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       if (!searchRes.ok) throw new Error(`places search failed: ${searchRes.status}`);
       const rows = (await searchRes.json()) as Record<string, unknown>[];
       const datos = rows.map(filterPlaceFields);
+      responsePlaces = toChatPlaceReferences(rows);
       resultCount = datos.length;
 
       let datosCercanos: { city: string; count: number } | null = null;
@@ -1725,7 +1753,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   });
 
   return jsonResponse(
-    { reply, pending_submission: responsePending, action: responseAction, rate_limited: false },
+    { reply, pending_submission: responsePending, action: responseAction, rate_limited: false, places: responsePlaces },
     200,
     cors,
   );

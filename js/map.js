@@ -16,6 +16,12 @@
   var mapEl = document.getElementById("cm-map");
   if (!mapEl || typeof L === "undefined") return;
   var statusEl = document.getElementById("map-status");
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  function motion(seconds) { return reducedMotion.matches ? { animate: false, duration: 0 } : { duration: seconds }; }
+  var returnFocusEl = null;
+  var previousView = null;
+  var panelExpanded = false;
+  function tr(es, en) { return lang() === "en" ? en : es; }
 
   /* --------------------------- i18n labels -------------------------- */
   var LABELS = {
@@ -25,10 +31,8 @@
       shop: { es: "Comercio", en: "Shop" }
     },
     safety: {
-      // 2 levels (matches the map legend): gluten_free_100 + celiac_friendly
-      // share "Sin TACC"; options_available is "Tiene opciones sin TACC".
-      gluten_free_100: { es: "Sin TACC", en: "Gluten-free" },
-      celiac_friendly: { es: "Sin TACC", en: "Gluten-free" },
+      gluten_free_100: { es: "Espacio 100% sin gluten", en: "100% gluten-free venue" },
+      celiac_friendly: { es: "Atención para celíacos", en: "Celiac-friendly service" },
       options_available: { es: "Tiene opciones sin TACC", en: "Has gluten-free options" }
     },
     status: {
@@ -48,7 +52,7 @@
       vote: { es: "Votar", en: "Vote" }
     },
     source: {
-      google_places: { es: "Verificado por Google", en: "Verified by Google" },
+      google_places: { es: "Datos de Google", en: "Google data" },
       social: { es: "Encontrado en redes sociales", en: "Found on social media" },
       manual: { es: "Lugar curado", en: "Curated place" },
       user: { es: "Sugerido por la comunidad", en: "Community suggested" }
@@ -216,7 +220,7 @@
 
   /* ------------------------------ Map ------------------------------- */
   // Centered on the Río de la Plata to frame both Montevideo and Buenos Aires.
-  var map = L.map(mapEl, { scrollWheelZoom: false }).setView([-34.75, -57.4], 6);
+  var map = L.map(mapEl, { scrollWheelZoom: false, zoomAnimation: !reducedMotion.matches, fadeAnimation: !reducedMotion.matches }).setView([-34.75, -57.4], 6);
 
   // The Río de la Plata core (Montevideo + the Buenos Aires metro, Tigre to
   // Pilar). frameVisible() uses this as the default view, so outlier cities
@@ -247,24 +251,24 @@
   map.on("focus", function () { map.scrollWheelZoom.enable(); });
   map.on("blur", function () { map.scrollWheelZoom.disable(); });
 
-  // 2 visual levels: gluten_free_100 + celiac_friendly share the dark "safe"
-  // color; options_available is the light "options" color.
   function safetyClass(level) {
     if (level === "options_available") return "cm-marker--options";
-    return "cm-marker--safe";
+    if (level === "celiac_friendly") return "cm-marker--friendly";
+    return "cm-marker--dedicated";
   }
 
   function safetyBadgeClass(level) {
     if (level === "options_available") return "pp-badge--options";
-    return "pp-badge--safe";
+    if (level === "celiac_friendly") return "pp-badge--friendly";
+    return "pp-badge--dedicated";
   }
 
-  function icon(level) {
+  function icon(level, selected) {
     return L.divIcon({
       className: "",
-      html: '<span class="cm-marker ' + safetyClass(level) + '"></span>',
-      iconSize: [18, 18],
-      iconAnchor: [9, 9],
+      html: '<span class="cm-marker ' + safetyClass(level) + (selected ? " is-selected" : "") + '"></span>',
+      iconSize: [selected ? 28 : 18, selected ? 28 : 18],
+      iconAnchor: [selected ? 14 : 9, selected ? 14 : 9],
       popupAnchor: [0, -10]
     });
   }
@@ -416,6 +420,20 @@
 
   function openPanel(p) {
     panelBody.innerHTML = panelHtml(p);
+    var expand = document.createElement("button");
+    expand.type = "button";
+    expand.className = "detail-expand";
+    expand.textContent = tr("Ver información completa", "View full details");
+    expand.setAttribute("aria-expanded", String(panelExpanded));
+    expand.hidden = panelExpanded;
+    expand.addEventListener("click", function () {
+      panelExpanded = true;
+      panelEl.classList.add("is-expanded");
+      expand.hidden = true;
+      panelEl.focus({ preventScroll: true });
+    });
+    panelBody.appendChild(expand);
+    panelEl.classList.toggle("is-expanded", panelExpanded);
     panelEl.classList.add("is-open");
     panelEl.setAttribute("aria-hidden", "false");
     // Let js/ranking.js wire the .pp-vote button and reflect the voted state.
@@ -433,6 +451,9 @@
     // Only when it actually closed: closePanel also runs on every map click / Escape.
     if (wasOpen) {
       try { document.dispatchEvent(new CustomEvent("celiacmap:panel-close")); } catch (e) {}
+      if (panelEl.contains(document.activeElement)) {
+        (returnFocusEl && returnFocusEl.isConnected && returnFocusEl.getClientRects().length ? returnFocusEl : mapEl).focus({ preventScroll: true });
+      }
     }
   }
 
@@ -451,17 +472,24 @@
   }
 
   if (panelAvailable) {
-    panelClose.addEventListener("click", closePanel);
+    panelClose.addEventListener("click", function () {
+      closePanel();
+      if (previousView) map.setView(previousView.center, previousView.zoom, { animate: false });
+    });
     // Close on background map click (Leaflet does not fire this for markers).
     map.on("click", closePanel);
     // Close on click anywhere outside the panel and outside the map.
     document.addEventListener("click", function (e) {
       if (!panelEl.classList.contains("is-open")) return;
       if (panelEl.contains(e.target) || mapEl.contains(e.target)) return;
+      if (e.target.closest && e.target.closest(".place-result, .chat-place-link")) return;
       closePanel();
     });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") closePanel();
+      if (e.key === "Escape" && panelEl.classList.contains("is-open")) {
+        closePanel();
+        if (previousView) map.setView(previousView.center, previousView.zoom, { animate: false });
+      }
     });
     // "Reportar error" is a placeholder for now.
     panelBody.addEventListener("click", function (e) {
@@ -474,21 +502,103 @@
 
   /* --------------------------- Markers ------------------------------ */
   var entries = [];                       // { marker, category, name, city }
-  var visible = L.layerGroup().addTo(map);
+  var visible = typeof L.markerClusterGroup === "function"
+    ? L.markerClusterGroup({ showCoverageOnHover: false, spiderfyOnMaxZoom: true, maxClusterRadius: 46, animate: !reducedMotion.matches })
+    : L.layerGroup();
+  visible.addTo(map);
   var currentCategory = "all";
   var currentCity = "all";
+  var currentSafety = "all";
   var currentQuery = "";
+  var selectedEntry = null;
+  var resultLimit = 8;
+  var userLocation = null;
+  var locationMarker = null;
+  function filteredEntries() { return entries.filter(matches); }
 
   var searchInput = document.getElementById("place-search");
   var searchClear = document.getElementById("search-clear");
   var citySelect = document.getElementById("city-select");
   var countEl = document.getElementById("map-result-count");
   var suggestEl = document.getElementById("search-suggest");
+  var resultsEl = document.getElementById("place-results");
+  var explorerCountEl = document.getElementById("explorer-count");
+  var explorerHintEl = document.getElementById("explorer-hint");
+  var resultsMoreEl = document.getElementById("results-more");
+
+  function setResultsOpen(open) {
+    document.getElementById("explorer-results").classList.toggle("is-results-open", open);
+    document.getElementById("results-toggle").setAttribute("aria-expanded", String(open));
+    var fab = document.getElementById("chat-fab");
+    if (fab) fab.classList.toggle("is-suppressed", open || panelEl.classList.contains("is-open"));
+  }
+  document.getElementById("results-toggle").addEventListener("click", function () {
+    closePanel();
+    setResultsOpen(this.getAttribute("aria-expanded") !== "true");
+    if (this.getAttribute("aria-expanded") === "true") document.getElementById("results-close").focus();
+  });
+  document.getElementById("results-close").addEventListener("click", function () {
+    setResultsOpen(false);
+    document.getElementById("results-toggle").focus();
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && document.getElementById("explorer-results").classList.contains("is-results-open")) {
+      setResultsOpen(false);
+      document.getElementById("results-toggle").focus();
+    }
+  });
+  document.addEventListener("celiacmap:chat-open", function () { closePanel(); setResultsOpen(false); });
+
+  function resetFilters() {
+    currentCategory = currentCity = currentSafety = "all";
+    currentQuery = "";
+    citySelect.value = "all";
+    searchInput.value = "";
+    searchClear.hidden = true;
+    closeSuggest();
+    Array.prototype.forEach.call(document.querySelectorAll("[data-category], [data-safety]"), function (button) {
+      var on = (button.getAttribute("data-category") || button.getAttribute("data-safety")) === "all";
+      button.classList.toggle(button.hasAttribute("data-safety") ? "is-active" : "chip-active", on);
+      button.setAttribute("aria-pressed", String(on));
+    });
+    resultLimit = 8;
+    refresh();
+  }
+  document.getElementById("reset-filters").addEventListener("click", function () { resetFilters(); frameVisible(); });
+  document.getElementById("apply-filters").addEventListener("click", function () {
+    document.getElementById("explorer-filters").open = false;
+    frameVisible();
+    document.querySelector("#explorer-filters summary").focus();
+  });
+  function translateExplorer() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-explorer-es]"), function (node) {
+      node.textContent = node.getAttribute("data-explorer-" + lang());
+    });
+    var texts = [
+      ["#explorer-results-title", "Lugares encontrados", "Places found"],
+      [".explorer-kicker", "Explorá el mapa", "Explore the map"],
+      ["#locate-me span", "Mi ubicación", "My location"],
+      [".map-legend li:first-child span:last-child", "Espacio 100% sin gluten", "100% gluten-free venue"],
+      [".map-legend li:nth-child(2) span:last-child", "Atención para celíacos", "Celiac-friendly service"]
+    ];
+    texts.forEach(function (item) { var node = document.querySelector(item[0]); if (node) node.textContent = tr(item[1], item[2]); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-safety]"), function (button) {
+      var level = button.getAttribute("data-safety");
+      button.textContent = level === "all" ? tr("Todos los niveles", "All levels") : safetyText(level);
+    });
+    document.getElementById("locate-me").setAttribute("aria-label", tr("Usar mi ubicación", "Use my location"));
+    resultsEl.setAttribute("aria-label", tr("Resultados del mapa", "Map results"));
+    document.querySelector(".map-safety-chips").setAttribute("aria-label", tr("Información sin TACC", "Gluten-free information"));
+    panelClose.setAttribute("aria-label", tr("Volver al mapa", "Back to map"));
+    panelEl.setAttribute("aria-label", tr("Detalle del lugar", "Place details"));
+  }
+  translateExplorer();
 
   // A marker passes when it satisfies all three filters at once.
   function matches(e) {
     if (currentCategory !== "all" && e.category !== currentCategory) return false;
     if (currentCity !== "all" && e.city !== currentCity) return false;
+    if (currentSafety !== "all" && e.place.safety_level !== currentSafety) return false;
     if (currentQuery.length >= 2 && nameScore(currentQuery, e.name) === null) return false;
     return true;
   }
@@ -520,22 +630,94 @@
     }
   }
 
+  function safetyText(level) {
+    return (LABELS.safety[level] && LABELS.safety[level][lang()]) || level;
+  }
+
+  function categoryText(category) {
+    return (LABELS.category[category] && LABELS.category[category][lang()]) || category;
+  }
+
+  function renderResults(shown) {
+    var activeId = document.activeElement && resultsEl.contains(document.activeElement) ? document.activeElement.getAttribute("data-place-id") : null;
+    if (explorerCountEl) explorerCountEl.textContent = String(shown.length);
+    if (!resultsEl) return;
+    if (!shown.length) {
+      resultsEl.innerHTML = '<li class="place-results-empty">' + tr("No hay lugares con estos filtros. Probá ampliar la búsqueda.", "No places match these filters. Try broadening your search.") + '</li>';
+      if (explorerHintEl) explorerHintEl.textContent = tr("Ajustá los filtros para explorar más opciones.", "Adjust the filters to explore more options.");
+      if (resultsMoreEl) resultsMoreEl.hidden = true;
+      return;
+    }
+    if (explorerHintEl) explorerHintEl.textContent = tr("Seleccioná un resultado o marcador. Los niveles son orientativos: confirmá con el local.", "Select a result or marker. Levels are indicative: confirm with the venue.");
+    var ordered = shown.slice().sort(function (a, b) {
+      if (userLocation) return map.distance(userLocation, a.marker.getLatLng()) - map.distance(userLocation, b.marker.getLatLng());
+      return a.place.name.localeCompare(b.place.name);
+    });
+    resultsEl.innerHTML = ordered.slice(0, resultLimit).map(function (entry) {
+      var p = entry.place;
+      var selected = entry === selectedEntry ? " is-selected" : "";
+      return '<li><button type="button" class="place-result' + selected + '" data-place-id="' + esc(p.id) + '" aria-pressed="' + (entry === selectedEntry ? "true" : "false") + '">' +
+        '<span class="place-result-main"><span class="place-result-name">' + esc(p.name) + '</span>' +
+        '<span class="place-result-meta">' + esc([categoryText(p.category), p.city].filter(Boolean).join(" · ")) + '</span></span>' +
+        (userLocation ? '<span class="place-distance">' + (map.distance(userLocation, entry.marker.getLatLng()) / 1000).toFixed(1) + tr(' km en línea recta', ' km straight-line') + '</span>' : '') +
+        '<span class="place-result-safety ' + safetyClass(p.safety_level) + '">' + esc(safetyText(p.safety_level)) + '</span>' +
+        '<span class="place-result-arrow" aria-hidden="true">→</span></button></li>';
+    }).join("");
+    if (activeId) Array.prototype.forEach.call(resultsEl.querySelectorAll("[data-place-id]"), function (button) {
+      if (button.getAttribute("data-place-id") === activeId) button.focus({ preventScroll: true });
+    });
+    if (resultsMoreEl) {
+      resultsMoreEl.hidden = ordered.length <= resultLimit;
+      resultsMoreEl.textContent = tr("Ver más lugares", "Show more places");
+    }
+  }
+
+  function selectEntry(entry, focusPanel) {
+    if (!entry) return;
+    clearTimeout(searchTimer);
+    if (!panelEl.classList.contains("is-open")) previousView = { center: map.getCenter(), zoom: map.getZoom() };
+    returnFocusEl = document.activeElement;
+    panelExpanded = false;
+    if (selectedEntry && selectedEntry !== entry) selectedEntry.marker.setIcon(icon(selectedEntry.place.safety_level));
+    selectedEntry = entry;
+    entry.marker.setIcon(icon(entry.place.safety_level, true));
+    map.invalidateSize();
+    map.flyTo(entry.marker.getLatLng(), Math.max(map.getZoom(), 16), motion(0.45));
+    setResultsOpen(false);
+    showDetails(entry.place, entry.marker);
+    Array.prototype.forEach.call(resultsEl.querySelectorAll("[data-place-id]"), function (button) {
+      var on = button.getAttribute("data-place-id") === entry.place.id;
+      button.classList.toggle("is-selected", on);
+      button.setAttribute("aria-pressed", String(on));
+    });
+    try { document.dispatchEvent(new CustomEvent("celiacmap:place-selected", { detail: entry.place })); } catch (e) {}
+    if (focusPanel && panelEl) panelEl.focus({ preventScroll: true });
+  }
+
   // Re-apply category + city + search to the marker layer.
   function refresh() {
-    visible.clearLayers();
-    var n = 0;
+    closeSuggest();
+    var shown = [];
     entries.forEach(function (e) {
-      if (matches(e)) { visible.addLayer(e.marker); n += 1; }
+      var include = matches(e);
+      if (include) { if (!visible.hasLayer(e.marker)) visible.addLayer(e.marker); shown.push(e); }
+      else if (visible.hasLayer(e.marker)) visible.removeLayer(e.marker);
     });
-    updateCount(n);
-    return n;
+    if (selectedEntry && !matches(selectedEntry)) {
+      closePanel();
+      selectedEntry.marker.setIcon(icon(selectedEntry.place.safety_level));
+      selectedEntry = null;
+    }
+    updateCount(shown.length);
+    renderResults(shown);
+    return shown.length;
   }
 
   function frameVisible() {
     map.invalidateSize();
     var shown = shownMarkers();
     var isDefaultView =
-      currentCategory === "all" && currentCity === "all" && currentQuery.length < 2;
+      currentCategory === "all" && currentCity === "all" && currentSafety === "all" && currentQuery.length < 2;
     if (isDefaultView) {
       // Coverage now spans Tucumán to Patagonia; fitting every marker zooms out
       // past the region (most of South America on a phone) and collapses the
@@ -573,6 +755,9 @@
   // Re-render the dynamic count text when the page language toggles.
   document.addEventListener("celiacmap:lang", function () {
     updateCount(shownMarkers().length);
+    translateExplorer();
+    renderResults(filteredEntries());
+    if (selectedEntry && panelEl && panelEl.classList.contains("is-open")) openPanel(selectedEntry.place);
   });
 
   /* ----------------------------- Chips ------------------------------ */
@@ -591,6 +776,55 @@
     });
   });
 
+  var safetyChips = Array.prototype.slice.call(document.querySelectorAll(".map-safety-chips .safety-chip"));
+  safetyChips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      safetyChips.forEach(function (c) {
+        c.classList.remove("is-active");
+        c.setAttribute("aria-pressed", "false");
+      });
+      chip.classList.add("is-active");
+      chip.setAttribute("aria-pressed", "true");
+      currentSafety = chip.getAttribute("data-safety") || "all";
+      resultLimit = 8;
+      refresh();
+      frameVisible();
+    });
+  });
+
+  if (resultsEl) {
+    resultsEl.addEventListener("click", function (e) {
+      var button = e.target && e.target.closest ? e.target.closest("[data-place-id]") : null;
+      if (!button) return;
+      e.stopPropagation();
+      var id = button.getAttribute("data-place-id");
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].place.id === id) { selectEntry(entries[i], true); break; }
+      }
+    });
+  }
+  if (resultsMoreEl) {
+    resultsMoreEl.addEventListener("click", function () {
+      var previousCount = resultLimit;
+      resultLimit += 8;
+      renderResults(filteredEntries());
+      var buttons = resultsEl.querySelectorAll("button");
+      if (buttons[previousCount]) buttons[previousCount].focus();
+    });
+  }
+  document.addEventListener("celiacmap:open-place", function (event) {
+    var id = event.detail && event.detail.id;
+    if (!id) return;
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].place.id === id) {
+        if (!matches(entries[i])) resetFilters();
+        document.getElementById("map").scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth", block: "start" });
+        selectEntry(entries[i], true);
+        return;
+      }
+    }
+  });
+
   /* ------------------------- City selector -------------------------- */
   if (citySelect) {
     citySelect.addEventListener("change", function () {
@@ -602,7 +836,7 @@
       var zoom = opt ? parseInt(opt.getAttribute("data-zoom"), 10) : NaN;
       map.invalidateSize();
       if (currentCity !== "all" && isFinite(lat) && isFinite(lng)) {
-        map.flyTo([lat, lng], isFinite(zoom) ? zoom : 13, { duration: 0.8 });
+        map.flyTo([lat, lng], isFinite(zoom) ? zoom : 13, motion(0.8));
       } else {
         frameVisible();
       }
@@ -632,9 +866,7 @@
   function selectSuggestion(entry) {
     clearTimeout(searchTimer);          // don't let the debounced fit override us
     closeSuggest();
-    map.invalidateSize();
-    map.flyTo(entry.marker.getLatLng(), 16, { duration: 0.8 });
-    showDetails(entry.place, entry.marker);
+    selectEntry(entry, true);
   }
 
   function setActive(idx) {
@@ -662,6 +894,7 @@
     var l = lang();
     var scored = [];
     for (var i = 0; i < entries.length; i++) {
+      if (!matches(entries[i])) continue;
       var sc = nameScore(currentQuery, entries[i].name);
       if (sc !== null) scored.push({ entry: entries[i], score: sc });
     }
@@ -736,6 +969,28 @@
     closeSuggest();
   });
 
+  var locateBtn = document.getElementById("locate-me");
+  if (locateBtn && navigator.geolocation) {
+    locateBtn.addEventListener("click", function () {
+      locateBtn.disabled = true;
+      navigator.geolocation.getCurrentPosition(function (position) {
+        var latlng = [position.coords.latitude, position.coords.longitude];
+        userLocation = L.latLng(latlng);
+        if (locationMarker) locationMarker.remove();
+        locationMarker = L.circleMarker(latlng, { radius: 8, color: "#fffdf9", weight: 3, fillColor: "#256a50", fillOpacity: 1 })
+          .addTo(map).bindTooltip(tr("Tu ubicación", "Your location"), { direction: "top" }).openTooltip();
+        renderResults(filteredEntries());
+        map.flyTo(latlng, 14, motion(0.7));
+        locateBtn.disabled = false;
+      }, function () {
+        locateBtn.disabled = false;
+        document.getElementById("location-status").textContent = tr("No pudimos obtener tu ubicación. Podés elegir una ciudad.", "Location unavailable. You can choose a city instead.");
+      }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
+    });
+  } else if (locateBtn) {
+    locateBtn.hidden = true;
+  }
+
   /* ----------------------------- Data ------------------------------- */
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
     setStatus("error");
@@ -748,18 +1003,25 @@
     cfg.SUPABASE_URL.replace(/\/+$/, "") +
     "/rest/v1/places?select=id,name,lat,lng,category,city,safety_level,address,source," +
     "phone,website,opening_hours,social_url,rating,user_ratings_total" +
-    "&status=eq.approved&limit=1000";
+    "&status=eq.approved&order=name.asc,id.asc";
 
-  fetch(url, {
-    headers: {
-      apikey: cfg.SUPABASE_ANON_KEY,
-      Authorization: "Bearer " + cfg.SUPABASE_ANON_KEY
-    }
-  })
-    .then(function (res) {
+  function fetchAllPlaces(start, collected) {
+    return fetch(url + "&limit=500&offset=" + start, {
+      headers: {
+        apikey: cfg.SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + cfg.SUPABASE_ANON_KEY
+      }
+    }).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
-    })
+    }).then(function (rows) {
+      if (!Array.isArray(rows)) throw new Error("Invalid places response");
+      var next = collected.concat(rows);
+      return rows.length === 500 ? fetchAllPlaces(start + 500, next) : next;
+    });
+  }
+
+  fetchAllPlaces(0, [])
     .then(function (rows) {
       if (!Array.isArray(rows) || rows.length === 0) {
         setStatus("empty");
@@ -770,7 +1032,12 @@
         var marker = L.marker([p.lat, p.lng], { icon: icon(p.safety_level), title: p.name });
         if (panelAvailable) {
           marker.on("click", (function (place, mk) {
-            return function () { showDetails(place, mk); };
+            return function () {
+              for (var i = 0; i < entries.length; i++) {
+                if (entries[i].place.id === place.id) { selectEntry(entries[i], false); return; }
+              }
+              showDetails(place, mk);
+            };
           })(p, marker));
         } else {
           marker.bindPopup(function () { return popupHtml(p); });

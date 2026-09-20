@@ -75,6 +75,156 @@
   </header>
 
   <main id="main">
+    <!-- =========================== MAPA INTERACTIVO ========================= -->
+    <section class="section section-alt" id="map">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow" data-i18n="map.eyebrow">Mapa interactivo</span>
+          <h2 class="section-title" data-i18n="map.title">El corazón de CeliacMap</h2>
+          <p class="section-lead" data-i18n="map.lead">
+            Lugares aptos, niveles de seguridad y filtros rápidos. Todo de un vistazo.
+          </p>
+        </header>
+
+        <div class="map-layout">
+        <div class="map-demo reveal">
+            <div class="map-search">
+              <svg class="map-search-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="M21 21l-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              <input type="search" id="place-search" class="map-search-input" autocomplete="off"
+                placeholder="Buscar un lugar sin TACC…" data-i18n-placeholder="map.searchPlaceholder"
+                aria-label="Buscar lugar por nombre" role="combobox" aria-expanded="false"
+                aria-controls="search-suggest" aria-autocomplete="list" />
+              <button type="button" id="search-clear" class="map-search-clear"
+                aria-label="Limpiar búsqueda" hidden>&times;</button>
+              <ul class="map-suggest" id="search-suggest" role="listbox"
+                aria-label="Sugerencias de lugares" hidden></ul>
+            </div>
+          <details class="explorer-filters" id="explorer-filters">
+          <summary data-explorer-es="Filtros" data-explorer-en="Filters">Filtros</summary>
+          <div class="map-chips" role="group" aria-label="Filtros del mapa">
+            <button type="button" class="chip chip-active" data-category="all"
+              aria-pressed="true" data-i18n="map.chip1">Todos</button>
+            <button type="button" class="chip" data-category="restaurant"
+              aria-pressed="false" data-i18n="map.chip2">Restaurantes</button>
+            <button type="button" class="chip" data-category="cafe"
+              aria-pressed="false" data-i18n="map.chip3">Cafés</button>
+            <button type="button" class="chip" data-category="shop"
+              aria-pressed="false" data-i18n="map.chip4">Comercios</button>
+          </div>
+
+          <div class="map-safety-chips" role="group" aria-label="Nivel de información sin TACC">
+            <button type="button" class="safety-chip is-active" data-safety="all" aria-pressed="true">Todos los niveles</button>
+            <button type="button" class="safety-chip safety-chip--dedicated" data-safety="gluten_free_100" aria-pressed="false">Espacio 100% sin gluten</button>
+            <button type="button" class="safety-chip safety-chip--friendly" data-safety="celiac_friendly" aria-pressed="false">Atención celíaca</button>
+            <button type="button" class="safety-chip safety-chip--options" data-safety="options_available" aria-pressed="false">Con opciones</button>
+          </div>
+
+          <div class="map-toolbar">
+            <select id="city-select" class="map-select" aria-label="Elegir ciudad">
+              <option value="all" data-i18n="map.allCities">Todas las ciudades</option>
+              <optgroup label="Uruguay">
+                <option value="Montevideo" data-lat="-34.9011" data-lng="-56.1645" data-zoom="13">Montevideo</option>
+                <option value="Punta del Este" data-lat="-34.9667" data-lng="-54.9500" data-zoom="13">Punta del Este</option>
+                <option value="Colonia del Sacramento" data-lat="-34.4716" data-lng="-57.8444" data-zoom="14">Colonia del Sacramento</option>
+                <option value="Salto" data-lat="-31.3833" data-lng="-57.9667" data-zoom="14">Salto</option>
+                <option value="Paysandú" data-lat="-32.3171" data-lng="-58.0807" data-zoom="14">Paysandú</option>
+                <option value="Rivera" data-lat="-30.9022" data-lng="-55.5508" data-zoom="14">Rivera</option>
+                <option value="Tacuarembó" data-lat="-31.7167" data-lng="-55.9833" data-zoom="14">Tacuarembó</option>
+                <option value="Melo" data-lat="-32.3661" data-lng="-54.1675" data-zoom="14">Melo</option>
+                <option value="Treinta y Tres" data-lat="-33.2294" data-lng="-54.3836" data-zoom="14">Treinta y Tres</option>
+                <option value="Rocha" data-lat="-34.4827" data-lng="-54.3336" data-zoom="14">Rocha</option>
+                <option value="Minas" data-lat="-34.3753" data-lng="-55.2386" data-zoom="14">Minas</option>
+                <option value="Trinidad" data-lat="-33.5236" data-lng="-56.9008" data-zoom="14">Trinidad</option>
+                <option value="Durazno" data-lat="-33.3809" data-lng="-56.5231" data-zoom="14">Durazno</option>
+                <option value="Mercedes" data-lat="-33.2524" data-lng="-58.0269" data-zoom="14">Mercedes</option>
+                <option value="Artigas" data-lat="-30.4006" data-lng="-56.4644" data-zoom="14">Artigas</option>
+                <option value="Fray Bentos" data-lat="-33.1392" data-lng="-58.3008" data-zoom="14">Fray Bentos</option>
+              </optgroup>
+              <optgroup label="Argentina">
+                <option value="Buenos Aires" data-lat="-34.6037" data-lng="-58.3816" data-zoom="12">Buenos Aires</option>
+                <option value="San Isidro" data-lat="-34.4670" data-lng="-58.5000" data-zoom="14">San Isidro</option>
+                <option value="Vicente López" data-lat="-34.5170" data-lng="-58.4830" data-zoom="14">Vicente López</option>
+                <option value="Tigre" data-lat="-34.4167" data-lng="-58.5833" data-zoom="13">Tigre</option>
+                <option value="San Fernando" data-lat="-34.4500" data-lng="-58.5670" data-zoom="14">San Fernando</option>
+                <option value="Pilar" data-lat="-34.4670" data-lng="-58.9170" data-zoom="13">Pilar</option>
+                <option value="Morón" data-lat="-34.6500" data-lng="-58.6170" data-zoom="14">Morón</option>
+                <option value="Ituzaingó" data-lat="-34.6522" data-lng="-58.6750" data-zoom="14">Ituzaingó</option>
+                <option value="Hurlingham" data-lat="-34.6000" data-lng="-58.6330" data-zoom="14">Hurlingham</option>
+                <option value="Córdoba" data-lat="-31.4201" data-lng="-64.1888" data-zoom="13">Córdoba</option>
+                <option value="Rosario" data-lat="-32.9468" data-lng="-60.6393" data-zoom="13">Rosario</option>
+                <option value="Mendoza" data-lat="-32.8895" data-lng="-68.8458" data-zoom="13">Mendoza</option>
+                <option value="La Plata" data-lat="-34.9215" data-lng="-57.9545" data-zoom="13">La Plata</option>
+                <option value="Mar del Plata" data-lat="-38.0055" data-lng="-57.5426" data-zoom="13">Mar del Plata</option>
+                <option value="Gualeguaychú" data-lat="-33.0088" data-lng="-58.5228" data-zoom="14">Gualeguaychú</option>
+                <option value="Paraná" data-lat="-31.7333" data-lng="-60.5333" data-zoom="13">Paraná</option>
+              </optgroup>
+            </select>
+
+            <button type="button" id="locate-me" class="map-locate" aria-label="Usar mi ubicación">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <span>Mi ubicación</span>
+            </button>
+
+
+          </div>
+
+          <div class="filter-actions">
+            <button type="button" id="reset-filters" data-explorer-es="Restablecer" data-explorer-en="Reset">Restablecer</button>
+            <button type="button" id="apply-filters" data-explorer-es="Ver resultados" data-explorer-en="View results">Ver resultados</button>
+          </div>
+          </details>
+          <p id="location-status" role="status"></p>
+          <button type="button" id="results-toggle" aria-expanded="false" aria-controls="explorer-results" data-explorer-es="Lugares / mapa" data-explorer-en="Places / map">Lugares / mapa</button>
+          <p class="map-result-count" id="map-result-count" role="status" aria-live="polite" hidden></p>
+
+          <div class="map-wrap">
+            <div id="cm-map" role="application" aria-label="Mapa de lugares sin TACC"></div>
+            <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
+
+            <aside class="place-panel" id="place-panel" aria-hidden="true"
+              role="dialog" aria-modal="false" aria-label="Detalle del lugar" tabindex="-1">
+              <button type="button" class="place-panel-close" id="place-panel-close"
+                aria-label="Cerrar">&times;</button>
+              <div class="place-panel-body" id="place-panel-body"></div>
+            </aside>
+          </div>
+
+          <ul class="map-legend">
+            <li><span class="dot dot-safe"></span><span>Espacio 100% sin gluten</span></li>
+            <li><span class="dot dot-mid"></span><span>Atención para celíacos</span></li>
+            <li><span class="dot dot-options"></span><span data-i18n="map.legend2">Tiene opciones sin TACC</span></li>
+          </ul>
+        </div>
+
+        <aside class="explorer-results" id="explorer-results" aria-labelledby="explorer-results-title">
+          <button type="button" id="results-close" data-explorer-es="Volver al mapa" data-explorer-en="Back to map">Volver al mapa</button>
+          <div class="explorer-results-head">
+            <div>
+              <p class="explorer-kicker">Explorá el mapa</p>
+              <h3 id="explorer-results-title">Lugares encontrados</h3>
+            </div>
+            <span class="explorer-count" id="explorer-count" aria-live="polite">0</span>
+          </div>
+          <p class="explorer-hint" id="explorer-hint">Elegí un lugar para ver su información.</p>
+          <ol class="place-results" id="place-results" aria-live="polite" aria-label="Resultados del mapa"></ol>
+          <button type="button" class="results-more" id="results-more" hidden>Ver más lugares</button>
+
+          <aside class="map-top3" id="map-top3" hidden aria-labelledby="map-top3-title">
+          <h3 class="map-top3-title" id="map-top3-title"
+            data-i18n="ranking.top3.title">Top 3 de la comunidad</h3>
+          <ol class="map-top3-list" id="map-top3-list"></ol>
+          <a class="map-top3-link" href="#ranking"
+            data-i18n="ranking.top3.link">Ver ranking completo →</a>
+        </aside>
+        </aside>
+        </div>
+      </div>
+    </section>
+
+
 
     <!-- ================================ HERO ================================ -->
     <section class="hero" id="hero">
@@ -336,118 +486,6 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- =========================== MAPA INTERACTIVO ========================= -->
-    <section class="section section-alt" id="map">
-      <div class="container">
-        <header class="section-head reveal">
-          <span class="eyebrow" data-i18n="map.eyebrow">Mapa interactivo</span>
-          <h2 class="section-title" data-i18n="map.title">El corazón de CeliacMap</h2>
-          <p class="section-lead" data-i18n="map.lead">
-            Lugares aptos, niveles de seguridad y filtros rápidos. Todo de un vistazo.
-          </p>
-        </header>
-
-        <div class="map-layout">
-        <div class="map-demo reveal">
-          <div class="map-chips" role="group" aria-label="Filtros del mapa">
-            <button type="button" class="chip chip-active" data-category="all"
-              aria-pressed="true" data-i18n="map.chip1">Todos</button>
-            <button type="button" class="chip" data-category="restaurant"
-              aria-pressed="false" data-i18n="map.chip2">Restaurantes</button>
-            <button type="button" class="chip" data-category="cafe"
-              aria-pressed="false" data-i18n="map.chip3">Cafés</button>
-            <button type="button" class="chip" data-category="shop"
-              aria-pressed="false" data-i18n="map.chip4">Comercios</button>
-          </div>
-
-          <div class="map-toolbar">
-            <select id="city-select" class="map-select" aria-label="Elegir ciudad">
-              <option value="all" data-i18n="map.allCities">Todas las ciudades</option>
-              <optgroup label="Uruguay">
-                <option value="Montevideo" data-lat="-34.9011" data-lng="-56.1645" data-zoom="13">Montevideo</option>
-                <option value="Punta del Este" data-lat="-34.9667" data-lng="-54.9500" data-zoom="13">Punta del Este</option>
-                <option value="Colonia del Sacramento" data-lat="-34.4716" data-lng="-57.8444" data-zoom="14">Colonia del Sacramento</option>
-                <option value="Salto" data-lat="-31.3833" data-lng="-57.9667" data-zoom="14">Salto</option>
-                <option value="Paysandú" data-lat="-32.3171" data-lng="-58.0807" data-zoom="14">Paysandú</option>
-                <option value="Rivera" data-lat="-30.9022" data-lng="-55.5508" data-zoom="14">Rivera</option>
-                <option value="Tacuarembó" data-lat="-31.7167" data-lng="-55.9833" data-zoom="14">Tacuarembó</option>
-                <option value="Melo" data-lat="-32.3661" data-lng="-54.1675" data-zoom="14">Melo</option>
-                <option value="Treinta y Tres" data-lat="-33.2294" data-lng="-54.3836" data-zoom="14">Treinta y Tres</option>
-                <option value="Rocha" data-lat="-34.4827" data-lng="-54.3336" data-zoom="14">Rocha</option>
-                <option value="Minas" data-lat="-34.3753" data-lng="-55.2386" data-zoom="14">Minas</option>
-                <option value="Trinidad" data-lat="-33.5236" data-lng="-56.9008" data-zoom="14">Trinidad</option>
-                <option value="Durazno" data-lat="-33.3809" data-lng="-56.5231" data-zoom="14">Durazno</option>
-                <option value="Mercedes" data-lat="-33.2524" data-lng="-58.0269" data-zoom="14">Mercedes</option>
-                <option value="Artigas" data-lat="-30.4006" data-lng="-56.4644" data-zoom="14">Artigas</option>
-                <option value="Fray Bentos" data-lat="-33.1392" data-lng="-58.3008" data-zoom="14">Fray Bentos</option>
-              </optgroup>
-              <optgroup label="Argentina">
-                <option value="Buenos Aires" data-lat="-34.6037" data-lng="-58.3816" data-zoom="12">Buenos Aires</option>
-                <option value="San Isidro" data-lat="-34.4670" data-lng="-58.5000" data-zoom="14">San Isidro</option>
-                <option value="Vicente López" data-lat="-34.5170" data-lng="-58.4830" data-zoom="14">Vicente López</option>
-                <option value="Tigre" data-lat="-34.4167" data-lng="-58.5833" data-zoom="13">Tigre</option>
-                <option value="San Fernando" data-lat="-34.4500" data-lng="-58.5670" data-zoom="14">San Fernando</option>
-                <option value="Pilar" data-lat="-34.4670" data-lng="-58.9170" data-zoom="13">Pilar</option>
-                <option value="Morón" data-lat="-34.6500" data-lng="-58.6170" data-zoom="14">Morón</option>
-                <option value="Ituzaingó" data-lat="-34.6522" data-lng="-58.6750" data-zoom="14">Ituzaingó</option>
-                <option value="Hurlingham" data-lat="-34.6000" data-lng="-58.6330" data-zoom="14">Hurlingham</option>
-                <option value="Córdoba" data-lat="-31.4201" data-lng="-64.1888" data-zoom="13">Córdoba</option>
-                <option value="Rosario" data-lat="-32.9468" data-lng="-60.6393" data-zoom="13">Rosario</option>
-                <option value="Mendoza" data-lat="-32.8895" data-lng="-68.8458" data-zoom="13">Mendoza</option>
-                <option value="La Plata" data-lat="-34.9215" data-lng="-57.9545" data-zoom="13">La Plata</option>
-                <option value="Mar del Plata" data-lat="-38.0055" data-lng="-57.5426" data-zoom="13">Mar del Plata</option>
-                <option value="Gualeguaychú" data-lat="-33.0088" data-lng="-58.5228" data-zoom="14">Gualeguaychú</option>
-                <option value="Paraná" data-lat="-31.7333" data-lng="-60.5333" data-zoom="13">Paraná</option>
-              </optgroup>
-            </select>
-
-            <div class="map-search">
-              <svg class="map-search-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
-                <path d="M21 21l-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-              </svg>
-              <input type="search" id="place-search" class="map-search-input" autocomplete="off"
-                placeholder="Buscar un lugar sin TACC…" data-i18n-placeholder="map.searchPlaceholder"
-                aria-label="Buscar lugar por nombre" role="combobox" aria-expanded="false"
-                aria-controls="search-suggest" aria-autocomplete="list" />
-              <button type="button" id="search-clear" class="map-search-clear"
-                aria-label="Limpiar búsqueda" hidden>&times;</button>
-              <ul class="map-suggest" id="search-suggest" role="listbox"
-                aria-label="Sugerencias de lugares" hidden></ul>
-            </div>
-          </div>
-
-          <p class="map-result-count" id="map-result-count" role="status" aria-live="polite" hidden></p>
-
-          <div class="map-wrap">
-            <div id="cm-map" role="application" aria-label="Mapa de lugares sin TACC"></div>
-            <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
-
-            <aside class="place-panel" id="place-panel" aria-hidden="true"
-              role="dialog" aria-modal="false" aria-label="Detalle del lugar" tabindex="-1">
-              <button type="button" class="place-panel-close" id="place-panel-close"
-                aria-label="Cerrar">&times;</button>
-              <div class="place-panel-body" id="place-panel-body"></div>
-            </aside>
-          </div>
-
-          <ul class="map-legend">
-            <li><span class="dot dot-safe"></span><span data-i18n="map.legend1">Sin TACC</span></li>
-            <li><span class="dot dot-options"></span><span data-i18n="map.legend2">Tiene opciones sin TACC</span></li>
-          </ul>
-        </div>
-
-        <aside class="map-top3" id="map-top3" hidden aria-labelledby="map-top3-title">
-          <h3 class="map-top3-title" id="map-top3-title"
-            data-i18n="ranking.top3.title">Top 3 de la comunidad</h3>
-          <ol class="map-top3-list" id="map-top3-list"></ol>
-          <a class="map-top3-link" href="#ranking"
-            data-i18n="ranking.top3.link">Ver ranking completo →</a>
-        </aside>
         </div>
       </div>
     </section>
@@ -897,6 +935,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="js/main.js"></script>
   <script src="js/config.js"></script>
   <script src="js/map.js"></script>

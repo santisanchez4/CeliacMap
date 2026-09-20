@@ -49,6 +49,7 @@ import {
   SCOPE_DECLINE_REPLIES,
   sha256Hex,
   trimHistory,
+  toChatPlaceReferences,
   validatePendingSubmission,
   validateRequestBody,
   type ConfirmarResult,
@@ -164,6 +165,13 @@ Deno.test("filterPlaceFields keeps only allowlisted keys even when every field i
   row.source = "google_places";
   const filtered = filterPlaceFields(row);
   assertEquals(Object.keys(filtered).sort(), [...PLACES_SELECT_FIELDS].sort());
+});
+
+Deno.test("toChatPlaceReferences exposes only the small approved-place map contract", () => {
+  assertEquals(toChatPlaceReferences([
+    { id: "a", name: "Pan Sin TACC", city: "Montevideo", category: "shop", safety_level: "gluten_free_100", contact_email: "private@example.com" },
+    { id: 3, name: "Ignored" },
+  ]), [{ id: "a", name: "Pan Sin TACC", city: "Montevideo", category: "shop", safety_level: "gluten_free_100" }]);
 });
 
 Deno.test("buildPlacesSearchUrl filters by city, status=approved, and orders/limits per ADR-006", () => {
