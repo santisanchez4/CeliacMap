@@ -858,7 +858,9 @@ Target (functional product — see **## Architecture**):
 │   ├── config.js               # Supabase URL + anon key (public)
 │   ├── map.js                  # Leaflet init, fetch approved places, filters
 │   ├── suggest.js              # Form A: suggest a new place -> suggestions table
-│   └── report.js               # Form B: recommend/report an existing place -> place_reports
+│   ├── report.js               # Form B: recommend/report an existing place -> place_reports
+│   ├── ranking.js              # community ranking (#ranking) + place_votes voting
+│   └── chat.js                 # floating assistant widget -> `chat` Edge Function
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
 │   ├── base.py
@@ -2409,9 +2411,96 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   (`detectCancelIntent - known accepted false positive`): un uso no
   relacionado de la misma palabra ("necesito cancelar mi tarjeta") también
   dispara — riesgo bajo dado el alcance acotado del chat, no bloqueante.
-  10 tests nuevos, suite 123 → 133. **Pendiente de deploy y verificación en
-  vivo** (implementado, no desplegado — Santiago pidió revisar el diff
-  antes de deployar o commitear).
+  10 tests nuevos, suite 123 → 133. **Desplegado** (`chat` v9, ver la
+  actualización del 2026-09-19 en Phase 22); el camino de cancelación se
+  verificó en vivo el 2026-09-20 a través del widget (ver Phase 23 — con la
+  salvedad de que solo se alcanza si el router NO marca el mensaje como
+  `fuera_de_alcance`).
+
+### Chatbot Fase D — widget flotante (`js/chat.js`) design decisions
+
+Implementa ADR-006 decisión 11 (frontend only — la Edge Function no se toca).
+Desvíos respecto de `PLAN-chatbot-rag.md` §Frontend y hallazgos, todos
+resueltos durante la implementación:
+
+- **Todo el copy vive en `MSG = {es, en}` dentro de `chat.js`, sin tocar
+  `main.js`.** El PLAN repartía el texto entre `data-i18n` + claves EN en
+  `main.js`, pero `main.js` no soporta `data-i18n-aria-label` (solo
+  `data-i18n` y `data-i18n-placeholder`) y tampoco existe `.sr-only` en el
+  CSS. El markup del widget en `index.html` no lleva texto: `chat.js` lo
+  rellena desde atributos `data-chat-text` / `data-chat-aria` /
+  `data-chat-placeholder` y re-renderiza en `celiacmap:lang`. El FAB nace
+  `hidden` y `chat.js` lo revela solo si hay markup + config — sin JS no
+  queda un botón muerto. (La regla "el español vive en el markup" de la
+  decisión de i18n no aplica: el widget es inútil sin JS.)
+- **Faltaba un evento de cierre.** `map.js` solo disparaba
+  `celiacmap:panel-open`; `closePanel()` no avisaba. Se agregó
+  `celiacmap:panel-close`, disparado **solo si el panel estaba abierto**
+  (`closePanel` corre en cada click de mapa / Escape). Ojo: el widget Top 3
+  (`.map-top3`) **no** escucha `panel-open` — es un `<aside>` sticky
+  estático; el "patrón del Top 3" que se citó no existía. El FAB usa
+  `is-suppressed` (toggle por JS, sin importar el viewport) y el CSS solo
+  actúa en `@media (max-width: 640px)`, así el breakpoint vive en un único
+  lugar. Si el sheet del chat está abierto en mobile cuando abre el panel del
+  mapa, el chat se cierra (estado en memoria intacto).
+- **Atribución CARTO/OSM — se corre la atribución, no el FAB.** El FAB es
+  fixed al viewport y la atribución es relativa al mapa (condición de
+  licencia: nunca ocultarla). `#cm-map .leaflet-bottom.leaflet-right` recibe
+  `margin-right: --chat-fab-size + --chat-edge`, **solo** bajo
+  `@media not all and (min-width: 1000px)` — el complemento exacto del
+  cambio de layout de `.map-layout` (desde 1000px el aside del Top 3 deja el
+  borde derecho del mapa lejos del FAB, y un corrimiento incondicional
+  dejaba la atribución inset sin motivo). `max-width: 999px` se descartó:
+  con anchos fraccionarios (zoom / DPR 1.25) ni ese ni `min-width: 1000px`
+  matchean, un hueco que ya existe en los breakpoints del sitio.
+  Verificado midiendo `getBoundingClientRect` en el peor scroll a 390 / 800 /
+  999 / 1000 / 1100 px: cero superposición.
+- **Spam-guard (decisión 11) implementado, con clave propia
+  `celiacmap-chat-last`:** honeypot (descarte silencioso), `MIN_FILL_MS`
+  2000 desde la primera apertura del panel, cooldown 1500 ms, y un candado de
+  una request a la vez + timeout 30 s. Un envío demasiado rápido o en
+  cooldown **no** finge éxito (a diferencia de `report.js`): muestra un
+  aviso `--notice` y deja el texto en el input, porque en un chat un humano
+  legítimo puede pegar y enviar en <3 s. Los 3 caps del server siguen siendo
+  la defensa real.
+- **Contrato con el server tal como es.** Cada entrada del historial se
+  recorta a 2000 chars (el server responde 400 si una excede), el historial
+  enviado son las últimas 15 entradas (8 turnos de usuario + 7 del bot; el
+  server recorta igual a `CHAT_MAX_HISTORY_TURNS`), y `pending_submission` se
+  **sobrescribe siempre** con lo que devuelve el server (lo repite intacto en
+  un turno `rate_limited` y lo limpia tras un `action`). Ante un error de
+  red / HTTP / timeout / respuesta vacía: se revierte el turno fallido del
+  historial (para que siga alternando user/assistant), se quita esa burbuja
+  de usuario, se devuelve el texto al textarea y se muestra un error
+  genérico — nunca detalle técnico.
+- **Render de respuestas: `textContent`, nunca `innerHTML`.** Único
+  tratamiento especial: el marcador `**negrita**` en respuestas del bot se
+  renderiza como `<strong>` vía nodos DOM. Hallazgo real en vivo: el REDACTOR
+  pide texto plano, pero Haiku envolvió nombres de lugares en `**…**` y se
+  veían los asteriscos. Se resolvió en el cliente (tolerante) en vez de
+  tocar el prompt, que es una decisión de diseño aparte (ver **The Chatbot
+  System Prompts**); si el ruido crece, la corrección de fondo es una línea
+  en el REDACTOR prohibiendo markdown.
+- **Hallazgo de routing (2026-09-19, en la verificación real): "quiero
+  recomendar X" sobre un lugar YA publicado se enruta a `confirmar` (Módulo
+  4), no a `reportar`.** Visto en `agent_log` (`modulo:"confirmar"`,
+  `envio_estado:"necesita_mas_detalle"`) y en la respuesta (el bot pidió
+  barrio/dirección y no devolvió borrador). Con "quiero dejar un comentario
+  positivo sobre X en Buenos Aires" sí llegó a `reportar` →
+  `borrador_listo`. Inferido del diseño, no observado: en Módulo 4 el
+  lookup es solo contra `needs_review`, así que una recomendación de un lugar
+  ya `approved` no matchea y, de completarse, quedaría como `place_reports`
+  con `place_id: null` + `place_name_text`, sin vincularse al lugar
+  publicado. Es una arista del router/REDACTOR ("REPORTAR o RECOMENDAR" en
+  el alcance vs. la definición de `confirmar`), no del widget; no se tocó.
+- **Hallazgos que NO se arreglaron acá (Edge Function fuera de alcance):**
+  el mensaje de `rate_limited` viene **siempre en español**, incluso para
+  usuarios en EN (el router todavía no corrió, `getReply(..., "es")`); el
+  widget lo muestra tal cual, como `--notice`. Además, la página muestra un
+  scroll horizontal en desktop angosto (medido a 1036 px) cuyos únicos
+  elementos desbordados son `.place-panel` (fuera de pantalla) y
+  `.leaflet-proxy` — ninguno tocado por este cambio ni del widget; queda
+  anotado por si se quiere corregir aparte.
 
 ### Build status (phases)
 
@@ -3025,9 +3114,131 @@ hacen explícito algo que el diseño daba por sentado o dejaba sin cubrir:
   `city` in `decideConfirmTurn`; `<envio>` also gained `direccion` / `pais`
   so the redactor is never asked to recite a draft it wasn't given. See
   **Hallazgos de la revisión final de rama** under **Chatbot Fase C** above.
-  **The deployed function predates this fix wave** — a redeploy (and a
-  short re-run of the Módulo 2 "recomendar un lugar nuevo" path, which is
-  the one this changes) is the remaining step.
+  **Update 2026-09-19:** the fix waves are deployed — `chat` v9 (last
+  updated 2026-09-18 17:33 -03, i.e. the working tree was deployed before
+  commit `ec5129e` landed at 20:57) and its downloaded source
+  (`supabase functions download chat --use-api`) is **byte-identical to HEAD**
+  (0 diff lines in `index.ts` and `prompts.ts`, CRLF-normalised), including
+  `detectCancelIntent`. The matched-place confirm turn was re-verified live
+  through the widget (see Phase 23), and so was the Módulo 2 "recomendar un
+  lugar nuevo" path (the one the city-nullable fix changes) end to end —
+  address + country collection, derived city, confirm, real `suggestions`
+  INSERT — and the cancel path (see Phase 23).
+- 🚧 **Phase 23 — Chatbot Fase D: floating widget (`js/chat.js`), implemented and
+  verified and committed locally, not yet pushed/deployed.** Frontend-only step of ADR-006
+  decisión 11: a fixed bottom-right FAB (brand green, bubble + pin glyph, no
+  pulse) opening a ~380px panel (near-full-height bottom sheet ≤640px), wired to
+  the existing `chat` Edge Function. New: `js/chat.js`, the FAB + panel markup in
+  `index.html` (outside `<main>`), and a `Chat widget` block in
+  `css/styles.css`; one line of `js/map.js` (`celiacmap:panel-close`). **No
+  changes** to the Edge Function, `main.js`, the schema or any agent. Design
+  rationale, deviations from the PLAN and the findings: **Chatbot Fase D**
+  above.
+
+  **Verified in Chrome** against a local `http.server` (localhost is in the
+  function's CORS allowlist) and the **real deployed endpoint** — `buscar` with
+  results (real places, incl. the `**bold**` finding) and without (Adrogué),
+  `fuera_de_alcance`, `celiaquia`, and turn 1 of a `reportar` draft
+  ("¿Lo envío así?"), stopping there: the confirm turn would INSERT a real row
+  into `place_reports`, so **turn 2, `rate_limited`, network error and HTTP 500
+  were exercised with a stubbed `fetch`** (payload echo of `pending_submission`,
+  `--sent` / `--notice` / `--error` bubbles, history rollback, honeypot, the
+  too-fast guard). ES↔EN toggle re-renders every string; `panel-open` /
+  `panel-close` verified through the real `map.js` marker click. Mobile was
+  verified with a real 390px viewport by loading the page in a **same-origin
+  iframe** (its own viewport, so the `≤640px` media queries actually apply —
+  this sidesteps the window-resize limitation noted in the design audit):
+  sheet geometry, FAB hidden while open, `overscroll-behavior: contain`,
+  16px input (no iOS zoom), focus return to the FAB. 0 console errors. The
+  deployed function was later confirmed source-identical to HEAD (see Phase
+  22 update).
+
+  **Real confirm turn verified, then reverted (2026-09-19).** Through the
+  widget, against the deployed function, with a fixed test session token
+  (`celiac-test-faseD-20260919`, so every `chat_usage` bucket and cleanup
+  predicate was known up front): a **positive** report on Cucina Paradiso
+  Senza Glutine (`a52410f9-…`). Positive on purpose — it exercises the same
+  real `place_reports` INSERT without firing the negative-report chain
+  (webhook → Actions → Sonnet → status change), already verified in Phases 19
+  and 22. Turn 1 returned a `kind:"report"` draft with the right `place_id`
+  (a gate: turn 2 was only sent once it matched); turn 2 echoed the
+  `pending_submission`, got `action: report_submitted` /
+  `pending_submission: null`, and inserted exactly one `positive`/`new` row
+  (no `dispatched`, no `review_handler` log row). Everything was reverted with
+  literal SQL shown first and read-only SELECTs before each DELETE. Because
+  `agent_log` chatbot rows carry **no session token**, attribution was by
+  time window + module/timestamp match + counter arithmetic: `chat_usage`
+  `global` = sum of all session buckets proved no one else used the chat.
+  Final state checked against the pre-session baselines: `place_reports` n=1
+  (positives 0), `suggestions` n=1, the test place's row `md5` unchanged, and —
+  after also reverting this session's earlier 5 real turns — `agent_log`
+  chatbot 74 → 69 and no `chat_usage` rows for the day.
+
+  **"Recomendar un lugar nuevo" verified end to end, then reverted
+  (2026-09-19).** Same protocol, fixed token `celiac-test-faseD-suggest-…`,
+  an invented place ("Panadería Zzqx Sin TACC", absent from `places` /
+  `suggestions` / `place_reports`), four gated turns: positive report with
+  no match and **no city named** → `kind:"suggestion"` draft (`city:null`) →
+  address `"Calle Inventada 1234, Rosario"` (no country) → `city:"Rosario"`
+  **derived by `deriveCityFromAddress`, never asked**, bot asks the country →
+  `"Argentina"` → complete draft → `"dale, mandalo"` → `action:
+  suggestion_submitted`. Exactly one `suggestions` row landed with every
+  expected field (`origin:community`, `status:new`, `promoted_place_id:null`,
+  `category:null`); `place_reports` and the whole `places` table (n=1308,
+  fingerprint) were untouched, and there is no trigger on `suggestions`
+  (only `place_reports` has the webhook). Reverted with the literal SQL;
+  final state identical to the pre-test baselines (`suggestions` n=1 same
+  `md5`, `place_reports` same `md5`, `agent_log` chatbot 69, no
+  `chat_usage` rows). Lessons for the next run of this protocol:
+  - **The router extracts, it does not copy verbatim.** "sobre X: <texto>"
+    glued the whole string into `lugar_nombre` (→ `ask_more_detail`, no
+    draft); a comma-delimited comment dropped the marker from `notes`; only
+    "…sobre X. Mi comentario: <texto>" kept it. A cleanup predicate that
+    relies on a marker in `notes` must be checked against the draft's
+    `pending_submission` **before** the confirm turn — otherwise the DELETE
+    matches 0 rows and leaves the test row in production.
+  - **The redactor reads the draft.** With "PRUEBA DE VERIFICACIÓN … ignorar"
+    in `notes` it asked whether it was a test message instead of the
+    scripted "¿Lo sugiero así?" — harmless (state lives in
+    `pending_submission`, so the confirm turn still worked) but a reminder
+    that draft text is model-visible.
+
+  **Cancel path verified end to end, then reverted (2026-09-20).** Same
+  protocol (fixed token, literal SQL, guard DELETEs that had to match 0 rows).
+  With an incomplete suggestion draft in flight ("Panadería Zzqx Sin TACC",
+  bot asking for the address), the message "olvidalo, mejor buscame un café
+  con opciones sin tacc en Montevideo" returned exactly `CANCEL_REPLIES.es`
+  ("Listo, no sigo con esa recomendación. ¿Te ayudo con otra cosa?"),
+  `pending_submission: null`, `action: null`, rendered as a plain `--bot`
+  bubble. Structural proof of "no redactor call": that turn's `agent_log`
+  row (`modulo:"buscar"`, `marked:false`, `query:null`) has `router_tokens` and
+  **no `redactor_tokens` key**, while the draft turns and the following search
+  turn (`result_count: 8`) — the positive controls — do; it was also created
+  0.8 s after the send vs 2–6 s for redactor turns. The next turn, a plain
+  search, answered normally and its request carried `pending: null` (nothing
+  stale). `suggestions` / `place_reports` / `places` untouched (same `md5`s and
+  fingerprint); final state identical to the pre-test baselines.
+  **Finding — the deterministic cancel only runs when the router keeps the
+  message in scope.** The handler order is router → `fuera_de_alcance` →
+  cancel, and the router flags a *pure* cancellation as `fuera_de_alcance`
+  ("ante la duda"): "dejalo así, gracias" and "mejor cancelá la
+  recomendación, gracias" both did, 2 of 2. Effect: the draft is still
+  dropped (`pending_submission: null` — the pre-existing router escape), but
+  the reply is the scope decline ("Solo puedo ayudarte a buscar lugares…")
+  instead of `CANCEL_REPLIES`, and the turn is a *marked* one, so the person's
+  raw text is kept in `agent_log` for the 30-day retention window. Commit
+  `ec5129e` therefore improves the reply only for messages that combine a
+  cancel phrase with an in-scope request; not changed here (router prompt /
+  Edge Function are out of scope for Fase D). If pure cancels should get the
+  friendly reply and stay unmarked, the fix belongs in the router
+  (classify an explicit cancel of an in-flight draft as in-scope), or in
+  running `detectCancelIntent` before the `fuera_de_alcance` branch.
+  **Decisión (2026-09-20):** se deja como limitación conocida por ahora —
+  no se ajusta el orden de evaluación en esta sesión. Revisar si el patrón
+  se repite en uso real (frases de cancelación "puras" cayendo en
+  `fuera_de_alcance`) antes de decidir entre las dos alternativas ya
+  anotadas.
+  Remaining: the push — `deploy-pages.yml` (on `origin`) publishes it.
 
 ### GitHub Pages deploy decision
 

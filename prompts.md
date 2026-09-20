@@ -1790,3 +1790,60 @@ ni etiquetas XML en la respuesta.
 
 **Full design + fases + rationale:** `docs/architecture/ADR-006-chatbot-rag.md`
 and `docs/plans/PLAN-chatbot-rag.md`.
+
+---
+
+## 28. Chatbot Fase D — floating widget (design-first, then build)
+
+**Prompt (paraphrased, two turns):**
+
+> "Fase D of ADR-006: wire the floating widget to the site — frontend only, no
+> Edge Function changes. FAB fixed bottom-right (brand green, discreet
+> bubble + pin glyph, no pulsing), ~380px panel on desktop / near-full sheet
+> on mobile, bilingual (`MSG={es,en}` + `celiacmap:lang`), new `js/chat.js`
+> (session token, in-memory history, `pending_submission` echo, POST to the
+> function), hide on mobile while the map's bottom-sheet is open, z-index over
+> Leaflet with room for the CARTO attribution, states for thinking / network
+> error / `rate_limited`. **Before writing code: show a text wireframe (FAB
+> closed → panel open → message sent → reply) and confirm the CSS class/ID
+> names so nothing collides. Implement only after I approve. Verify visually
+> in Chrome before showing me the final diff.**"
+
+**How it was run.** Design first, in chat, with no spec file: read ADR-006
+decisión 11, `PLAN-chatbot-rag.md` (Fase D + the Edge Function contract),
+`map.js` / `ranking.js` / `main.js` and the CSS z-index map, then presented the
+wireframe, the class/ID list (a grep confirmed zero existing `chat` matches)
+and seven decisions where the request and the code disagreed. Implementation
+started only after approval. Findings that changed the design — full list in
+CLAUDE.md **Chatbot Fase D**:
+
+- the "Top 3 widget pattern" for hiding on `panel-open` didn't exist
+  (`.map-top3` is a static aside) and `map.js` had no close event → added
+  `celiacmap:panel-close`;
+- `main.js` has no `data-i18n-aria-label` and the CSS no `.sr-only` → all
+  widget copy lives in `chat.js`'s `MSG`;
+- the request omitted the disclaimers (ADR decisión 10) and the spam-guard
+  (decisión 11) that the ADR requires → both included;
+- live testing found the REDACTOR emitting literal `**bold**` → rendered
+  client-side as `<strong>` via DOM nodes rather than editing the prompt.
+
+**Verification method worth reusing.** Real endpoint for read-only turns; a
+stubbed `fetch` for any turn that would INSERT (confirm turn, `rate_limited`,
+network/HTTP errors); and a **same-origin iframe of a fixed width** to get a
+genuine mobile viewport (its own media queries apply), which sidesteps the
+window-resize limitation.
+
+**Real confirm-turn run (same pattern as ADR-004 / Phase 17 / 19 / 22).**
+Fixed test session token so the `chat_usage` bucket and every cleanup
+predicate were literal before running; the literal SQL and a read-only
+SELECT of the exact rows to delete were shown before each DELETE; a gate
+between turns (confirm only if the draft matched the expected `place_id` /
+type); and a final read-only comparison against baselines. Lesson: `agent_log`
+chatbot rows have no session token, so "only my rows" was proven by time
+window + module sequence + `chat_usage` arithmetic (`global` = sum of all
+session buckets), not assumed. Also: **verify what is actually deployed**
+(`supabase functions download <slug> --use-api` into a scratch `--workdir`,
+then diff) instead of inferring it from `functions list` timestamps.
+
+**Full design:** `docs/architecture/ADR-006-chatbot-rag.md` decisión 11 and
+`docs/plans/PLAN-chatbot-rag.md` Fase D.

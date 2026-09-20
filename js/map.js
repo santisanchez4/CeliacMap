@@ -426,8 +426,14 @@
 
   function closePanel() {
     if (!panelAvailable) return;
+    var wasOpen = panelEl.classList.contains("is-open");
     panelEl.classList.remove("is-open");
     panelEl.setAttribute("aria-hidden", "true");
+    // Counterpart of celiacmap:panel-open, so js/chat.js can bring its FAB back.
+    // Only when it actually closed: closePanel also runs on every map click / Escape.
+    if (wasOpen) {
+      try { document.dispatchEvent(new CustomEvent("celiacmap:panel-close")); } catch (e) {}
+    }
   }
 
   // Open the side panel; fall back to the Leaflet popup if anything fails.

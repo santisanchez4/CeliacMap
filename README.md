@@ -205,7 +205,8 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── map.js                  # Leaflet + Supabase data + filters + place panel
 │   ├── suggest.js              # public "Suggest a Place" form → suggestions table
 │   ├── report.js               # public "recommend / report" form → place_reports
-│   └── ranking.js              # community ranking (#ranking) + place_votes voting
+│   ├── ranking.js              # community ranking (#ranking) + place_votes voting
+│   └── chat.js                 # floating assistant widget → `chat` Edge Function
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
 │   ├── base.py                 # shared base + agent_log helper

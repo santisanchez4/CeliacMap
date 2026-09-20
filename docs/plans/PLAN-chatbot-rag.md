@@ -534,6 +534,14 @@ Cada fase = un commit separado, mismo patrón que ADR-004 / ADR-005.
 
 ### Fase D — Widget de frontend
 
+> **Estado (2026-09-19): implementada y verificada localmente, sin commitear.**
+> Desvíos respecto de lo que sigue (el detalle y el porqué están en `CLAUDE.md`,
+> **Chatbot Fase D**): el copy vive entero en `MSG` de `chat.js` — no se toca
+> `main.js` (no soporta `data-i18n-aria-label`) y el markup no lleva texto; se
+> agregó `celiacmap:panel-close` en `map.js`; la atribución CARTO se corre solo
+> bajo `@media not all and (min-width: 1000px)`; un timeout de 30 s y un candado
+> de una request a la vez; y `**negrita**` se renderiza como `<strong>`.
+
 - `js/chat.js` (nuevo) — session token, historial + recorte,
   `pending_submission`, spam-guard con clave propia, `MSG` es/en +
   `celiacmap:lang`, fetch al endpoint, render de conversación, indicador
