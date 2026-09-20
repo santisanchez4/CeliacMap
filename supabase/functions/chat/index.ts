@@ -176,7 +176,11 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
   return null;
 }
 
-const MODULOS = ["buscar", "reportar", "celiaquia", "confirmar", "fuera_de_alcance"] as const;
+// "cortesia" (Fase E, F3): a pure thank-you/compliment with no request. It is its own
+// module rather than "the previous turn's module" on purpose — a filterless `buscar`
+// would answer "gracias" with the 8 most-voted places of any country. It is answered
+// by a canned reply (decideCortesiaTurn): no redactor call, no lookup, no write.
+const MODULOS = ["buscar", "reportar", "celiaquia", "confirmar", "cortesia", "fuera_de_alcance"] as const;
 const CATEGORIES = ["restaurant", "cafe", "shop"] as const;
 const PAISES = ["Argentina", "Uruguay"] as const;
 const REPORT_TYPES = ["positive", "negative"] as const;
@@ -687,7 +691,10 @@ export function decideCollectingSuggestion(
   modulo: RouterOutput["modulo"],
   pending: PendingSubmission | null,
 ): PendingSuggestionSubmission | null {
-  if (modulo === "fuera_de_alcance") return null;
+  // "cortesia" must be excluded too: this gate hands EVERY other module's turn to an open
+  // draft as its address/country answer, so an unexcluded "gracias" would be stored as
+  // the address of a place.
+  if (modulo === "fuera_de_alcance" || modulo === "cortesia") return null;
   if (pending?.kind !== "suggestion") return null;
   return !pending.address || !pending.country ? pending : null;
 }
@@ -986,6 +993,41 @@ export const CANCEL_REPLIES: Record<Idioma, string> = {
   es: "Listo, no sigo con esa recomendación. ¿Te ayudo con otra cosa?",
   en: "Got it, I won't continue with that recommendation. Can I help you with something else?",
 };
+
+// Pure courtesy ("gracias, sos muy útil") — Fase E, F3. Canned for the same reason as the
+// two dicts above (fully determined in code, so an LLM call would be cost with no judgment
+// to make), and it means a courtesy turn can never leak, look up, or write anything: even
+// if the router misclassified an attack as "cortesia", the worst outcome is this line.
+export const CORTESIA_REPLIES: Record<Idioma, string> = {
+  es:
+    "¡De nada! Cuando quieras, puedo buscar lugares sin TACC en Argentina y Uruguay, ayudarte a dejar un comentario sobre un lugar o responder dudas generales sobre la celiaquía.",
+  en:
+    "You're welcome! Whenever you like, I can look for gluten-free places in Argentina and Uruguay, help you leave a comment about a place, or answer general questions about celiac disease.",
+};
+
+// Same, but while a draft is in progress. A bare "¡De nada!" right after "¿Lo envío así?"
+// would read as "done, it went out"; this one is true for every draft state (report ready,
+// suggestion ready, suggestion still missing its address).
+export const CORTESIA_PENDING_REPLIES: Record<Idioma, string> = {
+  es: "¡De nada! Ojo que todavía no se envió nada: cuando quieras seguimos con lo que estábamos armando.",
+  en:
+    "You're welcome! Just so you know, nothing has been sent yet: whenever you like we can pick up what we were putting together.",
+};
+
+/**
+ * A courtesy turn does nothing, so an in-progress draft is echoed back untouched (the same
+ * treatment a rate-limited turn gets) instead of being silently destroyed — the person only
+ * said thanks, they did not cancel.
+ */
+export function decideCortesiaTurn(
+  pending: PendingSubmission | null,
+  idioma: Idioma,
+): { reply: string; pending: PendingSubmission | null } {
+  return {
+    reply: getReply(pending ? CORTESIA_PENDING_REPLIES : CORTESIA_REPLIES, idioma),
+    pending,
+  };
+}
 
 export function getReply(dict: Record<Idioma, string>, idioma: Idioma): string {
   return dict[idioma] ?? dict.es;
@@ -1506,6 +1548,12 @@ export async function handleRequest(req: Request): Promise<Response> {
       );
       reply = redactorCall.text;
       redactorUsage = redactorCall.usage;
+    } else if (router.modulo === "cortesia") {
+      // Placed AFTER the confirm branches on purpose: "dale, gracias" with a draft ready is a
+      // confirmation the router may tag with either module, and confirma_envio must win.
+      const courtesy = decideCortesiaTurn(pendingIn, router.idioma);
+      reply = courtesy.reply;
+      responsePending = courtesy.pending;
     } else {
       // buscar
       queryLog = { ciudad: router.ciudad, zona: router.zona, category: router.category, texto_libre: router.texto_libre };
