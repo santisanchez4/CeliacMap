@@ -1955,3 +1955,18 @@ CLAUDE.md, Decisions Log, "Chatbot Fase E".
   `fuera_de_alcance`.
 - **`limite_medico` stays router-side (logging only)** — forwarding it would turn
   the general tolerance question into a refusal.
+
+**Follow-up — what the live model did with this revision (2026-09-20).** F3
+held (pure courtesy 3/3, combined requests 4/4 still `fuera_de_alcance`,
+`dale, gracias` still confirms). F4 did **not** fully hold: a labelling figure
+("< 20 ppm", the Codex value, not Argentina's 10 mg/kg) and "hablá urgente con
+un médico" kept appearing, and in an offline A/B (N=8) urgency mentions went
+**0/8 -> 4/8** with the new instruction — a plausible, unverified cause is that
+quoting the forbidden phrases inside the prompt primes them. So the prompt was
+not left carrying the safety on its own: a deterministic guard in code now
+replaces any `celiaquia` reply carrying a gluten figure or "urgen…" with a fixed
+message (CLAUDE.md, Decisions Log, "Chatbot Fase E"). Reformulating instruction 4
+without naming the forbidden phrases is **in progress, not blocking**; its gate is
+`db/checks/chat_prompt_ab.py` (N >= 16, must beat the deployed prompt on both
+metrics, no new false positives). When that revision exists, its prompt text and
+the A/B result belong here as the next entry.
