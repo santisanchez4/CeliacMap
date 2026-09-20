@@ -1029,6 +1029,73 @@ export function decideCortesiaTurn(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Celiaquía safety net (Fase E, F4 Option 2)
+//
+// The redactor prompt asks for no gluten figures and no urgency judgments, but on the live
+// model it still sometimes emits "< 20 ppm" (the Codex figure, NOT Argentina's 10 mg/kg) or
+// "hablá urgente con un médico". A prompt cannot guarantee health content; code can. After
+// the redactor answers a `celiaquia` turn, a reply carrying either is replaced WHOLE by a
+// fixed message (same pattern as RATE_LIMIT_REPLIES) and the turn is logged with the
+// discarded text, so how often the net fires is real data for tuning the prompt.
+//
+// Deliberately narrow: a number only counts when it carries a gluten-quantity unit
+// ("hace 2 años" must not fire), and the urgency stem must start a word (so "insurgente" or
+// "resurgencia" do not fire).
+// Not detected, by design of this first cut: severity wording without "urgen…" ("es grave",
+// "de inmediato", "emergencia") and figures in other modules' replies.
+// ---------------------------------------------------------------------------
+
+export type CeliaquiaGuardReason = "figura" | "urgencia";
+
+const NUMBER_WORDS = [
+  "cero", "un", "uno", "una", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez",
+  "once", "doce", "trece", "catorce", "quince", "veinte", "treinta", "cuarenta", "cincuenta", "sesenta",
+  "setenta", "ochenta", "noventa", "cien", "ciento", "mil", "medio", "media",
+  "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+  "fifteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred", "half",
+];
+const AMOUNT = `(?:\\d+(?:[.,]\\d+)*|(?<!\\p{L})(?:${NUMBER_WORDS.join("|")}|veinti\\p{L}+)(?!\\p{L}))`;
+const QUANTITY_UNIT =
+  "(?:mg|miligramos?|milligrams?|mcg|µg|microgramos?|micrograms?|ppm|partes?\\s+por\\s+mill[oó]n|parts?\\s+per\\s+million)";
+const GLUTEN_MASS_UNIT = "(?:g|gramos?|grams?)\\s+(?:de\\s+|of\\s+)?gluten";
+const GLUTEN_FIGURE_RE = new RegExp(`${AMOUNT}\\s*(?:${QUANTITY_UNIT}|${GLUTEN_MASS_UNIT})(?!\\p{L})`, "iu");
+const URGENCY_RE = /(?<!\p{L})urgen(?:t|c)/iu;
+
+/** Which safety-net reasons a celiaquia reply trips, figure first; [] when it is clean. */
+export function detectCeliaquiaGuard(reply: string): CeliaquiaGuardReason[] {
+  const reasons: CeliaquiaGuardReason[] = [];
+  if (GLUTEN_FIGURE_RE.test(reply)) reasons.push("figura");
+  if (URGENCY_RE.test(reply)) reasons.push("urgencia");
+  return reasons;
+}
+
+export const CELIAQUIA_GUARD_REPLIES: Record<Idioma, string> = {
+  es:
+    "Prefiero no darte cifras ni valorar síntomas por este medio: eso tiene que evaluarlo un profesional de la salud que conozca tu caso. Para orientarte, podés consultar a tu médico y a las asociaciones: en Argentina, ACELA (acela.org.ar) o ACA (celiaco.org.ar); en Uruguay, ACELU (acelu.org).",
+  en:
+    "I'd rather not give figures or assess symptoms here: that needs a health professional who knows your case. For guidance, you can talk to your doctor and to the patient associations: in Argentina, ACELA (acela.org.ar) or ACA (celiaco.org.ar); in Uruguay, ACELU (acelu.org).",
+};
+
+export interface CeliaquiaGuardTrip {
+  reasons: CeliaquiaGuardReason[];
+  /** The model text that was discarded — kept only for the (marked) audit log. */
+  original: string;
+  markedReason: string;
+}
+
+export function guardCeliaquiaReply(
+  reply: string,
+  idioma: Idioma,
+): { reply: string; tripped: CeliaquiaGuardTrip | null } {
+  const reasons = detectCeliaquiaGuard(reply);
+  if (reasons.length === 0) return { reply, tripped: null };
+  return {
+    reply: getReply(CELIAQUIA_GUARD_REPLIES, idioma),
+    tripped: { reasons, original: reply, markedReason: `guardian_celiaquia:${reasons.join("+")}` },
+  };
+}
+
 export function getReply(dict: Record<Idioma, string>, idioma: Idioma): string {
   return dict[idioma] ?? dict.es;
 }
@@ -1161,8 +1228,7 @@ function internalErrorResponse(cors: Record<string, string>): Response {
   return jsonResponse({ error: "internal_error" }, 500, cors);
 }
 
-// deno-lint-ignore no-explicit-any
-async function logChatTurn(supabase: any, entry: {
+export interface ChatLogEntry {
   action: string;
   modulo: string | null;
   marked: boolean;
@@ -1174,7 +1240,13 @@ async function logChatTurn(supabase: any, entry: {
   redactorUsage?: { in: number; out: number } | null;
   rawUserMessage?: string;
   rawBotReply?: string;
-}): Promise<void> {
+  // Set only when the celiaquia safety net replaced the model's reply: rawBotReply is then what
+  // the person actually received, and the discarded model text lives here.
+  guard?: { reasons: CeliaquiaGuardReason[]; discardedBotReply: string };
+}
+
+/** The agent_log `result` payload for a chat turn. Pure so its shape is testable. */
+export function buildChatLogResult(entry: ChatLogEntry): Record<string, unknown> {
   const result: Record<string, unknown> = {
     modulo: entry.modulo,
     marked: entry.marked,
@@ -1189,6 +1261,15 @@ async function logChatTurn(supabase: any, entry: {
     result.raw_user_message = entry.rawUserMessage ?? null;
     result.raw_bot_reply = entry.rawBotReply ?? null;
   }
+  if (entry.guard) {
+    result.guard = { tripped: true, reasons: entry.guard.reasons, discarded_bot_reply: entry.guard.discardedBotReply };
+  }
+  return result;
+}
+
+// deno-lint-ignore no-explicit-any
+async function logChatTurn(supabase: any, entry: ChatLogEntry): Promise<void> {
+  const result = buildChatLogResult(entry);
   try {
     await supabase.from("agent_log").insert({ agent: "chatbot", action: entry.action, status: "success", result });
   } catch {
@@ -1338,6 +1419,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   let queryLog: Record<string, unknown> | null = null;
   let resultCount: number | null = null;
   let nearbyCount: number | null = null;
+  let guardTrip: CeliaquiaGuardTrip | null = null;
   // Módulo 2/4 state for this turn: what the redactor is told about the draft
   // or the send outcome, and what the client gets back to echo next turn.
   let envio: EnvioContext | null = null;
@@ -1548,6 +1630,16 @@ export async function handleRequest(req: Request): Promise<Response> {
       );
       reply = redactorCall.text;
       redactorUsage = redactorCall.usage;
+      // Deterministic safety net (Fase E, F4): a gluten figure or an urgency judgment never
+      // reaches the person, whatever the prompt let through. The turn is marked so the
+      // discarded model text lands in agent_log (30-day retention, like every marked turn).
+      const guarded = guardCeliaquiaReply(reply, router.idioma);
+      if (guarded.tripped) {
+        guardTrip = guarded.tripped;
+        reply = guarded.reply;
+        marked = true;
+        markedReason = [markedReason, guarded.tripped.markedReason].filter(Boolean).join("+");
+      }
     } else if (router.modulo === "cortesia") {
       // Placed AFTER the confirm branches on purpose: "dale, gracias" with a draft ready is a
       // confirmation the router may tag with either module, and confirma_envio must win.
@@ -1629,6 +1721,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     redactorUsage,
     rawUserMessage: marked ? lastUserMessage : undefined,
     rawBotReply: marked ? reply : undefined,
+    guard: guardTrip ? { reasons: guardTrip.reasons, discardedBotReply: guardTrip.original } : undefined,
   });
 
   return jsonResponse(

@@ -9,6 +9,7 @@
 
 import { assertEquals, assertMatch, assertNotEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
+  buildChatLogResult,
   buildCorsHeaders,
   buildNearbyCountUrl,
   buildPlaceLookupUrl,
@@ -18,6 +19,7 @@ import {
   buildSuggestionInsertPayload,
   buildRouterUserMessage,
   CANCEL_REPLIES,
+  CELIAQUIA_GUARD_REPLIES,
   computeBucketKeys,
   continueSuggestionCollection,
   CORTESIA_PENDING_REPLIES,
@@ -31,8 +33,10 @@ import {
   decideSuggestionTurn,
   deriveCityFromAddress,
   detectCancelIntent,
+  detectCeliaquiaGuard,
   filterPlaceFields,
   getClientIp,
+  guardCeliaquiaReply,
   insertIntakeRow,
   getReply,
   isAllowedOrigin,
@@ -1503,4 +1507,168 @@ Deno.test("buildResponderUserMessage - limite_medico is deliberately NOT forward
   // in general terms. If this ever changes, it is a design change to record, not a refactor.
   const message = buildResponderUserMessage({ modulo: "celiaquia", userMessage: "¿cuánto gluten puede comer un celíaco?" });
   assertEquals(message.includes("limite_medico"), false);
+});
+
+// ---------------------------------------------------------------------------
+// Fase E — F4, Option 2: the deterministic safety net for `celiaquia` replies.
+//
+// The prompt fix did not fully hold on the live model (a labelling figure such as
+// "< 20 ppm" still appeared, and "hablá urgente con un médico" survived), and a prompt
+// cannot guarantee health content — code can. After the redactor answers a `celiaquia`
+// turn, a reply that carries a gluten figure or an urgency judgment is replaced WHOLE by a
+// fixed message. Fixtures below are verbatim model outputs captured in the Fase E runs.
+// ---------------------------------------------------------------------------
+
+const CLEAN_CROSS_CONTAMINATION_REPLY =
+  "La contaminación cruzada es cuando un alimento sin gluten entra en contacto con gluten o restos de gluten, ya sea por usar los mismos utensilios, tablas de corte, freidoras, o incluso por migas en una superficie. Para una persona celíaca esto es un problema real: hasta cantidades muy pequeñas de gluten pueden dañar su intestino.";
+
+Deno.test("detectCeliaquiaGuard - a clean general answer passes: cross-contamination explanation and the prompt's own tolerance example", () => {
+  assertEquals(detectCeliaquiaGuard(CLEAN_CROSS_CONTAMINATION_REPLY), []);
+  const example = promptExamples(RESPONDER_PROMPT).find((e) => /cuánto gluten/i.test(e))!;
+  assertEquals(detectCeliaquiaGuard(example.slice(example.indexOf("Asistente:"))), []);
+});
+
+Deno.test("detectCeliaquiaGuard - flags a gluten figure: number + mg/ppm/mg-kg/mg-día in every shape the model produced or could produce", () => {
+  const withFigure = [
+    "Incluso dosis muy bajas (menos de 20 mg al día) pueden dañar el intestino", // original F4 reply
+    'Los límites legales que ves en los rótulos (como "sin gluten" o "< 20 ppm") son concentraciones', // live F4-1
+    "Los 10 ppm (partes por millón) es un límite legal para que un producto se rotule", // live F4-2
+    "el máximo es 10ppm",
+    "unos 0,5 mg por porción",
+    "hasta 0.5 mg diarios",
+    "el límite es 20 mg/kg",
+    "no más de 50 mg/día",
+    "unos 20 miligramos",
+    "veinte partes por millón",
+    "diez ppm",
+    "veinticinco mg",
+    "hasta 1.000 ppm",
+    "less than 20 mg per day",
+    "10 parts per million",
+    "ten milligrams",
+    "medio gramo de gluten",
+    "5 g de gluten",
+  ];
+  for (const text of withFigure) assertEquals(detectCeliaquiaGuard(text), ["figura"], text);
+});
+
+Deno.test("detectCeliaquiaGuard - flags any urgency variant, in Spanish and English", () => {
+  const withUrgency = [
+    "si tenés síntomas como los que contás, hablá urgente con un médico", // live F4-3
+    "esos síntomas necesitan una consulta médica urgente", // Fase E battery, 3h
+    "lo urgente es consultar con un médico",
+    "es una urgencia",
+    "Urgentemente consultá a un profesional",
+    "this is urgent, see a doctor",
+    "seek care urgently",
+    "there is no urgency",
+  ];
+  for (const text of withUrgency) assertEquals(detectCeliaquiaGuard(text), ["urgencia"], text);
+});
+
+Deno.test("detectCeliaquiaGuard - does not fire on numbers that are not gluten quantities, nor on words that merely contain the urgency stem", () => {
+  // The edge case from the brief: a number is not a figure unless it carries a gluten unit.
+  const harmless = [
+    "Si te diagnosticaron hace 2 años, seguí las indicaciones de tu equipo médico",
+    "Comer 3 veces al día no cambia el riesgo",
+    "Afecta aproximadamente a 1 de cada 100 personas",
+    "Tuve síntomas desde 2019 y a los 30 años me diagnosticaron",
+    "esperá 10 días antes de repetir el estudio",
+    "Los límites se expresan en ppm o en mg/kg, según el país", // the UNITS are named, but no number
+    // Words that CONTAIN the urgency stem ("urgent…"/"urgenc…") without being an urgency judgment.
+    // These are what the word-start lookbehind protects; "surgen" alone never matched at all.
+    "Un grupo insurgente publicó el informe",
+    "Puede haber una resurgencia de los síntomas si se retoma el gluten",
+    "Si surgen síntomas, consultá a tu médico",
+  ];
+  for (const text of harmless) assertEquals(detectCeliaquiaGuard(text), [], text);
+});
+
+Deno.test("detectCeliaquiaGuard - reports both reasons when both are present, figure first", () => {
+  assertEquals(detectCeliaquiaGuard("son 20 ppm, y es urgente que consultes"), ["figura", "urgencia"]);
+});
+
+Deno.test("guardCeliaquiaReply - a clean reply is returned untouched and nothing is tripped", () => {
+  const out = guardCeliaquiaReply(CLEAN_CROSS_CONTAMINATION_REPLY, "es");
+  assertEquals(out.reply, CLEAN_CROSS_CONTAMINATION_REPLY);
+  assertEquals(out.tripped, null);
+});
+
+Deno.test("guardCeliaquiaReply - a figure replaces the WHOLE reply with the fixed message and keeps the discarded text for the log", () => {
+  const original =
+    'No hay una cantidad segura. Los límites legales (como "< 20 ppm") son concentraciones máximas. Consultá a tu médico.';
+  const out = guardCeliaquiaReply(original, "es");
+  assertEquals(out.reply, getReply(CELIAQUIA_GUARD_REPLIES, "es"));
+  assertEquals(out.reply.includes("20 ppm"), false);
+  assertEquals(out.tripped, { reasons: ["figura"], original, markedReason: "guardian_celiaquia:figura" });
+});
+
+Deno.test("guardCeliaquiaReply - urgency replaces the whole reply, and both reasons are recorded together", () => {
+  const urgent = guardCeliaquiaReply("hablá urgente con un médico", "es");
+  assertEquals(urgent.reply, getReply(CELIAQUIA_GUARD_REPLIES, "es"));
+  assertEquals(urgent.tripped?.markedReason, "guardian_celiaquia:urgencia");
+  const both = guardCeliaquiaReply("son 20 ppm y es urgente", "es");
+  assertEquals(both.tripped?.reasons, ["figura", "urgencia"]);
+  assertEquals(both.tripped?.markedReason, "guardian_celiaquia:figura+urgencia");
+});
+
+Deno.test("guardCeliaquiaReply - the fixed message follows the person's language", () => {
+  const out = guardCeliaquiaReply("less than 20 mg per day", "en");
+  assertEquals(out.reply, getReply(CELIAQUIA_GUARD_REPLIES, "en"));
+  assertNotEquals(getReply(CELIAQUIA_GUARD_REPLIES, "en"), getReply(CELIAQUIA_GUARD_REPLIES, "es"));
+});
+
+Deno.test("CELIAQUIA_GUARD_REPLIES - the fixed messages pass their own detector and refer to every association in <fuentes>", () => {
+  // A fixed reply that itself carried a figure or 'urgent' would make the net contradict itself.
+  for (const idioma of ["es", "en"] as const) {
+    const reply = getReply(CELIAQUIA_GUARD_REPLIES, idioma);
+    assertEquals(detectCeliaquiaGuard(reply), []);
+    for (const association of ["ACELA", "ACA", "ACELU"]) assertStringIncludes(reply, association);
+  }
+});
+
+Deno.test("buildChatLogResult - an ordinary unmarked turn keeps its metadata-only shape (no raw text, no guard)", () => {
+  const result = buildChatLogResult({
+    action: "chat_turn",
+    modulo: "celiaquia",
+    marked: false,
+    markedReason: null,
+    routerUsage: { in: 1700, out: 90 },
+    redactorUsage: { in: 3300, out: 180 },
+    rawUserMessage: undefined,
+    rawBotReply: undefined,
+  });
+  assertEquals(result, {
+    modulo: "celiaquia",
+    marked: false,
+    marked_reason: null,
+    router_tokens: { in: 1700, out: 90 },
+    redactor_tokens: { in: 3300, out: 180 },
+  });
+});
+
+Deno.test("buildChatLogResult - a marked turn keeps the raw texts, and a guard trip adds the DISCARDED model text separately from what the user saw", () => {
+  const marked = buildChatLogResult({
+    action: "chat_turn",
+    modulo: "celiaquia",
+    marked: true,
+    markedReason: "limite_medico",
+    rawUserMessage: "¿cuánto gluten puedo comer?",
+    rawBotReply: "respuesta enviada",
+  });
+  assertEquals(marked.raw_user_message, "¿cuánto gluten puedo comer?");
+  assertEquals(marked.raw_bot_reply, "respuesta enviada");
+  assertEquals("guard" in marked, false);
+
+  const tripped = buildChatLogResult({
+    action: "chat_turn",
+    modulo: "celiaquia",
+    marked: true,
+    markedReason: "limite_medico+guardian_celiaquia:figura",
+    rawUserMessage: "¿cuánto gluten puedo comer?",
+    rawBotReply: getReply(CELIAQUIA_GUARD_REPLIES, "es"), // what the person actually received
+    guard: { reasons: ["figura"], discardedBotReply: "menos de 20 mg al día" },
+  });
+  assertEquals(tripped.raw_bot_reply, getReply(CELIAQUIA_GUARD_REPLIES, "es"));
+  assertEquals(tripped.guard, { tripped: true, reasons: ["figura"], discarded_bot_reply: "menos de 20 mg al día" });
 });
