@@ -1,7 +1,10 @@
 # Plan — Chatbot RAG (búsqueda + reporte + celiaquía general + evidencia needs_review)
 
-**Estado:** Propuesto — pendiente de aceptar `ADR-006-chatbot-rag.md`
-**ADR relacionado:** `docs/architecture/ADR-006-chatbot-rag.md` (Propuesto)
+**Estado:** Completado (2026-09-20), con dos excepciones registradas: el
+**soft-launch con tráfico orgánico** (pendiente) y el chequeo
+`db/checks/<fecha>-chat-log-purge.sql` (no se escribió). Ver `## Verificación` de
+`ADR-006-chatbot-rag.md`.
+**ADR relacionado:** `docs/architecture/ADR-006-chatbot-rag.md` (Aceptado)
 
 ## Objetivo
 
@@ -563,6 +566,18 @@ Cada fase = un commit separado, mismo patrón que ADR-004 / ADR-005.
 - **Commit:** `feat(chat): floating widget — js/chat.js + panel + CSS + i18n`
 
 ### Fase E — Endurecimiento + testing de jailbreak + soft-launch
+
+> **Ejecución (2026-09-20).** *Hecho:* batería de jailbreak ampliada de 37 turnos
+> (`db/checks/2026-09-20-chat-jailbreak.md`: multi-turno con historial falsificado,
+> inyección vía reportar, ofuscación, rol sutil, autoridad falsa y un par pareado
+> contra el oráculo de estado de Módulo 4); volumen contra los topes de sesión e IP
+> (Fase B); medición de costo real; y las correcciones que salieron de la batería
+> (F3: módulo `cortesia`; F4: instrucción nueva más un guardián determinista de
+> `celiaquia`), con re-verificación en vivo en `chat` v10 y v11. `CHAT_MODEL` se
+> mantuvo en Haiku: el alcance no cedió (0 rupturas claras). *No hecho:*
+> `db/checks/<fecha>-chat-log-purge.sql` y el **soft-launch** (su plan propuesto está
+> en `## Verificación` del ADR-006, sin aprobar ni ejecutar). El tope global de 500
+> turnos/día no se ejercitó.
 
 - `db/checks/<fecha>-chat-jailbreak.md` — batería documentada y
   reproducible corrida contra el endpoint deployado:

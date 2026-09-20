@@ -934,21 +934,29 @@ Target (functional product — see **## Architecture**):
 │   ├── outreach-reply/         # Edge Function: Etapa 2 webhook receiver (Deno/TS)
 │   │   ├── index.ts
 │   │   └── index.test.ts
-│   └── place-report-created/   # Edge Function: place_reports Database Webhook receiver (Deno/TS)
-│       ├── index.ts
+│   ├── place-report-created/   # Edge Function: place_reports Database Webhook receiver (Deno/TS)
+│   │   ├── index.ts
+│   │   └── index.test.ts
+│   └── chat/                   # Edge Function: the chatbot (router + redactor, Haiku) — ADR-006
+│       ├── index.ts            # handleRequest, rate limiting, celiaquia safety net, log shape
+│       ├── prompts.ts          # ROUTER_PROMPT / RESPONDER_PROMPT — source of truth for the 4 copies
 │       └── index.test.ts
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
 │   └── targets.yaml            # countries/cities + search terms
 ├── scripts/
 │   ├── run_agents.py           # CI entrypoint: search → social → web → suggestion → validator → updater → outreach → review_sweep
+│   ├── purge_chat_logs.py      # weekly purge of agent_log chatbot rows > 30 days (chat-log-purge.yml)
 │   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
-│   └── seed.sql                # manual seed (UY/AR)
+│   ├── seed.sql                # manual seed (UY/AR)
+│   └── checks/                 # verification evidence: begin;…rollback; SQL, batteries, live runs,
+│                               # and chat_prompt_ab.py (offline A/B of the chatbot prompts vs the real model)
 ├── tests/                      # offline unit tests (external calls mocked)
+│                               # incl. test_chat_prompts_sync.py: the 4 copies of the chatbot prompts must match
 ├── .github/workflows/{agents-monthly,validator-midmonth,deploy-pages,
-│       outreach-reply,place-report-review}.yml
+│       outreach-reply,place-report-review,chat-log-purge}.yml
 ├── requirements.txt
 ├── .env.example
 ├── README.md  CLAUDE.md  prompts.md  .gitignore
@@ -3583,3 +3591,15 @@ modelo real, con la métrica "cuántas respuestas reemplazaría el guardián"),
   `places.vote_count` mantenida por el trigger `sync_place_vote_count`.
   No hay sistema externo ni agente nuevo (sin LLM, sin GitHub Actions).
   Ver docs/architecture/C4-diagrams.md.
+- Chatbot RAG: interfaz conversacional sobre la base ya validada, con **cero
+  autoridad** sobre `places.status` (relata lo que el Validator aprobó y enruta
+  entradas a `place_reports` / `suggestions`); aceptado el 2026-09-20 con el
+  soft-launch pendiente y sus enmiendas de la Fase E (módulo `cortesia`,
+  guardián determinista de `celiaquia`); ver
+  docs/architecture/ADR-006-chatbot-rag.md.
+- C4 diagrams — Nivel 2 agrega la Edge Function `chat` (la primera que llama a
+  un LLM: 2 llamadas a Haiku por turno), `js/chat.js` dentro del frontend, las
+  tablas server-only `chat_usage` / `agent_log` que escribe con `service_role`, y
+  la purga semanal de `agent_log` (GitHub Actions). Nivel 1: el frontend ahora
+  también habla con Anthropic, vía esa Edge Function. Ver
+  docs/architecture/C4-diagrams.md.

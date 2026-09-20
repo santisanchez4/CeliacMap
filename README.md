@@ -52,6 +52,18 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   Skill ([`skills/validator-rubric/SKILL.md`](skills/validator-rubric/SKILL.md)),
   and an **MCP server** ([`mcp_server/`](mcp_server/)) exposing 6 tools over Supabase
   + the Validator rubric for Claude Desktop / Claude Code / external agents.
+- ✅ **Chatbot assistant** — a floating widget on the site (`js/chat.js`) backed by a
+  Supabase Edge Function (`supabase/functions/chat/`, `claude-haiku-4-5`: a router
+  call plus a redactor call per turn). It finds **approved** places in natural
+  language, helps leave a comment or recommend a place (writing to the same
+  `place_reports` / `suggestions` intake tables as the public forms, under the same
+  RLS), and answers general celiac-disease questions, always inside a closed scope.
+  It has **zero authority over `places.status`**. Hardened with a 37-turn jailbreak
+  battery, per-session / per-IP / global rate limits with its own budget, and a
+  deterministic safety net that replaces any celiac-disease reply carrying a gluten
+  figure or an urgency judgment. Accepted in
+  [`ADR-006`](docs/architecture/ADR-006-chatbot-rag.md); the soft-launch with organic
+  traffic is still pending.
 
 See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
 
@@ -190,6 +202,8 @@ serif display headings over a clean sans body, and generous spacing.
   Suggest a Place, Reviews, AI & Agents, About, Call to Action, Footer.
 - Bilingual interface: Spanish (default, "sin TACC") with a client-side ES/EN
   toggle (remembered via `localStorage`).
+- Floating assistant chat (bottom-right; a bottom sheet on mobile) for finding places,
+  leaving a comment and general celiac-disease questions, in Spanish or English.
 - Conceptual interactive map built entirely with HTML/CSS (no map library).
 - Accessible: semantic landmarks, skip link, focus styles, reduced-motion support.
 
@@ -222,6 +236,8 @@ serif display headings over a clean sans body, and generous spacing.
 │   └── README.md
 ├── skills/                     # AI toolkit — reusable skills
 │   └── validator-rubric/SKILL.md
+├── supabase/functions/         # Deno/TypeScript Edge Functions
+│   └── chat/                   # the chatbot: router + redactor, safety net, rate limits (ADR-006)
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
 │   └── targets.yaml            # countries/cities + search/social terms
@@ -231,7 +247,7 @@ serif display headings over a clean sans body, and generous spacing.
 ├── db/
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers
 │   ├── seed.sql                # manual seed (UY/AR) + community-ranking seed (15 places)
-│   └── checks/                 # non-destructive BEGIN;…ROLLBACK; verification scripts
+│   └── checks/                 # verification evidence: BEGIN;…ROLLBACK; scripts, jailbreak battery, live runs, prompt A/B tool
 ├── tests/                      # offline unit tests (all external calls mocked)
 ├── .github/workflows/          # agents-monthly cron + Pages deploy
 ├── requirements.txt

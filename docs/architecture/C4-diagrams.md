@@ -9,16 +9,16 @@ flowchart TB
 
     celiacmap["🗺️ <b>CeliacMap</b><br/><i>Plataforma web que identifica, valida<br/>y muestra lugares sin TACC confiables</i>"]
 
-    anthropic[["Anthropic API<br/><i>Claude Haiku (descubrimiento)<br/>y Sonnet (juicio de seguridad)</i>"]]
+    anthropic[["Anthropic API<br/><i>Claude Haiku (descubrimiento y<br/>asistente conversacional) y Sonnet<br/>(juicio de seguridad)</i>"]]
     google[["Google Places API<br/><i>Búsqueda determinística<br/>de comercios</i>"]]
     tavily[["Tavily API<br/><i>Descubrimiento de menciones<br/>en redes sociales</i>"]]
     resend[["Resend API<br/><i>Envío y recepción de<br/>email transaccional (Outreach)</i>"]]
     github_actions[["GitHub Actions<br/><i>Orquesta el pipeline<br/>de forma mensual</i>"]]
 
-    usuario -->|"Consulta el mapa<br/>HTTPS"| celiacmap
+    usuario -->|"Consulta el mapa o<br/>chatea con el asistente<br/>HTTPS"| celiacmap
     colaborador -->|"Sugiere un lugar<br/>HTTPS/Formulario"| celiacmap
 
-    celiacmap -->|"Valida y clasifica<br/>candidatos"| anthropic
+    celiacmap -->|"Valida y clasifica candidatos;<br/>responde al asistente"| anthropic
     celiacmap -->|"Busca comercios<br/>candidatos"| google
     celiacmap -->|"Busca menciones<br/>sociales"| tavily
     celiacmap -->|"Envía email de<br/>confirmación"| resend
@@ -48,17 +48,23 @@ flowchart TB
     github_actions[["GitHub Actions<br/><i>Cron mensual +<br/>repository_dispatch</i>"]]
 
     subgraph celiacmap["CeliacMap [SYSTEM]"]
-        frontend["<b>Frontend estático</b><br/><i>HTML/CSS/JS + Leaflet.js</i><br/>Mapa interactivo + ranking<br/>comunitario, servido por<br/>GitHub Pages, sin build step"]
+        frontend["<b>Frontend estático</b><br/><i>HTML/CSS/JS + Leaflet.js</i><br/>Mapa interactivo + ranking<br/>comunitario + widget del asistente<br/>(chat.js), servido por GitHub<br/>Pages, sin build step"]
         pipeline["<b>Pipeline de agentes</b><br/><i>Python</i><br/>Search, Social, Web, Suggestion,<br/>Validator, Updater y Outreach<br/>(7 etapas) + Reply Handler<br/>(on-demand, vía dispatch)"]
         edge_function["<b>Edge Function</b><br/><i>Deno/TypeScript</i><br/>outreach-reply: recibe webhooks<br/>de Resend, dispara repository_dispatch"]
+        chat_fn["<b>Edge Function chat</b><br/><i>Deno/TypeScript</i><br/>Asistente: router + redactor (2 llamadas<br/>Haiku por turno), guardián determinista<br/>de celiaquía, contadores de uso"]
         mcp["<b>MCP Server</b><br/><i>Python/FastMCP</i><br/>Expone 6 tools para interactuar<br/>con los datos validados"]
-        db[("<b>Base de datos</b><br/><i>Supabase (PostgreSQL)</i><br/>Lugares validados, sugerencias,<br/>reportes, votos comunitarios,<br/>estado del rubric de 3 niveles")]
+        db[("<b>Base de datos</b><br/><i>Supabase (PostgreSQL)</i><br/>Lugares validados, sugerencias,<br/>reportes, votos comunitarios, contadores<br/>del chat, estado del rubric de 3 niveles")]
     end
 
     usuario -->|"Navega el mapa<br/>HTTPS"| frontend
     usuario -->|"Envía sugerencia / reporte<br/>Formulario"| frontend
     usuario -->|"Vota un lugar<br/>1 click"| frontend
+    usuario -->|"Chatea<br/>widget flotante"| frontend
     frontend -->|"Lee/escribe<br/>REST"| db
+    frontend -->|"POST /functions/v1/chat<br/>anon key, HTTPS"| chat_fn
+
+    chat_fn -->|"Router + redactor<br/>(2 llamadas Haiku), API"| anthropic
+    chat_fn -->|"Lee lugares approved (anon);<br/>escribe place_reports/suggestions (anon);<br/>chat_usage y agent_log<br/>(service_role), REST"| db
 
     pipeline -->|"Lee/escribe lugares<br/>y estado, REST"| db
     pipeline -->|"Descubre (Haiku) y<br/>valida (Sonnet), API"| anthropic
@@ -71,12 +77,14 @@ flowchart TB
     edge_function -->|"repository_dispatch<br/>(outreach_reply_received)"| github_actions
     github_actions -->|"Ejecuta<br/>outreach_reply_handler.py"| pipeline
     github_actions -->|"Orquesta mensualmente<br/>cron"| pipeline
+    github_actions -->|"Purga semanal de agent_log<br/>del chatbot (más de 30 días)"| db
 
     mcp -->|"Consulta datos<br/>validados, REST"| db
 
     style frontend fill:#1168bd,color:#fff
     style pipeline fill:#1168bd,color:#fff
     style edge_function fill:#1168bd,color:#fff
+    style chat_fn fill:#1168bd,color:#fff
     style mcp fill:#1168bd,color:#fff
     style db fill:#1168bd,color:#fff
     style usuario fill:#08427b,color:#fff
@@ -96,3 +104,22 @@ mantiene con un trigger de base de datos (`sync_place_vote_count`,
 `SECURITY DEFINER`) — **sin agente, sin LLM, sin GitHub Actions, sin Edge
 Function**: en el diagrama, el borde `frontend → db` simplemente pasa a cubrir
 también la escritura de votos.
+
+**Nota — chatbot (ADR-006).** La Edge Function `chat` es la **primera que llama a
+un LLM** y la única Edge Function abierta al tráfico público sin autenticación
+(las otras dos son receptores de webhooks protegidos con un secreto). Por eso es
+el contenedor con más restricciones:
+- **Cero autoridad sobre `places.status`.** Lee solo lugares `approved` con la
+  anon key (la RLS de `places` es el respaldo estructural) y escribe únicamente
+  en las tablas intake `place_reports` / `suggestions`, con la misma anon key y la
+  misma RLS que los formularios públicos: es un tercer escritor de un pipeline que
+  ya existía, no uno con privilegios.
+- **`service_role` acotado a tres usos:** los contadores de `chat_usage` (rate
+  limiting por sesión, IP y global), el lookup de lugares `needs_review` del
+  Módulo 4, y las escrituras a `agent_log`. Ninguna clave llega al navegador.
+- **El texto libre de un turno solo se guarda si el turno queda marcado** (fuera de
+  alcance, límite médico, rate limit, o si el guardián determinista de `celiaquia`
+  reemplazó la respuesta); `agent_log` del chatbot se purga cada semana a los 30
+  días con un workflow de GitHub Actions.
+- **Presupuesto propio** (`CHAT_DAILY_CALL_CAP`), separado del `AGENT_DAILY_BUDGET`
+  del pipeline batch.
