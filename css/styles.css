@@ -1737,6 +1737,11 @@ h1, h2, h3 {
 #location-status:empty { display: none; }
 #results-toggle, #results-close { display: none; }
 .map-demo > .map-search { width: 100%; }
+.map-search-clear[hidden] { display: none; }
+@media (min-width: 768px) {
+  /* Keep the closed detail drawer inside the map instead of widening the page. */
+  .map-wrap { overflow: hidden; border-radius: 15px; }
+}
 .place-result { grid-template-columns: minmax(0, 1fr) auto; }
 .place-result-main, .place-distance { grid-column: 1 / -1; }
 .place-distance { font-size: .8rem; color: var(--color-text-muted); }

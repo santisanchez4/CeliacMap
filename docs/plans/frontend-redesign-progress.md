@@ -29,6 +29,12 @@ git diff --check
 
 Los tests de frontend ejecutan los módulos reales con un DOM de LinkeDOM y una capa Leaflet simulada. LinkeDOM se descarga en la caché de Deno, no se incorpora al sitio ni a sus dependencias de producción. Cubren apertura de detalle mediante cards y chatbot, conflicto de filtros, autocomplete, paginación, traducción y orden del DOM.
 
-## Validación pendiente en dispositivos reales
+## Verificación de publicación y navegador
 
-No se dispone de navegador automatizable en esta sesión. Los tests DOM no comprueban la composición visual de Leaflet, gestos, agrupación real, teclado iOS/Android ni lectores de pantalla. Verificar a 360, 390, 768, 1024 y 1440 px los tres recorridos del plan, con zoom del navegador, teclado y movimiento reducido, antes de publicar.
+El frontend del commit `d1ffa19` se publicó mediante GitHub Pages. La función `chat` se desplegó como versión 12 y se verificó `ACTIVE`, conservando `verify_jwt=false`.
+
+Una búsqueda real desde el chat en producción devolvió referencias estructuradas. Se verificaron sus IDs contra `places.status=approved` y se abrió una recomendación en el mapa desde el widget mobile.
+
+Se habilitó una instalación temporal de Playwright fuera de las dependencias de producción, en `supabase/.temp/visual-qa`, para ejecutar Chrome real en modo headless. Se comprobaron vistas de 360, 390, 768, 1024 y 1440 px: mapa primero, selección desde cards, expansión del detalle mobile, cierre, filtros y apertura del chat. Se inspeccionaron capturas. La prueba encontró un desbordamiento horizontal causado por el panel de detalle cerrado desde 768 px; se corrigió conteniendo ese panel dentro del mapa y se repitieron satisfactoriamente los cinco tamaños sobre el código corregido, sin errores JavaScript.
+
+Esto valida Chromium con emulación de viewport/touch, no hardware móvil. Quedan fuera de esta verificación el teclado nativo de iOS/Android, Safari, lectores de pantalla y pruebas con personas usuarias.
