@@ -3124,8 +3124,8 @@ resueltos durante la implementación:
   lugar nuevo" path (the one the city-nullable fix changes) end to end —
   address + country collection, derived city, confirm, real `suggestions`
   INSERT — and the cancel path (see Phase 23).
-- 🚧 **Phase 23 — Chatbot Fase D: floating widget (`js/chat.js`), implemented and
-  verified and committed locally, not yet pushed/deployed.** Frontend-only step of ADR-006
+- ✅ **Phase 23 — Chatbot Fase D: floating widget (`js/chat.js`), implemented,
+  deployed and verified live.** Frontend-only step of ADR-006
   decisión 11: a fixed bottom-right FAB (brand green, bubble + pin glyph, no
   pulse) opening a ~380px panel (near-full-height bottom sheet ≤640px), wired to
   the existing `chat` Edge Function. New: `js/chat.js`, the FAB + panel markup in
@@ -3238,7 +3238,11 @@ resueltos durante la implementación:
   se repite en uso real (frases de cancelación "puras" cayendo en
   `fuera_de_alcance`) antes de decidir entre las dos alternativas ya
   anotadas.
-  Remaining: the push — `deploy-pages.yml` (on `origin`) publishes it.
+  **Deployed and verified live (2026-09-20):** push to `origin/main`
+  succeeded (`2a93210..1ee9ff5`; `origin` is now the only remote in use and
+  `main` tracks it), `deploy-pages.yml` green, and on https://celiacmap.org a
+  real search turn worked end to end (`200`, `**bold**` rendered as
+  `<strong>`, 0 console errors).
 
 ### GitHub Pages deploy decision
 
