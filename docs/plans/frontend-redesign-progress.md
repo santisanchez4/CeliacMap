@@ -4,11 +4,11 @@
 
 - El mapa precede al contenido informativo en el DOM y en pantalla.
 - Búsqueda permanente; filtros de categoría, ciudad y nivel en un panel desplegable. Se actualizan inmediatamente; «Ver resultados» cierra el panel y encuadra los lugares. «Restablecer» limpia los filtros.
-- En desktop los resultados acompañan al mapa. Hasta 767 px se abren como un panel inferior colapsable; el detalle comienza como resumen y permite expandir la información.
+- La card junto al mapa (desde 1000 px) es solo el Top 3 de la comunidad, con selector Argentina / Uruguay compartido con el ranking completo. No hay lista de «lugares encontrados»: los lugares se exploran con los marcadores, la búsqueda, los filtros y las recomendaciones del chat. En pantallas angostas el detalle comienza como resumen y permite expandir la información.
 - Seleccionar una recomendación con filtros incompatibles restablece esos filtros antes de mostrar el lugar. El autocomplete respeta todos los filtros activos.
 - Cambiar selección, paginar cards o traducir no reconstruye la capa de marcadores. Los cambios de filtros agregan o eliminan únicamente los marcadores afectados.
 - A petición del usuario, se retiraron la geolocalización, las distancias y los grupos numerados. Cada lugar se muestra con un marcador individual; la ciudad se selecciona manualmente.
-- El chat móvil ocupa temporalmente la pantalla y adapta su altura a VisualViewport. Conserva la conversación en memoria; abrirlo no activa el teclado. Incluye prompts editables, foco contenido y fondo inerte mientras funciona como diálogo modal.
+- El chat móvil ocupa temporalmente la pantalla y adapta su altura a VisualViewport. Conserva la conversación en memoria; abrirlo no activa el teclado. Abre solo con el saludo (sin preguntas sugeridas), con foco contenido y fondo inerte mientras funciona como diálogo modal.
 - Se conservan el stack estático, Leaflet y las reglas de publicación de lugares aprobados. No hay migraciones ni cambios en prompts del modelo.
 
 ## Contrato del chatbot
@@ -27,7 +27,11 @@ deno test --allow-read --no-lock --node-modules-dir=none tests/frontend_explorer
 git diff --check
 ```
 
-Los tests de frontend ejecutan los módulos reales con un DOM de LinkeDOM y una capa Leaflet simulada. LinkeDOM se descarga en la caché de Deno, no se incorpora al sitio ni a sus dependencias de producción. Cubren apertura de detalle mediante cards y chatbot, conflicto de filtros, autocomplete, paginación, traducción y orden del DOM.
+Los tests de frontend ejecutan los módulos reales con un DOM de LinkeDOM y una capa Leaflet simulada. LinkeDOM se descarga en la caché de Deno, no se incorpora al sitio ni a sus dependencias de producción. Cubren apertura de detalle mediante el chatbot, conflicto de filtros, autocomplete, traducción, orden del DOM, la card del Top 3 (selector de país compartido, país sin votos, error de carga) y que el chat abra sin preguntas sugeridas.
+
+## Simplificación posterior (2026-09-20)
+
+A pedido del dueño del producto: se quitó la lista «Lugares encontrados» (cards, paginación, contador y el botón móvil «Lugares / mapa») y la card junto al mapa volvió a ser solo el Top 3, ahora con selector Argentina / Uruguay. También se quitaron las preguntas sugeridas del chat, que lo cargaban de información al abrirlo. Solo frontend: sin cambios en la Edge Function, el esquema ni los prompts. El breakpoint de dos columnas vuelve a 1000 px (coincide con el que oculta la card por debajo y con el corrimiento de la atribución del mapa frente al FAB del chat).
 
 ## Verificación de publicación y navegador
 

@@ -482,7 +482,7 @@
     document.addEventListener("click", function (e) {
       if (!panelEl.classList.contains("is-open")) return;
       if (panelEl.contains(e.target) || mapEl.contains(e.target)) return;
-      if (e.target.closest && e.target.closest(".place-result, .chat-place-link")) return;
+      if (e.target.closest && e.target.closest(".chat-place-link")) return;
       closePanel();
     });
     document.addEventListener("keydown", function (e) {
@@ -509,41 +509,14 @@
   var currentSafety = "all";
   var currentQuery = "";
   var selectedEntry = null;
-  var resultLimit = 8;
-  function filteredEntries() { return entries.filter(matches); }
 
   var searchInput = document.getElementById("place-search");
   var searchClear = document.getElementById("search-clear");
   var citySelect = document.getElementById("city-select");
   var countEl = document.getElementById("map-result-count");
   var suggestEl = document.getElementById("search-suggest");
-  var resultsEl = document.getElementById("place-results");
-  var explorerCountEl = document.getElementById("explorer-count");
-  var explorerHintEl = document.getElementById("explorer-hint");
-  var resultsMoreEl = document.getElementById("results-more");
 
-  function setResultsOpen(open) {
-    document.getElementById("explorer-results").classList.toggle("is-results-open", open);
-    document.getElementById("results-toggle").setAttribute("aria-expanded", String(open));
-    var fab = document.getElementById("chat-fab");
-    if (fab) fab.classList.toggle("is-suppressed", open || panelEl.classList.contains("is-open"));
-  }
-  document.getElementById("results-toggle").addEventListener("click", function () {
-    closePanel();
-    setResultsOpen(this.getAttribute("aria-expanded") !== "true");
-    if (this.getAttribute("aria-expanded") === "true") document.getElementById("results-close").focus();
-  });
-  document.getElementById("results-close").addEventListener("click", function () {
-    setResultsOpen(false);
-    document.getElementById("results-toggle").focus();
-  });
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && document.getElementById("explorer-results").classList.contains("is-results-open")) {
-      setResultsOpen(false);
-      document.getElementById("results-toggle").focus();
-    }
-  });
-  document.addEventListener("celiacmap:chat-open", function () { closePanel(); setResultsOpen(false); });
+  document.addEventListener("celiacmap:chat-open", function () { closePanel(); });
 
   function resetFilters() {
     currentCategory = currentCity = currentSafety = "all";
@@ -557,7 +530,6 @@
       button.classList.toggle(button.hasAttribute("data-safety") ? "is-active" : "chip-active", on);
       button.setAttribute("aria-pressed", String(on));
     });
-    resultLimit = 8;
     refresh();
   }
   document.getElementById("reset-filters").addEventListener("click", function () { resetFilters(); frameVisible(); });
@@ -571,8 +543,6 @@
       node.textContent = node.getAttribute("data-explorer-" + lang());
     });
     var texts = [
-      ["#explorer-results-title", "Lugares encontrados", "Places found"],
-      [".explorer-kicker", "Explorá el mapa", "Explore the map"],
       [".map-legend li:first-child span:last-child", "Espacio 100% sin gluten", "100% gluten-free venue"],
       [".map-legend li:nth-child(2) span:last-child", "Atención para celíacos", "Celiac-friendly service"]
     ];
@@ -581,7 +551,6 @@
       var level = button.getAttribute("data-safety");
       button.textContent = level === "all" ? tr("Todos los niveles", "All levels") : safetyText(level);
     });
-    resultsEl.setAttribute("aria-label", tr("Resultados del mapa", "Map results"));
     document.querySelector(".map-safety-chips").setAttribute("aria-label", tr("Información sin TACC", "Gluten-free information"));
     panelClose.setAttribute("aria-label", tr("Volver al mapa", "Back to map"));
     panelEl.setAttribute("aria-label", tr("Detalle del lugar", "Place details"));
@@ -628,42 +597,6 @@
     return (LABELS.safety[level] && LABELS.safety[level][lang()]) || level;
   }
 
-  function categoryText(category) {
-    return (LABELS.category[category] && LABELS.category[category][lang()]) || category;
-  }
-
-  function renderResults(shown) {
-    var activeId = document.activeElement && resultsEl.contains(document.activeElement) ? document.activeElement.getAttribute("data-place-id") : null;
-    if (explorerCountEl) explorerCountEl.textContent = String(shown.length);
-    if (!resultsEl) return;
-    if (!shown.length) {
-      resultsEl.innerHTML = '<li class="place-results-empty">' + tr("No hay lugares con estos filtros. Probá ampliar la búsqueda.", "No places match these filters. Try broadening your search.") + '</li>';
-      if (explorerHintEl) explorerHintEl.textContent = tr("Ajustá los filtros para explorar más opciones.", "Adjust the filters to explore more options.");
-      if (resultsMoreEl) resultsMoreEl.hidden = true;
-      return;
-    }
-    if (explorerHintEl) explorerHintEl.textContent = tr("Seleccioná un resultado o marcador. Los niveles son orientativos: confirmá con el local.", "Select a result or marker. Levels are indicative: confirm with the venue.");
-    var ordered = shown.slice().sort(function (a, b) {
-      return a.place.name.localeCompare(b.place.name);
-    });
-    resultsEl.innerHTML = ordered.slice(0, resultLimit).map(function (entry) {
-      var p = entry.place;
-      var selected = entry === selectedEntry ? " is-selected" : "";
-      return '<li><button type="button" class="place-result' + selected + '" data-place-id="' + esc(p.id) + '" aria-pressed="' + (entry === selectedEntry ? "true" : "false") + '">' +
-        '<span class="place-result-main"><span class="place-result-name">' + esc(p.name) + '</span>' +
-        '<span class="place-result-meta">' + esc([categoryText(p.category), p.city].filter(Boolean).join(" · ")) + '</span></span>' +
-        '<span class="place-result-safety ' + safetyClass(p.safety_level) + '">' + esc(safetyText(p.safety_level)) + '</span>' +
-        '<span class="place-result-arrow" aria-hidden="true">→</span></button></li>';
-    }).join("");
-    if (activeId) Array.prototype.forEach.call(resultsEl.querySelectorAll("[data-place-id]"), function (button) {
-      if (button.getAttribute("data-place-id") === activeId) button.focus({ preventScroll: true });
-    });
-    if (resultsMoreEl) {
-      resultsMoreEl.hidden = ordered.length <= resultLimit;
-      resultsMoreEl.textContent = tr("Ver más lugares", "Show more places");
-    }
-  }
-
   function selectEntry(entry, focusPanel) {
     if (!entry) return;
     clearTimeout(searchTimer);
@@ -675,13 +608,7 @@
     entry.marker.setIcon(icon(entry.place.safety_level, true));
     map.invalidateSize();
     map.flyTo(entry.marker.getLatLng(), Math.max(map.getZoom(), 16), motion(0.45));
-    setResultsOpen(false);
     showDetails(entry.place, entry.marker);
-    Array.prototype.forEach.call(resultsEl.querySelectorAll("[data-place-id]"), function (button) {
-      var on = button.getAttribute("data-place-id") === entry.place.id;
-      button.classList.toggle("is-selected", on);
-      button.setAttribute("aria-pressed", String(on));
-    });
     try { document.dispatchEvent(new CustomEvent("celiacmap:place-selected", { detail: entry.place })); } catch (e) {}
     if (focusPanel && panelEl) panelEl.focus({ preventScroll: true });
   }
@@ -701,7 +628,6 @@
       selectedEntry = null;
     }
     updateCount(shown.length);
-    renderResults(shown);
     return shown.length;
   }
 
@@ -748,7 +674,6 @@
   document.addEventListener("celiacmap:lang", function () {
     updateCount(shownMarkers().length);
     translateExplorer();
-    renderResults(filteredEntries());
     if (selectedEntry && panelEl && panelEl.classList.contains("is-open")) openPanel(selectedEntry.place);
   });
 
@@ -778,32 +703,11 @@
       chip.classList.add("is-active");
       chip.setAttribute("aria-pressed", "true");
       currentSafety = chip.getAttribute("data-safety") || "all";
-      resultLimit = 8;
       refresh();
       frameVisible();
     });
   });
 
-  if (resultsEl) {
-    resultsEl.addEventListener("click", function (e) {
-      var button = e.target && e.target.closest ? e.target.closest("[data-place-id]") : null;
-      if (!button) return;
-      e.stopPropagation();
-      var id = button.getAttribute("data-place-id");
-      for (var i = 0; i < entries.length; i++) {
-        if (entries[i].place.id === id) { selectEntry(entries[i], true); break; }
-      }
-    });
-  }
-  if (resultsMoreEl) {
-    resultsMoreEl.addEventListener("click", function () {
-      var previousCount = resultLimit;
-      resultLimit += 8;
-      renderResults(filteredEntries());
-      var buttons = resultsEl.querySelectorAll("button");
-      if (buttons[previousCount]) buttons[previousCount].focus();
-    });
-  }
   document.addEventListener("celiacmap:open-place", function (event) {
     var id = event.detail && event.detail.id;
     if (!id) return;

@@ -2776,6 +2776,31 @@ modelo real, con la métrica "cuántas respuestas reemplazaría el guardián"),
 `db/checks/2026-09-20-chat-f4-f3-live-run.md` (v10) y
 `db/checks/2026-09-20-chat-f4-guard-live-run.md` (v11).
 
+### Map explorer — results list and chat prompts removed (2026-09-20)
+
+Owner-decided simplification of the explorer redesign (frontend only — no Edge
+Function, schema or prompt change):
+
+- **The card beside the map is only the community Top 3 again**, now with an
+  Argentina / Uruguay selector. The "Lugares encontrados" list (result cards,
+  "Ver más" pagination, counter, and the mobile "Lugares / mapa" sheet) was
+  removed from `index.html`, `js/map.js` and `css/styles.css`. Places are still
+  reachable through markers, search/autocomplete, filters and the chatbot's
+  `celiacmap:open-place` links. The card's tabs and the `#ranking` section's tabs
+  share one state in `js/ranking.js` (`.ranking-tabs, .map-top3-tabs`); a country
+  with no votes keeps the card and its tabs visible (an empty note) so the other
+  country stays one click away, and a failed load still hides it.
+- **Two-column breakpoint back to 1000px** (the redesign had moved it to 980px).
+  It must match the `max-width: 999px` rule that hides `.map-top3` and the
+  `not all and (min-width: 1000px)` attribution shift in the chat block, or the
+  grid reserves an empty 330px column.
+- **The chat widget opens with only its greeting** — the three suggested-question
+  buttons (`renderPrompts` / `.chat-prompts`) were removed as visual overload. The
+  two footer notes (medical-estimate disclaimer, 30-day log notice) stay: the log
+  notice is part of the ADR-006 privacy design.
+- Tests: `tests/frontend_explorer.test.js` (12) now covers the Top 3 card (shared
+  country state, empty country, load error) and the prompt-free chat.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

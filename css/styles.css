@@ -936,7 +936,9 @@ h1, h2, h3 {
   color: var(--color-text-muted);
   margin-bottom: 12px;
 }
+.map-top3-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .map-top3-list { display: flex; flex-direction: column; }
+.map-top3-empty { font-size: 0.8125rem; line-height: 1.5; color: var(--color-text-muted); }
 .map-top3-item {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1666,48 +1668,26 @@ h1, h2, h3 {
 .pp-badge--friendly::before { background: var(--color-friendly); }
 .pp-badge--options::before { background: var(--color-options); }
 
-.explorer-results {
-  min-width: 0; background: var(--surface-raised); border: 1px solid var(--color-border); border-radius: 22px;
-  padding: 18px; box-shadow: var(--shadow-sm);
-}
-.explorer-results-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-.explorer-kicker { margin-bottom: 2px; color: var(--color-primary); font-size: .69rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.explorer-results h3 { font-family: var(--font-serif); font-size: 1.24rem; line-height: 1.2; }
-.explorer-count { display: grid; min-width: 34px; min-height: 34px; place-items: center; border-radius: 50%; background: var(--color-primary-light); color: var(--color-primary); font-size: .82rem; font-weight: 800; }
-.explorer-hint { margin: 8px 0 12px; color: var(--color-text-muted); font-size: .8rem; line-height: 1.45; }
-.place-results { display: grid; gap: 8px; }
-.place-result { width: 100%; min-height: 68px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 9px; padding: 10px; text-align: left; border: 1px solid transparent; border-radius: 13px; background: var(--color-bg); }
-.place-result:hover, .place-result:focus-visible, .place-result.is-selected { border-color: rgba(23,107,77,.35); background: var(--color-primary-light); }
-.place-result-main { min-width: 0; display: grid; gap: 2px; }
-.place-result-name { overflow-wrap: anywhere; color: var(--color-text); font-size: .95rem; font-weight: 750; }
-.place-result-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); font-size: .74rem; }
-.place-result-safety { max-width: 140px; padding: 4px 7px; border-radius: 9px; color: white; font-size: .8rem; font-weight: 650; line-height: 1.4; text-align: left; }
-.place-result-safety.cm-marker--dedicated,
 .pp-badge.pp-badge--dedicated,
 .safety-chip.safety-chip--dedicated {
   background: var(--color-dedicated); color: #fff; border-color: var(--color-dedicated);
 }
-.place-result-safety.cm-marker--friendly,
 .pp-badge.pp-badge--friendly,
 .safety-chip.safety-chip--friendly {
   background: var(--color-friendly-bg); color: var(--color-friendly-text); border-color: var(--color-friendly-bg);
 }
-.place-result-safety.cm-marker--options,
 .pp-badge.pp-badge--options,
 .safety-chip.safety-chip--options {
   background: var(--color-options-bg); color: var(--color-options-text); border-color: var(--color-options-bg);
 }
 .pp-badge--dedicated::before { background: #fff; }
 .safety-chip.is-active { box-shadow: inset 0 0 0 2px currentColor; }
-.place-result-arrow { color: var(--color-primary); font-size: 1.1rem; }
-.place-results-empty { padding: 20px 8px; color: var(--color-text-muted); font-size: .88rem; text-align: center; }
-.results-more { width: 100%; min-height: 44px; margin-top: 10px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-primary); font-size: .84rem; font-weight: 700; }
-.results-more:hover { background: var(--color-primary-light); }
-.explorer-results .map-top3 { position: static; margin-top: 18px; padding: 16px 0 0; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; box-shadow: none; }
 
-@media (min-width: 980px) {
-  .map-layout { grid-template-columns: minmax(0, 1fr) 330px; align-items: stretch; }
-  .explorer-results { max-height: min(690px, 64vh); position: sticky; top: calc(var(--header-h) + 16px); overflow: auto; }
+/* The Top 3 card sits beside the map from the same 1000px breakpoint at which
+   it stops being hidden (see .map-top3 above), so the grid never reserves an
+   empty column. */
+@media (min-width: 1000px) {
+  .map-layout { grid-template-columns: minmax(0, 1fr) 330px; }
 }
 @media (max-width: 767px) {
   #map .container { padding-inline: 0; }
@@ -1718,16 +1698,10 @@ h1, h2, h3 {
   .chip { flex: 0 1 auto; min-height: 44px; }
   .map-toolbar { margin-bottom: 10px; }
   #cm-map { height: 54dvh; min-height: 360px; border-inline: 0; border-radius: 0; }
-  .explorer-results { display: none; position: fixed; bottom: 0; left: 0; right: 0; max-height: 55dvh; overflow-y: auto; overscroll-behavior: contain; z-index: 1200; border-radius: 18px 18px 0 0; padding-bottom: calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -5px 22px rgba(26,58,42,.08); }
-  .explorer-results.is-results-open { display: block; }
-  .place-result { min-height: 72px; }
-  .place-result-safety { max-width: 160px; font-size: .8rem; }
   .chat-panel { padding-bottom: env(safe-area-inset-bottom); }
 }
 
 .chat-place-links { display: grid; gap: 6px; margin-top: 10px; }
-.chat-prompts { display: grid; gap: 8px; }
-.chat-prompts[hidden] { display: none; }
 .chat-place-link {
   width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid rgba(23,107,77,.25); border-radius: 9px;
   color: var(--color-primary); background: var(--color-surface); font-size: .78rem; font-weight: 700; line-height: 1.25; text-align: left;
@@ -1735,32 +1709,25 @@ h1, h2, h3 {
 .chat-place-link:hover, .chat-place-link:focus-visible { background: var(--color-primary-light); border-color: var(--color-primary); }
 
 .explorer-filters { margin: 12px 0; }
-.explorer-filters summary, .filter-actions button, #results-toggle, #results-close, .detail-expand {
+.explorer-filters summary, .filter-actions button, .detail-expand {
   min-height: 44px; padding: 10px 14px; border-radius: 10px; color: var(--color-primary); font-weight: 700; font-size: .9rem; cursor: pointer;
 }
 .explorer-filters summary { border: 1px solid var(--color-border); }
 .explorer-filters[open] summary { margin-bottom: 14px; }
 .filter-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 #apply-filters, .detail-expand { background: var(--color-primary); color: white; }
-#results-toggle, #results-close { display: none; }
 .map-demo > .map-search { width: 100%; }
 .map-search-clear[hidden] { display: none; }
 @media (min-width: 768px) {
   /* Keep the closed detail drawer inside the map instead of widening the page. */
   .map-wrap { overflow: hidden; border-radius: 15px; }
 }
-.place-result { grid-template-columns: minmax(0, 1fr) auto; }
-.place-result-main { grid-column: 1 / -1; }
-.place-result-arrow { grid-column: 2; }
 .detail-expand { display: none; }
 .chip::before { display: none; }
 .chip { min-height: 44px; }
 .chat-input, .map-search-input { font-size: 1rem; }
 @media (max-width: 767px) {
-  #results-toggle, #results-close { display: block; }
   .map-demo > .map-search { width: calc(100% - 32px); }
-  #results-toggle { margin-bottom: 10px; border: 1px solid var(--color-border); }
-  #results-close { margin-left: auto; margin-bottom: 8px; }
   .explorer-filters[open] { max-height: 45dvh; overflow: auto; overscroll-behavior: contain; }
   .place-panel { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 42dvh; border-radius: 22px 22px 0 0; padding-bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateY(105%); z-index: 1200; }
   .place-panel.is-open { transform: translateY(0); }

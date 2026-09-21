@@ -172,7 +172,6 @@
             <button type="button" id="apply-filters" data-explorer-es="Ver resultados" data-explorer-en="View results">Ver resultados</button>
           </div>
           </details>
-          <button type="button" id="results-toggle" aria-expanded="false" aria-controls="explorer-results" data-explorer-es="Lugares / mapa" data-explorer-en="Places / map">Lugares / mapa</button>
           <p class="map-result-count" id="map-result-count" role="status" aria-live="polite" hidden></p>
 
           <div class="map-wrap">
@@ -194,26 +193,18 @@
           </ul>
         </div>
 
-        <aside class="explorer-results" id="explorer-results" aria-labelledby="explorer-results-title">
-          <button type="button" id="results-close" data-explorer-es="Volver al mapa" data-explorer-en="Back to map">Volver al mapa</button>
-          <div class="explorer-results-head">
-            <div>
-              <p class="explorer-kicker">Explorá el mapa</p>
-              <h3 id="explorer-results-title">Lugares encontrados</h3>
-            </div>
-            <span class="explorer-count" id="explorer-count" aria-live="polite">0</span>
-          </div>
-          <p class="explorer-hint" id="explorer-hint">Elegí un lugar para ver su información.</p>
-          <ol class="place-results" id="place-results" aria-live="polite" aria-label="Resultados del mapa"></ol>
-          <button type="button" class="results-more" id="results-more" hidden>Ver más lugares</button>
-
-          <aside class="map-top3" id="map-top3" hidden aria-labelledby="map-top3-title">
+        <aside class="map-top3" id="map-top3" hidden aria-labelledby="map-top3-title">
           <h3 class="map-top3-title" id="map-top3-title"
             data-i18n="ranking.top3.title">Top 3 de la comunidad</h3>
+          <div class="map-top3-tabs" role="group" aria-label="País del ranking">
+            <button type="button" class="chip chip-active" data-country="Argentina"
+              aria-pressed="true">Argentina</button>
+            <button type="button" class="chip" data-country="Uruguay"
+              aria-pressed="false">Uruguay</button>
+          </div>
           <ol class="map-top3-list" id="map-top3-list"></ol>
           <a class="map-top3-link" href="#ranking"
             data-i18n="ranking.top3.link">Ver ranking completo →</a>
-        </aside>
         </aside>
         </div>
       </div>

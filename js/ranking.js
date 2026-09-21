@@ -34,6 +34,8 @@
       one: "voto",
       many: "votos",
       empty: "Todavía no hay votos de la comunidad. Cuando la gente empiece a recomendar sus lugares seguros, el ranking aparece acá.",
+      top3Empty: "Todavía no hay votos en este país.",
+      country: "País del ranking",
       loadError: "No se pudo cargar el ranking.",
       voteError: "No se pudo votar. Probá de nuevo en un momento.",
       cooldown: "Esperá un momento antes de votar de nuevo."
@@ -44,6 +46,8 @@
       one: "vote",
       many: "votes",
       empty: "No community votes yet. Once people start recommending their safe places, the ranking shows up here.",
+      top3Empty: "No votes in this country yet.",
+      country: "Ranking country",
       loadError: "Couldn't load the ranking.",
       voteError: "Couldn't vote. Try again in a moment.",
       cooldown: "Wait a moment before voting again."
@@ -149,13 +153,18 @@
   /* --------------------------- Ranking list --------------------- */
   var listEl = document.getElementById("ranking-list");
   var statusEl = document.getElementById("ranking-status");
-  var tabs = Array.prototype.slice.call(document.querySelectorAll(".ranking-tabs .chip"));
-  // The "Top 3" widget next to the map — same data (rows.slice(0,3)), no
-  // country selector of its own, hidden until data is ready / on error.
+  // Both country selectors (the #ranking section's and the Top 3 card's) share
+  // one state: picking a country in either one reloads both lists.
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".ranking-tabs .chip, .map-top3-tabs .chip"));
+  var tabGroups = Array.prototype.slice.call(document.querySelectorAll(".ranking-tabs, .map-top3-tabs"));
+  // The "Top 3" widget next to the map — same data (rows.slice(0,3)), hidden
+  // until data is ready / on error. A country with no votes keeps the card (and
+  // its selector) visible so the other country stays one click away.
   var top3El = document.getElementById("map-top3");
   var top3ListEl = document.getElementById("map-top3-list");
   var country = lsGet(COUNTRY_KEY) || DEFAULT_COUNTRY;
   var rows = [];
+  var loaded = false;   // true only after a successful fetch (gates the Top 3 card)
   var flashTimer;
 
   function metaText(p) {
@@ -244,15 +253,16 @@
   }
 
   function renderTop3() {
-    if (!top3ListEl) return;
-    if (!rows.length) { if (top3El) top3El.hidden = true; return; }
-    top3ListEl.innerHTML = rows.slice(0, 3)
-      .map(function (p, i) { return top3RowHtml(p, i + 1); }).join("");
+    if (!top3ListEl || !loaded) return;
+    top3ListEl.innerHTML = rows.length
+      ? rows.slice(0, 3).map(function (p, i) { return top3RowHtml(p, i + 1); }).join("")
+      : '<li class="map-top3-empty">' + esc(t("top3Empty")) + "</li>";
     if (top3El) top3El.hidden = false;
   }
 
   function load() {
     if (!listEl) return;
+    loaded = false;
     setStatus("");
     var url = REST + "/places?select=id,name,city,country,category,safety_level,vote_count,rating" +
       "&status=eq.approved&country=eq." + encodeURIComponent(country) +
@@ -260,7 +270,7 @@
       "&order=vote_count.desc,rating.desc.nullslast,name.asc&limit=" + TOP_N;
     fetch(url, { headers: AUTH })
       .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
-      .then(function (data) { rows = Array.isArray(data) ? data : []; render(); })
+      .then(function (data) { rows = Array.isArray(data) ? data : []; loaded = true; render(); })
       .catch(function () {
         rows = [];
         if (listEl) listEl.innerHTML = "";
@@ -284,7 +294,13 @@
     tb.addEventListener("click", function () { selectCountry(tb.getAttribute("data-country")); });
   });
 
-  document.addEventListener("celiacmap:lang", function () { if (listEl) render(); });
+  function labelTabGroups() {
+    tabGroups.forEach(function (g) { g.setAttribute("aria-label", t("country")); });
+  }
+  document.addEventListener("celiacmap:lang", function () {
+    labelTabGroups();
+    if (listEl) render();
+  });
 
   if (listEl) selectCountry(country);
 

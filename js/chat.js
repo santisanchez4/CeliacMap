@@ -129,7 +129,6 @@
     eachNode("[data-chat-aria]", function (n) { n.setAttribute("aria-label", t(n.getAttribute("data-chat-aria"))); });
     eachNode("[data-chat-placeholder]", function (n) { n.setAttribute("placeholder", t(n.getAttribute("data-chat-placeholder"))); });
     if (introEl) introEl.firstChild.textContent = t("intro");
-    renderPrompts();
     syncFab();
   }
 
@@ -360,7 +359,6 @@
     eachNode(".chat-msg--error", removeNode);
 
     turns.push({ role: "user", content: clamp(text) });
-    renderPrompts();
     var userEl = addMessage("user", text);
     input.value = "";
     autosize();
@@ -402,29 +400,7 @@
   });
 
   /* -------------------------------- Init -------------------------- */
-  var promptsEl = document.createElement("div");
-  promptsEl.className = "chat-prompts";
-  function renderPrompts() {
-    if (!promptsEl) return;
-    promptsEl.hidden = turns.length > 0;
-    promptsEl.innerHTML = "";
-    var prompts = lang() === "en" ? ["Gluten-free cafés in Montevideo", "Places in Buenos Aires", "How can I suggest a place?"] : ["Cafés sin TACC en Montevideo", "Lugares en Buenos Aires", "¿Cómo sugiero un lugar?"];
-    prompts.forEach(function (prompt) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "chat-place-link";
-      button.textContent = prompt;
-      button.addEventListener("click", function () {
-        input.value = prompt;
-        autosize();
-        updateSendState();
-        input.focus({ preventScroll: true });
-      });
-      promptsEl.appendChild(button);
-    });
-  }
   introEl = addMessage("intro", t("intro"));
-  log.appendChild(promptsEl);
   document.addEventListener("celiacmap:lang", applyChrome);
   applyChrome();
   updateSendState();

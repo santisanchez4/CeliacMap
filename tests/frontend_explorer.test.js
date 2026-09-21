@@ -64,24 +64,21 @@ async function fixture(mobile = false) {
     loadChat: async () => vm.runInNewContext(await Deno.readTextFile("js/chat.js"), context) };
 }
 
-Deno.test("result click leaves detail open and does not rebuild markers", async () => {
+Deno.test("selecting a place leaves detail open and does not rebuild markers", async () => {
   const f = await fixture();
   const before = f.mutations();
-  const button = f.click(".place-result");
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
   assert.equal(f.document.getElementById("place-panel").getAttribute("aria-hidden"), "false");
-  assert.equal(button.getAttribute("aria-pressed"), "true");
   assert.equal(f.mutations(), before);
-  assert.equal(button.isConnected, true);
 });
 
-Deno.test("pagination and language changes do not rebuild map layers", async () => {
+Deno.test("language changes translate the explorer without rebuilding map layers", async () => {
   const f = await fixture();
   const before = f.mutations();
-  f.click("#results-more");
-  assert.equal(f.document.querySelectorAll(".place-result").length, 12);
   f.document.documentElement.setAttribute("lang", "en");
   f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:lang"));
-  assert.equal(f.document.getElementById("explorer-results-title").textContent, "Places found");
+  assert.equal(f.document.querySelector('[data-safety="all"]').textContent, "All levels");
+  assert.equal(f.document.getElementById("apply-filters").textContent, "View results");
   assert.equal(f.mutations(), before);
 });
 
@@ -95,13 +92,16 @@ Deno.test("chat selection clears conflicting filters and reveals its marker", as
   assert.equal(f.document.getElementById("place-panel").getAttribute("aria-hidden"), "false");
 });
 
-Deno.test("map is first in document order and mobile results can be closed", async () => {
+Deno.test("map is first in document order and its side card is only the community Top 3", async () => {
   const f = await fixture();
   assert.equal(f.document.querySelector("main > section").id, "map");
-  f.click("#results-toggle");
-  assert.ok(f.document.getElementById("explorer-results").classList.contains("is-results-open"));
-  f.click("#results-close");
-  assert.equal(f.document.getElementById("results-toggle").getAttribute("aria-expanded"), "false");
+  const side = f.document.querySelectorAll(".map-layout > aside");
+  assert.equal(side.length, 1);
+  assert.equal(side[0].id, "map-top3");
+  assert.equal(f.document.getElementById("place-results"), null);
+  assert.equal(f.document.getElementById("results-toggle"), null);
+  const countries = Array.from(side[0].querySelectorAll("[data-country]")).map(b => b.getAttribute("data-country"));
+  assert.deepEqual(countries, ["Argentina", "Uruguay"]);
 });
 
 Deno.test("autocomplete respects category filters", async () => {
@@ -123,6 +123,89 @@ Deno.test("real chat recommendation click keeps the map detail open", async () =
   await new Promise(resolve => setTimeout(resolve, 0));
   f.click(".chat-place-links button");
   assert.equal(f.document.getElementById("place-panel").getAttribute("aria-hidden"), "false");
+});
+
+Deno.test("chat opens with only its intro: no suggested prompts", async () => {
+  const f = await fixture();
+  await f.loadChat();
+  f.click("#chat-fab");
+  const log = f.document.getElementById("chat-log");
+  assert.equal(log.children.length, 1);
+  assert.ok(log.children[0].classList.contains("chat-msg--intro"));
+  assert.equal(log.querySelectorAll("button").length, 0);
+});
+
+async function rankingFixture({ votes, fail = false }) {
+  const html = await Deno.readTextFile("index.html");
+  const source = await Deno.readTextFile("js/ranking.js");
+  const { window, document } = parseHTML(html);
+  const store = new Map();
+  const urls = [];
+  const context = {
+    window: { CELIACMAP_CONFIG: { SUPABASE_URL: "https://fixture.invalid", SUPABASE_ANON_KEY: "fixture" } },
+    document, CustomEvent: window.CustomEvent, Date, setTimeout, clearTimeout,
+    localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) },
+    fetch: async url => {
+      urls.push(String(url));
+      if (fail) return { ok: false, status: 500, json: async () => ({}) };
+      const country = decodeURIComponent(String(url).match(/country=eq\.([^&]+)/)[1]);
+      return { ok: true, json: async () => votes[country] || [] };
+    },
+  };
+  vm.runInNewContext(source, context);
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+  await settle();
+  return {
+    document, window, urls,
+    async click(selector) {
+      document.querySelector(selector).dispatchEvent(new window.Event("click", { bubbles: true }));
+      await settle();
+    },
+    topNames: () => Array.from(document.querySelectorAll(".mt3-name")).map(n => n.textContent),
+    cardHidden: () => document.getElementById("map-top3").hasAttribute("hidden"),
+  };
+}
+
+const placesFor = (prefix, n) => Array.from({ length: n }, (_, i) => ({
+  id: prefix + i, name: prefix + " " + i, city: "X", safety_level: "celiac_friendly", vote_count: n - i,
+}));
+
+Deno.test("Top 3 card lists the top three and its country tabs drive the full ranking too", async () => {
+  const f = await rankingFixture({ votes: { Argentina: placesFor("AR", 5), Uruguay: placesFor("UY", 2) } });
+  assert.equal(f.cardHidden(), false);
+  assert.deepEqual(f.topNames(), ["AR 0", "AR 1", "AR 2"]);
+  await f.click('.map-top3-tabs [data-country="Uruguay"]');
+  assert.deepEqual(f.topNames(), ["UY 0", "UY 1"]);
+  assert.equal(f.document.querySelectorAll("#ranking-list .ranking-item").length, 2);
+  for (const sel of [".map-top3-tabs", ".ranking-tabs"]) {
+    assert.ok(f.document.querySelector(sel + ' [data-country="Uruguay"]').classList.contains("chip-active"), sel);
+    assert.equal(f.document.querySelector(sel + ' [data-country="Argentina"]').getAttribute("aria-pressed"), "false", sel);
+  }
+});
+
+Deno.test("the section's country tabs also switch the Top 3 card", async () => {
+  const f = await rankingFixture({ votes: { Argentina: placesFor("AR", 3), Uruguay: placesFor("UY", 3) } });
+  await f.click('.ranking-tabs [data-country="Uruguay"]');
+  assert.deepEqual(f.topNames(), ["UY 0", "UY 1", "UY 2"]);
+  assert.ok(f.document.querySelector('.map-top3-tabs [data-country="Uruguay"]').classList.contains("chip-active"));
+});
+
+Deno.test("a country without votes keeps the Top 3 card and its tabs on screen", async () => {
+  const f = await rankingFixture({ votes: { Argentina: placesFor("AR", 3), Uruguay: [] } });
+  await f.click('.map-top3-tabs [data-country="Uruguay"]');
+  assert.equal(f.cardHidden(), false);
+  assert.equal(f.document.querySelectorAll(".map-top3-item").length, 0);
+  assert.ok(f.document.querySelector(".map-top3-empty"));
+  await f.click('.map-top3-tabs [data-country="Argentina"]');
+  assert.deepEqual(f.topNames(), ["AR 0", "AR 1", "AR 2"]);
+});
+
+Deno.test("Top 3 card stays hidden when the ranking cannot load, even after a language change", async () => {
+  const f = await rankingFixture({ votes: {}, fail: true });
+  assert.equal(f.cardHidden(), true);
+  f.document.documentElement.setAttribute("lang", "en");
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:lang"));
+  assert.equal(f.cardHidden(), true);
 });
 
 Deno.test("mobile chat follows viewport, isolates background and opens without focusing input", async () => {
