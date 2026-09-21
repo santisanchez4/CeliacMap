@@ -72,6 +72,34 @@ Deno.test("selecting a place leaves detail open and does not rebuild markers", a
   assert.equal(f.mutations(), before);
 });
 
+// Selecting a marker swaps its icon (setIcon), which replaces the very node the
+// person clicked. By the time that click bubbles to document its target is
+// detached, and the "click outside closes the panel" handler must not read that
+// as an outside click (it closed the detail the instant it opened).
+Deno.test("a marker click whose icon is replaced while handling it keeps the detail open", async () => {
+  const f = await fixture();
+  const mapEl = f.document.getElementById("cm-map");
+  const icon = f.document.createElement("span");
+  mapEl.appendChild(icon);
+  mapEl.addEventListener("click", () => {
+    f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
+    icon.remove();
+  });
+  icon.dispatchEvent(new f.window.Event("click", { bubbles: true }));
+  const panel = f.document.getElementById("place-panel");
+  assert.equal(panel.getAttribute("aria-hidden"), "false");
+  assert.ok(panel.classList.contains("is-open"));
+});
+
+Deno.test("a click outside the map and the panel still closes the detail", async () => {
+  const f = await fixture();
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
+  const panel = f.document.getElementById("place-panel");
+  assert.ok(panel.classList.contains("is-open"));
+  f.click("#map .section-title");
+  assert.equal(panel.getAttribute("aria-hidden"), "true");
+});
+
 Deno.test("language changes translate the explorer without rebuilding map layers", async () => {
   const f = await fixture();
   const before = f.mutations();

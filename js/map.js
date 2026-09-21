@@ -481,6 +481,9 @@
     // Close on click anywhere outside the panel and outside the map.
     document.addEventListener("click", function (e) {
       if (!panelEl.classList.contains("is-open")) return;
+      // Selecting a marker swaps its icon (setIcon), replacing the node that was
+      // clicked: its target is already detached by the time the click gets here.
+      if (!e.target.isConnected) return;
       if (panelEl.contains(e.target) || mapEl.contains(e.target)) return;
       if (e.target.closest && e.target.closest(".chat-place-link")) return;
       closePanel();

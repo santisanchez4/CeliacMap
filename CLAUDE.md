@@ -2798,8 +2798,21 @@ Function, schema or prompt change):
   buttons (`renderPrompts` / `.chat-prompts`) were removed as visual overload. The
   two footer notes (medical-estimate disclaimer, 30-day log notice) stay: the log
   notice is part of the ADR-006 privacy design.
-- Tests: `tests/frontend_explorer.test.js` (12) now covers the Top 3 card (shared
-  country state, empty country, load error) and the prompt-free chat.
+- **Regression found right after: a real click on a map marker opened the detail
+  and closed it in the same click** (introduced by the explorer redesign, hidden
+  because the results list was the only path that worked). `selectEntry` calls
+  `marker.setIcon(...)`, which replaces the `<span class="cm-marker">` that was
+  clicked, so by the time the click bubbles to `document` its target is
+  detached and `mapEl.contains(e.target)` is false — the "click outside closes
+  the panel" handler in `js/map.js` read it as an outside click. The results
+  list had masked it through a `.place-result` exception in that handler. Fixed
+  with an `if (!e.target.isConnected) return;` guard. **Lesson:** a synthetic
+  `dispatchEvent` on the marker's outer `<div>` does *not* reproduce it (that
+  node stays attached); only a real mouse click on the inner span does, so
+  verify marker clicks with a real click, not a scripted one.
+- Tests: `tests/frontend_explorer.test.js` (14) covers the Top 3 card (shared
+  country state, empty country, load error), the prompt-free chat, and the
+  marker-click regression above.
 
 ### Build status (phases)
 

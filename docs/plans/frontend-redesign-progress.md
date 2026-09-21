@@ -31,7 +31,7 @@ Los tests de frontend ejecutan los módulos reales con un DOM de LinkeDOM y una 
 
 ## Simplificación posterior (2026-09-20)
 
-A pedido del dueño del producto: se quitó la lista «Lugares encontrados» (cards, paginación, contador y el botón móvil «Lugares / mapa») y la card junto al mapa volvió a ser solo el Top 3, ahora con selector Argentina / Uruguay. También se quitaron las preguntas sugeridas del chat, que lo cargaban de información al abrirlo. Solo frontend: sin cambios en la Edge Function, el esquema ni los prompts. El breakpoint de dos columnas vuelve a 1000 px (coincide con el que oculta la card por debajo y con el corrimiento de la atribución del mapa frente al FAB del chat).
+A pedido del dueño del producto: se quitó la lista «Lugares encontrados» (cards, paginación, contador y el botón móvil «Lugares / mapa») y la card junto al mapa volvió a ser solo el Top 3, ahora con selector Argentina / Uruguay. También se quitaron las preguntas sugeridas del chat, que lo cargaban de información al abrirlo. Solo frontend: sin cambios en la Edge Function, el esquema ni los prompts. Al quitar la lista salió a la luz un bug del rediseño: un clic real sobre un marcador abría el detalle y lo cerraba en el mismo clic (el ícono se reemplaza con `setIcon` y el handler de «clic afuera» veía un target ya desconectado); se corrigió con un guard `isConnected` en `js/map.js` y un test de regresión. El breakpoint de dos columnas vuelve a 1000 px (coincide con el que oculta la card por debajo y con el corrimiento de la atribución del mapa frente al FAB del chat).
 
 ## Verificación de publicación y navegador
 
