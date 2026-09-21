@@ -502,9 +502,7 @@
 
   /* --------------------------- Markers ------------------------------ */
   var entries = [];                       // { marker, category, name, city }
-  var visible = typeof L.markerClusterGroup === "function"
-    ? L.markerClusterGroup({ showCoverageOnHover: false, spiderfyOnMaxZoom: true, maxClusterRadius: 46, animate: !reducedMotion.matches })
-    : L.layerGroup();
+  var visible = L.layerGroup();
   visible.addTo(map);
   var currentCategory = "all";
   var currentCity = "all";
@@ -512,8 +510,6 @@
   var currentQuery = "";
   var selectedEntry = null;
   var resultLimit = 8;
-  var userLocation = null;
-  var locationMarker = null;
   function filteredEntries() { return entries.filter(matches); }
 
   var searchInput = document.getElementById("place-search");
@@ -577,7 +573,6 @@
     var texts = [
       ["#explorer-results-title", "Lugares encontrados", "Places found"],
       [".explorer-kicker", "Explorá el mapa", "Explore the map"],
-      ["#locate-me span", "Mi ubicación", "My location"],
       [".map-legend li:first-child span:last-child", "Espacio 100% sin gluten", "100% gluten-free venue"],
       [".map-legend li:nth-child(2) span:last-child", "Atención para celíacos", "Celiac-friendly service"]
     ];
@@ -586,7 +581,6 @@
       var level = button.getAttribute("data-safety");
       button.textContent = level === "all" ? tr("Todos los niveles", "All levels") : safetyText(level);
     });
-    document.getElementById("locate-me").setAttribute("aria-label", tr("Usar mi ubicación", "Use my location"));
     resultsEl.setAttribute("aria-label", tr("Resultados del mapa", "Map results"));
     document.querySelector(".map-safety-chips").setAttribute("aria-label", tr("Información sin TACC", "Gluten-free information"));
     panelClose.setAttribute("aria-label", tr("Volver al mapa", "Back to map"));
@@ -650,7 +644,6 @@
     }
     if (explorerHintEl) explorerHintEl.textContent = tr("Seleccioná un resultado o marcador. Los niveles son orientativos: confirmá con el local.", "Select a result or marker. Levels are indicative: confirm with the venue.");
     var ordered = shown.slice().sort(function (a, b) {
-      if (userLocation) return map.distance(userLocation, a.marker.getLatLng()) - map.distance(userLocation, b.marker.getLatLng());
       return a.place.name.localeCompare(b.place.name);
     });
     resultsEl.innerHTML = ordered.slice(0, resultLimit).map(function (entry) {
@@ -659,7 +652,6 @@
       return '<li><button type="button" class="place-result' + selected + '" data-place-id="' + esc(p.id) + '" aria-pressed="' + (entry === selectedEntry ? "true" : "false") + '">' +
         '<span class="place-result-main"><span class="place-result-name">' + esc(p.name) + '</span>' +
         '<span class="place-result-meta">' + esc([categoryText(p.category), p.city].filter(Boolean).join(" · ")) + '</span></span>' +
-        (userLocation ? '<span class="place-distance">' + (map.distance(userLocation, entry.marker.getLatLng()) / 1000).toFixed(1) + tr(' km en línea recta', ' km straight-line') + '</span>' : '') +
         '<span class="place-result-safety ' + safetyClass(p.safety_level) + '">' + esc(safetyText(p.safety_level)) + '</span>' +
         '<span class="place-result-arrow" aria-hidden="true">→</span></button></li>';
     }).join("");
@@ -968,28 +960,6 @@
     if (e.target === searchInput || suggestEl.contains(e.target)) return;
     closeSuggest();
   });
-
-  var locateBtn = document.getElementById("locate-me");
-  if (locateBtn && navigator.geolocation) {
-    locateBtn.addEventListener("click", function () {
-      locateBtn.disabled = true;
-      navigator.geolocation.getCurrentPosition(function (position) {
-        var latlng = [position.coords.latitude, position.coords.longitude];
-        userLocation = L.latLng(latlng);
-        if (locationMarker) locationMarker.remove();
-        locationMarker = L.circleMarker(latlng, { radius: 8, color: "#fffdf9", weight: 3, fillColor: "#256a50", fillOpacity: 1 })
-          .addTo(map).bindTooltip(tr("Tu ubicación", "Your location"), { direction: "top" }).openTooltip();
-        renderResults(filteredEntries());
-        map.flyTo(latlng, 14, motion(0.7));
-        locateBtn.disabled = false;
-      }, function () {
-        locateBtn.disabled = false;
-        document.getElementById("location-status").textContent = tr("No pudimos obtener tu ubicación. Podés elegir una ciudad.", "Location unavailable. You can choose a city instead.");
-      }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
-    });
-  } else if (locateBtn) {
-    locateBtn.hidden = true;
-  }
 
   /* ----------------------------- Data ------------------------------- */
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {

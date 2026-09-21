@@ -7,7 +7,7 @@
 - En desktop los resultados acompañan al mapa. Hasta 767 px se abren como un panel inferior colapsable; el detalle comienza como resumen y permite expandir la información.
 - Seleccionar una recomendación con filtros incompatibles restablece esos filtros antes de mostrar el lugar. El autocomplete respeta todos los filtros activos.
 - Cambiar selección, paginar cards o traducir no reconstruye la capa de marcadores. Los cambios de filtros agregan o eliminan únicamente los marcadores afectados.
-- Geolocalización solicitada mediante botón, guardada solo en memoria. Las distancias se presentan explícitamente como línea recta, sin inferir tiempos de viaje.
+- A petición del usuario, se retiraron la geolocalización, las distancias y los grupos numerados. Cada lugar se muestra con un marcador individual; la ciudad se selecciona manualmente.
 - El chat móvil ocupa temporalmente la pantalla y adapta su altura a VisualViewport. Conserva la conversación en memoria; abrirlo no activa el teclado. Incluye prompts editables, foco contenido y fondo inerte mientras funciona como diálogo modal.
 - Se conservan el stack estático, Leaflet y las reglas de publicación de lugares aprobados. No hay migraciones ni cambios en prompts del modelo.
 

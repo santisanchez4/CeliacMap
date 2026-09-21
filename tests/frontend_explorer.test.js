@@ -32,7 +32,7 @@ async function fixture(mobile = false) {
   };
   const L = {
     map: () => map, tileLayer: () => ({ addTo() {} }), latLngBounds: () => ({}),
-    divIcon: x => x, markerClusterGroup: () => group,
+    divIcon: x => x, layerGroup: () => group,
     featureGroup: () => ({ getBounds: () => ({ pad() { return {}; } }) }),
     marker(coords, options) {
       const m = { options, on() {}, getLatLng: () => coords, setIcon(icon) { this.options.icon = icon; } };

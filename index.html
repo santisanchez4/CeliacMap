@@ -163,10 +163,6 @@
               </optgroup>
             </select>
 
-            <button type="button" id="locate-me" class="map-locate" aria-label="Usar mi ubicación">
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              <span>Mi ubicación</span>
-            </button>
 
 
           </div>
@@ -176,7 +172,6 @@
             <button type="button" id="apply-filters" data-explorer-es="Ver resultados" data-explorer-en="View results">Ver resultados</button>
           </div>
           </details>
-          <p id="location-status" role="status"></p>
           <button type="button" id="results-toggle" aria-expanded="false" aria-controls="explorer-results" data-explorer-es="Lugares / mapa" data-explorer-en="Places / map">Lugares / mapa</button>
           <p class="map-result-count" id="map-result-count" role="status" aria-live="polite" hidden></p>
 
@@ -935,7 +930,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="js/main.js"></script>
   <script src="js/config.js"></script>
   <script src="js/map.js"></script>
