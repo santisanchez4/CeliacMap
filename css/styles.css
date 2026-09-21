@@ -911,7 +911,6 @@ h1, h2, h3 {
 .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(38, 53, 43, 0.12); }
 .dot-safe { background: var(--color-safe); }
 .dot-options { background: var(--color-options); }
-.dot-mid { background: var(--color-mid); }  /* legacy */
 
 /* --------------------- Map "Top 3" widget (aside) ------------------ */
 /* Populated by js/ranking.js from the same rows it fetches for #ranking
@@ -1625,17 +1624,12 @@ h1, h2, h3 {
 /* ======================== Map explorer redesign ===================== */
 :root {
   --color-dedicated: #176b4d;
-  --color-friendly: #1d5fa7;
-  --color-friendly-bg: #e7f1fc;
-  --color-friendly-text: #174674;
   --color-options: #a4670f;
   --color-options-bg: #fff0ce;
   --color-options-text: #75450b;
   --surface-raised: #fffefa;
 }
 
-/* The map is the first visual destination once the main content is laid out. */
-#map { padding-top: clamp(22px, 4vw, 54px); }
 #map .section-head { max-width: 700px; margin: 0 0 24px; text-align: left; }
 #map .section-head .section-lead { margin-left: 0; }
 .map-layout { max-width: none; grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -1651,30 +1645,24 @@ h1, h2, h3 {
   border-radius: 999px; color: var(--color-text-muted); background: var(--surface-raised); font-size: .76rem; font-weight: 600;
 }
 .safety-chip.is-active { background: var(--color-text); border-color: var(--color-text); color: #fff; }
-.safety-chip--dedicated::before, .safety-chip--friendly::before, .safety-chip--options::before {
+.safety-chip--dedicated::before, .safety-chip--options::before {
   content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor;
 }
 #cm-map { height: min(64vh, 680px); min-height: 440px; border-radius: 15px; }
 .cm-marker { transition: transform .18s ease, box-shadow .18s ease; }
 .cm-marker--dedicated { background: var(--color-dedicated); }
-.cm-marker--friendly { background: var(--color-friendly); }
 .cm-marker--options { background: var(--color-options); }
 .cm-marker.is-selected { width: 28px; height: 28px; border-width: 4px; box-shadow: 0 0 0 5px rgba(23, 107, 77, .22), 0 7px 17px rgba(26,58,42,.35); }
 .map-legend { flex-wrap: wrap; gap: 12px 20px; margin-top: 14px; }
+.map-disclaimer { margin-top: 10px; font-size: .78rem; line-height: 1.5; color: var(--color-text-muted); }
 .dot-safe { background: var(--color-dedicated); }
-.dot-mid { background: var(--color-friendly); }
 .dot-options { background: var(--color-options); }
 .pp-badge--dedicated::before { background: var(--color-dedicated); }
-.pp-badge--friendly::before { background: var(--color-friendly); }
 .pp-badge--options::before { background: var(--color-options); }
 
 .pp-badge.pp-badge--dedicated,
 .safety-chip.safety-chip--dedicated {
   background: var(--color-dedicated); color: #fff; border-color: var(--color-dedicated);
-}
-.pp-badge.pp-badge--friendly,
-.safety-chip.safety-chip--friendly {
-  background: var(--color-friendly-bg); color: var(--color-friendly-text); border-color: var(--color-friendly-bg);
 }
 .pp-badge.pp-badge--options,
 .safety-chip.safety-chip--options {

@@ -54,8 +54,9 @@
     }
   };
   var SAFE = {
-    es: { gluten_free_100: "Espacio 100% sin gluten", celiac_friendly: "Atención para celíacos", options_available: "Tiene opciones sin TACC", dflt: "Información sin TACC" },
-    en: { gluten_free_100: "100% gluten-free venue", celiac_friendly: "Celiac-friendly service", options_available: "Has gluten-free options", dflt: "Gluten-free information" }
+    // 2 public levels, same as js/map.js: celiac_friendly reads as "options".
+    es: { gluten_free_100: "Espacio 100% sin gluten", celiac_friendly: "Tiene opciones sin TACC", options_available: "Tiene opciones sin TACC", dflt: "Información sin TACC" },
+    en: { gluten_free_100: "100% gluten-free venue", celiac_friendly: "Has gluten-free options", options_available: "Has gluten-free options", dflt: "Gluten-free information" }
   };
 
   function lang() {
@@ -68,8 +69,7 @@
   }
   function badgeClass(level) {
     if (level === "gluten_free_100") return "pp-badge--dedicated";
-    if (level === "celiac_friendly") return "pp-badge--friendly";
-    return level === "options_available" ? "pp-badge--options" : "pp-badge--source";
+    return level === "celiac_friendly" || level === "options_available" ? "pp-badge--options" : "pp-badge--source";
   }
   function votesLabel(n) { return n + " " + (n === 1 ? t("one") : t("many")); }
 

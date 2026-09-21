@@ -31,8 +31,11 @@
       shop: { es: "Comercio", en: "Shop" }
     },
     safety: {
+      // 2 public levels. Only a dedicated venue (exclusive gluten-free
+      // products/sales) is "100% gluten-free"; celiac_friendly and
+      // options_available both read "Has gluten-free options". The DB keeps 3.
       gluten_free_100: { es: "Espacio 100% sin gluten", en: "100% gluten-free venue" },
-      celiac_friendly: { es: "Atención para celíacos", en: "Celiac-friendly service" },
+      celiac_friendly: { es: "Tiene opciones sin TACC", en: "Has gluten-free options" },
       options_available: { es: "Tiene opciones sin TACC", en: "Has gluten-free options" }
     },
     status: {
@@ -251,16 +254,18 @@
   map.on("focus", function () { map.scrollWheelZoom.enable(); });
   map.on("blur", function () { map.scrollWheelZoom.disable(); });
 
+  // Only an explicit gluten_free_100 is "100% gluten-free"; anything else —
+  // celiac_friendly, options_available, or an unknown value — is "options".
+  function safetyGroup(level) {
+    return level === "gluten_free_100" ? "gluten_free_100" : "options_available";
+  }
+
   function safetyClass(level) {
-    if (level === "options_available") return "cm-marker--options";
-    if (level === "celiac_friendly") return "cm-marker--friendly";
-    return "cm-marker--dedicated";
+    return safetyGroup(level) === "gluten_free_100" ? "cm-marker--dedicated" : "cm-marker--options";
   }
 
   function safetyBadgeClass(level) {
-    if (level === "options_available") return "pp-badge--options";
-    if (level === "celiac_friendly") return "pp-badge--friendly";
-    return "pp-badge--dedicated";
+    return safetyGroup(level) === "gluten_free_100" ? "pp-badge--dedicated" : "pp-badge--options";
   }
 
   function icon(level, selected) {
@@ -547,7 +552,7 @@
     });
     var texts = [
       [".map-legend li:first-child span:last-child", "Espacio 100% sin gluten", "100% gluten-free venue"],
-      [".map-legend li:nth-child(2) span:last-child", "Atención para celíacos", "Celiac-friendly service"]
+      [".map-legend li:nth-child(2) span:last-child", "Tiene opciones sin TACC", "Has gluten-free options"]
     ];
     texts.forEach(function (item) { var node = document.querySelector(item[0]); if (node) node.textContent = tr(item[1], item[2]); });
     Array.prototype.forEach.call(document.querySelectorAll("[data-safety]"), function (button) {
@@ -564,7 +569,7 @@
   function matches(e) {
     if (currentCategory !== "all" && e.category !== currentCategory) return false;
     if (currentCity !== "all" && e.city !== currentCity) return false;
-    if (currentSafety !== "all" && e.place.safety_level !== currentSafety) return false;
+    if (currentSafety !== "all" && safetyGroup(e.place.safety_level) !== currentSafety) return false;
     if (currentQuery.length >= 2 && nameScore(currentQuery, e.name) === null) return false;
     return true;
   }

@@ -14,9 +14,10 @@ async function fixture(mobile = false) {
   window.HTMLElement.prototype.scrollIntoView = function () {};
   const cities = document.getElementById("city-select");
   Object.defineProperty(cities, "value", { writable: true, value: "all" });
+  const levels = ["gluten_free_100", "celiac_friendly", "options_available"];
   const rows = Array.from({ length: 12 }, (_, i) => ({
     id: "place-" + i, name: "Place " + String(i).padStart(2, "0"), city: "Montevideo",
-    category: i === 0 ? "cafe" : "restaurant", safety_level: "gluten_free_100", lat: -34.9, lng: -56.1,
+    category: i === 0 ? "cafe" : "restaurant", safety_level: levels[i % 3], lat: -34.9, lng: -56.1,
   }));
   const markers = [];
   let mutations = 0;
@@ -100,6 +101,47 @@ Deno.test("a click outside the map and the panel still closes the detail", async
   assert.equal(panel.getAttribute("aria-hidden"), "true");
 });
 
+// Two public levels: only a dedicated venue is "100% gluten-free"; celiac_friendly
+// and options_available are both "has options" (the DB still stores three).
+Deno.test("safety filters and legend expose two levels", async () => {
+  const f = await fixture();
+  const chips = Array.from(f.document.querySelectorAll(".safety-chip")).map(c => c.getAttribute("data-safety"));
+  assert.deepEqual(chips, ["all", "gluten_free_100", "options_available"]);
+  const legend = Array.from(f.document.querySelectorAll(".map-legend li span:last-child")).map(s => s.textContent);
+  assert.deepEqual(legend, ["Espacio 100% sin gluten", "Tiene opciones sin TACC"]);
+  assert.equal(f.document.querySelector('[data-safety="options_available"]').textContent, "Tiene opciones sin TACC");
+});
+
+Deno.test("the map legend is followed by the 'levels are an estimate' note, in both languages", async () => {
+  const f = await fixture();
+  const legend = f.document.querySelector(".map-legend");
+  const note = legend.nextElementSibling;
+  assert.ok(note && note.classList.contains("map-disclaimer"));
+  assert.match(note.textContent, /estimación .* no una garantía médica/);
+  assert.equal(note.getAttribute("data-i18n"), "map.disclaimer");
+  assert.match(await Deno.readTextFile("js/main.js"), /"map\.disclaimer": "Levels are an estimate .* not a medical guarantee/);
+});
+
+Deno.test("the options filter also shows celiac_friendly places; the 100% filter shows only dedicated ones", async () => {
+  const f = await fixture();
+  const shown = () => f.markers.map((m, i) => f.layers.has(m) ? i : -1).filter(i => i >= 0);
+  f.click('[data-safety="options_available"]');
+  assert.deepEqual(shown(), [1, 2, 4, 5, 7, 8, 10, 11]);     // celiac_friendly + options_available
+  f.click('[data-safety="gluten_free_100"]');
+  assert.deepEqual(shown(), [0, 3, 6, 9]);                    // dedicated only
+  f.click('[data-safety="all"]');
+  assert.equal(shown().length, 12);
+});
+
+Deno.test("markers of celiac_friendly and unknown levels are never drawn as 100% gluten-free", async () => {
+  const f = await fixture();
+  const cls = m => m.options.icon.html;
+  assert.ok(cls(f.markers[0]).includes("cm-marker--dedicated"));
+  assert.ok(cls(f.markers[1]).includes("cm-marker--options"));   // celiac_friendly
+  assert.ok(cls(f.markers[2]).includes("cm-marker--options"));   // options_available
+  assert.equal(cls(f.markers[1]).includes("friendly"), false);
+});
+
 Deno.test("language changes translate the explorer without rebuilding map layers", async () => {
   const f = await fixture();
   const before = f.mutations();
@@ -120,9 +162,10 @@ Deno.test("chat selection clears conflicting filters and reveals its marker", as
   assert.equal(f.document.getElementById("place-panel").getAttribute("aria-hidden"), "false");
 });
 
-Deno.test("map is first in document order and its side card is only the community Top 3", async () => {
+Deno.test("hero opens the page, the map follows it, and the map's side card is only the community Top 3", async () => {
   const f = await fixture();
-  assert.equal(f.document.querySelector("main > section").id, "map");
+  const sections = Array.from(f.document.querySelectorAll("main > section")).map(s => s.id);
+  assert.deepEqual(sections.slice(0, 2), ["hero", "map"]);
   const side = f.document.querySelectorAll(".map-layout > aside");
   assert.equal(side.length, 1);
   assert.equal(side[0].id, "map-top3");
@@ -209,6 +252,16 @@ Deno.test("Top 3 card lists the top three and its country tabs drive the full ra
     assert.ok(f.document.querySelector(sel + ' [data-country="Uruguay"]').classList.contains("chip-active"), sel);
     assert.equal(f.document.querySelector(sel + ' [data-country="Argentina"]').getAttribute("aria-pressed"), "false", sel);
   }
+});
+
+Deno.test("ranking rows label celiac_friendly as options, in both languages", async () => {
+  const f = await rankingFixture({ votes: { Argentina: placesFor("AR", 1) } });
+  const badge = () => f.document.querySelector("#ranking-list .pp-badge");
+  assert.equal(badge().textContent, "Tiene opciones sin TACC");
+  assert.ok(badge().classList.contains("pp-badge--options"));
+  f.document.documentElement.setAttribute("lang", "en");
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:lang"));
+  assert.equal(badge().textContent, "Has gluten-free options");
 });
 
 Deno.test("the section's country tabs also switch the Top 3 card", async () => {

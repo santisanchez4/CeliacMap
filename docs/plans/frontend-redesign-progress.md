@@ -2,7 +2,7 @@
 
 ## Comportamiento implementado
 
-- El mapa precede al contenido informativo en el DOM y en pantalla.
+- La página abre con el hero («Comer afuera, sin miedo.») y el mapa va inmediatamente después, antes del contenido informativo (el rediseño lo había puesto primero; se revirtió a pedido del dueño del producto el 2026-09-20).
 - Búsqueda permanente; filtros de categoría, ciudad y nivel en un panel desplegable. Se actualizan inmediatamente; «Ver resultados» cierra el panel y encuadra los lugares. «Restablecer» limpia los filtros.
 - La card junto al mapa (desde 1000 px) es solo el Top 3 de la comunidad, con selector Argentina / Uruguay compartido con el ranking completo. No hay lista de «lugares encontrados»: los lugares se exploran con los marcadores, la búsqueda, los filtros y las recomendaciones del chat. En pantallas angostas el detalle comienza como resumen y permite expandir la información.
 - Seleccionar una recomendación con filtros incompatibles restablece esos filtros antes de mostrar el lugar. El autocomplete respeta todos los filtros activos.
@@ -31,7 +31,7 @@ Los tests de frontend ejecutan los módulos reales con un DOM de LinkeDOM y una 
 
 ## Simplificación posterior (2026-09-20)
 
-A pedido del dueño del producto: se quitó la lista «Lugares encontrados» (cards, paginación, contador y el botón móvil «Lugares / mapa») y la card junto al mapa volvió a ser solo el Top 3, ahora con selector Argentina / Uruguay. También se quitaron las preguntas sugeridas del chat, que lo cargaban de información al abrirlo. Solo frontend: sin cambios en la Edge Function, el esquema ni los prompts. Al quitar la lista salió a la luz un bug del rediseño: un clic real sobre un marcador abría el detalle y lo cerraba en el mismo clic (el ícono se reemplaza con `setIcon` y el handler de «clic afuera» veía un target ya desconectado); se corrigió con un guard `isConnected` en `js/map.js` y un test de regresión. El breakpoint de dos columnas vuelve a 1000 px (coincide con el que oculta la card por debajo y con el corrimiento de la atribución del mapa frente al FAB del chat).
+A pedido del dueño del producto: se quitó la lista «Lugares encontrados» (cards, paginación, contador y el botón móvil «Lugares / mapa») y la card junto al mapa volvió a ser solo el Top 3, ahora con selector Argentina / Uruguay. También se quitaron las preguntas sugeridas del chat, que lo cargaban de información al abrirlo. Solo frontend: sin cambios en la Edge Function, el esquema ni los prompts. Al quitar la lista salió a la luz un bug del rediseño: un clic real sobre un marcador abría el detalle y lo cerraba en el mismo clic (el ícono se reemplaza con `setIcon` y el handler de «clic afuera» veía un target ya desconectado); se corrigió con un guard `isConnected` en `js/map.js` y un test de regresión. Las etiquetas públicas pasan de tres a dos: «Espacio 100% sin gluten» (`gluten_free_100`: local dedicado, venta exclusiva) y «Tiene opciones sin TACC» (todo lo demás, incluido `celiac_friendly`); la base y el Validator siguen con tres niveles. El chat todavía nombra `celiac_friendly` como «Sin TACC» (pendiente de decidir si se ajusta su prompt). El breakpoint de dos columnas vuelve a 1000 px (coincide con el que oculta la card por debajo y con el corrimiento de la atribución del mapa frente al FAB del chat).
 
 ## Verificación de publicación y navegador
 

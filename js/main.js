@@ -152,8 +152,9 @@
     "map.chip3": "Cafés",
     "map.chip4": "Shops",
     "map.popupBadge": "100% gluten-free",
-    "map.legend1": "Gluten-free",
+    "map.legend1": "100% gluten-free venue",
     "map.legend2": "Has gluten-free options",
+    "map.disclaimer": "Levels are an estimate from the community and the system, not a medical guarantee. Confirm with the venue.",
     "map.allCities": "All cities",
     "map.searchPlaceholder": "Search a gluten-free place…",
 
