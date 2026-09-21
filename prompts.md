@@ -2019,6 +2019,8 @@ matched the numbers already recorded for v10/v11 (0/20 false positives in `legit
 only the NEW arm was run). Full write-up and limits:
 `db/checks/2026-09-20-chat-level-labels-run.md`.
 
-**Status:** in the repository only. The deployed `chat` (v11) keeps the old wording
-until it is redeployed, and the live jailbreak battery has not been re-run against the
-new prompt. Changing a prompt restarts the soft-launch count (CLAUDE.md).
+**Status:** deployed 2026-09-20 (`chat` v12 -> v13; source byte-identical to HEAD,
+`verify_jwt` still `false`). Two real turns on Paysandú (2 dedicated + 4
+`celiac_friendly` places) labelled all 12 lines exactly as the map does, in Spanish and
+in English. The live jailbreak battery has not been re-run against the new prompt.
+Changing a prompt restarts the soft-launch count (CLAUDE.md).

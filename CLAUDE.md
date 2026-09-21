@@ -2822,9 +2822,11 @@ Function, schema or prompt change):
   worded a `celiac_friendly` place as a bare "Sin TACC" 8/8; the new one labelled
   48/48 place lines correctly (prompts.md §30, ADR-006 decision 15,
   `db/checks/2026-09-20-chat-level-labels-run.md`). The bias lived only in the
-  prompt: the place search neither filters nor orders by level. **Repository only
-  until `chat` is redeployed** (v11 still runs the old wording); the live jailbreak
-  battery has not been re-run on the new prompt; and the change restarts the
+  prompt: the place search neither filters nor orders by level. **Deployed
+  2026-09-20 (`chat` v12 -> v13)**, source byte-identical to HEAD, `verify_jwt`
+  still `false`; two real turns on Paysandú (2 dedicated + 4 `celiac_friendly`
+  places) labelled 12/12 lines as the map does, in ES and EN. The live jailbreak
+  battery has **not** been re-run on the new prompt, and the change restarts the
   soft-launch count. The "levels are an estimate — confirm with the venue" note is
   back under the map legend (`.map-disclaimer`, key `map.disclaimer`), ES + EN.
 - **Page order: the hero opens the page and the map comes right after it** (the

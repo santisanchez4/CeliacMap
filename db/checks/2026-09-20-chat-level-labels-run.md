@@ -8,7 +8,8 @@ deployed.** Cost: roughly US$0.4 in total (about 80 model calls).
 
 The map, filters and ranking now show two public levels — "Espacio 100% sin gluten"
 (`gluten_free_100`, a dedicated venue) and "Tiene opciones sin TACC" (everything else,
-including `celiac_friendly`). The deployed chat prompt (v11) still told the model to say
+including `celiac_friendly`). The chat prompt that was deployed until now (unchanged since
+v11; v12 only added `places` to the response) still told the model to say
 "Sin TACC" for `gluten_free_100` **and** `celiac_friendly`, so the chat could describe a
 place more permissively than the map did. The chat receives the raw `safety_level` in
 `<datos>` and the prompt alone decides the wording (nothing in `index.ts` maps it), and
@@ -68,7 +69,32 @@ correctly (24 ES + 24 EN).
 - Untested: replies listing eight places, a result set holding a single level, other languages.
 - The ROUTER prompt is unchanged, so its suites were not re-run.
 
+## Deploy and live check (2026-09-20, after the offline run)
+
+- Deployed with `node_modules/.bin/supabase functions deploy chat`: `chat` **v12 -> v13**,
+  `ACTIVE`, `verify_jwt=false` before and after (`supabase functions list`). The other two
+  functions were untouched (`outreach-reply` v11, `place-report-created` v7).
+- The deployed source was downloaded (`functions download chat --use-api`) and `index.ts` /
+  `prompts.ts` are byte-identical to HEAD (CRLF-normalised md5); the working tree stayed clean.
+- Two real turns to the deployed endpoint, fixed session token `celiac-test-labels-20260920`,
+  city Paysandú (approved: 2 `gluten_free_100` + 4 `celiac_friendly`, all returned):
+  - ES "lugares sin tacc en Paysandú": both dedicated places "Espacio 100% sin gluten", the
+    four `celiac_friendly` ones "Tiene opciones sin TACC".
+  - EN "gluten free places in Paysandú?": "100% gluten-free venue" / "Has gluten-free options",
+    no Spanish label pasted into the English reply.
+  - 12/12 place lines correct. Same wording as the map.
+- Side effects of those two turns (ordinary usage, metadata only, `marked:false`): 2
+  `agent_log` rows (`agent='chatbot'`, `modulo='buscar'`, `result_count=6`) and 3 `chat_usage`
+  counters for 2026-09-21 (`session:…`, `ip:…`, `global`, count 2 each). These are the only
+  rows of that day, so they are attributable to this check.
+- **Reverted** the same day, after re-reading the state and with the exact SQL approved first:
+  the 2 `agent_log` rows deleted by id (`c41f98ac-…`, `c9ed22b7-…`, `agent='chatbot'`) and the
+  3 `chat_usage` rows of 2026-09-21 deleted (`day = '2026-09-21' and updated_at < '…02:10'`).
+  A read-only check afterwards found 0 `agent_log` rows since the test and 0 `chat_usage` rows
+  for that day.
+
 ## Status
 
-Repository only. The deployed function (`chat` v11) still runs the old prompt until it is
-redeployed. Per CLAUDE.md, changing a prompt **restarts the soft-launch count**.
+Deployed (`chat` v13). Not done: the live jailbreak battery
+(`2026-09-20-chat-jailbreak.md`) has not been re-run against the new prompt. Per CLAUDE.md,
+changing a prompt **restarts the soft-launch count**.

@@ -658,9 +658,11 @@ más permisiva en el chat que en el mapa.
   nuevo etiquetó bien las 48 líneas (24 ES + 24 EN). Un humo de regresión de `f4` +
   `legit` dio lo ya registrado para v10/v11, sin falsos positivos en `legit` (solo se
   corrió el brazo NEW). Detalle y límites: `db/checks/2026-09-20-chat-level-labels-run.md`.
-- **Estado.** Solo en el repositorio: `chat` v11 sigue con el texto anterior hasta
-  redesplegar, y la batería de jailbreak en vivo no se repitió con este prompt. Cambiar el
-  prompt reinicia el conteo del soft-launch.
+- **Estado.** Desplegado el 2026-09-20 (`chat` v12 -> v13, código idéntico byte a byte
+  a HEAD, `verify_jwt` sigue en `false`). Dos turnos reales sobre Paysandú (2 lugares
+  dedicados + 4 `celiac_friendly`) etiquetaron las 12 líneas como lo hace el mapa, en ES y
+  EN. La batería de jailbreak en vivo no se repitió con este prompt. Cambiar el prompt
+  reinicia el conteo del soft-launch.
 
 
 ## Los prompts del chatbot
