@@ -28,8 +28,7 @@
 
   --color-gold: #bfa06a;           /* muted accent, decorative only */
 
-  /* Safety-level scale (2 levels): dark = sin TACC (gluten_free_100 +
-     celiac_friendly), light = tiene opciones sin TACC (options_available). */
+  /* Legacy aliases; the explorer defines three distinct safety palettes below. */
   --color-safe: var(--green-deep);
   --color-options: #95d5b2;
   --color-mid: var(--green-soft);  /* legacy alias */
@@ -1624,8 +1623,12 @@ h1, h2, h3 {
 /* ======================== Map explorer redesign ===================== */
 :root {
   --color-dedicated: #176b4d;
-  --color-friendly: #386a50;
-  --color-options: #87521e;
+  --color-friendly: #1d5fa7;
+  --color-friendly-bg: #e7f1fc;
+  --color-friendly-text: #174674;
+  --color-options: #a4670f;
+  --color-options-bg: #fff0ce;
+  --color-options-text: #75450b;
   --surface-raised: #fffefa;
 }
 
@@ -1679,6 +1682,23 @@ h1, h2, h3 {
 .place-result-name { overflow-wrap: anywhere; color: var(--color-text); font-size: .95rem; font-weight: 750; }
 .place-result-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); font-size: .74rem; }
 .place-result-safety { max-width: 140px; padding: 4px 7px; border-radius: 9px; color: white; font-size: .8rem; font-weight: 650; line-height: 1.4; text-align: left; }
+.place-result-safety.cm-marker--dedicated,
+.pp-badge.pp-badge--dedicated,
+.safety-chip.safety-chip--dedicated {
+  background: var(--color-dedicated); color: #fff; border-color: var(--color-dedicated);
+}
+.place-result-safety.cm-marker--friendly,
+.pp-badge.pp-badge--friendly,
+.safety-chip.safety-chip--friendly {
+  background: var(--color-friendly-bg); color: var(--color-friendly-text); border-color: var(--color-friendly-bg);
+}
+.place-result-safety.cm-marker--options,
+.pp-badge.pp-badge--options,
+.safety-chip.safety-chip--options {
+  background: var(--color-options-bg); color: var(--color-options-text); border-color: var(--color-options-bg);
+}
+.pp-badge--dedicated::before { background: #fff; }
+.safety-chip.is-active { box-shadow: inset 0 0 0 2px currentColor; }
 .place-result-arrow { color: var(--color-primary); font-size: 1.1rem; }
 .place-results-empty { padding: 20px 8px; color: var(--color-text-muted); font-size: .88rem; text-align: center; }
 .results-more { width: 100%; min-height: 44px; margin-top: 10px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-primary); font-size: .84rem; font-weight: 700; }

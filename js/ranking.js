@@ -50,8 +50,8 @@
     }
   };
   var SAFE = {
-    es: { options_available: "Tiene opciones sin TACC", dflt: "Sin TACC" },
-    en: { options_available: "Has gluten-free options", dflt: "Gluten-free" }
+    es: { gluten_free_100: "Espacio 100% sin gluten", celiac_friendly: "Atención para celíacos", options_available: "Tiene opciones sin TACC", dflt: "Información sin TACC" },
+    en: { gluten_free_100: "100% gluten-free venue", celiac_friendly: "Celiac-friendly service", options_available: "Has gluten-free options", dflt: "Gluten-free information" }
   };
 
   function lang() {
@@ -60,10 +60,12 @@
   function t(k) { return MSG[lang()][k]; }
   function safeLabel(level) {
     var d = SAFE[lang()];
-    return level === "options_available" ? d.options_available : d.dflt;
+    return d[level] || d.dflt;
   }
   function badgeClass(level) {
-    return level === "options_available" ? "pp-badge--options" : "pp-badge--safe";
+    if (level === "gluten_free_100") return "pp-badge--dedicated";
+    if (level === "celiac_friendly") return "pp-badge--friendly";
+    return level === "options_available" ? "pp-badge--options" : "pp-badge--source";
   }
   function votesLabel(n) { return n + " " + (n === 1 ? t("one") : t("many")); }
 

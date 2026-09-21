@@ -283,7 +283,7 @@
       '<div class="cm-popup">' +
       '<div class="cm-popup-title">' + esc(p.name) + "</div>" +
       '<div class="cm-popup-meta">' + meta + "</div>" +
-      '<span class="badge badge-safe">' + esc(saf) + "</span>" +
+      '<span class="pp-badge ' + safetyBadgeClass(p.safety_level) + '">' + esc(saf) + "</span>" +
       addr +
       "</div>"
     );
