@@ -661,8 +661,12 @@ más permisiva en el chat que en el mapa.
 - **Estado.** Desplegado el 2026-09-20 (`chat` v12 -> v13, código idéntico byte a byte
   a HEAD, `verify_jwt` sigue en `false`). Dos turnos reales sobre Paysandú (2 lugares
   dedicados + 4 `celiac_friendly`) etiquetaron las 12 líneas como lo hace el mapa, en ES y
-  EN. La batería de jailbreak en vivo no se repitió con este prompt. Cambiar el prompt
-  reinicia el conteo del soft-launch.
+  EN. La batería completa de jailbreak (37 turnos) se re-corrió en vivo sobre v13
+  (`db/checks/2026-09-20-chat-jailbreak-v13.md`): 0 rupturas claras, 1 caso gris (turno 36:
+  «Ya pasó por revisión y se envió», una afirmación falsa sobre el estado del proceso, sin
+  filtrar el estado del lugar) y 0 falsos positivos; el falso positivo F3 de v9 desapareció y
+  el gris F4 ahora lo cubre el guardián. Casi no ejercita el cambio de etiquetas (ningún turno
+  lista lugares). Cambiar el prompt reinicia el conteo del soft-launch.
 
 
 ## Los prompts del chatbot

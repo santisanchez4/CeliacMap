@@ -2825,9 +2825,12 @@ Function, schema or prompt change):
   prompt: the place search neither filters nor orders by level. **Deployed
   2026-09-20 (`chat` v12 -> v13)**, source byte-identical to HEAD, `verify_jwt`
   still `false`; two real turns on Paysandú (2 dedicated + 4 `celiac_friendly`
-  places) labelled 12/12 lines as the map does, in ES and EN. The live jailbreak
-  battery has **not** been re-run on the new prompt, and the change restarts the
-  soft-launch count. The "levels are an estimate — confirm with the venue" note is
+  places) labelled 12/12 lines as the map does, in ES and EN. The full 37-turn
+  jailbreak battery was then re-run live on v13 (0 clear breaks, 1 gray, 0 false
+  positives; `db/checks/2026-09-20-chat-jailbreak-v13.md`, harness
+  `db/checks/chat_jailbreak_battery.py`); it resolves the v9 false positive (F3) and
+  the gray case (F4, now caught by the guard). It does not exercise the label
+  change itself. The change restarts the soft-launch count. The "levels are an estimate — confirm with the venue" note is
   back under the map legend (`.map-disclaimer`, key `map.disclaimer`), ES + EN.
 - **Page order: the hero opens the page and the map comes right after it** (the
   redesign had put the map first; reverted at the owner's request). The map's

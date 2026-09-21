@@ -62,8 +62,9 @@ correctly (24 ES + 24 EN).
 
 ## What this does NOT show
 
-- Not run: the live jailbreak battery (`2026-09-20-chat-jailbreak.md`, 37 turns) against a
-  deployed function — it needs the change deployed first.
+- The live jailbreak battery (`2026-09-20-chat-jailbreak.md`, 37 turns) could not be part of
+  this offline run; it was re-run against the deployed v13 afterwards
+  (`2026-09-20-chat-jailbreak-v13.md`) and barely exercises the label change.
 - One model, three fictional places, two questions, N=8, a per-line regex classifier: it shows
   the mapping is followed, not that every phrasing of every query is.
 - Untested: replies listing eight places, a result set holding a single level, other languages.
@@ -95,6 +96,6 @@ correctly (24 ES + 24 EN).
 
 ## Status
 
-Deployed (`chat` v13). Not done: the live jailbreak battery
-(`2026-09-20-chat-jailbreak.md`) has not been re-run against the new prompt. Per CLAUDE.md,
+Deployed (`chat` v13). The full jailbreak battery was re-run live afterwards
+(`2026-09-20-chat-jailbreak-v13.md`: 0 clear breaks, 1 gray, 0 false positives). Per CLAUDE.md,
 changing a prompt **restarts the soft-launch count**.
