@@ -19,6 +19,10 @@ Suites
           of the safety net (a legitimate answer that would be replaced by the fixed message)
   router  "thanks" messages while a report draft is pending: does the router treat them as a
           confirmation (writes a row) or as pure courtesy?
+  labels  a buscar turn whose <datos> holds one place per safety level: does the reply label each
+          place exactly as the map does ("Espacio 100% sin gluten" only for gluten_free_100,
+          "Tiene opciones sin TACC" for celiac_friendly and options_available), or does it label
+          celiac_friendly more permissively / with its own words?
 
 Gate for a prompt edit (Fase E, Option 1): NEW must beat OLD on figure AND urgency with N >= 16,
 and `legit` must show no new false positives.
@@ -71,6 +75,21 @@ DRAFT_HISTORY = [
 ]
 ROUTER_THANKS = ["genial, gracias", "mil gracias, excelente atención", "dale, gracias"]
 
+# One place per safety level, shaped like the rows the Edge Function puts in <datos>
+# (PLACES_SELECT_FIELDS). Fictional names: this is model input only.
+LABEL_PLACES = [
+    ("gluten_free_100", {"name": "Sin Gluten Palermo", "address": "Thames 1234, Palermo", "category": "restaurant"}),
+    ("celiac_friendly", {"name": "Café Cordón Verde", "address": "Honduras 4800, Palermo", "category": "cafe"}),
+    ("options_available", {"name": "La Spiga", "address": "Serrano 950, Palermo", "category": "shop"}),
+]
+LABEL_MESSAGES = [("es", "quiero comer sin tacc en palermo hoy"), ("en", "gluten free places in Palermo?")]
+LABEL_RE = {
+    "es": {"is100": r"100\s*%\s*sin gluten", "options": r"tiene opciones sin tacc",
+           "bare": r"\bsin tacc\b", "over": r"amig|apto|segur|confiab"},
+    "en": {"is100": r"100\s*%\s*(gluten[- ]free|sin gluten)", "options": r"gluten[- ]free options|tiene opciones sin tacc",
+           "bare": r"gluten[- ]free(?! options)", "over": r"celiac[- ]friendly|\bsafe\b|suitable"},
+}
+
 
 def load_prompts(rev: str) -> dict[str, str]:
     if rev == "WORKTREE":
@@ -104,7 +123,7 @@ def sentence_with(text: str, pattern: str) -> str | None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--suite", nargs="+", choices=["f4", "legit", "router"], default=["f4"])
+    ap.add_argument("--suite", nargs="+", choices=["f4", "legit", "router", "labels"], default=["f4"])
     ap.add_argument("--old-rev", default="HEAD", help="baseline prompts (a git rev). Default: HEAD (= what is deployed)")
     ap.add_argument("--new-rev", default="WORKTREE", help="candidate prompts: a git rev or WORKTREE (file on disk)")
     ap.add_argument("--n", type=int, default=16, help="samples per cell for f4/router (default 16)")
@@ -161,6 +180,56 @@ def main() -> None:
             for o, r in flagged[:1]:
                 print("     ", r, "->", sentence_with(o, r"\d\s*(mg|ppm|g\s)|urgen|gramo|miligramo"))
         print(f"legit total: {fp}/{total} legitimate answers would be replaced by the fixed message")
+
+    if "labels" in args.suite:
+        import random
+
+        def labels_msg(lang_msg: str, order_seed: int) -> tuple[str, list[str]]:
+            rows = []
+            for level, base in LABEL_PLACES:
+                rows.append({**base, "city": "Buenos Aires", "country": "Argentina", "safety_level": level,
+                             "rating": 4.6, "user_ratings_total": 120, "opening_hours": None, "website": None,
+                             "phone": None, "lat": -34.58, "lng": -58.43, "vote_count": 3})
+            random.Random(order_seed).shuffle(rows)
+            msg = "\n".join(["modulo: buscar", "<datos>" + json.dumps(rows, ensure_ascii=False) + "</datos>",
+                             f"Mensaje del usuario: {lang_msg}"])
+            return msg, [r["name"] for r in rows]
+
+        print(f"\n=== labels: buscar turn with one place per level, N={args.n} per cell ===")
+        for lang, text in LABEL_MESSAGES:
+            rx = LABEL_RE[lang]
+            for tag, P in variants:
+                stats = {lvl: collections.Counter() for lvl, _ in LABEL_PLACES}
+                wrong: dict[str, str] = {}
+                for i in range(args.n):
+                    msg, _ = labels_msg(text, i)
+                    reply = call(P["RESPONDER_PROMPT"], msg, 700)
+                    for level, base in LABEL_PLACES:
+                        line = next((ln for ln in reply.split("\n") if base["name"].lower() in ln.lower()), None)
+                        if line is None:
+                            stats[level]["not listed"] += 1
+                            continue
+                        no_opt = re.sub(rx["options"], "", line, flags=re.I)
+                        is100 = bool(re.search(rx["is100"], line, re.I))
+                        opt = bool(re.search(rx["options"], line, re.I))
+                        bare = bool(re.search(rx["bare"], no_opt, re.I)) and not is100
+                        over = bool(re.search(rx["over"], line, re.I))
+                        ok = (is100 and not opt) if level == "gluten_free_100" else (opt and not is100 and not bare)
+                        stats[level]["correct"] += ok
+                        stats[level]["says 100%"] += is100 and level != "gluten_free_100"
+                        stats[level]["bare label"] += bare
+                        stats[level]["overclaim words"] += over
+                        stats[level]["es label in en"] += lang == "en" and bool(
+                            re.search(r"tiene opciones sin tacc|espacio 100% sin gluten", line, re.I))
+                        if not ok and level not in wrong:
+                            wrong[level] = line.strip()[:170]
+                for level, _ in LABEL_PLACES:
+                    c = stats[level]
+                    print(f"[{lang} {tag} {level:18s}] correct {c['correct']}/{args.n} | says 100%: {c['says 100%']} | "
+                          f"bare label: {c['bare label']} | overclaim words: {c['overclaim words']} | "
+                          f"not listed: {c['not listed']} | ES label in EN reply: {c['es label in en']}")
+                    if level in wrong and tag == "NEW":
+                        print("     wrong:", wrong[level])
 
     if "router" in args.suite:
         n = args.n

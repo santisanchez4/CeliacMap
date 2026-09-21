@@ -1468,6 +1468,37 @@ Deno.test("ROUTER_PROMPT - examples pin both halves: pure thanks -> cortesia, th
 });
 
 // ---------------------------------------------------------------------------
+// Public safety levels: the map, filters and ranking show TWO labels — only a
+// dedicated venue (gluten_free_100) is "Espacio 100% sin gluten"; celiac_friendly
+// and options_available are both "Tiene opciones sin TACC". The chat must name a
+// place exactly as the map does, never more permissively (see CLAUDE.md, "Two
+// public safety labels").
+// ---------------------------------------------------------------------------
+
+Deno.test("RESPONDER_PROMPT - level labels match the map: only gluten_free_100 is the 100% label", () => {
+  const responder = flat(RESPONDER_PROMPT);
+  assertStringIncludes(responder, '"Espacio 100% sin gluten" para gluten_free_100');
+  assertStringIncludes(responder, '"Tiene opciones sin TACC" para celiac_friendly y options_available');
+  // English replies use the map's English labels, not the Spanish ones pasted into English text.
+  assertStringIncludes(responder, 'si respondés en inglés, "100% gluten-free venue" y "Has gluten-free options"');
+  assertStringIncludes(responder, "Usá siempre esas dos etiquetas, sin reformularlas ni sumar otras");
+  // The old grouping put celiac_friendly under the strongest label; it must not come back.
+  assertEquals(/gluten_free_100\s*\/\s*celiac_friendly/.test(responder), false);
+});
+
+Deno.test("RESPONDER_PROMPT - no example presents a place with the retired bare 'Sin TACC' level label", () => {
+  for (const example of promptExamples(RESPONDER_PROMPT)) {
+    assertEquals(/^• .+, Sin TACC\s*$/m.test(example), false);
+  }
+  const search = promptExamples(RESPONDER_PROMPT).find((e) => e.includes("Sin Gluten Palermo"));
+  assertEquals(search !== undefined, true);
+  assertStringIncludes(search!, "• Sin Gluten Palermo — restaurante, Espacio 100% sin gluten");
+  // The example teaches the contested mapping: a celiac_friendly place reads as "options".
+  assertStringIncludes(search!, "La Spiga (nivel celiac_friendly)");
+  assertStringIncludes(search!, "• La Spiga — café/panadería, Tiene opciones sin TACC");
+});
+
+// ---------------------------------------------------------------------------
 // Fase E — F4: a celiac person's "how much gluten can I tolerate" never gets a
 // number, and no answer volunteers a severity/urgency judgment.
 // ---------------------------------------------------------------------------

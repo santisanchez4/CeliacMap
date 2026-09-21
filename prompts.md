@@ -1618,8 +1618,11 @@ amabilidad en una o dos frases y recordá para qué servís.
    a. Basá la respuesta EXCLUSIVAMENTE en el bloque <datos>. Nombrá únicamente
       lugares que aparezcan ahí, con los datos que ahí figuran.
    b. Si <datos> trae lugares, presentá hasta 8: nombre, barrio o dirección,
-      tipo, y nivel ("Sin TACC" para gluten_free_100 / celiac_friendly, "Tiene
-      opciones sin TACC" para options_available). Ofrecé afinar por barrio o tipo.
+      tipo, y nivel ("Espacio 100% sin gluten" para gluten_free_100; "Tiene
+      opciones sin TACC" para celiac_friendly y options_available; si respondés
+      en inglés, "100% gluten-free venue" y "Has gluten-free options"). Usá
+      siempre esas dos etiquetas, sin reformularlas ni sumar otras. Ofrecé
+      afinar por barrio o tipo.
    c. Si <datos> viene vacío, decilo con claridad: no hay lugares confirmados en
       esa zona. Ofrecé (1) las zonas cercanas de <datos_cercanos> si las hay, y
       (2) sugerir el lugar. NUNCA inventes un lugar ni menciones uno de tu
@@ -1700,10 +1703,10 @@ Para cualquier tema clínico, la fuente es un profesional de la salud.
 
 <examples>
 <example>
-Contexto: modulo=buscar; <datos> tiene 2 lugares en Palermo.
+Contexto: modulo=buscar; <datos> tiene 2 lugares en Palermo: Sin Gluten Palermo (nivel gluten_free_100) y La Spiga (nivel celiac_friendly).
 Usuario: "quiero cenar sin tacc en palermo hoy"
 Asistente: "En Palermo la comunidad tiene confirmados:
-• Sin Gluten Palermo — restaurante, Sin TACC
+• Sin Gluten Palermo — restaurante, Espacio 100% sin gluten
 • La Spiga — café/panadería, Tiene opciones sin TACC
 ¿Querés que filtre por tipo de lugar o que pruebe otra zona?"
 </example>
@@ -1970,3 +1973,52 @@ without naming the forbidden phrases is **in progress, not blocking**; its gate 
 `db/checks/chat_prompt_ab.py` (N >= 16, must beat the deployed prompt on both
 metrics, no new false positives). When that revision exists, its prompt text and
 the A/B result belong here as the next entry.
+
+## 30. Chatbot — level labels aligned with the map (two public labels)
+
+**Prompt (paraphrased):**
+
+> "Add the 'levels are an estimate' note under the map legend, and review the
+> chat thing to leave it without biases: the map now shows two labels — only a
+> dedicated venue (exclusive sale of gluten-free products) is '100% sin gluten',
+> everything else 'has options' — but the chat's prompt still says 'Sin TACC'
+> for `celiac_friendly`. Align it, and measure it against the real model before
+> trusting it."
+
+**Used for:** Removing the last surface where a place was described more
+permissively than on the map. Before this, a `celiac_friendly` place read
+"Tiene opciones sin TACC" on the map but "Sin TACC" — the same wording as a
+dedicated venue — in the chat.
+
+**Where the bias could live (checked before editing):** only in the prompt. The
+Edge Function hands the redactor the raw `safety_level` in `<datos>` and maps
+nothing itself, and the place search neither filters nor orders by level (it
+orders by `vote_count, rating, name`), so no code path shaped the wording.
+
+**Key decisions carried by the revised REDACTOR (instruction 2b + the Palermo example):**
+- `gluten_free_100` -> "Espacio 100% sin gluten"; `celiac_friendly` and
+  `options_available` -> "Tiene opciones sin TACC" (the map's exact labels).
+- "Use always those two labels, without rewording or adding others" — the enum
+  name `celiac_friendly` invites a paraphrase like "amigable con celíacos" that
+  would overstate it again.
+- English replies use the map's English labels ("100% gluten-free venue" / "Has
+  gluten-free options"). This was added **after** the first measurement: the model
+  pasted the Spanish labels verbatim inside English replies (the old prompt did the
+  same with "Sin TACC"). My first English metric looked for English phrases and
+  scored those replies as wrong; reading the real replies showed what was going on.
+- The example now shows La Spiga as `celiac_friendly` (it was `options_available`
+  by implication), so the contested mapping is taught explicitly.
+- The ROUTER prompt is untouched.
+
+**Measurement** (`db/checks/chat_prompt_ab.py --suite labels`, new; real model, N=8
+per cell, one place per level in random order, ES + EN): the deployed prompt worded a
+`celiac_friendly` place as a bare "Sin TACC" in 8/8 samples — identical to the
+dedicated venue; the new prompt labelled all 48 place lines correctly (24 ES + 24 EN),
+with no overclaim words. A regression smoke of `f4` + `legit` on the new prompt
+matched the numbers already recorded for v10/v11 (0/20 false positives in `legit`;
+only the NEW arm was run). Full write-up and limits:
+`db/checks/2026-09-20-chat-level-labels-run.md`.
+
+**Status:** in the repository only. The deployed `chat` (v11) keeps the old wording
+until it is redeployed, and the live jailbreak battery has not been re-run against the
+new prompt. Changing a prompt restarts the soft-launch count (CLAUDE.md).

@@ -635,6 +635,34 @@ de 10 mg/kg) y «hablá urgente con un médico».
 
 Detalle, mediciones y límites: CLAUDE.md, Decisions Log, «Chatbot Fase E».
 
+### 15. Las etiquetas de nivel del chat son las del mapa (2026-09-20)
+
+Enmienda a la decisión 7: el mapa, los filtros y el ranking pasaron a **dos**
+etiquetas públicas — «Espacio 100% sin gluten» (`gluten_free_100`: local dedicado,
+venta exclusiva) y «Tiene opciones sin TACC» (todo lo demás, incluido
+`celiac_friendly`) —, pero el prompt del redactor seguía llamando «Sin TACC» tanto a
+`gluten_free_100` como a `celiac_friendly`. Un mismo lugar quedaba descrito de forma
+más permisiva en el chat que en el mapa.
+
+- **Dónde estaba el sesgo.** Solo en el prompt: el redactor recibe el `safety_level`
+  crudo en `<datos>`, el código no lo traduce y la búsqueda no filtra ni ordena por
+  nivel (ordena por votos, rating y nombre).
+- **Qué cambió.** Instrucción 2b y el ejemplo de búsqueda: `gluten_free_100` -> «Espacio
+  100% sin gluten»; `celiac_friendly` y `options_available` -> «Tiene opciones sin
+  TACC»; en inglés, «100% gluten-free venue» / «Has gluten-free options»; y «usá siempre
+  esas dos etiquetas, sin reformularlas ni sumar otras» (el nombre del enum invita a
+  parafrasear como «amigable con celíacos»). El ROUTER no cambia.
+- **Medición con el modelo real** (`db/checks/chat_prompt_ab.py --suite labels`, N=8 por
+  celda, un lugar por nivel, ES y EN): el prompt desplegado nombró a un lugar
+  `celiac_friendly` como «Sin TACC» pelado en 8/8 muestras, igual que al dedicado; el
+  nuevo etiquetó bien las 48 líneas (24 ES + 24 EN). Un humo de regresión de `f4` +
+  `legit` dio lo ya registrado para v10/v11, sin falsos positivos en `legit` (solo se
+  corrió el brazo NEW). Detalle y límites: `db/checks/2026-09-20-chat-level-labels-run.md`.
+- **Estado.** Solo en el repositorio: `chat` v11 sigue con el texto anterior hasta
+  redesplegar, y la batería de jailbreak en vivo no se repitió con este prompt. Cambiar el
+  prompt reinicia el conteo del soft-launch.
+
+
 ## Los prompts del chatbot
 
 > **Por qué estos prompts importan tanto como el `RUBRIC`:** son la única
@@ -819,8 +847,11 @@ amabilidad en una o dos frases y recordá para qué servís.
    a. Basá la respuesta EXCLUSIVAMENTE en el bloque <datos>. Nombrá únicamente
       lugares que aparezcan ahí, con los datos que ahí figuran.
    b. Si <datos> trae lugares, presentá hasta 8: nombre, barrio o dirección,
-      tipo, y nivel ("Sin TACC" para gluten_free_100 / celiac_friendly, "Tiene
-      opciones sin TACC" para options_available). Ofrecé afinar por barrio o tipo.
+      tipo, y nivel ("Espacio 100% sin gluten" para gluten_free_100; "Tiene
+      opciones sin TACC" para celiac_friendly y options_available; si respondés
+      en inglés, "100% gluten-free venue" y "Has gluten-free options"). Usá
+      siempre esas dos etiquetas, sin reformularlas ni sumar otras. Ofrecé
+      afinar por barrio o tipo.
    c. Si <datos> viene vacío, decilo con claridad: no hay lugares confirmados en
       esa zona. Ofrecé (1) las zonas cercanas de <datos_cercanos> si las hay, y
       (2) sugerir el lugar. NUNCA inventes un lugar ni menciones uno de tu
@@ -901,10 +932,10 @@ Para cualquier tema clínico, la fuente es un profesional de la salud.
 
 <examples>
 <example>
-Contexto: modulo=buscar; <datos> tiene 2 lugares en Palermo.
+Contexto: modulo=buscar; <datos> tiene 2 lugares en Palermo: Sin Gluten Palermo (nivel gluten_free_100) y La Spiga (nivel celiac_friendly).
 Usuario: "quiero cenar sin tacc en palermo hoy"
 Asistente: "En Palermo la comunidad tiene confirmados:
-• Sin Gluten Palermo — restaurante, Sin TACC
+• Sin Gluten Palermo — restaurante, Espacio 100% sin gluten
 • La Spiga — café/panadería, Tiene opciones sin TACC
 ¿Querés que filtre por tipo de lugar o que pruebe otra zona?"
 </example>

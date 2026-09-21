@@ -630,8 +630,11 @@ amabilidad en una o dos frases y recordá para qué servís.
    a. Basá la respuesta EXCLUSIVAMENTE en el bloque <datos>. Nombrá únicamente
       lugares que aparezcan ahí, con los datos que ahí figuran.
    b. Si <datos> trae lugares, presentá hasta 8: nombre, barrio o dirección,
-      tipo, y nivel ("Sin TACC" para gluten_free_100 / celiac_friendly, "Tiene
-      opciones sin TACC" para options_available). Ofrecé afinar por barrio o tipo.
+      tipo, y nivel ("Espacio 100% sin gluten" para gluten_free_100; "Tiene
+      opciones sin TACC" para celiac_friendly y options_available; si respondés
+      en inglés, "100% gluten-free venue" y "Has gluten-free options"). Usá
+      siempre esas dos etiquetas, sin reformularlas ni sumar otras. Ofrecé
+      afinar por barrio o tipo.
    c. Si <datos> viene vacío, decilo con claridad: no hay lugares confirmados en
       esa zona. Ofrecé (1) las zonas cercanas de <datos_cercanos> si las hay, y
       (2) sugerir el lugar. NUNCA inventes un lugar ni menciones uno de tu
@@ -712,10 +715,10 @@ Para cualquier tema clínico, la fuente es un profesional de la salud.
 
 <examples>
 <example>
-Contexto: modulo=buscar; <datos> tiene 2 lugares en Palermo.
+Contexto: modulo=buscar; <datos> tiene 2 lugares en Palermo: Sin Gluten Palermo (nivel gluten_free_100) y La Spiga (nivel celiac_friendly).
 Usuario: "quiero cenar sin tacc en palermo hoy"
 Asistente: "En Palermo la comunidad tiene confirmados:
-• Sin Gluten Palermo — restaurante, Sin TACC
+• Sin Gluten Palermo — restaurante, Espacio 100% sin gluten
 • La Spiga — café/panadería, Tiene opciones sin TACC
 ¿Querés que filtre por tipo de lugar o que pruebe otra zona?"
 </example>
@@ -2798,6 +2801,37 @@ Function, schema or prompt change):
   buttons (`renderPrompts` / `.chat-prompts`) were removed as visual overload. The
   two footer notes (medical-estimate disclaimer, 30-day log notice) stay: the log
   notice is part of the ADR-006 privacy design.
+- **Two public safety labels instead of three (owner decision, frontend only).**
+  "Espacio 100% sin gluten" = `gluten_free_100` = a dedicated venue with exclusive
+  sale of gluten-free products; "Tiene opciones sin TACC" = everything else
+  (`celiac_friendly` + `options_available`). Applied to the map legend, markers,
+  detail badge, filter chips and the ranking; the blue "Atención para celíacos"
+  tier and its CSS were removed. `js/map.js` `safetyGroup()` is the single rule:
+  the "options" filter matches both levels, and an **unknown level falls to
+  "options", never to 100%** (the old `safetyClass` default painted it as 100%).
+  This is more conservative than the pre-redesign two-label version, which merged
+  `celiac_friendly` into "Sin TACC" with the dedicated venues. The DB, the
+  Validator `RUBRIC` and the 0.85/0.7/0.5 gates are **unchanged** — three levels
+  are still produced and stored; only the public wording collapsed. The
+  features-section preview badge now shows the real 100% badge (`map.legend1`).
+  **The chat was the one surface still on the old grouping:** its REDACTOR prompt
+  said "Sin TACC" for both `gluten_free_100` and `celiac_friendly`, so it could name
+  a place more permissively than the map did. Aligned 2026-09-20 (instruction 2b
+  and the Palermo example in `prompts.ts` and its three synced copies, plus English
+  labels) and measured against the real model — offline A/B, N=8: the old prompt
+  worded a `celiac_friendly` place as a bare "Sin TACC" 8/8; the new one labelled
+  48/48 place lines correctly (prompts.md §30, ADR-006 decision 15,
+  `db/checks/2026-09-20-chat-level-labels-run.md`). The bias lived only in the
+  prompt: the place search neither filters nor orders by level. **Repository only
+  until `chat` is redeployed** (v11 still runs the old wording); the live jailbreak
+  battery has not been re-run on the new prompt; and the change restarts the
+  soft-launch count. The "levels are an estimate — confirm with the venue" note is
+  back under the map legend (`.map-disclaimer`, key `map.disclaimer`), ES + EN.
+- **Page order: the hero opens the page and the map comes right after it** (the
+  redesign had put the map first; reverted at the owner's request). The map's
+  reduced `padding-top` override, which only made sense as the first section,
+  was dropped, so `#map` uses the standard section padding again. The hero's
+  "Explorar el mapa" CTA (`#map`) now lands on the next section.
 - **Regression found right after: a real click on a map marker opened the detail
   and closed it in the same click** (introduced by the explorer redesign, hidden
   because the results list was the only path that worked). `selectEntry` calls
@@ -2810,9 +2844,12 @@ Function, schema or prompt change):
   `dispatchEvent` on the marker's outer `<div>` does *not* reproduce it (that
   node stays attached); only a real mouse click on the inner span does, so
   verify marker clicks with a real click, not a scripted one.
-- Tests: `tests/frontend_explorer.test.js` (14) covers the Top 3 card (shared
-  country state, empty country, load error), the prompt-free chat, and the
-  marker-click regression above.
+- Tests: `tests/frontend_explorer.test.js` (19) covers the Top 3 card (shared
+  country state, empty country, load error), the prompt-free chat, the
+  marker-click regression above, hero-then-map order, the two-label behavior
+  (grouped filter, legend/chips, marker classes, ranking badge) and the legend
+  note. `supabase/functions/chat/index.test.ts` (161) gained two prompt guards
+  for the level labels; both fail against the previous prompt.
 
 ### Build status (phases)
 
