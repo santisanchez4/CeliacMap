@@ -104,6 +104,7 @@
   var openedAt = 0;          // first time the panel opened (MIN_FILL_MS clock)
   var introEl = null;
   var waitEl = null;
+  var lockedScroll = null;
   var backgroundNodes = Array.prototype.map.call(document.querySelectorAll("main, .site-header, .site-footer"), function (node) {
     return { node: node, originallyInert: node.hasAttribute("inert") };
   });
@@ -177,8 +178,8 @@
       button.textContent = place.name + (place.city ? " · " + place.city : "");
       button.addEventListener("click", function (event) {
         event.stopPropagation();
-        try { document.dispatchEvent(new CustomEvent("celiacmap:open-place", { detail: { id: place.id } })); } catch (e) {}
         if (isMobile()) setOpen(false, false);
+        try { document.dispatchEvent(new CustomEvent("celiacmap:open-place", { detail: { id: place.id } })); } catch (e) {}
       });
       list.appendChild(button);
     });
@@ -223,6 +224,7 @@
 
   /* ---------------------------- Open / close ---------------------- */
   function setOpen(open, returnFocus) {
+    if (!open && panel.contains(document.activeElement)) document.activeElement.blur();
     isOpen = open;
     panel.hidden = !open;
     fab.setAttribute("aria-expanded", open ? "true" : "false");
@@ -237,17 +239,33 @@
       if (!isMobile()) input.focus({ preventScroll: true });
       else closeBtn.focus({ preventScroll: true });
     } else if (returnFocus) {
-      fab.focus();
+      fab.focus({ preventScroll: true });
     }
   }
 
   function syncViewport() {
-    document.body.classList.toggle("chat-mobile-open", isOpen && isMobile());
+    var modal = isOpen && isMobile();
+    if (modal && lockedScroll === null) {
+      lockedScroll = { x: window.scrollX || 0, y: window.scrollY || 0 };
+      document.body.style.setProperty("--chat-scroll-top", -lockedScroll.y + "px");
+    }
+    document.body.classList.toggle("chat-mobile-open", modal);
+    document.documentElement.classList.toggle("chat-mobile-open", modal);
+    if (!modal && lockedScroll !== null) {
+      var position = lockedScroll;
+      lockedScroll = null;
+      document.body.style.removeProperty("--chat-scroll-top");
+      // Override the site's smooth scrolling while restoring the frozen page.
+      var behavior = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = "auto";
+      window.scrollTo(position.x, position.y);
+      document.documentElement.style.scrollBehavior = behavior;
+    }
     backgroundNodes.forEach(function (entry) {
       if (isOpen && isMobile()) entry.node.setAttribute("inert", "");
       else if (!entry.originallyInert) entry.node.removeAttribute("inert");
     });
-    panel.setAttribute("aria-modal", String(isMobile()));
+    panel.setAttribute("aria-modal", String(modal));
     if (window.visualViewport) {
       panel.style.setProperty("--chat-viewport-height", window.visualViewport.height + "px");
       panel.style.setProperty("--chat-viewport-top", window.visualViewport.offsetTop + "px");
@@ -401,6 +419,8 @@
 
   /* -------------------------------- Init -------------------------- */
   introEl = addMessage("intro", t("intro"));
+  var disclaimers = document.querySelector(".chat-disclaimers");
+  if (disclaimers) introEl.appendChild(disclaimers);
   document.addEventListener("celiacmap:lang", applyChrome);
   applyChrome();
   updateSendState();

@@ -40,10 +40,13 @@ async function fixture(mobile = false) {
       markers.push(m); return m;
     },
   };
+  const viewportListeners = {};
   const browser = {
     CELIACMAP_CONFIG: { SUPABASE_URL: "https://fixture.invalid", SUPABASE_ANON_KEY: "fixture" },
     matchMedia: query => ({ matches: mobile && query.includes("max-width") }), addEventListener() {},
-    visualViewport: { height: 500, offsetTop: 0, addEventListener() {} },
+    scrollX: 0, scrollY: 840,
+    scrollTo(x, y) { this.scrollX = x; this.scrollY = y; },
+    visualViewport: { height: 500, offsetTop: 0, addEventListener(name, fn) { viewportListeners[name] = fn; } },
   };
   let now = 10000;
   const context = {
@@ -61,7 +64,7 @@ async function fixture(mobile = false) {
     el.dispatchEvent(new window.Event("click", { bubbles: true }));
     return el;
   }
-  return { document, window, click, markers, layers, mutations: () => mutations,
+  return { document, window, browser, viewportListeners, click, markers, layers, mutations: () => mutations,
     loadChat: async () => vm.runInNewContext(await Deno.readTextFile("js/chat.js"), context) };
 }
 
@@ -297,7 +300,19 @@ Deno.test("mobile chat follows viewport, isolates background and opens without f
   assert.equal(panel.style.getPropertyValue("--chat-viewport-height"), "500px");
   assert.equal(f.document.activeElement.id, "chat-panel-close");
   assert.equal(f.document.querySelector("main").hasAttribute("inert"), true);
+  assert.equal(f.document.body.style.getPropertyValue("--chat-scroll-top"), "-840px");
+  assert.equal(f.document.documentElement.classList.contains("chat-mobile-open"), true);
+  f.browser.scrollY = 0;
+  f.browser.visualViewport.height = 280;
+  f.browser.visualViewport.offsetTop = 12;
+  f.viewportListeners.resize();
+  assert.equal(panel.style.getPropertyValue("--chat-viewport-height"), "280px");
+  assert.equal(panel.style.getPropertyValue("--chat-viewport-top"), "12px");
+  assert.equal(f.document.body.style.getPropertyValue("--chat-scroll-top"), "-840px");
+  assert.ok(f.document.querySelector("#chat-log .chat-disclaimers"));
   f.click("#chat-panel-close");
+  assert.equal(f.browser.scrollY, 840);
+  assert.equal(f.document.documentElement.classList.contains("chat-mobile-open"), false);
   assert.equal(f.document.querySelector("main").hasAttribute("inert"), false);
   assert.equal(f.document.body.classList.contains("chat-mobile-open"), false);
 });
