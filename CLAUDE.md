@@ -1913,6 +1913,29 @@ rewritten to state the override, the retained evidence limitation, and the
 original user note; `validation_confidence` left at `0.52`; `verified` left
 `false`.
 
+**Second precedent — override on a *fresh insert*, not a correction
+(2026-09-22).** Every prior manual insert into `places` (Café Ramona WTC, Casa
+& Dispensa, La Commedia, La Molienda, etc. — see **Product evolution** /
+Montevideo manual places above) went in as `status='pending'` so the Validator
+still judged it; overrides had only ever been applied *after* a Validator
+verdict already existed. **Ta Bacana Resto Bar** and **Caneladesayunos** (both
+Fray Bentos, `18 de Julio 1400` / `18 de Julio 1125`) break that pattern at
+Santiago's explicit request — inserted directly as `status='approved'`,
+`safety_level='options_available'`, with no Validator run at all, because he
+wanted them live on the map immediately rather than waiting on a verdict the
+model would likely call `needs_review` anyway (name + address + phone +
+Instagram handle, no explicit "sin TACC" text to hand the Validator).
+`validation_notes` on both states `APROBACIÓN MANUAL` up front;
+`validation_confidence` is `null` (never fabricated to look like a real
+score); `verified` stays `false`. Neither business has a Google Place listing,
+so `geocode_method='address_only'` and coordinates come from Uruguay's
+official cadastral address-point dataset (AGESIC, via OpenStreetMap's
+`ref:AGESIC` tag, EWKB/UTM-21S decoded and reprojected to WGS84) rather than
+Google Geocoding — a new coordinate source for this project, used because
+Google had nothing to geocode against for either address. See
+`db/fixes/2026-09-22-fray-bentos-ta-bacana-canela.sql` for the full SQL and
+reasoning.
+
 ### Retroactive re-validation of pre-three-tier-rubric approvals (2026-09-06)
 
 **The gap.** The three-tier Validator rubric and its code-enforced confidence
