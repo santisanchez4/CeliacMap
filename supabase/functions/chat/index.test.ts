@@ -15,6 +15,8 @@ import {
   buildPlaceLookupUrl,
   buildPlaceReportInsertPayload,
   buildPlacesSearchUrl,
+  fetchSearchPlaces,
+  rankNamedPlaces,
   buildResponderUserMessage,
   buildSuggestionInsertPayload,
   buildRouterUserMessage,
@@ -60,6 +62,60 @@ import {
   type ReportarDraftResult,
 } from "./index.ts";
 import { RESPONDER_PROMPT, ROUTER_PROMPT } from "./prompts.ts";
+
+Deno.test("named search matches accents, branches and user typos without unrelated results", () => {
+  const rows = [
+    { id: "1", name: "Dalbertt" }, { id: "2", name: "Los Leños" },
+    { id: "3", name: "Café Ramona - Centro" }, { id: "4", name: "Café Ramona - WTC" },
+    { id: "5", name: "La Pasta Libre" },
+  ];
+  for (const typo of ["dalbert", "Dalebertt", "Dalbertt"]) {
+    assertEquals(rankNamedPlaces(rows, ["Los Lenos", "Ramona", typo]).map((r) => r.id), ["2", "3", "1", "4"]);
+  }
+  assertEquals(rankNamedPlaces(rows, ["restaurante inexistente"]), []);
+  assertEquals(rankNamedPlaces(rows, ["Cafe Ramona Centro"]).map((r) => r.id), ["3"]);
+  assertEquals(rankNamedPlaces(rows, ["bar"]), []);
+});
+
+Deno.test("named retrieval reaches later pages, retains public scope and ignores stale filters", async () => {
+  const original = globalThis.fetch;
+  const calls: URL[] = [];
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input)); calls.push(url);
+    assertEquals(new Headers(init?.headers).get("apikey"), "anon-test");
+    assertEquals(url.searchParams.get("status"), "eq.approved");
+    const body = url.searchParams.has("id") ? [{ id: "target", name: "Dalbertt", city: "Montevideo" }] :
+      url.searchParams.get("offset") === "0" ? Array.from({ length: 500 }, (_, i) => ({ id: String(i), name: "Otro local" })) :
+      [{ id: "target", name: "Dalbertt" }];
+    return Promise.resolve(new Response(JSON.stringify(body)));
+  }) as typeof fetch;
+  try {
+    const rows = await fetchSearchPlaces("https://example.com", "anon-test", {
+      ciudad: "Montevideo", pais: "Uruguay", zona: "Ciudad Vieja", category: "cafe", lugar_nombre: "Dalbert",
+    });
+    assertEquals(rows.map((r) => r.name), ["Dalbertt"]);
+    assertEquals(calls.length, 3);
+    for (const url of calls.slice(0, 2)) {
+      assertEquals(url.searchParams.get("city"), "ilike.*Montevideo*");
+      assertEquals(url.searchParams.get("country"), "eq.Uruguay");
+      assertEquals(url.searchParams.get("address"), null);
+      assertEquals(url.searchParams.get("category"), null);
+      assertEquals(url.searchParams.get("select"), "id,name");
+    }
+    assertEquals(calls[2].searchParams.get("id"), "in.(target)");
+  } finally { globalThis.fetch = original; }
+});
+
+Deno.test("named retrieval propagates failures instead of claiming absence", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = (() => Promise.resolve(new Response("unavailable", { status: 503 }))) as typeof fetch;
+  try {
+    let failed = false;
+    try { await fetchSearchPlaces("https://example.com", "anon", { lugar_nombre: "Ramona" }); }
+    catch { failed = true; }
+    assertEquals(failed, true);
+  } finally { globalThis.fetch = original; }
+});
 
 // ---------------------------------------------------------------------------
 // CORS allowlist

@@ -289,9 +289,11 @@ export function filterPlaceFields(row: Record<string, unknown>): Record<string, 
 
 interface PlacesQueryParams {
   ciudad?: string | null;
+  pais?: string | null;
   zona?: string | null;
   category?: string | null;
   texto_libre?: string | null;
+  lugar_nombre?: string | null;
 }
 
 export function buildPlacesSearchUrl(supabaseUrl: string, params: PlacesQueryParams): string {
@@ -299,12 +301,95 @@ export function buildPlacesSearchUrl(supabaseUrl: string, params: PlacesQueryPar
   // still excludes it, so the redactor receives exactly the audited allowlist.
   const parts = [`select=id,${PLACES_SELECT_FIELDS.join(",")}`, "status=eq.approved"];
   if (params.ciudad) parts.push(`city=ilike.*${encodeURIComponent(params.ciudad)}*`);
+  if (params.pais) parts.push(`country=eq.${encodeURIComponent(params.pais)}`);
   if (params.zona) parts.push(`address=ilike.*${encodeURIComponent(params.zona)}*`);
   if (params.category) parts.push(`category=eq.${encodeURIComponent(params.category)}`);
   if (params.texto_libre) parts.push(`name=ilike.*${encodeURIComponent(params.texto_libre)}*`);
   parts.push("order=vote_count.desc,rating.desc.nullslast,name.asc");
   parts.push(`limit=${PLACES_SEARCH_LIMIT}`);
   return `${supabaseUrl}/rest/v1/places?${parts.join("&")}`;
+}
+
+function normalizePlaceName(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function oneEditApart(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length >= b.length) i++;
+    if (b.length >= a.length) j++;
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+/** Search aliases are evidence from the user, never invented business data.
+ * Exact/partial word matches win; a one-character typo is allowed only on long
+ * words. Return all ambiguous branches by their real names, never pick an ID
+ * for a report or other write through this fuzzy search. */
+export function rankNamedPlaces(
+  rows: Record<string, unknown>[], names: string[],
+): Record<string, unknown>[] {
+  const groups = names.map((name) => {
+    const query = normalizePlaceName(name);
+    const tokens = query.split(" ").filter(Boolean);
+    return rows.map((row) => {
+      const actual = normalizePlaceName(String(row.name ?? ""));
+      const words = actual.split(" ");
+      const score = !query ? 0 : actual === query ? 3 :
+        (` ${actual} `).includes(` ${query} `) ? 2 :
+        tokens.every((token) => words.some((word) => word === token ||
+          (token.length >= 5 && word.length >= 5 && oneEditApart(token, word)))) ? 1 : 0;
+      return { row, score };
+    }).filter(({ score }) => score > 0).sort((a, b) => b.score - a.score);
+  });
+  // Give each requested business a slot before adding ambiguous branches.
+  const ordered = [...groups.flatMap((g) => g.slice(0, 1)), ...groups.flatMap((g) => g.slice(1))];
+  const seen = new Set<unknown>();
+  return ordered.filter(({ row }) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  }).slice(0, PLACES_SEARCH_LIMIT).map(({ row }) => row);
+}
+
+export async function fetchSearchPlaces(
+  supabaseUrl: string, anonKey: string, params: PlacesQueryParams,
+): Promise<Record<string, unknown>[]> {
+  const headers = { apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+  const read = async (url: string): Promise<Record<string, unknown>[]> => {
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`places search failed: ${res.status}`);
+    return await res.json();
+  };
+  const names = (params.lugar_nombre || params.texto_libre || "")
+    .split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
+  if (!names.length) return read(buildPlacesSearchUrl(supabaseUrl, params));
+
+  // Named lookups ignore stale neighborhood/category filters (a cafe may have
+  // been requested after "restaurants"). Scan only public names, paginated so
+  // the general search's top-eight cutoff cannot hide a business.
+  const url = new URL(buildPlacesSearchUrl(supabaseUrl, { ciudad: params.ciudad, pais: params.pais }));
+  url.searchParams.set("select", "id,name");
+  url.searchParams.set("order", "id.asc");
+  url.searchParams.set("limit", "500");
+  const candidates: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += 500) {
+    url.searchParams.set("offset", String(offset));
+    const page = await read(url.toString());
+    candidates.push(...page);
+    if (page.length < 500) break;
+  }
+  const matches = rankNamedPlaces(candidates, names);
+  if (!matches.length) return [];
+  const detailsUrl = new URL(buildPlacesSearchUrl(supabaseUrl, {}));
+  detailsUrl.searchParams.set("id", `in.(${matches.map((row) => row.id).join(",")})`);
+  const details = await read(detailsUrl.toString());
+  return matches.flatMap((match) => details.filter((row) => row.id === match.id));
 }
 
 export function toChatPlaceReferences(rows: Record<string, unknown>[]): ChatPlaceReference[] {
@@ -1675,12 +1760,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       responsePending = courtesy.pending;
     } else {
       // buscar
-      queryLog = { ciudad: router.ciudad, zona: router.zona, category: router.category, texto_libre: router.texto_libre };
-      const searchRes = await fetch(buildPlacesSearchUrl(supabaseUrl, router), {
-        headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
-      });
-      if (!searchRes.ok) throw new Error(`places search failed: ${searchRes.status}`);
-      const rows = (await searchRes.json()) as Record<string, unknown>[];
+      queryLog = { ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category, texto_libre: router.texto_libre, lugar_nombre: router.lugar_nombre };
+      const rows = await fetchSearchPlaces(supabaseUrl, anonKey, router);
       const datos = rows.map(filterPlaceFields);
       responsePlaces = toChatPlaceReferences(rows);
       resultCount = datos.length;
