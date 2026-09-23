@@ -12,6 +12,9 @@ async function fixture(mobile = false) {
   window.HTMLElement.prototype.getClientRects = function () { return this.closest("[hidden]") ? [] : [1]; };
   Object.defineProperty(document, "activeElement", { get: () => document.focused });
   window.HTMLElement.prototype.scrollIntoView = function () {};
+  window.HTMLElement.prototype.getBoundingClientRect = function () { return { top: 100, bottom: 600, height: 500 }; };
+  Object.defineProperty(document.getElementById("place-panel"), "offsetWidth", { value: 360 });
+  Object.defineProperty(document.getElementById("place-panel"), "offsetHeight", { value: 240 });
   const cities = document.getElementById("city-select");
   Object.defineProperty(cities, "value", { writable: true, value: "all" });
   const levels = ["gluten_free_100", "celiac_friendly", "options_available"];
@@ -28,6 +31,7 @@ async function fixture(mobile = false) {
   };
   const map = {
     setView() { return this; }, on() {}, invalidateSize() {}, fitBounds() {}, flyTo() {},
+    flyToBounds(bounds, options) { this.lastFrame = { bounds, options }; },
     getCenter() { return [0, 0]; }, getZoom() { return 12; },
     scrollWheelZoom: { enable() {}, disable() {} },
   };
@@ -42,6 +46,7 @@ async function fixture(mobile = false) {
   };
   const viewportListeners = {};
   const browser = {
+    innerHeight: 700,
     CELIACMAP_CONFIG: { SUPABASE_URL: "https://fixture.invalid", SUPABASE_ANON_KEY: "fixture" },
     matchMedia: query => ({ matches: mobile && query.includes("max-width") }), addEventListener() {},
     scrollX: 0, scrollY: 840,
@@ -64,9 +69,28 @@ async function fixture(mobile = false) {
     el.dispatchEvent(new window.Event("click", { bubbles: true }));
     return el;
   }
-  return { document, window, browser, viewportListeners, click, markers, layers, mutations: () => mutations,
+  return { document, window, browser, map, viewportListeners, click, markers, layers, mutations: () => mutations,
     loadChat: async () => vm.runInNewContext(await Deno.readTextFile("js/chat.js"), context) };
 }
+
+Deno.test("selected pin is centered in the map area left of the desktop card", async () => {
+  const f = await fixture();
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
+  const options = f.map.lastFrame.options;
+  assert.equal(options.maxZoom, 16);
+  // Leaflet's asymmetric padding moves the pin 180px left of map center.
+  assert.equal((options.paddingBottomRight[0] - options.paddingTopLeft[0]) / 2, 180);
+  assert.equal(options.paddingBottomRight[1], options.paddingTopLeft[1]);
+});
+
+Deno.test("mobile selection reserves only the bottom sheet overlap with the map", async () => {
+  const f = await fixture(true);
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
+  const options = f.map.lastFrame.options;
+  assert.equal(options.paddingBottomRight[0], options.paddingTopLeft[0]);
+  // Map ends at 600; sheet starts at 700 - 240 = 460. Overlap is 140.
+  assert.equal(options.paddingBottomRight[1] - options.paddingTopLeft[1], 140);
+});
 
 Deno.test("selecting a place leaves detail open and does not rebuild markers", async () => {
   const f = await fixture();

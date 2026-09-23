@@ -435,6 +435,7 @@
       panelExpanded = true;
       panelEl.classList.add("is-expanded");
       expand.hidden = true;
+      if (selectedEntry) frameSelectedEntry(selectedEntry);
       panelEl.focus({ preventScroll: true });
     });
     panelBody.appendChild(expand);
@@ -605,6 +606,31 @@
     return (LABELS.safety[level] && LABELS.safety[level][lang()]) || level;
   }
 
+  function frameSelectedEntry(entry) {
+    var right = 0;
+    var bottom = 0;
+    var top = 0;
+    if (panelAvailable && panelEl.classList.contains("is-open")) {
+      // Use layout dimensions: the drawer's bounding rect is still moving
+      // during its opening transition, but its final width/height is known.
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        var rect = mapEl.getBoundingClientRect();
+        var sheetTop = window.innerHeight - panelEl.offsetHeight;
+        top = Math.max(0, -rect.top);
+        bottom = Math.max(0, rect.bottom - sheetTop);
+        bottom = Math.min(bottom, Math.max(0, rect.height - top - 80));
+      } else {
+        right = panelEl.offsetWidth;
+      }
+    }
+    var point = entry.marker.getLatLng();
+    map.flyToBounds([point, point], Object.assign(motion(0.45), {
+      maxZoom: Math.max(map.getZoom(), 16),
+      paddingTopLeft: [32, top + 32],
+      paddingBottomRight: [right + 32, bottom + 32]
+    }));
+  }
+
   function selectEntry(entry, focusPanel) {
     if (!entry) return;
     clearTimeout(searchTimer);
@@ -615,8 +641,8 @@
     selectedEntry = entry;
     entry.marker.setIcon(icon(entry.place.safety_level, true));
     map.invalidateSize();
-    map.flyTo(entry.marker.getLatLng(), Math.max(map.getZoom(), 16), motion(0.45));
     showDetails(entry.place, entry.marker);
+    frameSelectedEntry(entry);
     try { document.dispatchEvent(new CustomEvent("celiacmap:place-selected", { detail: entry.place })); } catch (e) {}
     if (focusPanel && panelEl) panelEl.focus({ preventScroll: true });
   }
@@ -675,7 +701,10 @@
   var resizeTimer;
   window.addEventListener("resize", function () {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(function () { map.invalidateSize(); }, 200);
+    resizeTimer = setTimeout(function () {
+      map.invalidateSize();
+      if (selectedEntry && panelAvailable && panelEl.classList.contains("is-open")) frameSelectedEntry(selectedEntry);
+    }, 200);
   });
 
   // Re-render the dynamic count text when the page language toggles.

@@ -1106,6 +1106,14 @@ and avoid claiming an empty search proves absence from the map. No status change
 Named scans transfer only IDs/names, but cost grows with public catalog size;
 move matching to an indexed database search if that becomes material.
 
+Deployment verified 2026-09-23: production was still chat v13 after the Git push
+(GitHub Pages deploys the frontend, not Supabase functions). Deployed chat v14
+with existing verify_jwt=false unchanged. The live four-turn replay in
+db/checks/chat_named_live.py passed: Los Leños alone; Dalbertt plus Café Ramona
+Centro/WTC despite "dalebertt"; the Mercedes 799 map correction; and the follow-up
+"ese restaurante" plus Los Leños. Returned cards matched the requested places;
+no contribution action or pending submission was generated.
+
 Key decisions made during development (keep this updated as the project evolves):
 
 - **Language — Bilingual (ES default + EN toggle):** Spanish (Argentina, "sin
