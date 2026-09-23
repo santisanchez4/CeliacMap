@@ -238,6 +238,7 @@
     "cta.primary": "Explore the map",
 
     "footer.tagline": "Safe gluten-free places, mapped by the community.",
+    "footer.contact": "Let's stay in touch",
     "footer.credit": "Made by Santiago Sanchez"
   };
 

@@ -1323,7 +1323,11 @@ h1, h2, h3 {
 .footer-tagline { margin-top: 14px; font-size: 0.9375rem; color: #93a297; max-width: 34ch; }
 .footer-nav { display: flex; flex-wrap: wrap; gap: 18px; align-content: start; }
 .footer-nav a:hover, .footer-social a:hover { color: var(--color-bg); }
-.footer-social { display: flex; gap: 18px; align-content: start; }
+.footer-social { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; min-width: 0; }
+.footer-contact-title { margin: 0 0 4px; font-family: var(--font-sans); font-size: 1rem; font-weight: 600; color: var(--color-bg); }
+.footer-contact-link { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; max-width: 100%; }
+.footer-contact-link svg { flex: none; }
+.footer-contact-link span { overflow-wrap: anywhere; }
 .footer-bottom { padding-top: 26px; font-size: 0.8125rem; color: #84938a; }
 
 /* ---------------------------- Chat widget -------------------------- */
