@@ -324,6 +324,59 @@ negocio y su dirección: se geocodificó solo la dirección, se cargó el lugar 
 queda en `needs_location` (no en `rejected`); `notes` y `evidence_url` aparecen en el prompt del Validator; `--approve`
 escribe la nota de override sin tocar `validation_confidence`.
 
+### Paso 9 — Avisos por email al admin (santiagosanchez@celiacmap.org)
+
+**Objetivo:** enterarse de todo lo que hace la gente y de lo que dejan los agentes para revisar, sin entrar a Supabase.
+Se envía con Resend (ya configurado, dominio `celiacmap.org` verificado) al buzón de Zoho.
+
+**Dos canales**, para no llenar el buzón:
+
+| Canal | Cuándo | Qué incluye |
+|-------|--------|-------------|
+| **Aviso inmediato** (un email por evento) | Solo lo urgente | Reporte negativo (sobre todo si describe contaminación o síntomas); lugar que salió del mapa por reportes (paso 7); respuesta de un comercio al outreach |
+| **Resumen diario** (un email, solo si hay algo) | Todos los días, ~08:45 (Uruguay) | Todo lo demás, agrupado |
+
+**Contenido del resumen diario** (últimas 24 h, más lo que sigue pendiente):
+
+- Formulario "Agregalo" y chatbot: sugerencias nuevas, con nombre, ciudad, dirección, nota, link y respuestas de cocina.
+- Sugerencias sin ubicar (`needs_location`, paso 8).
+- Recomendaciones positivas esperando moderación (`moderate_opinions.py`), con el texto completo y el aviso ⚠ del paso 5.
+- Reportes negativos del día y avisos activos en el mapa.
+- Resultado del Validator: nuevos `needs_review` y nuevos "100% pendiente de confirmación".
+- Errores de los agentes (filas `agent_log` con `status='error'`) y el resumen del pipeline si corrió.
+- Chatbot: **solo conteos** (turnos, turnos marcados, disparos del guardián de celiaquía). El texto de los turnos no va
+  por email: la retención de 30 días del chatbot no alcanza a un buzón externo.
+- Cada ítem trae el comando para resolverlo (`review_queue.py --approve …`, `moderate_opinions.py --approve …`) y el link
+  al lugar en el mapa.
+
+**Implementación:**
+
+- `scripts/admin_digest.py`: consulta con service_role, arma el email en texto plano + HTML simple y lo envía con
+  `ResendClient`. `--dry-run` imprime el email sin enviarlo. No envía nada si no hay novedades.
+- `.github/workflows/admin-digest.yml`: cron diario `45 11 * * *` (UTC) + `workflow_dispatch`. Secretos que ya existen
+  (`SUPABASE_*`, `RESEND_API_KEY`) más `ADMIN_EMAIL` (nuevo).
+- Aviso inmediato: una Edge Function `notify-admin`, disparada por un Database Webhook en `INSERT` de `place_reports`
+  (tipo `negative`), con el mismo secreto compartido que `place-report-created`. La salida del mapa y la respuesta de un
+  comercio se avisan desde el código Python que ya maneja esos eventos (`review_handler.py`,
+  `outreach_reply_handler.py`), con un `notify_admin()` común.
+- Remitente: `avisos@celiacmap.org`. Asunto con prefijo fijo (`[CeliacMap] Resumen del día`, `[CeliacMap] URGENTE: …`)
+  para armar un filtro en Zoho.
+- Anti-flood: el aviso inmediato tiene un tope por hora. Si se supera, el resto va al resumen diario. Así un bot que
+  llena el formulario no inunda el buzón.
+- Privacidad: el email lleva el dato "dueño celíaco" de una sugerencia porque es para la revisión del admin, pero nunca
+  va a un canal público. No lleva el texto de los turnos del chatbot.
+
+**Antes de implementar — verificar el DNS del correo.** En agosto se configuró Resend para **recibir** mail en
+`celiacmap.org` (las respuestas al outreach llegan a `outreach+<id>@celiacmap.org`), y el buzón de Zoho usa el mismo
+dominio. Si los dos tienen registros MX en `celiacmap.org`, el mail entrante se reparte entre Resend y Zoho según la
+prioridad, y se pierden las respuestas al outreach o los emails del buzón. Hay que mirar los MX en el panel del DNS. Si
+están los dos, mover la recepción de Resend a un subdominio (por ejemplo `respuestas.celiacmap.org`) y cambiar
+`OUTREACH_INBOUND_DOMAIN`. El envío (SPF/DKIM) no tiene conflicto; el SPF tiene que incluir a los dos
+(`include:zoho.com` y el de Resend).
+
+**Tests:** el resumen agrupa bien y no se envía vacío; `--dry-run` no llama a Resend; el texto del chatbot nunca aparece;
+el tope por hora desvía al resumen.
+
 ---
 
 ## Verificación de cada paso
