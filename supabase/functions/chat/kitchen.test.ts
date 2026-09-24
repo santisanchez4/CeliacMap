@@ -380,6 +380,10 @@ Deno.test("RESPONDER_PROMPT - the kitchen question: only with preguntar_cocina, 
   assertStringIncludes(r, "Si <envio> trae preguntar_cocina: true");
   assertStringIncludes(r, "Terminá siempre con la pregunta de envío");
   assertStringIncludes(r, "no vuelvas a preguntar");
+  // Live finding (chat v15, scenario S2): after a bare "no sé" the bot offered to rewrite the comment instead of
+  // re-showing the draft. A draft with no kitchen question and no facts must be re-summarized with the send question.
+  assertStringIncludes(r, 'volvé a resumir el borrador en una frase y preguntá "¿Lo envío así?"');
+  assertStringIncludes(r, "no ofrezcas reescribirlo ni dejarlo para después");
   assertStringIncludes(r, "Si <envio> trae invitar_cocina: true");
 });
 
@@ -404,6 +408,9 @@ Deno.test("RESPONDER_PROMPT - kitchen examples ask once, cite only what was said
   const recap = ex.find((e) => e.includes('"dueno_celiaco": "si"'));
   assertEquals(recap !== undefined, true);
   assertStringIncludes(recap!, "el equipo lo confirma antes de definir la etiqueta");
+  const resend = ex.find((e) => e.includes('Usuario: "no sé"'));
+  assertEquals(resend !== undefined, true);
+  assertStringIncludes(resend!.split("Asistente:")[1], "¿Lo envío así?");
   for (const e of ex) assertEquals(/urgen/i.test(e.split("Asistente:")[1] ?? ""), false);
 });
 
