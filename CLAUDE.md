@@ -1978,6 +1978,54 @@ Google had nothing to geocode against for either address. See
 `db/fixes/2026-09-22-fray-bentos-ta-bacana-canela.sql` for the full SQL and
 reasoning.
 
+**Third precedent — safety-label corrections + a home-based business
+(2026-09-24).** **Los Leños** (Montevideo, S. José 909) and **Dalbertt**
+(Mercedes 799) had been approved on 2026-09-05 as `options_available`; on
+Santiago's direct knowledge that both cook *exclusively* gluten-free, both moved
+to `gluten_free_100` (`db/fixes/2026-09-24-los-lenos-dalbertt-gluten-free-100.sql`;
+`CORRECCIÓN MANUAL` header prepended, `validation_confidence` / `verified` /
+`status` untouched). **Pastas Lo de Flor** (Fray Bentos) — a community
+suggestion whose address ("JC 23") could not be geocoded — was inserted directly
+as `approved` / `gluten_free_100` / `shop`, `source='user'`,
+`geocode_method='address_only'` (Google Geocoding, ROOFTOP, Eugenio Guevara 128;
+the street name reached us with several misspellings and all resolve to the same
+route), `validation_confidence` null, and its suggestion flipped to `promoted`
+(`db/fixes/2026-09-24-fray-bentos-pastas-lo-de-flor.sql`). It is a by-order home
+business with no storefront; the submitter reported the owner is celiac and
+Santiago confirmed the business.
+
+**Labeling rule (decided 2026-09-24 — applies to the Validator, the public forms
+and the chatbot).** `gluten_free_100` means the establishment cooks and sells
+*only* gluten-free / celiac-safe products. "Sin gluten", "sin TACC" and "apto para
+celíacos" are not interchangeable terms. A place that cooks everything but offers
+dishes or a menu for celiacs (prepared separately, or in a separate kitchen) is
+`options_available` ("Tiene opciones sin TACC"). A small business that uses one
+kitchen for everything is not 100% by default. A claim that the **owner is
+celiac** raises confidence but is **evidence for human review, never automatic**:
+until the owner confirms it directly or a corroborating review exists, the label
+stays `options_available`; only the admin upgrades it to 100%. Collecting the
+kitchen type / owner-celiac facts in the forms and the chatbot is being designed
+separately (not yet built).
+
+### `#suggest` section — card titles and copy (2026-09-24)
+
+The two form cards in `#suggest` (Form A "Sumá un lugar", Form B "Recomendar /
+reportar") opened straight into a message and fields, with nothing saying what
+each card was for. Each now leads with an `h3.suggest-form-title` — **"¿Conocés un
+lugar? Agregalo"** / **"¿Ya fuiste a un lugar del mapa? Contanos cómo te fue"** —
+followed by a rewritten intro (Form B's states that a report is evidence for
+review and never changes the map on its own). Step 1 of the 3-step row above
+("Marcá el lugar… en el mapa") was inaccurate — the form pins nothing on the map —
+and now reads "Completá los datos del lugar". ES + EN (`js/main.js`), frontend
+only; `tests/frontend_forms_copy.test.js` (4) guards the titles, the intros, step
+1, and that every `data-i18n` key in `#suggest` has an EN entry. Verified in
+Chrome (ES/EN toggle, 390px, no console errors). This is **piece 1 of 3** from the
+2026-09-24 design session; the other two are designed separately and **not built**:
+(2) collect kitchen type / owner-celiac in the forms and chatbot as human-review
+evidence (see the labeling rule above), and (3) publicly show community
+recommendations — e.g. the 2026-09-23 positive report on *San Felipa - Sin gluten*
+(Gualeguaychú), which today sits in `place_reports` with no public read path.
+
 ### Retroactive re-validation of pre-three-tier-rubric approvals (2026-09-06)
 
 **The gap.** The three-tier Validator rubric and its code-enforced confidence
