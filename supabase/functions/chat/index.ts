@@ -79,6 +79,15 @@ export type PendingReportSubmission = {
   place_name: string | null;
   report_type: "positive" | "negative";
   description: string;
+  // Kitchen declarations (spec 2026-09-24-kitchen-info-design.md). SPARSE: a key exists only
+  // when it carries a value, so a draft without kitchen data keeps the exact shape it always
+  // had. Positive reports only (place_reports has a CHECK that forbids them on a negative one).
+  kitchen_exclusive?: boolean | null;
+  celiac_prep?: CeliacPrep | null;
+  owner_celiac?: boolean | null;
+  // Internal: the kitchen question was already put to the person for this draft. Round-tripped
+  // through the client echo only; never written to the database (like place_name).
+  kitchen_asked?: boolean;
 };
 
 export type PendingSuggestionSubmission = {
@@ -96,6 +105,11 @@ export type PendingSuggestionSubmission = {
   address: string | null; // null while still being collected (Task 4)
   category: "restaurant" | "cafe" | "shop" | null;
   notes: string | null;
+  // Kitchen declarations — same sparse rules as PendingReportSubmission.
+  kitchen_exclusive?: boolean | null;
+  celiac_prep?: CeliacPrep | null;
+  owner_celiac?: boolean | null;
+  kitchen_asked?: boolean;
 };
 
 export type PendingSubmission = PendingReportSubmission | PendingSuggestionSubmission;
@@ -147,6 +161,7 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
     if (placeId === null && placeNameText === null) return null; // schema requires one of the two
     if (obj.report_type !== "positive" && obj.report_type !== "negative") return null;
     if (!isNonEmptyString(obj.description, 2000)) return null;
+    const facts = obj.report_type === "positive" ? normalizeKitchenFacts(obj) : NO_KITCHEN_FACTS;
     return {
       kind: "report",
       place_id: placeId as string | null,
@@ -154,6 +169,7 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
       place_name: placeName as string | null,
       report_type: obj.report_type,
       description: obj.description as string,
+      ...sparseKitchen(facts, obj.kitchen_asked === true),
     };
   }
 
@@ -173,6 +189,7 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
     if (category !== null && category !== "restaurant" && category !== "cafe" && category !== "shop") return null;
     const notes = obj.notes;
     if (notes !== null && !isNonEmptyString(notes, 1000)) return null;
+    const facts = normalizeKitchenFacts(obj);
     return {
       kind: "suggestion",
       name: obj.name as string,
@@ -181,6 +198,7 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
       address: (address ?? null) as string | null,
       category: (category ?? null) as "restaurant" | "cafe" | "shop" | null,
       notes: (notes ?? null) as string | null,
+      ...sparseKitchen(facts, obj.kitchen_asked === true),
     };
   }
 
@@ -839,6 +857,105 @@ export function buildSuggestionInsertPayload(p: PendingSuggestionSubmission) {
     notes: p.notes,
     origin: "community",
   };
+}
+
+// ---------------------------------------------------------------------------
+// Kitchen declarations (docs/superpowers/specs/2026-09-24-kitchen-info-design.md, 8.2)
+//
+// What the person says about HOW a place cooks. Unverified evidence for the human
+// reviewer and the Validator: it never changes a label by itself. Incoherent input
+// (a client echo edited by hand, a model contradiction) is CLAMPED to null, never
+// rejected — rejecting would silently destroy the whole in-progress draft, the exact
+// bug class the Fase C final review fixed.
+// ---------------------------------------------------------------------------
+
+export type CeliacPrep = "separate_kitchen" | "separate_prep" | "shared_kitchen";
+const CELIAC_PREPS: readonly CeliacPrep[] = ["separate_kitchen", "separate_prep", "shared_kitchen"];
+
+export interface KitchenFacts {
+  kitchen_exclusive: boolean | null;
+  celiac_prep: CeliacPrep | null;
+  owner_celiac: boolean | null;
+}
+export const NO_KITCHEN_FACTS: KitchenFacts = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
+
+type SparseKitchen = { kitchen_exclusive?: boolean; celiac_prep?: CeliacPrep; owner_celiac?: boolean; kitchen_asked?: true };
+
+/** Only the keys that carry a value (plus the internal asked marker). */
+function sparseKitchen(facts: KitchenFacts, asked: boolean): SparseKitchen {
+  const out: SparseKitchen = {};
+  if (facts.kitchen_exclusive !== null) out.kitchen_exclusive = facts.kitchen_exclusive;
+  if (facts.celiac_prep !== null) out.celiac_prep = facts.celiac_prep;
+  if (facts.owner_celiac !== null) out.owner_celiac = facts.owner_celiac;
+  if (asked) out.kitchen_asked = true;
+  return out;
+}
+
+export function normalizeKitchenFacts(
+  input: { kitchen_exclusive?: unknown; celiac_prep?: unknown; owner_celiac?: unknown },
+): KitchenFacts {
+  const exclusive = typeof input.kitchen_exclusive === "boolean" ? input.kitchen_exclusive : null;
+  // The preparation method only exists when the kitchen is NOT exclusive (a CHECK in the database).
+  const prep = exclusive === false && (CELIAC_PREPS as readonly unknown[]).includes(input.celiac_prep)
+    ? (input.celiac_prep as CeliacPrep)
+    : null;
+  const owner = typeof input.owner_celiac === "boolean" ? input.owner_celiac : null;
+  return { kitchen_exclusive: exclusive, celiac_prep: prep, owner_celiac: owner };
+}
+
+export function hasKitchenFacts(f: KitchenFacts): boolean {
+  return f.kitchen_exclusive !== null || f.celiac_prep !== null || f.owner_celiac !== null;
+}
+
+/** The router's Spanish words -> the database vocabulary. Never infers beyond one rule:
+ * describing HOW celiac food is prepared implies the place also cooks with gluten. */
+export function kitchenFactsFromRouter(
+  r: {
+    cocina_exclusiva: "si" | "no" | null;
+    preparacion_celiaca: "cocina_separada" | "preparacion_aparte" | "misma_cocina" | null;
+    dueno_celiaco: "si" | "no" | null;
+  },
+): KitchenFacts {
+  const yesNo = (v: "si" | "no" | null): boolean | null => (v === "si" ? true : v === "no" ? false : null);
+  const prepWords = { cocina_separada: "separate_kitchen", preparacion_aparte: "separate_prep", misma_cocina: "shared_kitchen" } as const;
+  const prep = r.preparacion_celiaca ? prepWords[r.preparacion_celiaca] : null;
+  let exclusive = yesNo(r.cocina_exclusiva);
+  if (prep !== null && exclusive === null) exclusive = false;
+  return normalizeKitchenFacts({ kitchen_exclusive: exclusive, celiac_prep: prep, owner_celiac: yesNo(r.dueno_celiaco) });
+}
+
+/** `p` with `facts` merged over its own (a new non-null value wins). A negative report never
+ * carries kitchen facts. Keys exist only when meaningful, so no facts => the same shape as before. */
+export function mergeKitchenFacts<T extends PendingSubmission>(p: T, facts: KitchenFacts): T {
+  const next = { ...p } as T & { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: boolean | null };
+  delete next.kitchen_exclusive;
+  delete next.celiac_prep;
+  delete next.owner_celiac;
+  if (p.kind === "report" && p.report_type === "negative") return next;
+  const current = normalizeKitchenFacts(p);
+  const merged = normalizeKitchenFacts({
+    kitchen_exclusive: facts.kitchen_exclusive ?? current.kitchen_exclusive,
+    celiac_prep: facts.celiac_prep ?? current.celiac_prep,
+    owner_celiac: facts.owner_celiac ?? current.owner_celiac,
+  });
+  if (merged.kitchen_exclusive !== null) next.kitchen_exclusive = merged.kitchen_exclusive;
+  if (merged.celiac_prep !== null) next.celiac_prep = merged.celiac_prep;
+  if (merged.owner_celiac !== null) next.owner_celiac = merged.owner_celiac;
+  return next;
+}
+
+/** One kitchen step for a draft turn: merge what the router extracted this turn and, ONLY the
+ * first time a complete draft has no kitchen data, mark it as asked so the redactor puts the
+ * optional question together with the "¿Lo envío así?". Never asks about a negative report. */
+export function applyKitchenStep<T extends PendingSubmission>(
+  pending: T,
+  router: Parameters<typeof kitchenFactsFromRouter>[0],
+  opts: { complete: boolean },
+): { pending: T; preguntarCocina: boolean } {
+  if (pending.kind === "report" && pending.report_type === "negative") return { pending, preguntarCocina: false };
+  const merged = mergeKitchenFacts(pending, kitchenFactsFromRouter(router));
+  const ask = opts.complete && merged.kitchen_asked !== true && !hasKitchenFacts(normalizeKitchenFacts(merged));
+  return { pending: ask ? ({ ...merged, kitchen_asked: true } as T) : merged, preguntarCocina: ask };
 }
 
 // A failed intake write must never be reported to the user as a success (the
