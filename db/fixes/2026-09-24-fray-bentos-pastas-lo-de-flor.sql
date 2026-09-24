@@ -3,10 +3,11 @@
 -- — not geocodable) resolved by the admin (Santiago Sánchez) on 2026-09-24.
 --
 -- Small home-based business (homemade sin-TACC pasta, orders Mon-Thu, delivered
--- on Saturdays), Instagram-only, no Google Place. The submitter noted the owner
--- is celiac. Admin criterion (2026-09-24): a business whose owner is celiac is
--- trusted fully and labelled 100% gluten free, even when it is a single-kitchen
--- home business — the owner's own celiac status is the safety guarantee.
+-- on Saturdays), Instagram-only, no Google Place. Labelled 100% gluten free by the
+-- admin's own criterion, based on direct information about the business's kitchen.
+-- That detail is deliberately NOT written down here or in the row's validation_notes:
+-- places.validation_notes is publicly readable and the detail concerns a named third
+-- party (see db/fixes/2026-09-24-lo-de-flor-note-privacy.sql).
 --
 -- Address per the admin: "Eugenio Guevara 128, Fray Bentos" (may be off by a
 -- small house-number variation, admin-accepted). Google Geocoding API resolves
@@ -38,7 +39,7 @@ with new_place as (
     'Eugenio Guevara 128, 65000 Fray Bentos, Departamento de Río Negro, Uruguay',
     'user', null, 'address_only',
     'https://www.instagram.com/pastas_lodeflor/',
-    'APROBACIÓN MANUAL (2026-09-24, Santiago Sánchez): agregado y aprobado directamente por el administrador, sin evaluación del Validator. Emprendimiento casero de pastas sin TACC en Fray Bentos (Instagram @pastas_lodeflor: "Pastas caseras sin TACC — pedidos de lunes a jueves, se entregan los sábados"; trabaja por encargo). Sugerido por la comunidad, que indicó que la dueña es celíaca; criterio del administrador: un emprendimiento cuya dueña o dueño es celíaco se etiqueta como 100% sin gluten. Dirección informada por el administrador: Eugenio Guevara 128 (el número puede tener una pequeña variación). Sin ficha de Google Place: coordenadas por Google Geocoding API a nivel de puerta (ROOFTOP), geocode_method address_only. validation_confidence se deja en null (no hay puntaje real del Validator); verified sigue en false.'
+    'APROBACIÓN MANUAL (2026-09-24, Santiago Sánchez): agregado y aprobado directamente por el administrador, sin evaluación del Validator. Emprendimiento casero de pastas sin TACC en Fray Bentos (Instagram @pastas_lodeflor: "Pastas caseras sin TACC — pedidos de lunes a jueves, se entregan los sábados"; trabaja por encargo). Sugerido por la comunidad. Etiqueta 100% sin gluten por criterio del administrador, con información directa sobre la cocina del emprendimiento (el detalle no se publica por privacidad). Dirección informada por el administrador: Eugenio Guevara 128 (el número puede tener una pequeña variación). Sin ficha de Google Place: coordenadas por Google Geocoding API a nivel de puerta (ROOFTOP), geocode_method address_only. validation_confidence se deja en null (no hay puntaje real del Validator); verified sigue en false.'
   where not exists (
     select 1 from public.places
     where name = 'Pastas Lo de Flor' and city = 'Fray Bentos' and country = 'Uruguay'
