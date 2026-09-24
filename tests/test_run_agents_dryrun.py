@@ -31,3 +31,15 @@ def test_dry_run_wrapper_mirrors_every_read_method_of_the_client():
     ]
     missing = [name for name in reads if not hasattr(DryRunSupabase, name)]
     assert missing == [], f"DryRunSupabase lacks these reads: {missing}"
+
+
+def test_dry_run_wrapper_reads_unpublished_opinions_but_never_publishes():
+    inner = MagicMock()
+    inner.fetch_unpublished_opinions.return_value = [{"id": "r1"}]
+    wrapper = DryRunSupabase(inner)
+
+    assert wrapper.fetch_unpublished_opinions(limit=5) == [{"id": "r1"}]
+    inner.fetch_unpublished_opinions.assert_called_once_with(limit=5)
+
+    assert wrapper.set_opinions_published(["r1"], True) == []
+    inner.set_opinions_published.assert_not_called()
