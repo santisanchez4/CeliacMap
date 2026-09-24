@@ -73,6 +73,9 @@ class DryRunSupabase:
     def fetch_unpublished_opinions(self, limit: int = 100) -> list[dict]:
         return self._inner.fetch_unpublished_opinions(limit=limit)
 
+    def fetch_place_evidence(self, place_id: str, limit: int = 5) -> list[dict]:
+        return self._inner.fetch_place_evidence(place_id, limit=limit)
+
     def fetch_latest_received_message(self, place_id: str) -> dict | None:
         return self._inner.fetch_latest_received_message(place_id)
 
@@ -149,6 +152,9 @@ class DryRunSupabase:
 
     def update_place(self, place_id: str, patch: dict[str, Any]) -> None:
         logger.info("[dry-run] would update place %s -> %s", place_id, patch)
+
+    def add_place_evidence(self, place_id: str, source: str, text=None, url=None) -> None:
+        logger.info("[dry-run] would add %s evidence for place %s", source, place_id)
 
     def update_place_validation(self, place_id: str, **kwargs: Any) -> None:
         logger.info("[dry-run] would set validation on %s -> %s", place_id, kwargs)

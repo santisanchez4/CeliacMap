@@ -19,6 +19,8 @@ confirms before a place is marked verified).
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 
 from agents.base import BaseAgent
 from agents.clients.llm import LLMClient
@@ -39,6 +41,32 @@ _PREP_LABELS = {
     "separate_prep": "preparación aparte",
     "shared_kitchen": "misma cocina",
 }
+
+# Discovery / community / admin evidence (audit plan step 1): server-only place_evidence rows.
+MAX_EVIDENCE = 5
+MAX_EVIDENCE_CHARS = 400
+_EVIDENCE_LABELS = {
+    "social": "redes sociales",
+    "web": "web",
+    "user": "aporte de una persona (formulario)",
+    "admin": "administrador de CeliacMap",
+}
+
+# Tope C (audit plan step 2): an automatic "gluten_free_100" needs an explicit exclusivity
+# phrase in the evidence the model was given (reviews + place_evidence). The place's NAME
+# never counts: it is not in the texts searched here. Matched after lower-casing and
+# stripping accents.
+_EXCLUSIVE_SIGNAL_RE = re.compile(
+    r"100\s*%\s*(?:sin (?:gluten|tacc)|libre de gluten|gluten[ -]?free|apto|celiac)"
+    r"|(?:todo|toda|totalmente|exclusivamente|solo|solamente|unicamente)\s+(?:es\s+|lo que \w+\s+es\s+)?"
+    r"(?:sin (?:gluten|tacc)|libre de gluten|gluten[ -]?free|apto para celiac)"
+    r"|cocina (?:exclusiva|dedicada|100\s*%)"
+    r"|(?:espacio|local|lugar|panaderia|restaurante|cafe) (?:100\s*% )?libre de gluten"
+)
+_NEGATION_RE = re.compile(r"\bno\s+(?:es\s+|son\s+|tiene\s+)?$")
+# Sentences that tie a person (owner) to celiac disease: a third party's health condition,
+# never persisted to the publicly readable places columns (ADR-007).
+_OWNER_HEALTH_RE = re.compile(r"(?:due[nñ]|propietari|owner)\w*[^.;\n]{0,60}cel[ií]ac|cel[ií]ac\w*[^.;\n]{0,60}(?:due[nñ]|propietari|owner)", re.IGNORECASE)
 
 # Confidence gates (health-sensitive). Auto-approval needs strong evidence; the
 # 0.7 floor is below 0.85, so any place the model would "approve" with weak
@@ -111,6 +139,10 @@ verificación de existencia). Tratá esto como evidencia debilitada — NO asign
 "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", \
 reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
 
+Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
+
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, \
 exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",
@@ -140,7 +172,10 @@ class ValidatorAgent(BaseAgent):
 
     @staticmethod
     def _build_user_prompt(
-        place: dict, reviews: list[dict] | None = None, claims: list[dict] | None = None
+        place: dict,
+        reviews: list[dict] | None = None,
+        claims: list[dict] | None = None,
+        evidence: list[dict] | None = None,
     ) -> str:
         fields = {
             "name": place.get("name"),
@@ -171,10 +206,36 @@ class ValidatorAgent(BaseAgent):
                 f"- {text}" for text in snippets
             )
 
+        evidence_block = ValidatorAgent._evidence_block(evidence)
+        if evidence_block:
+            prompt += "\n\n" + evidence_block
+
         claims_block = ValidatorAgent._claims_block(claims)
         if claims_block:
             prompt += "\n\n" + claims_block
         return prompt
+
+    @staticmethod
+    def _evidence_block(evidence) -> str:
+        """Discovery / community / admin evidence (place_evidence), rendered as UNVERIFIED.
+
+        Best-effort like the claims block: anything that is not a list of dicts renders
+        nothing, so a place without evidence gets exactly the prompt it got before.
+        """
+        lines = []
+        for e in list(evidence or [])[:MAX_EVIDENCE]:
+            if not isinstance(e, dict):
+                continue
+            text = " ".join(str(e.get("text") or "").split())[:MAX_EVIDENCE_CHARS]
+            url = str(e.get("url") or "").strip()
+            if not text and not url:
+                continue
+            label = _EVIDENCE_LABELS.get(e.get("source"), "otra fuente")
+            body = text or "(sin texto)"
+            lines.append(f"- [{label}] {body}" + (f" (fuente: {url})" if url else ""))
+        if not lines:
+            return ""
+        return "evidencia_descubrimiento (NO verificada):\n" + "\n".join(lines)
 
     @staticmethod
     def _claims_block(claims) -> str:
@@ -231,6 +292,7 @@ class ValidatorAgent(BaseAgent):
         place: dict,
         reviews: list[dict] | None = None,
         claims: list[dict] | None = None,
+        evidence: list[dict] | None = None,
     ) -> dict:
         """Run the full model evaluation for a single place and return the
         normalized verdict dict (``verdict``, ``status``, ``category``,
@@ -244,9 +306,9 @@ class ValidatorAgent(BaseAgent):
         re-evaluation share one code path.
         """
         raw = self.llm.complete_json(
-            RUBRIC, self._build_user_prompt(place, reviews, claims), model=self.model
+            RUBRIC, self._build_user_prompt(place, reviews, claims, evidence), model=self.model
         )
-        return self._normalize(raw, place, claims)
+        return self._normalize(raw, place, claims, reviews=reviews, evidence=evidence)
 
     @staticmethod
     def _decide_status(verdict: str, confidence: float | None) -> str:
@@ -264,7 +326,15 @@ class ValidatorAgent(BaseAgent):
             return "approved"
         return "needs_review"
 
-    def _normalize(self, verdict: dict, place: dict, claims: list[dict] | None = None) -> dict:
+    def _normalize(
+        self,
+        verdict: dict,
+        place: dict,
+        claims: list[dict] | None = None,
+        *,
+        reviews: list[dict] | None = None,
+        evidence: list[dict] | None = None,
+    ) -> dict:
         """Coerce the model output into safe, schema-valid values."""
         raw = str(verdict.get("verdict", "")).strip().lower()
         verdict_label = raw if raw in ALLOWED_VERDICTS else "needs_review"
@@ -277,14 +347,18 @@ class ValidatorAgent(BaseAgent):
         if safety not in ALLOWED_SAFETY:
             safety = place.get("safety_level") or DEFAULT_SAFETY_LEVEL
         safety, cap_flags = self._apply_kitchen_caps(safety, place, claims)
+        safety, signal_flags = self._apply_exclusive_signal_cap(safety, reviews, evidence)
+        cap_flags += [f for f in signal_flags if f not in cap_flags]
 
         # Accept both the new field name and the legacy ones, defensively.
         confidence = self._clamp_confidence(
             verdict.get("confidence_score", verdict.get("confidence"))
         )
-        reasoning = str(verdict.get("reasoning", verdict.get("reason", ""))).strip()
+        reasoning = self._scrub_owner_health(
+            str(verdict.get("reasoning", verdict.get("reason", ""))).strip()
+        )
 
-        flags = self._coerce_flags(verdict.get("flags"))
+        flags = [f for f in self._coerce_flags(verdict.get("flags")) if not _OWNER_HEALTH_RE.search(f)]
         flags += [f for f in cap_flags if f not in flags]
 
         return {
@@ -295,7 +369,10 @@ class ValidatorAgent(BaseAgent):
             "confidence": confidence,
             "reason": reasoning or None,
             "flags": flags,
-            "recommendation": (str(verdict.get("recommendation", "")).strip() or None),
+            "recommendation": self._scrub_owner_health(
+                str(verdict.get("recommendation", "")).strip()
+            )
+            or None,
         }
 
     @staticmethod
@@ -330,6 +407,41 @@ class ValidatorAgent(BaseAgent):
                 flags.append(PENDING_ADMIN_FLAG)
         return safety, flags
 
+    @staticmethod
+    def has_exclusive_signal(texts) -> bool:
+        """True if any text states the place is exclusively gluten free ("100% sin TACC",
+        "todo es sin gluten", "cocina exclusiva"...), and the phrase is not negated."""
+        for raw in texts or []:
+            text = unicodedata.normalize("NFKD", str(raw or ""))
+            text = "".join(c for c in text if not unicodedata.combining(c)).lower()
+            for m in _EXCLUSIVE_SIGNAL_RE.finditer(text):
+                if not _NEGATION_RE.search(text[max(0, m.start() - 20): m.start()]):
+                    return True
+        return False
+
+    @classmethod
+    def _apply_exclusive_signal_cap(cls, safety: str, reviews, evidence) -> tuple[str, list[str]]:
+        """Tope C: "gluten_free_100" only survives with an explicit exclusivity phrase in the
+        evidence the model saw (reviews + place_evidence) — never from the name, never from the
+        model's own knowledge. Without it the level drops to "celiac_friendly" (public label
+        "Tiene opciones sin TACC") and the place is flagged for the admin, who confirms 100%."""
+        if safety != "gluten_free_100":
+            return safety, []
+        texts = [r.get("text") for r in list(reviews or []) if isinstance(r, dict)]
+        texts += [e.get("text") for e in list(evidence or []) if isinstance(e, dict)]
+        if cls.has_exclusive_signal(texts):
+            return safety, []
+        return "celiac_friendly", [PENDING_ADMIN_FLAG]
+
+    @staticmethod
+    def _scrub_owner_health(text: str) -> str:
+        """Drop sentences that tie an owner to celiac disease (a third party's health
+        condition); what's left is persisted to publicly readable places columns."""
+        if not text or not _OWNER_HEALTH_RE.search(text):
+            return text
+        sentences = re.split(r"(?<=[.;!?])\s+", text)
+        return " ".join(x for x in sentences if not _OWNER_HEALTH_RE.search(x)).strip()
+
     def run(self) -> dict:
         pending = self.db.fetch_places_by_status("pending", limit=self.max_per_run)
         approved = 0
@@ -350,7 +462,12 @@ class ValidatorAgent(BaseAgent):
                 logger.exception("fetching community claims failed for %s", place_id)
                 claims = []
             try:
-                v = self.evaluate(place, reviews, claims)
+                evidence = list(self.db.fetch_place_evidence(place_id) or [])
+            except Exception:  # noqa: BLE001 - evidence context is best-effort
+                logger.exception("fetching evidence failed for %s", place_id)
+                evidence = []
+            try:
+                v = self.evaluate(place, reviews, claims, evidence)
             except Exception as exc:  # noqa: BLE001
                 errors += 1
                 logger.exception("validation failed for %s", place_id)

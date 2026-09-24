@@ -166,7 +166,18 @@ class SocialAgent(BaseAgent):
             "city": (verdict.get("city") or "").strip() or None,
             "category": category,
             "address": (verdict.get("address") or "").strip() or None,
+            # The post/profile text itself ("100% sin TACC", "cocina exclusiva"...) is the
+            # evidence that separates a dedicated venue from one with options; the Validator
+            # reads it from place_evidence (audit plan step 1).
+            "evidence": " — ".join(part.strip() for part in (title, snippet) if part.strip()),
         }
+
+    def _keep_evidence(self, row: dict, source: str, text: str | None, url: str | None) -> None:
+        """Best-effort: a failed evidence write must never undo or abort the insert."""
+        try:
+            self.db.add_place_evidence(row.get("id"), source, text, url)
+        except Exception:  # noqa: BLE001
+            logger.exception("storing evidence failed for %s", row.get("id"))
 
     def run(self) -> dict:
         queries = self._build_queries()
@@ -310,6 +321,7 @@ class SocialAgent(BaseAgent):
 
                 if row:
                     inserted += 1
+                    self._keep_evidence(row, "social", lead.get("evidence"), url)
                     self.log(
                         "social_candidate_inserted",
                         {"name": candidate["name"], "url": url, "city": lead_city},

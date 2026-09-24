@@ -440,6 +440,10 @@ Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseña
 
 Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
 
+Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
+
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",
  "confidence_score": <número entre 0.0 y 1.0>,
@@ -2204,6 +2208,25 @@ evidence (see **Kitchen information as review evidence**), and (3) publicly show
 community recommendations (see **Community opinions on the public site**) — the
 2026-09-23 positive report on *San Felipa - Sin gluten* (Gualeguaychú) is the first
 one waiting to be moderated.
+
+### Audit 2026-09-24 — evidence for the Validator + 100% only with explicit evidence
+
+Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented here).
+
+- **Find Place name check (H6).** See the updated `resolve_location()` risk under **Key risks**.
+- **`place_evidence` (new, server-only table).** Social keeps the post title + snippet, Web keeps its `evidence`
+  sentence + URL, the Suggestion promoter keeps the person's note + link (no longer copied into `validation_notes`),
+  and the admin can add rows (`source='admin'`). The Validator, the review handler, the outreach reply handler and the
+  retroactive re-validation read it as an `evidencia_descubrimiento (NO verificada)` block; nothing overwrites it. It
+  closes the "`validation_notes` is invisible to the Validator" risk for anything written there. Server-only because it
+  carries unverified claims and third-party details, and `places` is publicly readable.
+- **RUBRIC** gained three paragraphs (evidence block; "only the evidence in this message — not your knowledge of the
+  business, not the name"; no health data in the output). prompts.md §32.
+- **Tope C** (code): `gluten_free_100` needs an explicit exclusivity phrase in the reviews/evidence the model saw; the
+  name never counts. Without it → `celiac_friendly` + `100% pendiente de confirmación del administrador`. Owner-health
+  sentences are scrubbed from `reasoning` / `flags` / `recommendation` before they reach public columns.
+- **Not yet done:** the real-model A/B, applying the migration (`place_evidence`), and the one-off pass over the
+  already-approved 100% places (plan step 2b).
 
 ### Kitchen information as review evidence (2026-09-24)
 

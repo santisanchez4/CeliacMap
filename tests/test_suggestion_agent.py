@@ -75,7 +75,10 @@ def test_promote_inserts_user_candidate():
     assert candidate["lat"] == -34.9 and candidate["lng"] == -56.2
     assert candidate["safety_level"] == DEFAULT_SAFETY_LEVEL
     assert candidate["social_url"] == "https://instagram.com/cafex"
-    assert candidate["validation_notes"] == "menú sin TACC"
+    # The note + link go to the server-only place_evidence the Validator reads, never to the
+    # publicly readable validation_notes.
+    assert "validation_notes" not in candidate
+    db.add_place_evidence.assert_called_once_with("row-1", "user", "menú sin TACC", "https://instagram.com/cafex")
     assert candidate["geocode_method"] == "find_place"
 
 

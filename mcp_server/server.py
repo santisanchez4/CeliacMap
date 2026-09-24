@@ -200,7 +200,9 @@ def validate_place(
     )
 
     raw = agent.llm.complete_json(RUBRIC, user_prompt)
-    v = agent._normalize(raw, place)
+    # The evidence text the caller pasted is what the model saw, so it is also what Tope C
+    # (100% only with an explicit exclusivity phrase) checks.
+    v = agent._normalize(raw, place, evidence=[{"source": "admin", "text": evidence}])
 
     result = {
         "verdict": v["verdict"],

@@ -417,7 +417,13 @@ def main() -> int:
             reviews = []
 
         try:
-            v = agent.evaluate(place, reviews)
+            evidence = list(db.fetch_place_evidence(pid) or [])
+        except Exception:  # noqa: BLE001 - evidence context is best-effort
+            logger.exception("fetching evidence failed for %s", pid)
+            evidence = []
+
+        try:
+            v = agent.evaluate(place, reviews, None, evidence)
         except Exception as exc:  # noqa: BLE001
             logger.exception("re-validation failed for %s", pid)
             errors.append((place, str(exc)))

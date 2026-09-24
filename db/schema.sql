@@ -667,6 +667,31 @@ $$;
 -- code -- see db/checks/2026-09-16-chat-usage.sql.
 revoke execute on function public.bump_chat_usage(text[], date) from public, anon, authenticated;
 
+-- PLACE-EVIDENCE-BEGIN
+-- ---------------------------------------------------------------------
+-- Table: place_evidence  (audit plan 2026-09-24, step 1)
+-- ---------------------------------------------------------------------
+-- The text a discovery agent or a person gave us about a place: the Instagram /
+-- Facebook snippet (Social), the "why is this GF" sentence + URL (Web), the note +
+-- link from the suggest form (user), or the admin's own evidence (admin). The
+-- Validator reads it and nothing ever overwrites it (validation_notes is rewritten on
+-- every validation, so evidence kept there was lost). SERVER-ONLY: it can carry
+-- unverified claims and third-party details, and places is publicly readable.
+create table if not exists public.place_evidence (
+  id         uuid primary key default gen_random_uuid(),
+  place_id   uuid not null references public.places(id) on delete cascade,
+  source     text not null
+               check (source in ('social', 'web', 'user', 'admin')),
+  text       text
+               check (text is null or char_length(text) between 1 and 1000),
+  url        text
+               check (url is null or char_length(url) <= 500),
+  created_at timestamptz not null default now(),
+  constraint place_evidence_has_content check (text is not null or url is not null)
+);
+create index if not exists place_evidence_place_id_idx on public.place_evidence (place_id);
+-- PLACE-EVIDENCE-END
+
 -- ---------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------
@@ -678,6 +703,7 @@ alter table public.outreach_messages enable row level security;
 alter table public.place_reports enable row level security;
 alter table public.place_votes enable row level security;
 alter table public.chat_usage enable row level security;
+alter table public.place_evidence enable row level security;
 
 -- Table-level privileges (RLS still gates rows).
 grant select on public.places  to anon, authenticated;
@@ -713,6 +739,8 @@ grant insert on public.place_votes to anon, authenticated;
 -- public. Only the chat Edge Function (service_role key, bypasses RLS) reads
 -- or writes it, via bump_chat_usage (itself EXECUTE-revoked from anon above).
 revoke all on public.chat_usage from anon, authenticated;
+-- place_evidence is server-only: no grant, no policy => fully denied to the public.
+revoke all on public.place_evidence from anon, authenticated;
 
 -- places: anyone may read ONLY approved rows.
 drop policy if exists "public read approved places" on public.places;

@@ -366,3 +366,32 @@ def test_geocode_error_is_counted():
 
     assert summary["errors"] == 1
     assert summary["inserted"] == 0
+
+
+# --- Audit plan step 1: the post text is kept as evidence for the Validator ----
+
+
+def test_inserted_candidate_keeps_title_and_snippet_as_evidence():
+    agent, db, search, _, _ = make_agent(max_queries=1)
+    search.search.return_value = [
+        {"title": "Cafe X | Instagram", "link": "https://instagram.com/cafex",
+         "snippet": "Cocina 100% sin TACC en Pocitos"}
+    ]
+
+    agent.run()
+
+    db.add_place_evidence.assert_called_once_with(
+        "row-1", "social", "Cafe X | Instagram — Cocina 100% sin TACC en Pocitos", "https://instagram.com/cafex"
+    )
+
+
+def test_evidence_write_failure_does_not_undo_the_insert():
+    agent, db, search, _, _ = make_agent(max_queries=1)
+    db.add_place_evidence.side_effect = RuntimeError("boom")
+    search.search.return_value = [
+        {"title": "Cafe X", "link": "https://instagram.com/cafex", "snippet": "sin TACC"}
+    ]
+
+    summary = agent.run()
+
+    assert summary["inserted"] == 1 and summary["errors"] == 0

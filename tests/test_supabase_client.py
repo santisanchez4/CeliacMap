@@ -266,3 +266,39 @@ def test_set_opinions_published_with_no_ids_does_not_touch_the_database():
     client = _client_with_mock_db()
     assert client.set_opinions_published([], True) == []
     client._db.table.assert_not_called()
+
+
+# --- place_evidence ------------------------------------------------------------
+
+
+def test_add_place_evidence_clamps_to_the_table_bounds():
+    from unittest.mock import MagicMock
+
+    from agents.clients.supabase_client import SupabaseClient
+
+    client = SupabaseClient.__new__(SupabaseClient)
+    client._db = MagicMock()
+    client.add_place_evidence("p1", "web", "x" * 5000, "u" * 900)
+    row = client._db.table.return_value.insert.call_args.args[0]
+    assert len(row["text"]) == 1000 and len(row["url"]) == 500
+
+
+def test_add_place_evidence_skips_an_empty_row():
+    from unittest.mock import MagicMock
+
+    from agents.clients.supabase_client import SupabaseClient
+
+    client = SupabaseClient.__new__(SupabaseClient)
+    client._db = MagicMock()
+    client.add_place_evidence("p1", "user", "   ", None)
+    client._db.table.assert_not_called()
+
+
+def test_place_evidence_table_is_server_only():
+    from pathlib import Path
+
+    schema = (Path(__file__).resolve().parent.parent / "db" / "schema.sql").read_text(encoding="utf-8")
+    assert "alter table public.place_evidence enable row level security;" in schema
+    assert "revoke all on public.place_evidence from anon, authenticated;" in schema
+    assert "grant select on public.place_evidence" not in schema
+    assert "grant insert on public.place_evidence" not in schema

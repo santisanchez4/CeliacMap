@@ -53,8 +53,10 @@ exactamente con esta forma:
 """
 
 
-def _build_reply_prompt(place: dict, reviews: list[dict], reply_text: str) -> str:
-    base = ValidatorAgent._build_user_prompt(place, reviews)
+def _build_reply_prompt(
+    place: dict, reviews: list[dict], reply_text: str, evidence: list[dict] | None = None
+) -> str:
+    base = ValidatorAgent._build_user_prompt(place, reviews, None, evidence)
     return (
         f"{base}\n\n"
         "Respuesta directa del comercio (auto-reportada vía email; el comercio "
@@ -151,11 +153,24 @@ class OutreachReplyHandler(BaseAgent):
             logger.exception("fetching review context failed for %s", place_id)
             reviews = []
 
-        prompt = _build_reply_prompt(place, reviews, reply_text)
+        try:
+            evidence = list(self.db.fetch_place_evidence(place_id) or [])
+        except Exception:  # noqa: BLE001 - evidence context is best-effort
+            logger.exception("fetching evidence failed for %s", place_id)
+            evidence = []
+
+        prompt = _build_reply_prompt(place, reviews, reply_text, evidence)
 
         try:
             raw_verdict = self.llm.complete_json(RUBRIC, prompt)
-            v = self.validator._normalize(raw_verdict, place)
+            # The business's own reply is text the model saw: it counts for Tope C (an
+            # explicit "somos 100% sin gluten" keeps a 100%), still capped by every gate.
+            v = self.validator._normalize(
+                raw_verdict,
+                place,
+                reviews=reviews,
+                evidence=evidence + [{"source": "business", "text": reply_text}],
+            )
         except Exception as exc:  # noqa: BLE001
             logger.exception("reply re-evaluation failed for %s", place_id)
             self.log(

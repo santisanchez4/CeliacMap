@@ -42,8 +42,9 @@ def _build_report_prompt(
     reviews: list[dict],
     report_description: str,
     claims: list[dict] | None = None,
+    evidence: list[dict] | None = None,
 ) -> str:
-    base = ValidatorAgent._build_user_prompt(place, reviews, claims)
+    base = ValidatorAgent._build_user_prompt(place, reviews, claims, evidence)
     return (
         f"{base}\n\n"
         "Reporte directo de la comunidad (no verificado; puede ser un caso "
@@ -144,11 +145,19 @@ class ReviewHandler(BaseAgent):
             logger.exception("fetching community claims failed for %s", place_id)
             claims = []
 
-        prompt = _build_report_prompt(place, reviews, description, claims)
+        try:
+            evidence = list(self.db.fetch_place_evidence(place_id) or [])
+        except Exception:  # noqa: BLE001 - evidence context is best-effort
+            logger.exception("fetching evidence failed for %s", place_id)
+            evidence = []
+
+        prompt = _build_report_prompt(place, reviews, description, claims, evidence)
 
         try:
             raw_verdict = self.llm.complete_json(RUBRIC, prompt, model=self.model)
-            v = self.validator._normalize(raw_verdict, place, claims)
+            v = self.validator._normalize(
+                raw_verdict, place, claims, reviews=reviews, evidence=evidence
+            )
         except Exception as exc:  # noqa: BLE001
             self.db.update_place_report_status(report_id, "error")
             logger.exception("report re-evaluation failed for %s", place_id)

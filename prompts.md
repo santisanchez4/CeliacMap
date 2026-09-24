@@ -486,6 +486,10 @@ Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseña
 
 Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
 
+Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
+
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",
  "confidence_score": <número entre 0.0 y 1.0>,
@@ -2268,3 +2272,37 @@ ask "¿Lo envío así?" — do not offer to rewrite it or leave it for later —
 (`db/checks/2026-09-24-chat-kitchen-live-run.md`).
 
 Changing a prompt restarts the soft-launch count (CLAUDE.md).
+
+## 32. Audit 2026-09-24 — evidence block + "only from the message" + Tope C (Validator `RUBRIC`)
+
+**Why:** the audit (`docs/plans/PLAN-auditoria-2026-09-24.md`, H1/H2) found that the text that separates a dedicated
+venue from one with options (the Instagram bio, the blog sentence, the suggest-form note) was found by the discovery
+agents and then thrown away, so the Validator judged on name + address alone; and that for Search/Social/Web places
+the model could set `gluten_free_100` from the name alone (the Serendipia-cea / Enharinate failure class).
+
+**Three `RUBRIC` paragraphs, added before the JSON contract** (the conservative core, the three verdicts and the
+0.85 / 0.7 / 0.5 gates are untouched):
+
+1. `evidencia_descubrimiento`: texts from public sources (social posts/profiles, web pages) or contributed by people or
+   the admin, with their URL. They are the main evidence to tell a 100% venue from one with options; they are not
+   verified; one isolated source is not enough for `approved` if the rest contradicts it; what a person contributes
+   weighs like `declaraciones_comunidad`.
+2. **Only the evidence in the message:** never the model's own knowledge of the business, never the name or part of it
+   ("the name says sin gluten" does not prove an exclusive kitchen, and a name that doesn't say it proves nothing).
+   This is the line CLAUDE.md had parked as the mitigation for Enharinate / Serendipia.
+3. Never mention anyone's health data in `reasoning` / `flags` / `recommendation` (backed by a code scrub, below).
+
+**Code, not prompt (defense in depth):**
+
+- **Tope C** (`ValidatorAgent._apply_exclusive_signal_cap`): a `gluten_free_100` survives only if the texts the model was
+  given (reviews + `place_evidence`) contain an explicit exclusivity phrase ("100% sin TACC", "todo es sin gluten",
+  "cocina exclusiva", "espacio libre de gluten"…, not negated). Otherwise → `celiac_friendly` (public label "Tiene
+  opciones sin TACC") + the flag `100% pendiente de confirmación del administrador`. The name is never searched. It only
+  lowers, never raises, and never touches `status`. Applies to every source (Tope A still blocks any automatic 100% for
+  `source='user'`).
+- `_scrub_owner_health`: sentences/flags tying an owner to celiac disease are dropped before persisting.
+
+**Verification status:** offline tests only (`tests/test_validator_agent.py`). **Not yet A/B-tested against the real
+model** — this environment has no Anthropic/Supabase access. Before deploying, run
+`db/checks/validator_kitchen_ab.py`-style cases (strong evidence without claims, name-only "Sin Gluten X",
+social evidence with "100% sin TACC") on `main` vs this branch.

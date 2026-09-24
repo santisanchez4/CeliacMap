@@ -267,6 +267,38 @@ class SupabaseClient:
         claims.sort(key=lambda r: r.get("created_at") or "", reverse=True)
         return claims[:limit]
 
+    # --- place_evidence (server-only) -------------------------------
+    EVIDENCE_TEXT_MAX = 1000
+    EVIDENCE_URL_MAX = 500
+
+    def add_place_evidence(
+        self, place_id: str, source: str, text: str | None = None, url: str | None = None
+    ) -> None:
+        """Keep what a discovery agent / person told us about a place (audit plan step 1).
+
+        Clamped to the table's CHECK bounds on the way in; a row with neither text nor URL
+        is skipped rather than rejected by the database.
+        """
+        text = (text or "").strip()[: self.EVIDENCE_TEXT_MAX] or None
+        url = (url or "").strip()[: self.EVIDENCE_URL_MAX] or None
+        if not text and not url:
+            return
+        self._db.table("place_evidence").insert(
+            {"place_id": place_id, "source": source, "text": text, "url": url}
+        ).execute()
+
+    def fetch_place_evidence(self, place_id: str, limit: int = 5) -> list[dict]:
+        """Newest-first evidence rows for a place (``source``, ``text``, ``url``)."""
+        res = (
+            self._db.table("place_evidence")
+            .select("source, text, url, created_at")
+            .eq("place_id", place_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
     def fetch_unpublished_opinions(self, limit: int = 100) -> list[dict]:
         """Positive reports waiting for moderation: not published yet, about a place that is
         currently ``approved``. Oldest first. The full ``description`` is returned on purpose --

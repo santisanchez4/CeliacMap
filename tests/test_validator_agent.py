@@ -81,7 +81,7 @@ def test_invalid_safety_with_no_place_value_uses_default_floor():
 
 def test_valid_safety_passes_through():
     agent = make_agent()
-    out = agent._normalize({"safety_level": "gluten_free_100"}, {})
+    out = agent._normalize({"safety_level": "gluten_free_100"}, {}, evidence=EXCLUSIVE_EVIDENCE)
     assert out["safety_level"] == "gluten_free_100"
 
 
@@ -435,10 +435,15 @@ def test_evaluate_forwards_claims_and_does_no_db_access():
 from agents.validator_agent import PENDING_ADMIN_FLAG  # noqa: E402
 
 
-def _norm(verdict_extra=None, place=None, claims=None):
+# The kitchen caps are tested in isolation from Tope C: by default the model saw an explicit
+# exclusivity phrase, so a "gluten_free_100" is only ever lowered by the kitchen rules here.
+EXCLUSIVE_EVIDENCE = [{"source": "social", "text": "Panadería 100% sin TACC, cocina exclusiva"}]
+
+
+def _norm(verdict_extra=None, place=None, claims=None, evidence=EXCLUSIVE_EVIDENCE, reviews=None):
     verdict = {"verdict": "approved", "confidence_score": 0.9, "safety_level": "gluten_free_100"}
     verdict.update(verdict_extra or {})
-    return make_agent()._normalize(verdict, place or {}, claims)
+    return make_agent()._normalize(verdict, place or {}, claims, reviews=reviews, evidence=evidence)
 
 
 def test_tope_a_a_community_place_never_leaves_the_validator_as_100():
@@ -542,3 +547,148 @@ def test_tope_b_treats_a_preparation_method_as_not_exclusive_even_without_the_an
     claims = [{"kitchen_exclusive": None, "celiac_prep": "shared_kitchen"}]
     out = _norm(place={"source": "google_places"}, claims=claims)
     assert out["safety_level"] == "celiac_friendly"
+
+
+# --- Audit plan step 1: discovery / community evidence reaches the model ------
+
+
+def test_evidence_block_renders_source_text_and_url():
+    prompt = ValidatorAgent._build_user_prompt(
+        {"name": "Los Leños"},
+        evidence=[
+            {"source": "social", "text": "Los Leños — todo es sin gluten", "url": "https://instagram.com/x"},
+            {"source": "user", "text": "cocinan todo sin tacc", "url": None},
+        ],
+    )
+    assert "evidencia_descubrimiento (NO verificada):" in prompt
+    assert "- [redes sociales] Los Leños — todo es sin gluten (fuente: https://instagram.com/x)" in prompt
+    assert "- [aporte de una persona (formulario)] cocinan todo sin tacc" in prompt
+
+
+def test_no_evidence_leaves_the_prompt_as_before():
+    place = {"name": "Cafe X", "city": "Montevideo"}
+    assert ValidatorAgent._build_user_prompt(place) == ValidatorAgent._build_user_prompt(place, evidence=[])
+    assert ValidatorAgent._build_user_prompt(place, evidence=MagicMock()) == ValidatorAgent._build_user_prompt(place)
+
+
+def test_evidence_block_is_bounded():
+    evidence = [{"source": "web", "text": "x" * 5000} for _ in range(20)]
+    block = ValidatorAgent._evidence_block(evidence)
+    assert block.count("\n- [web]") == 5
+    assert max(len(line) for line in block.splitlines()) < 450
+
+
+def test_run_feeds_place_evidence_into_prompt():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
+    db.fetch_reviews_for_place.return_value = []
+    db.fetch_community_claims.return_value = []
+    db.fetch_place_evidence.return_value = [{"source": "web", "text": "blog: todo sin TACC", "url": "https://b.log"}]
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "approved", "confidence_score": 0.9, "safety_level": "gluten_free_100"}
+
+    ValidatorAgent(db, llm).run()
+
+    db.fetch_place_evidence.assert_called_once_with("p1")
+    assert "blog: todo sin TACC" in llm.complete_json.call_args.args[1]
+    # the phrase is explicit, so the 100% survives Tope C
+    assert db.update_place_validation.call_args.kwargs["safety_level"] == "gluten_free_100"
+
+
+def test_run_survives_evidence_fetch_failure():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
+    db.fetch_place_evidence.side_effect = RuntimeError("table missing")
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "needs_review", "confidence_score": 0.6}
+
+    summary = ValidatorAgent(db, llm).run()
+
+    assert summary["errors"] == 0
+    db.update_place_validation.assert_called_once()
+
+
+def test_rubric_forbids_name_and_prior_knowledge_as_evidence():
+    from agents.validator_agent import RUBRIC
+
+    assert "SOLO en la evidencia que viene en este mensaje" in RUBRIC
+    assert "ni tomes el nombre o una parte del nombre como evidencia" in RUBRIC
+    assert '"evidencia_descubrimiento"' in RUBRIC
+
+
+# --- Audit plan step 2 (Tope C): 100% only with an explicit exclusivity phrase ---
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Panadería 100% sin TACC",
+        "somos 100 % libre de gluten",
+        "Todo es sin gluten, hasta las pizzas",
+        "Cocina exclusiva para celíacos",
+        "exclusivamente sin tacc",
+        "Un espacio libre de gluten en Pocitos",
+        "Todo lo que venden es sin TACC",
+    ],
+)
+def test_exclusive_signal_detected(text):
+    assert ValidatorAgent.has_exclusive_signal([text])
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Tienen opciones sin TACC",
+        "menú apto celíacos muy rico",
+        "No es 100% sin gluten, tené cuidado",
+        "sin gluten",
+        "",
+        None,
+    ],
+)
+def test_exclusive_signal_not_detected(text):
+    assert not ValidatorAgent.has_exclusive_signal([text])
+
+
+def test_tope_c_drops_a_100_without_evidence_and_flags_it_for_the_admin():
+    out = _norm(place={"name": "Sin Gluten Palermo", "source": "google_places"}, evidence=None)
+    assert out["safety_level"] == "celiac_friendly"
+    assert PENDING_ADMIN_FLAG in out["flags"]
+    assert out["status"] == "approved"  # the level changes, the verdict/status does not
+
+
+def test_tope_c_the_name_never_counts():
+    """A name that says 100% is not evidence: only reviews and place_evidence texts are searched."""
+    out = _norm(place={"name": "100% Sin TACC Bakery", "source": "social"}, evidence=[])
+    assert out["safety_level"] == "celiac_friendly"
+
+
+def test_tope_c_a_review_with_the_phrase_keeps_the_100():
+    out = _norm(place={"source": "google_places"}, evidence=None, reviews=[{"text": "todo es sin gluten, genial"}])
+    assert out["safety_level"] == "gluten_free_100"
+    assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
+def test_tope_c_never_raises_a_level():
+    out = _norm({"safety_level": "options_available"}, place={"source": "web"}, evidence=None)
+    assert out["safety_level"] == "options_available"
+    assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
+# --- Owner health never reaches the public places columns --------------------
+
+
+def test_owner_health_sentences_are_scrubbed_from_public_text():
+    out = make_agent()._normalize(
+        {
+            "verdict": "needs_review",
+            "confidence_score": 0.7,
+            "reasoning": "Aporte con evidencia parcial. La dueña es celíaca según la sugerencia. Falta confirmar la cocina.",
+            "flags": ["dueño celíaco", "sin reseñas"],
+            "recommendation": "Confirmar si el dueño es celíaco y la cocina.",
+        },
+        {},
+    )
+    assert "celíac" not in out["reason"] and "Falta confirmar la cocina." in out["reason"]
+    assert out["flags"] == ["sin reseñas"]
+    assert out["recommendation"] is None

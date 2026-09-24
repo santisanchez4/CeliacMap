@@ -98,7 +98,6 @@ def promote_suggestion(
         # Keep the user's reference URL apart from validation_notes (which the
         # Validator overwrites with its rationale), like the Social/Web agents.
         "social_url": evidence_url,
-        "validation_notes": notes,
         # 'find_place' (matched a real Google business) or 'address_only' (only
         # the street address geocoded — the Validator treats it as weaker).
         "geocode_method": resolved.geocode_method,
@@ -106,6 +105,13 @@ def promote_suggestion(
 
     inserted = db.insert_place_candidate(candidate)
     if inserted:
+        # What the person wrote (+ their link) goes to the server-only place_evidence the
+        # Validator reads — not to validation_notes, which the Validator overwrites and
+        # places exposes publicly (a note can name a third party's health condition).
+        try:
+            db.add_place_evidence(inserted.get("id"), "user", notes, evidence_url)
+        except Exception:  # noqa: BLE001 - evidence is best-effort
+            logger.exception("storing suggestion evidence failed for %s", inserted.get("id"))
         return {
             "outcome": "promoted",
             "place_id": inserted.get("id"),
