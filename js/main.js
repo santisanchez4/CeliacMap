@@ -247,7 +247,7 @@
 
     "about.eyebrow": "About the project",
     "about.title": "An idea with purpose",
-    "about.lead": "CeliacMap started as an academic and portfolio project: the foundation for a future app so the celiac community can eat safely.",
+    "about.lead": "CeliacMap exists so the celiac community in Argentina and Uruguay can eat out with more peace of mind: verified places, and the voice of the people who know them.",
     "about.role": "Developer · Project author",
 
     "cta.title": "Join a safer way to eat out",
