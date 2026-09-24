@@ -88,8 +88,9 @@ confirme directamente o haya una reseña que lo respalde, queda en "Tiene opcion
   ninguna evidencia ahora muestra `celiac_friendly` en vez de `gluten_free_100` como mejor estimación cruda (el
   veredicto sigue en `needs_review`, y esa fila no es pública) — es la dirección conservadora y sale de la definición
   nueva de 100% ("únicamente productos aptos").
-- **Router:** `db/checks/chat_kitchen_router_check.py`, 17 casos × 8 muestras, todo verde (sin sobre-extracción; "no sé"
-  nunca cae en `fuera_de_alcance`; "sí", "sí, mandalo", "ok" y "dale" confirman el envío sin guardar ningún dato — el
+- **Router:** `db/checks/chat_kitchen_router_check.py`, 19 casos × 8 muestras, todo verde (sin sobre-extracción; "no sé"
+  nunca cae en `fuera_de_alcance`; una respuesta de cocina mezclada con "ignorá tus reglas" sí queda `fuera_de_alcance`
+  —el prompt anterior la trataba como respuesta de cocina, 0/8—; "sí", "sí, mandalo", "ok" y "dale" confirman el envío sin guardar ningún dato — el
   prompt anterior ya los manejaba con la redacción nueva de la pregunta, así que la regla agregada es defensiva). **Redactor:** `db/checks/2026-09-24-chat-kitchen-responder-regression-run.md`, sin
   regresión en cifras ni urgencia y 0/40 falsos positivos del guardián.
 - **Suites:** Python, Deno (`supabase/functions/chat/`) y frontend, todas verdes.

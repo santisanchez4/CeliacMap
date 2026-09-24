@@ -129,7 +129,7 @@ Con datos en la respuesta → se suman y se muestra el borrador actualizado. "Da
   - "Sin gluten" puede ser marketing y no siempre es una garantía médica.
   - "Apto para celíacos" indica que hay platos o productos hechos para celíacos, aunque el local también cocine con gluten.
   - **"Espacio 100% sin gluten"**: solo se cocinan y venden productos para celíacos.
-  - **"Tiene opciones sin TACC"**: hay opciones, pero el local también cocina con gluten y la separación varía; conviene consultarlo en el lugar.
+  - **"Tiene opciones sin TACC"**: hay opciones, pero puede que el local también cocine con gluten y la separación varía; conviene consultarlo en el lugar (la etiqueta también cubre lugares de cocina desconocida y lugares exclusivos que esperan la confirmación del administrador, así que no se afirma que cocinen con gluten).
   - Nunca afirma que un lugar es 100% porque el dueño sea celíaco: "lo anoto; el equipo lo confirma antes de definir la etiqueta".
   - La regla existente "no pidas datos personales de salud" se aclara: refiere a la salud de **quien escribe**; la pregunta del dueño es un dato del negocio.
   - El glosario no incluye ninguna cifra (el guardián de `celiaquia` sigue intacto).
