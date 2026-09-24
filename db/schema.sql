@@ -399,6 +399,72 @@ create index if not exists place_reports_place_id_idx on public.place_reports (p
 create index if not exists place_reports_status_idx   on public.place_reports (status);
 
 -- ---------------------------------------------------------------------
+-- Kitchen declarations (docs/superpowers/specs/2026-09-24-kitchen-info-design.md)
+-- ---------------------------------------------------------------------
+-- What the community says about HOW a place cooks: optional, UNVERIFIED, and
+-- server-side only. suggestions / place_reports are anon INSERT-only (no SELECT
+-- policy), so owner_celiac -- a third party's health condition -- is never publicly
+-- readable. Deliberately NOT added to public.places (public read). The Validator
+-- reads these via SupabaseClient.fetch_community_claims and treats them as
+-- unverified evidence; only the admin can raise a place to gluten_free_100.
+--   kitchen_exclusive  true  = only celiac-safe products are cooked/sold there
+--                      false = the place also cooks with gluten
+--   celiac_prep        (only when kitchen_exclusive is false) how the celiac food
+--                      is prepared: separate_kitchen | separate_prep (same kitchen,
+--                      separate utensils/surfaces/schedule) | shared_kitchen (no
+--                      separation)
+--   owner_celiac       the owner is celiac (raises confidence, never a label)
+-- KITCHEN-DECLARATIONS-BEGIN
+alter table public.suggestions   add column if not exists kitchen_exclusive boolean;
+alter table public.suggestions   add column if not exists celiac_prep       text;
+alter table public.suggestions   add column if not exists owner_celiac      boolean;
+alter table public.place_reports add column if not exists kitchen_exclusive boolean;
+alter table public.place_reports add column if not exists celiac_prep       text;
+alter table public.place_reports add column if not exists owner_celiac      boolean;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'suggestions_celiac_prep_values_check') then
+    alter table public.suggestions add constraint suggestions_celiac_prep_values_check
+      check (celiac_prep is null or celiac_prep in ('separate_kitchen', 'separate_prep', 'shared_kitchen'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'suggestions_celiac_prep_requires_mixed_check') then
+    alter table public.suggestions add constraint suggestions_celiac_prep_requires_mixed_check
+      check (celiac_prep is null or kitchen_exclusive = false);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'place_reports_celiac_prep_values_check') then
+    alter table public.place_reports add constraint place_reports_celiac_prep_values_check
+      check (celiac_prep is null or celiac_prep in ('separate_kitchen', 'separate_prep', 'shared_kitchen'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'place_reports_celiac_prep_requires_mixed_check') then
+    alter table public.place_reports add constraint place_reports_celiac_prep_requires_mixed_check
+      check (celiac_prep is null or kitchen_exclusive = false);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'place_reports_kitchen_positive_only_check') then
+    alter table public.place_reports add constraint place_reports_kitchen_positive_only_check
+      check (report_type = 'positive'
+             or (kitchen_exclusive is null and celiac_prep is null and owner_celiac is null));
+  end if;
+end $$;
+-- KITCHEN-DECLARATIONS-END
+
+-- ---------------------------------------------------------------------
 -- Table: place_votes  (community "recommend / upvote" — the ranking signal)
 -- ---------------------------------------------------------------------
 -- One row per (place, browser). A vote is a single click, no text — the
