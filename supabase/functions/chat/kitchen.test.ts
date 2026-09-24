@@ -13,6 +13,14 @@ import {
 } from "./index.ts";
 import { parseRouterOutput } from "./index.ts";
 import { buildPlaceReportInsertPayload, buildSuggestionInsertPayload, decideConfirmarSubmission } from "./index.ts";
+import {
+  decideKitchenAnswer,
+  envioBaseForPending,
+  kitchenEnvioExtras,
+  moduloCuatroEnvioExtras,
+  withConfirmFacts,
+  type ConfirmTurnResult,
+} from "./index.ts";
 
 const NO_FACTS = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
 const NO_ROUTER_FACTS = { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: null } as const;
@@ -243,4 +251,62 @@ Deno.test("decideConfirmarSubmission (Módulo 4) - facts volunteered in the mess
   if (plain.kind === "insert_now") {
     assertEquals(Object.keys(plain.payload).sort(), ["description", "place_id", "place_name_text", "report_type"]);
   }
+});
+
+// ---- turn logic: answer gate, confirm merge, <envio> extras --------------------
+
+const ANSWER = { modulo: "reportar", cocina_respuesta: true, confirma_envio: false } as const;
+
+Deno.test("decideKitchenAnswer - a complete draft already asked owns the turn when the router says it was answered", () => {
+  const asked = suggestion({ kitchen_asked: true });
+  assertEquals(decideKitchenAnswer(ANSWER, asked), asked);
+  const askedReport = report({ kitchen_asked: true });
+  assertEquals(decideKitchenAnswer(ANSWER, askedReport), askedReport);
+});
+
+Deno.test("decideKitchenAnswer - never when: not asked, not an answer, a confirmation, out of scope, courtesy, incomplete, negative", () => {
+  const asked = suggestion({ kitchen_asked: true });
+  assertEquals(decideKitchenAnswer(ANSWER, suggestion()), null); // never asked
+  assertEquals(decideKitchenAnswer({ ...ANSWER, cocina_respuesta: false }, asked), null);
+  assertEquals(decideKitchenAnswer({ ...ANSWER, confirma_envio: true }, asked), null); // the confirm branch merges instead
+  assertEquals(decideKitchenAnswer({ ...ANSWER, modulo: "fuera_de_alcance" }, asked), null);
+  assertEquals(decideKitchenAnswer({ ...ANSWER, modulo: "cortesia" }, asked), null);
+  assertEquals(decideKitchenAnswer(ANSWER, suggestion({ address: null, kitchen_asked: true })), null);
+  assertEquals(decideKitchenAnswer(ANSWER, report({ report_type: "negative", kitchen_asked: true })), null);
+  assertEquals(decideKitchenAnswer(ANSWER, null), null);
+});
+
+Deno.test("withConfirmFacts - facts said in the confirming message are merged before the insert", () => {
+  const confirm: ConfirmTurnResult = { kind: "insert_suggestion", payload: suggestion({ kitchen_asked: true }) };
+  const merged = withConfirmFacts(confirm, { kitchen_exclusive: false, celiac_prep: "separate_kitchen", owner_celiac: null });
+  assertEquals(merged.kind, "insert_suggestion");
+  if (merged.kind === "insert_suggestion") {
+    assertEquals(merged.payload.kitchen_exclusive, false);
+    assertEquals(merged.payload.celiac_prep, "separate_kitchen");
+  }
+  assertEquals(withConfirmFacts({ kind: "nothing_pending" }, { kitchen_exclusive: true, celiac_prep: null, owner_celiac: null }), { kind: "nothing_pending" });
+});
+
+Deno.test("kitchenEnvioExtras - the question flag and the recap use the router's words", () => {
+  assertEquals(kitchenEnvioExtras(suggestion(), true), { preguntar_cocina: true });
+  assertEquals(kitchenEnvioExtras(suggestion(), false), {});
+  assertEquals(
+    kitchenEnvioExtras(suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", owner_celiac: true }), false),
+    { cocina: { exclusiva: "no", preparacion: "preparacion_aparte", dueno_celiaco: "si" } },
+  );
+});
+
+Deno.test("moduloCuatroEnvioExtras - facts present => recap; none => invite to add them", () => {
+  assertEquals(moduloCuatroEnvioExtras({}), { invitar_cocina: true });
+  assertEquals(
+    moduloCuatroEnvioExtras({ kitchen_exclusive: true }),
+    { cocina: { exclusiva: "si", preparacion: null, dueno_celiaco: null } },
+  );
+});
+
+Deno.test("envioBaseForPending - identifies the draft without router data", () => {
+  assertEquals(envioBaseForPending(report()), { lugar_nombre: "Café Sol", report_type: "positive", texto: "Muy buena atención" });
+  assertEquals(envioBaseForPending(suggestion()), {
+    lugar_nombre: "Pan Justo", ciudad: "Rosario", direccion: "Corrientes 100, Rosario", pais: "Argentina", texto: "Cocinan de todo",
+  });
 });

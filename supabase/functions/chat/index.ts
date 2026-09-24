@@ -985,6 +985,64 @@ export function applyKitchenStep<T extends PendingSubmission>(
   return { pending: ask ? ({ ...merged, kitchen_asked: true } as T) : merged, preguntarCocina: ask };
 }
 
+/** A complete draft whose kitchen question was ALREADY asked owns the turn when the router says
+ * this message answers it (even with "no sé"). A confirmation is excluded: the confirm branch
+ * merges the facts and inserts. Same exclusions as decideCollectingSuggestion: out of scope and
+ * courtesy never own a turn. */
+export function decideKitchenAnswer(
+  router: Pick<RouterOutput, "modulo" | "cocina_respuesta" | "confirma_envio">,
+  pending: PendingSubmission | null,
+): PendingSubmission | null {
+  if (!pending || pending.kitchen_asked !== true) return null;
+  if (!router.cocina_respuesta || router.confirma_envio) return null;
+  if (router.modulo === "fuera_de_alcance" || router.modulo === "cortesia") return null;
+  if (pending.kind === "report") return pending.report_type === "positive" ? pending : null;
+  return pending.address && pending.country && pending.city ? pending : null;
+}
+
+/** In a confirmation turn, facts said in that same message ("dale, la dueña es celíaca") are
+ * merged into the payload before it is written. */
+export function withConfirmFacts(confirm: ConfirmTurnResult, facts: KitchenFacts): ConfirmTurnResult {
+  if (confirm.kind === "insert_report") return { kind: "insert_report", payload: mergeKitchenFacts(confirm.payload, facts) };
+  if (confirm.kind === "insert_suggestion") return { kind: "insert_suggestion", payload: mergeKitchenFacts(confirm.payload, facts) };
+  return confirm;
+}
+
+export function cocinaContext(
+  p: { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: boolean | null },
+): EnvioContext["cocina"] {
+  const f = normalizeKitchenFacts(p);
+  if (!hasKitchenFacts(f)) return null;
+  const prepWords = { separate_kitchen: "cocina_separada", separate_prep: "preparacion_aparte", shared_kitchen: "misma_cocina" } as const;
+  return {
+    exclusiva: f.kitchen_exclusive === null ? null : f.kitchen_exclusive ? "si" : "no",
+    preparacion: f.celiac_prep === null ? null : prepWords[f.celiac_prep],
+    dueno_celiaco: f.owner_celiac === null ? null : f.owner_celiac ? "si" : "no",
+  };
+}
+
+/** The <envio> additions for a draft turn: the question flag and/or the recap of the facts. */
+export function kitchenEnvioExtras(p: PendingSubmission, preguntarCocina: boolean): Partial<EnvioContext> {
+  const cocina = cocinaContext(p);
+  return { ...(preguntarCocina ? { preguntar_cocina: true } : {}), ...(cocina ? { cocina } : {}) };
+}
+
+/** Módulo 4 never asks (it stays single-turn): recite what was volunteered, else invite. */
+export function moduloCuatroEnvioExtras(
+  payload: { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: boolean | null },
+): Partial<EnvioContext> {
+  const cocina = cocinaContext(payload);
+  return cocina ? { cocina } : { invitar_cocina: true };
+}
+
+/** Identifying fields of a draft for <envio>, without needing the router's extraction. */
+export function envioBaseForPending(p: PendingSubmission): Omit<EnvioContext, "estado"> {
+  if (p.kind === "report") {
+    return { lugar_nombre: p.place_name ?? p.place_name_text, report_type: p.report_type, texto: p.description };
+  }
+  return { lugar_nombre: p.name, ciudad: p.city, direccion: p.address, pais: p.country, texto: p.notes };
+}
+
 // A failed intake write must never be reported to the user as a success (the
 // person would believe their report was recorded when it wasn't), so this
 // returns an outcome instead of throwing: both a transport failure and a
@@ -1153,6 +1211,17 @@ export interface EnvioContext {
   pais?: string | null;
   report_type?: "positive" | "negative" | null;
   texto?: string | null;
+  // Kitchen step (spec 2026-09-24-kitchen-info-design.md, 8.1). preguntar_cocina: put the ONE
+  // optional kitchen question together with the draft. invitar_cocina: Módulo 4 is single-turn,
+  // so it only invites the person to add the details in another message. cocina: what the person
+  // already said, recited as-is (never deduced).
+  preguntar_cocina?: boolean;
+  invitar_cocina?: boolean;
+  cocina?: {
+    exclusiva: "si" | "no" | null;
+    preparacion: "cocina_separada" | "preparacion_aparte" | "misma_cocina" | null;
+    dueno_celiaco: "si" | "no" | null;
+  } | null;
 }
 
 export function buildResponderUserMessage(args: {
@@ -1664,9 +1733,14 @@ export async function handleRequest(req: Request): Promise<Response> {
   // nothing_pending deliberately falls through to the modulo dispatch below
   // (no dead-end reply): a confirmation with nothing to confirm just becomes a
   // normal turn, and if the message names a place it can start a fresh draft.
-  const confirmTurn: ConfirmTurnResult = !collectingSuggestion && router.confirma_envio
-    ? decideConfirmTurn(pendingIn)
-    : { kind: "nothing_pending" };
+  const confirmTurn: ConfirmTurnResult = withConfirmFacts(
+    !collectingSuggestion && router.confirma_envio ? decideConfirmTurn(pendingIn) : { kind: "nothing_pending" },
+    kitchenFactsFromRouter(router),
+  );
+
+  // A complete draft whose kitchen question was already asked owns the turn when the router says
+  // this message answers it (decideKitchenAnswer); confirmations are handled above instead.
+  const kitchenAnswer = !collectingSuggestion ? decideKitchenAnswer(router, pendingIn) : null;
 
   // "" is never returned: every branch below either assigns `reply` directly
   // or sets `envio`, and the shared redactor call after the chain assigns
@@ -1707,14 +1781,16 @@ export async function handleRequest(req: Request): Promise<Response> {
         responsePending = null;
       } else {
         const collected = turnDecision.result;
-        responsePending = collected.pending;
+        const step = applyKitchenStep(collected.pending, router, { complete: collected.kind === "draft_ready" });
+        responsePending = step.pending;
         envio = {
           estado: collected.kind === "draft_ready" ? "borrador_listo" : "necesita_direccion",
-          lugar_nombre: collected.pending.name,
-          ciudad: collected.pending.city,
-          direccion: collected.pending.address,
-          pais: collected.pending.country,
-          texto: collected.pending.notes,
+          lugar_nombre: step.pending.name,
+          ciudad: step.pending.city,
+          direccion: step.pending.address,
+          pais: step.pending.country,
+          texto: step.pending.notes,
+          ...kitchenEnvioExtras(step.pending, step.preguntarCocina),
         };
       }
     } else if (confirmTurn.kind === "insert_report") {
@@ -1777,6 +1853,13 @@ export async function handleRequest(req: Request): Promise<Response> {
           texto: confirmTurn.payload.notes,
         };
       }
+    } else if (kitchenAnswer) {
+      // The person answered the kitchen question that came with the draft: merge what they said
+      // and show the updated draft — never re-ask. A message that also confirms is the branch above.
+      envioModulo = "reportar";
+      const step = applyKitchenStep(kitchenAnswer, router, { complete: true });
+      responsePending = step.pending;
+      envio = { ...envioBaseForPending(step.pending), estado: "borrador_listo", ...kitchenEnvioExtras(step.pending, false) };
     } else if (router.modulo === "reportar") {
       // Módulo 2 turn 1 — the lookup runs against APPROVED places with the
       // anon key, so the same "public read approved places" RLS that backs
@@ -1806,8 +1889,10 @@ export async function handleRequest(req: Request): Promise<Response> {
           texto: router.reporte_texto,
         };
       } else if (draft.kind === "draft_ready") {
-        responsePending = draft.pending;
+        const step = applyKitchenStep(draft.pending, router, { complete: true });
+        responsePending = step.pending;
         envio = {
+          ...kitchenEnvioExtras(step.pending, step.preguntarCocina),
           estado: "borrador_listo",
           // Same three-way fallback the confirm turn uses, so a matched place's
           // canonical name is shown consistently on both turns (a matched place
@@ -1820,7 +1905,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       } else {
         // needs_address — a recommendation for a place that isn't on the map
         // yet, routed into the suggestions pipeline once the address is known.
-        responsePending = draft.pending;
+        // Facts already said are kept in the draft; the question waits until it is complete.
+        responsePending = applyKitchenStep(draft.pending, router, { complete: false }).pending;
         envio = {
           estado: "necesita_direccion",
           lugar_nombre: draft.pending.name,
@@ -1842,6 +1928,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         match,
         lugarNombre: router.lugar_nombre,
         reporteTexto: router.reporte_texto,
+        facts: kitchenFactsFromRouter(router),
       });
       if (decision.kind === "ask_more_detail") {
         envio = { estado: "necesita_mas_detalle", lugar_nombre: router.lugar_nombre, ciudad: router.ciudad };
@@ -1854,6 +1941,7 @@ export async function handleRequest(req: Request): Promise<Response> {
           responseAction = { type: "report_submitted" };
           envio = {
             estado: "enviado",
+            ...moduloCuatroEnvioExtras(decision.payload),
             lugar_nombre: decision.payload.place_name_text ?? router.lugar_nombre,
             ciudad: router.ciudad,
             report_type: decision.payload.report_type,
@@ -1959,6 +2047,8 @@ export async function handleRequest(req: Request): Promise<Response> {
         ciudad: router.ciudad,
         confirma_envio: router.confirma_envio,
         envio_estado: envio.estado,
+        cocina_preguntada: envio.preguntar_cocina === true,
+        cocina_respondida: router.cocina_respuesta,
       };
     }
   } catch (err) {
