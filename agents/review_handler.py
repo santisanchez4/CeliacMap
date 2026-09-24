@@ -86,11 +86,48 @@ def _lower_level(current: str | None, proposed: str | None) -> str | None:
 class ReviewHandler(BaseAgent):
     name = "review_handler"
 
-    def __init__(self, db: SupabaseClient, llm: LLMClient, model: str | None = None):
+    def __init__(self, db: SupabaseClient, llm: LLMClient, model: str | None = None, notifier=None):
         super().__init__(db)
         self.llm = llm
         self.model = model
         self.validator = ValidatorAgent(db, llm)  # reused only for ._normalize()
+        self.notifier = notifier  # AdminNotifier or None (audit plan step 9)
+
+    def _alert_admin(self, place: dict, description: str, v: dict, hide: bool,
+                     contamination: bool, distinct_reports: int) -> None:
+        if not self.notifier:
+            return
+        name = place.get("name") or place.get("id")
+        where = ", ".join(x for x in (place.get("city"), place.get("country")) if x)
+        if hide:
+            subject = f"URGENTE: retirado del mapa por reportes — {name}"
+            outcome = ("Salió del mapa (needs_review): "
+                       + ("reporte creíble de contaminación o síntomas." if contamination
+                          else f"{distinct_reports} reportes distintos en {REPORT_WINDOW_DAYS} días."))
+        else:
+            subject = f"Reporte negativo — {name} (aviso en el mapa)"
+            outcome = (f"Sigue en el mapa con el aviso 'Reportado por la comunidad' "
+                       f"({distinct_reports} de {REPORTS_TO_HIDE} reportes para sacarlo).")
+        text = "\n".join([
+            f"Lugar: {name} — {where}",
+            f"Nivel: {place.get('safety_level')} · id {place.get('id')}",
+            "",
+            outcome,
+            "",
+            "Reporte (no verificado, no se publica):",
+            description,
+            "",
+            f"Re-evaluación del Validator: {v.get('verdict')} @ {v.get('confidence')}",
+            v.get("reason") or "",
+            f"Flags: {', '.join(v.get('flags') or []) or '-'}",
+            f"Sugiere: {v.get('recommendation') or '-'}",
+            "",
+            "Qué podés hacer:",
+            "  python -m scripts.review_queue --warnings",
+            f"  python -m scripts.review_queue --clear-warning {place.get('id')} --apply   # si el reporte no aplica",
+            f"  python -m scripts.review_queue --approve {place.get('id')} --level options --note \"...\" --apply",
+        ])
+        self.notifier.urgent(subject, text, agent=self.name, place_id=place.get("id"))
 
     def handle(self, place_id: str, report_id: str) -> dict:
         # Atomic claim (CAS: status new/dispatched -> processing). This is
@@ -269,6 +306,7 @@ class ReviewHandler(BaseAgent):
             status="success",
             place_id=place_id,
         )
+        self._alert_admin(place, description, v, hide, contamination, distinct_reports)
         return {"place_id": place_id, "status": db_status, "outcome": "hidden" if hide else "warning"}
 
     def sweep(self, limit: int = 50) -> dict:
@@ -331,7 +369,11 @@ def main() -> int:
     db = SupabaseClient(settings.supabase_url, settings.supabase_service_role_key)
     llm = LLMClient(settings.anthropic_api_key, settings.validator_model)
 
-    result = ReviewHandler(db, llm).handle(args.place_id, args.report_id)
+    from agents.admin_notify import build_notifier
+
+    result = ReviewHandler(db, llm, notifier=build_notifier(settings, db)).handle(
+        args.place_id, args.report_id
+    )
     print("Review handled:", result)
     return 0
 

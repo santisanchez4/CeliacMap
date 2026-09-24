@@ -94,6 +94,18 @@ class DryRunSupabase:
     def fetch_recent_negative_reports(self, place_id: str, days: int = 30) -> list[dict]:
         return self._inner.fetch_recent_negative_reports(place_id, days=days)
 
+    def fetch_agent_log_count(self, action: str, since: str) -> int:
+        return self._inner.fetch_agent_log_count(action, since)
+
+    def fetch_agent_log_since(self, since: str, limit: int = 2000) -> list[dict]:
+        return self._inner.fetch_agent_log_since(since, limit=limit)
+
+    def fetch_suggestions_since(self, since: str, limit: int = 200) -> list[dict]:
+        return self._inner.fetch_suggestions_since(since, limit=limit)
+
+    def fetch_place_reports_since(self, since: str, limit: int = 200) -> list[dict]:
+        return self._inner.fetch_place_reports_since(since, limit=limit)
+
     def fetch_latest_received_message(self, place_id: str) -> dict | None:
         return self._inner.fetch_latest_received_message(place_id)
 

@@ -565,6 +565,53 @@ class SupabaseClient:
         )
         return res.data or []
 
+    # --- admin notifications (audit plan step 9) ------------------------------
+    def fetch_agent_log_count(self, action: str, since: str) -> int:
+        res = (
+            self._db.table("agent_log")
+            .select("id", count="exact")
+            .eq("action", action)
+            .gte("created_at", since)
+            .limit(1)
+            .execute()
+        )
+        return int(res.count or 0)
+
+    def fetch_agent_log_since(self, since: str, limit: int = 2000) -> list[dict]:
+        """agent_log rows since ``since`` (the digest counts chatbot rows but never prints them)."""
+        res = (
+            self._db.table("agent_log")
+            .select("agent, action, status, result, place_id, created_at")
+            .gte("created_at", since)
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def fetch_suggestions_since(self, since: str, limit: int = 200) -> list[dict]:
+        res = (
+            self._db.table("suggestions")
+            .select("*")
+            .gte("created_at", since)
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def fetch_place_reports_since(self, since: str, limit: int = 200) -> list[dict]:
+        res = (
+            self._db.table("place_reports")
+            .select("id, report_type, description, author_name, place_name_text, created_at, "
+                    "place_id, places(name, city, country, safety_level)")
+            .gte("created_at", since)
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
     # --- agent_log ----------------------------------------------------
     def insert_agent_log(
         self,

@@ -266,7 +266,8 @@ create index if not exists agent_log_agent_idx      on public.agent_log (agent);
 -- base (search/validator/updater/social/web/pipeline/suggestion) -> +outreach
 -- (Phase 15) -> +outreach_reply (Etapa 2) -> +review_handler (ADR-004,
 -- docs/plans/PLAN-community-reviews.md) -> +chatbot (ADR-006,
--- docs/plans/PLAN-chatbot-rag.md — the chat Edge Function's turn log).
+-- docs/plans/PLAN-chatbot-rag.md — the chat Edge Function's turn log) ->
+-- +admin_notify (audit plan step 9: the daily admin digest).
 -- Collapsed into a single widening here instead of a chain of separate DO
 -- blocks: applied one at a time, incrementally, each was always safe — but
 -- with real production rows already using 'outreach' (19) and
@@ -281,7 +282,7 @@ begin
     add constraint agent_log_agent_check
     check (agent in
       ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion',
-       'outreach', 'outreach_reply', 'review_handler', 'chatbot'));
+       'outreach', 'outreach_reply', 'review_handler', 'chatbot', 'admin_notify'));
 end $$;
 
 -- ---------------------------------------------------------------------

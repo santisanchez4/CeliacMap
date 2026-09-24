@@ -1136,6 +1136,7 @@ Target (functional product — see **## Architecture**):
 │   ├── moderate_opinions.py    # list / --approve / --hide community opinions (dry-run unless --apply)
 │   ├── review_queue.py         # admin queue: 100% pending, needs_review, needs_location, warnings; --approve/--discard/--locate
 │   ├── cap_unsupported_100.py  # one-off: approved 100% places without explicit evidence -> options + admin flag
+│   ├── admin_digest.py         # daily email to the admin (admin-digest.yml); agents/admin_notify.py sends urgent alerts
 │   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
@@ -1144,7 +1145,7 @@ Target (functional product — see **## Architecture**):
 │                               # and chat_prompt_ab.py (offline A/B of the chatbot prompts vs the real model)
 ├── tests/                      # offline unit tests (external calls mocked)
 │                               # incl. test_chat_prompts_sync.py: the 4 copies of the chatbot prompts must match
-├── .github/workflows/{agents-monthly,validator-midmonth,suggestions-weekly,deploy-pages,
+├── .github/workflows/{agents-monthly,validator-midmonth,suggestions-weekly,admin-digest,deploy-pages,
 │       outreach-reply,place-report-review,chat-log-purge}.yml
 ├── requirements.txt
 ├── .env.example
@@ -2251,9 +2252,18 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   `scripts/cap_unsupported_100.py` applies Tope C once to the already-approved 100% places (dry run first — it changes
   the map). `scripts/moderate_opinions.py` warns when an opinion says "100%" about a place labelled "opciones". The
   place detail on the map now explains its label in one line.
+- **Admin email (step 9).** `agents/admin_notify.py`: `AdminNotifier.urgent()` emails the admin right away when a
+  negative report arrives (warning or taken off the map, with the report text and the commands to act) and when a
+  business replies to outreach; capped at 10/hour (past it, only the digest carries it). `scripts/admin_digest.py`
+  + `.github/workflows/admin-digest.yml` (daily 08:45 Uruguay, only when there is something): new suggestions, the
+  `needs_location` ones, negative reports, recommendations to approve, warnings, "100% pendiente" places, Validator
+  results, agent errors, and chatbot COUNTS only (turn text never goes by email). From `avisos@celiacmap.org` to
+  `ADMIN_EMAIL` (secret; falls back to santiagosanchez@celiacmap.org), subjects prefixed `[CeliacMap]`.
+  `agent_log.agent` gained `'admin_notify'`. **Check the MX records first** (plan step 9): Resend receives outreach
+  replies on `celiacmap.org`, the same domain as the Zoho mailbox.
 - **Not yet done:** the real-model A/B, applying the migration (`place_evidence`, `places.community_warning_at`,
-  `place_reports.reporter_token`, `suggestions` `needs_location`), the dry run of `cap_unsupported_100.py`, and
-  steps 4 (chatbot) and 9 (email).
+  `place_reports.reporter_token`, `suggestions` `needs_location`, `agent_log` `admin_notify`), the dry run of
+  `cap_unsupported_100.py`, the DNS check, and step 4 (chatbot).
 
 ### Kitchen information as review evidence (2026-09-24)
 

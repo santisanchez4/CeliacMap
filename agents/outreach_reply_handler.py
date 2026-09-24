@@ -69,11 +69,13 @@ def _build_reply_prompt(
 class OutreachReplyHandler(BaseAgent):
     name = "outreach_reply"
 
-    def __init__(self, db: SupabaseClient, llm: LLMClient, haiku_model: str | None = None):
+    def __init__(self, db: SupabaseClient, llm: LLMClient, haiku_model: str | None = None,
+                 notifier=None):
         super().__init__(db)
         self.llm = llm
         self.haiku_model = haiku_model
         self.validator = ValidatorAgent(db, llm)  # reused only for ._normalize()
+        self.notifier = notifier  # AdminNotifier or None (audit plan step 9)
 
     def _classify_opt_out(self, reply_text: str) -> dict:
         """Cheap Haiku pre-check. Always returns {'is_opt_out': bool, 'reason': str | None}.
@@ -212,6 +214,22 @@ class OutreachReplyHandler(BaseAgent):
             status="success",
             place_id=place_id,
         )
+        if self.notifier:
+            self.notifier.urgent(
+                f"Respondió un comercio — {place.get('name')}",
+                "\n".join([
+                    f"Lugar: {place.get('name')} — {place.get('city')}, {place.get('country')} · id {place_id}",
+                    f"Resultado: {db_status} (Validator {v['verdict']} @ {v['confidence']})",
+                    v.get("reason") or "",
+                    "",
+                    "Respuesta del comercio:",
+                    reply_text,
+                    "",
+                    f"Revisalo con: python -m scripts.review_queue --needs-review --city \"{place.get('city') or ''}\"",
+                ]),
+                agent=self.name,
+                place_id=place_id,
+            )
         return {"place_id": place_id, "status": db_status}
 
 
@@ -230,7 +248,11 @@ def main() -> int:
     db = SupabaseClient(settings.supabase_url, settings.supabase_service_role_key)
     llm = LLMClient(settings.anthropic_api_key, settings.validator_model)
 
-    result = OutreachReplyHandler(db, llm, haiku_model=settings.haiku_model).handle(args.place_id)
+    from agents.admin_notify import build_notifier
+
+    result = OutreachReplyHandler(
+        db, llm, haiku_model=settings.haiku_model, notifier=build_notifier(settings, db)
+    ).handle(args.place_id)
     print("Outreach reply handled:", result)
     return 0
 
