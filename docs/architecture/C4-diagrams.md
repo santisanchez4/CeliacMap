@@ -48,7 +48,7 @@ flowchart TB
     github_actions[["GitHub Actions<br/><i>Cron mensual +<br/>repository_dispatch</i>"]]
 
     subgraph celiacmap["CeliacMap [SYSTEM]"]
-        frontend["<b>Frontend estático</b><br/><i>HTML/CSS/JS + Leaflet.js</i><br/>Mapa interactivo + ranking<br/>comunitario + widget del asistente<br/>(chat.js), servido por GitHub<br/>Pages, sin build step"]
+        frontend["<b>Frontend estático</b><br/><i>HTML/CSS/JS + Leaflet.js</i><br/>Mapa interactivo + ranking<br/>comunitario + opiniones aprobadas<br/>+ widget del asistente<br/>(chat.js), servido por GitHub<br/>Pages, sin build step"]
         pipeline["<b>Pipeline de agentes</b><br/><i>Python</i><br/>Search, Social, Web, Suggestion,<br/>Validator, Updater y Outreach<br/>(7 etapas) + Reply Handler<br/>(on-demand, vía dispatch)"]
         edge_function["<b>Edge Function</b><br/><i>Deno/TypeScript</i><br/>outreach-reply: recibe webhooks<br/>de Resend, dispara repository_dispatch"]
         chat_fn["<b>Edge Function chat</b><br/><i>Deno/TypeScript</i><br/>Asistente: router + redactor (2 llamadas<br/>Haiku por turno), guardián determinista<br/>de celiaquía, contadores de uso"]
@@ -104,6 +104,17 @@ mantiene con un trigger de base de datos (`sync_place_vote_count`,
 `SECURITY DEFINER`) — **sin agente, sin LLM, sin GitHub Actions, sin Edge
 Function**: en el diagrama, el borde `frontend → db` simplemente pasa a cubrir
 también la escritura de votos.
+
+**Nota — opiniones de la comunidad (ADR-008).** La sección "La voz de la
+comunidad" (`js/opinions.js`, dentro del contenedor *Frontend estático*) lee la
+**vista `community_opinions`** con la anon key: 8 columnas explícitas, solo
+recomendaciones positivas ya publicadas de lugares `approved`. La tabla
+`place_reports` sigue cerrada al público (INSERT-only); el formulario B
+(`js/report.js`) ahora también envía el nombre opcional (`author_name`) y la
+política de inserción exige `published_at is null`. **El único camino que publica
+es el script `scripts/moderate_opinions.py`** (service_role, dry-run por defecto,
+corrida por el administrador): no hay agente, ni LLM, ni Edge Function nuevos, y
+en el diagrama el borde `frontend → db` ya cubre la lectura de la vista.
 
 **Nota — chatbot (ADR-006).** La Edge Function `chat` es la **primera que llama a
 un LLM** y la única Edge Function abierta al tráfico público sin autenticación

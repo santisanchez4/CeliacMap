@@ -6,6 +6,9 @@ This project is a web portfolio focused on the celiac community. The main idea i
 
 The project must look professional, clear, modern, and presentable as both an academic and personal portfolio.
 
+> The public site no longer presents the project as academic (2026-09-24); the academic framing above is historical
+> context for the repo, not copy for the page.
+
 ## Main Goal
 
 Create a high-quality landing page that communicates:
@@ -110,6 +113,11 @@ GEOGRAPHIC SCOPE
   declarations (`kitchen_exclusive`, `celiac_prep`, `owner_celiac`) with CHECKs that
   enforce coherence; **`places` deliberately does not** (`owner_celiac` is a named
   third party's health condition and `places` is publicly readable). See ADR-007.
+- **`place_reports`** also carries `author_name` (optional public name, 1-40 chars) and
+  `published_at` (null = not published; only a positive report can be published). The
+  only public read of it is the view **`community_opinions`** (8 explicit columns,
+  positive + published + place `approved`); the table itself stays closed to anon.
+  See ADR-008.
 - **`agent_log`** gains `agent`, `status`, `place_id` and a `jsonb result` for
   traceability; `timestamp` is named `created_at` for consistency.
 - **Row Level Security (RLS)** is enabled on all tables: the public **anon** key may
@@ -1075,6 +1083,7 @@ Target (functional product — see **## Architecture**):
 │   ├── kitchen.js              # shared "Sobre la cocina" block (Forms A and B); read() returns only answered keys
 │   ├── report.js               # Form B: recommend/report an existing place -> place_reports
 │   ├── ranking.js              # community ranking (#ranking) + place_votes voting
+│   ├── opinions.js             # "La voz de la comunidad": approved opinions from the public view community_opinions
 │   └── chat.js                 # floating assistant widget -> `chat` Edge Function
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
@@ -1112,6 +1121,7 @@ Target (functional product — see **## Architecture**):
 │   ├── run_agents.py           # CI entrypoint: search → social → web → suggestion → validator → updater → outreach → review_sweep
 │   ├── purge_chat_logs.py      # weekly purge of agent_log chatbot rows > 30 days (chat-log-purge.yml)
 │   ├── sync_chat_prompts.py    # copy prompts.ts -> the 3 doc copies of the chatbot prompts (--check to verify)
+│   ├── moderate_opinions.py    # list / --approve / --hide community opinions (dry-run unless --apply)
 │   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
@@ -2166,11 +2176,12 @@ and now reads "Completá los datos del lugar". ES + EN (`js/main.js`), frontend
 only; `tests/frontend_forms_copy.test.js` (4) guards the titles, the intros, step
 1, and that every `data-i18n` key in `#suggest` has an EN entry. Verified in
 Chrome (ES/EN toggle, 390px, no console errors). This is **piece 1 of 3** from the
-2026-09-24 design session; the other two are designed separately and **not built**:
+2026-09-24 design session; the other two were designed separately and are now built:
 (2) collect kitchen type / owner-celiac in the forms and chatbot as human-review
-evidence (see the labeling rule above), and (3) publicly show community
-recommendations — e.g. the 2026-09-23 positive report on *San Felipa - Sin gluten*
-(Gualeguaychú), which today sits in `place_reports` with no public read path.
+evidence (see **Kitchen information as review evidence**), and (3) publicly show
+community recommendations (see **Community opinions on the public site**) — the
+2026-09-23 positive report on *San Felipa - Sin gluten* (Gualeguaychú) is the first
+one waiting to be moderated.
 
 ### Kitchen information as review evidence (2026-09-24)
 
@@ -2200,6 +2211,35 @@ claims block. Chatbot: router fields `cocina_exclusiva` / `preparacion_celiaca` 
 question is asked **once** together with the draft, Módulo 4 stays single-turn (no question, only recites or invites),
 and the redactor gains a glossary and a rule never to promise a 100% because an owner is celiac. This **restarts the
 chatbot soft-launch count**. Tooling: `scripts/sync_chat_prompts.py` copies `prompts.ts` into the three doc copies.
+
+### Community opinions on the public site (2026-09-24)
+
+Piece 3 of the 2026-09-24 design session (spec `docs/superpowers/specs/2026-09-24-community-opinions-design.md`,
+plan `docs/superpowers/plans/2026-09-24-community-opinions.md`, ADR-008). A positive recommendation left through
+Form B (or the chatbot) used to sit in `place_reports` with **no public read path** — the only real one at the time was
+the 2026-09-23 report on *San Felipa - Sin gluten* — and the "La voz de la comunidad" section showed three **invented**
+testimonials under the heading "Experiencias reales". Both are fixed:
+
+- **What is shown:** only **positive** recommendations, only after the **admin approves** each one, with the name the
+  person chose (optional, 1–40 chars) or **"Anónimo"**. Negative reports are never shown (they keep going to the
+  Validator, ADR-004). The invented testimonials are gone; with fewer than three opinions the grid ends in an
+  invitation card to tell your experience. Cards cut long comments at ~280 chars on a whole word (the admin reads the
+  full text when approving).
+- **Schema:** `place_reports.author_name` and `place_reports.published_at` (null = not published, also the record of
+  when it was approved), a CHECK that only a positive report can be published, and the anonymous INSERT policy now
+  requires `published_at is null` — the public `grant insert` is table-wide, so without it a client could insert an
+  already-published row and skip moderation. The public reads **only** the view `community_opinions` (8 explicit
+  columns, positive + published + place `approved`); `place_reports` stays closed, so `owner_celiac` and the kitchen
+  facts never leave. The view runs with its owner's rights, so its `WHERE` is the only barrier.
+- **Moderation:** `scripts/moderate_opinions.py` (service_role, dry-run by default): list pending with the full text,
+  `--approve` (only positive pending reports of approved places), `--hide`. Nothing else publishes.
+- **Frontend:** the optional name field and its notice in Form B (hidden, and never sent, in "Reportar" mode;
+  `autocomplete="off"` so a browser does not autofill a real name that would be published), and `js/opinions.js`
+  drawing the section (`textContent` only — never HTML).
+- **The chatbot did not change:** its recommendations are saved without a name and, if approved, show as "Anónimo".
+- **Found in the browser, invisible to the DOM-emulation tests:** `.field { display: flex }` beat the `hidden`
+  attribute, so the name field stayed visible in "Reportar" mode. Fixed with `.field[hidden]` plus a regression test
+  on the CSS. Lesson: a `hidden` toggle needs a check in a real browser, not only on the `.hidden` property.
 
 ### Retroactive re-validation of pre-three-tier-rubric approvals (2026-09-06)
 
@@ -3940,6 +3980,15 @@ Function, schema or prompt change):
   publicly readable `places.validation_notes`; it was rewritten in production
   (`db/fixes/2026-09-24-lo-de-flor-note-privacy.sql`) and scrubbed from the repo
   going forward (git history keeps the old text).
+- 🚧 **Phase 26 — Community opinions on the public site (2026-09-24), implemented
+  on branch `feat/community-opinions`; production rollout pending.** Design and
+  decisions: **Community opinions on the public site** in the Decisions Log, ADR-008,
+  spec and plan. Schema (columns, hardened insert policy, public view), the moderation
+  script, the optional name in Form B and the new section are built and tested
+  (Python 332 → 351, frontend 39 → 62; the chat suite is untouched). The
+  rollout order is fixed: migration first (additive, nullable columns), then the
+  frontend, then a live verification with a test row that is reverted, and finally
+  the admin approves what he wants with `moderate_opinions.py`.
 
 ### GitHub Pages deploy decision
 
