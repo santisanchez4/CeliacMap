@@ -151,3 +151,58 @@ def test_delete_chatbot_logs_returns_zero_when_nothing_expired():
     chain.return_value.execute.return_value = MagicMock(data=[])
 
     assert client.delete_chatbot_logs() == 0
+
+
+# --- community kitchen claims (server-only intake tables) ----------------------
+
+
+def _client_with_intake_tables(suggestions=None, reports=None):
+    """Return (client, tables) where tables maps table name -> the MagicMock returned
+    by `_db.table(name)`, pre-wired for the two query shapes fetch_community_claims uses."""
+    client = _client_with_mock_db()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name not in tables:
+            t = MagicMock()
+            data = {"suggestions": suggestions, "place_reports": reports}.get(name) or []
+            t.select.return_value.eq.return_value.execute.return_value = MagicMock(data=data)
+            t.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=data)
+            tables[name] = t
+        return tables[name]
+
+    client._db.table.side_effect = table
+    return client, tables
+
+
+def test_fetch_community_claims_merges_both_tables_newest_first():
+    client, _ = _client_with_intake_tables(
+        suggestions=[{"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": True, "created_at": "2026-09-01T10:00:00"}],
+        reports=[{"kitchen_exclusive": False, "celiac_prep": "separate_kitchen", "owner_celiac": None, "created_at": "2026-09-05T10:00:00"}],
+    )
+    claims = client.fetch_community_claims("place-1")
+    assert [c["created_at"] for c in claims] == ["2026-09-05T10:00:00", "2026-09-01T10:00:00"]
+
+
+def test_fetch_community_claims_drops_rows_with_no_kitchen_datum():
+    empty = {"kitchen_exclusive": None, "celiac_prep": None, "owner_celiac": None, "created_at": "2026-09-01T10:00:00"}
+    client, _ = _client_with_intake_tables(suggestions=[empty], reports=[empty])
+    assert client.fetch_community_claims("place-1") == []
+
+
+def test_fetch_community_claims_respects_limit():
+    rows = [
+        {"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": None, "created_at": f"2026-09-0{i}T10:00:00"}
+        for i in range(1, 8)
+    ]
+    client, _ = _client_with_intake_tables(reports=rows)
+    assert len(client.fetch_community_claims("place-1", limit=3)) == 3
+
+
+def test_fetch_community_claims_only_reads_positive_reports_and_the_promoted_suggestion():
+    client, tables = _client_with_intake_tables()
+    client.fetch_community_claims("place-9")
+    tables["suggestions"].select.return_value.eq.assert_called_once_with("promoted_place_id", "place-9")
+    reports_eq = tables["place_reports"].select.return_value.eq
+    reports_eq.assert_called_once_with("place_id", "place-9")
+    reports_eq.return_value.eq.assert_called_once_with("report_type", "positive")

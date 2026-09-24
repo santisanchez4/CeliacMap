@@ -234,6 +234,37 @@ class SupabaseClient:
         )
         return res.data or []
 
+    _CLAIM_FACTS = ("kitchen_exclusive", "celiac_prep", "owner_celiac")
+
+    def fetch_community_claims(self, place_id: str, limit: int = 5) -> list[dict]:
+        """Community kitchen declarations about a place (UNVERIFIED evidence).
+
+        Reads the server-only intake tables: the suggestion that was promoted to this
+        place and its positive reports (a negative report cannot carry kitchen data).
+        Rows with no kitchen datum at all are dropped; newest first, at most ``limit``.
+        The caller (Validator) treats these as context to weigh, never as proof.
+        """
+        columns = "kitchen_exclusive, celiac_prep, owner_celiac, created_at"
+        rows: list[dict] = []
+        suggestions = (
+            self._db.table("suggestions")
+            .select(columns)
+            .eq("promoted_place_id", place_id)
+            .execute()
+        )
+        rows.extend(suggestions.data or [])
+        reports = (
+            self._db.table("place_reports")
+            .select(columns)
+            .eq("place_id", place_id)
+            .eq("report_type", "positive")
+            .execute()
+        )
+        rows.extend(reports.data or [])
+        claims = [r for r in rows if any(r.get(k) is not None for k in self._CLAIM_FACTS)]
+        claims.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+        return claims[:limit]
+
     def delete_expired_google_reviews(self, cutoff_days: int = 30) -> list[str]:
         """Delete source='google' review snippets older than cutoff_days.
 
