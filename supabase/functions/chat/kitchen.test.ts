@@ -352,7 +352,7 @@ Deno.test("ROUTER_PROMPT - every example's Salida is valid JSON with exactly the
   const format = ROUTER_PROMPT.slice(ROUTER_PROMPT.lastIndexOf("<output_format>"));
   const declared = [...format.matchAll(/"([a-z_]+)":/g)].map((m) => m[1]).sort();
   assertEquals(declared.includes("cocina_respuesta"), true);
-  assertEquals(declared.length, 16);
+  assertEquals(declared.length, 17); // +nivel (audit plan step 4)
   for (const example of promptExamples(ROUTER_PROMPT)) {
     assertEquals(Object.keys(routerOut(example)).sort(), declared, example.slice(0, 80));
   }

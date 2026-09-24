@@ -16,6 +16,14 @@ afecta empieza con una consulta de solo lectura (paso 0).
 
 ---
 
+## Estado (2026-09-24)
+
+Implementado en la rama `claude/celiacmap-audit-agents-chatbot-0ohie6`, **sin desplegar**: pasos 1, 2a, 2b (script),
+3, 4, 5, 6, 7, 8 y 9, y el control de nombre (H6). Falta, en este orden: revisar los MX del dominio, aplicar
+`db/migrations/2026-09-24-audit-plan.sql`, el A/B contra el modelo real (RUBRIC y prompts del chat), mergear y
+desplegar `chat`, y correr `scripts/cap_unsupported_100.py` en modo prueba antes de `--apply`. El web agent sigue
+apagado.
+
 ## Resumen
 
 La arquitectura es sólida. Hay una sola compuerta de seguridad, con umbrales que aplica el código. Los aportes de la

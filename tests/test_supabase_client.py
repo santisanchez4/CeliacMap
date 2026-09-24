@@ -302,3 +302,21 @@ def test_place_evidence_table_is_server_only():
     assert "revoke all on public.place_evidence from anon, authenticated;" in schema
     assert "grant select on public.place_evidence" not in schema
     assert "grant insert on public.place_evidence" not in schema
+
+
+def test_audit_migration_matches_the_schema_blocks():
+    """db/migrations/2026-09-24-audit-plan.sql is a copy of blocks of db/schema.sql: they must not drift."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    schema = (root / "db" / "schema.sql").read_text(encoding="utf-8")
+    migration = (root / "db" / "migrations" / "2026-09-24-audit-plan.sql").read_text(encoding="utf-8")
+    for begin, end in [
+        ("-- SUGGESTION-NEEDS-LOCATION-BEGIN", "-- SUGGESTION-NEEDS-LOCATION-END"),
+        ("-- COMMUNITY-WARNING-BEGIN", "-- COMMUNITY-WARNING-END"),
+        ("-- PLACE-EVIDENCE-BEGIN", "-- PLACE-EVIDENCE-END"),
+    ]:
+        blk = schema[schema.index(begin): schema.index(end)]
+        assert blk in migration, begin
+    assert "'admin_notify'" in migration
+    assert "revoke all on public.place_evidence from anon, authenticated;" in migration

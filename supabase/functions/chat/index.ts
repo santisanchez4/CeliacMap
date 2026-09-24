@@ -217,6 +217,7 @@ const REPORT_TYPES = ["positive", "negative"] as const;
 const IDIOMAS = ["es", "en"] as const;
 const SI_NO = ["si", "no"] as const;
 const PREPARACIONES = ["cocina_separada", "preparacion_aparte", "misma_cocina"] as const;
+const NIVELES = ["100"] as const;
 
 export interface RouterOutput {
   modulo: (typeof MODULOS)[number];
@@ -246,6 +247,9 @@ export interface RouterOutput {
   preparacion_celiaca: (typeof PREPARACIONES)[number] | null;
   dueno_celiaco: (typeof SI_NO)[number] | null;
   cocina_respuesta: boolean;
+  // "100" only when the person explicitly asks for 100% / dedicated / exclusive places (ROUTER
+  // prompt instruction 11): the search then keeps only gluten_free_100 (audit plan step 4).
+  nivel: (typeof NIVELES)[number] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -315,6 +319,18 @@ export function filterPlaceFields(row: Record<string, unknown>): Record<string, 
   return out;
 }
 
+// A recent negative community report (places.community_warning_at, audit plan step 7) is shown
+// on the map for 30 days; the chatbot mentions it the same way. The redactor only receives this
+// boolean, never the date or the report.
+const COMMUNITY_WARNING_DAYS = 30;
+
+export function toRedactorPlace(row: Record<string, unknown>, now = Date.now()): Record<string, unknown> {
+  const out = filterPlaceFields(row);
+  const at = typeof row.community_warning_at === "string" ? Date.parse(row.community_warning_at) : NaN;
+  if (!Number.isNaN(at) && now - at < COMMUNITY_WARNING_DAYS * 86_400_000) out.reportado_por_la_comunidad = true;
+  return out;
+}
+
 interface PlacesQueryParams {
   ciudad?: string | null;
   pais?: string | null;
@@ -322,17 +338,21 @@ interface PlacesQueryParams {
   category?: string | null;
   texto_libre?: string | null;
   lugar_nombre?: string | null;
+  nivel?: string | null;
 }
 
 export function buildPlacesSearchUrl(supabaseUrl: string, params: PlacesQueryParams): string {
   // `id` is selected only for the client-side map reference below. filterPlaceFields
   // still excludes it, so the redactor receives exactly the audited allowlist.
-  const parts = [`select=id,${PLACES_SELECT_FIELDS.join(",")}`, "status=eq.approved"];
+  // community_warning_at is read only to derive reportado_por_la_comunidad (toRedactorPlace);
+  // the raw column is not in the allowlist, so the redactor never sees it.
+  const parts = [`select=id,community_warning_at,${PLACES_SELECT_FIELDS.join(",")}`, "status=eq.approved"];
   if (params.ciudad) parts.push(`city=ilike.*${encodeURIComponent(params.ciudad)}*`);
   if (params.pais) parts.push(`country=eq.${encodeURIComponent(params.pais)}`);
   if (params.zona) parts.push(`address=ilike.*${encodeURIComponent(params.zona)}*`);
   if (params.category) parts.push(`category=eq.${encodeURIComponent(params.category)}`);
   if (params.texto_libre) parts.push(`name=ilike.*${encodeURIComponent(params.texto_libre)}*`);
+  if (params.nivel === "100") parts.push("safety_level=eq.gluten_free_100");
   parts.push("order=vote_count.desc,rating.desc.nullslast,name.asc");
   parts.push(`limit=${PLACES_SEARCH_LIMIT}`);
   return `${supabaseUrl}/rest/v1/places?${parts.join("&")}`;
@@ -1165,6 +1185,7 @@ export function parseRouterOutput(text: string): RouterOutput {
     preparacion_celiaca: asEnum(obj.preparacion_celiaca, PREPARACIONES),
     dueno_celiaco: asEnum(obj.dueno_celiaco, SI_NO),
     cocina_respuesta: obj.cocina_respuesta === true,
+    nivel: asEnum(obj.nivel, NIVELES),
   };
 }
 
@@ -1232,8 +1253,10 @@ export function buildResponderUserMessage(args: {
   datos?: Record<string, unknown>[];
   datosCercanos?: { city: string; count: number } | null;
   envio?: EnvioContext;
+  filtroNivel?: string | null;
 }): string {
   const parts = [`modulo: ${args.modulo}`];
+  if (args.filtroNivel === "100") parts.push("filtro_nivel: 100");
   if (args.datos) parts.push(`<datos>${JSON.stringify(args.datos)}</datos>`);
   if (args.datosCercanos) parts.push(`<datos_cercanos>${JSON.stringify(args.datosCercanos)}</datos_cercanos>`);
   if (args.envio) parts.push(`<envio>${JSON.stringify(args.envio)}</envio>`);
@@ -2005,7 +2028,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       // buscar
       queryLog = { ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category, texto_libre: router.texto_libre, lugar_nombre: router.lugar_nombre };
       const rows = await fetchSearchPlaces(supabaseUrl, anonKey, router);
-      const datos = rows.map(filterPlaceFields);
+      const datos = rows.map((row) => toRedactorPlace(row));
       responsePlaces = toChatPlaceReferences(rows);
       resultCount = datos.length;
 
@@ -2027,7 +2050,9 @@ export async function handleRequest(req: Request): Promise<Response> {
         anthropic,
         model,
         RESPONDER_PROMPT,
-        buildResponderUserMessage({ modulo: router.modulo, userMessage: lastUserMessage, datos, datosCercanos }),
+        buildResponderUserMessage({
+          modulo: router.modulo, userMessage: lastUserMessage, datos, datosCercanos, filtroNivel: router.nivel,
+        }),
         600,
       );
       reply = redactorCall.text;

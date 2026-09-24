@@ -52,6 +52,7 @@ import {
   sha256Hex,
   trimHistory,
   toChatPlaceReferences,
+  toRedactorPlace,
   validatePendingSubmission,
   validateRequestBody,
   type ConfirmarResult,
@@ -1766,4 +1767,47 @@ Deno.test("buildChatLogResult - a marked turn keeps the raw texts, and a guard t
   });
   assertEquals(tripped.raw_bot_reply, getReply(CELIAQUIA_GUARD_REPLIES, "es"));
   assertEquals(tripped.guard, { tripped: true, reasons: ["figura"], discarded_bot_reply: "menos de 20 mg al día" });
+});
+
+// ---------------------------------------------------------------------------
+// Audit plan step 4: "solo 100%" filter + the community warning in <datos>
+// ---------------------------------------------------------------------------
+
+Deno.test("parseRouterOutput - nivel is '100' or null, nothing else", () => {
+  assertEquals(parseRouterOutput('{"modulo":"buscar","nivel":"100"}').nivel, "100");
+  assertEquals(parseRouterOutput('{"modulo":"buscar","nivel":"gluten_free_100"}').nivel, null);
+  assertEquals(parseRouterOutput('{"modulo":"buscar"}').nivel, null);
+});
+
+Deno.test("buildPlacesSearchUrl - nivel 100 keeps only dedicated venues", () => {
+  const url = buildPlacesSearchUrl("https://x.supabase.co", { ciudad: "Montevideo", nivel: "100" });
+  assertStringIncludes(url, "safety_level=eq.gluten_free_100");
+  assertEquals(buildPlacesSearchUrl("https://x.supabase.co", { ciudad: "Montevideo" }).includes("safety_level=eq"), false);
+});
+
+Deno.test("toRedactorPlace - a recent warning becomes a boolean; the date itself never reaches the redactor", () => {
+  const now = Date.parse("2026-09-24T12:00:00Z");
+  const row = { id: "p1", name: "Cafe X", community_warning_at: "2026-09-20T10:00:00Z", validation_notes: "secret" };
+  const out = toRedactorPlace(row, now);
+  assertEquals(out.reportado_por_la_comunidad, true);
+  assertEquals("community_warning_at" in out, false);
+  assertEquals("validation_notes" in out, false);
+  assertEquals("id" in out, false);
+  assertEquals("reportado_por_la_comunidad" in toRedactorPlace({ ...row, community_warning_at: "2026-08-01T00:00:00Z" }, now), false);
+  assertEquals("reportado_por_la_comunidad" in toRedactorPlace({ name: "Y" }, now), false);
+});
+
+Deno.test("buildResponderUserMessage - tells the redactor when the search was 100%-only", () => {
+  const msg = buildResponderUserMessage({ modulo: "buscar", userMessage: "solo 100%", datos: [], filtroNivel: "100" });
+  assertStringIncludes(msg, "filtro_nivel: 100");
+  assertEquals(buildResponderUserMessage({ modulo: "buscar", userMessage: "x", datos: [] }).includes("filtro_nivel"), false);
+});
+
+Deno.test("prompts - the level filter needs an explicit ask, and the redactor handles an empty 100% search and the warning", () => {
+  const router = ROUTER_PROMPT.replace(/\s+/g, " ");
+  assertStringIncludes(router, 'nivel es "100" SOLO cuando');
+  assertStringIncludes(router, 'Pedir "sin TACC", "sin gluten" o "apto celíacos" a secas NO alcanza');
+  const redactor = RESPONDER_PROMPT.replace(/\s+/g, " ");
+  assertStringIncludes(redactor, "no encontraste espacios 100% sin gluten para esa búsqueda");
+  assertStringIncludes(redactor, "reportado_por_la_comunidad: true");
 });
