@@ -21,6 +21,7 @@ import {
   withConfirmFacts,
   type ConfirmTurnResult,
 } from "./index.ts";
+import { ROUTER_PROMPT } from "./prompts.ts";
 
 const NO_FACTS = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
 const NO_ROUTER_FACTS = { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: null } as const;
@@ -309,4 +310,49 @@ Deno.test("envioBaseForPending - identifies the draft without router data", () =
   assertEquals(envioBaseForPending(suggestion()), {
     lugar_nombre: "Pan Justo", ciudad: "Rosario", direccion: "Corrientes 100, Rosario", pais: "Argentina", texto: "Cocinan de todo",
   });
+});
+
+// ---- ROUTER prompt: kitchen fields ----------------------------------------------
+
+const flat = (text: string): string => text.replace(/\s+/g, " ");
+function promptExamples(prompt: string): string[] {
+  return [...prompt.matchAll(/<example>\n([\s\S]*?)\n<\/example>/g)].map((m) => m[1]);
+}
+function routerOut(example: string): Record<string, unknown> {
+  return JSON.parse(/^Salida: (\{.*\})$/m.exec(example)![1]);
+}
+
+Deno.test("ROUTER_PROMPT - every example's Salida is valid JSON with exactly the fields <output_format> declares", () => {
+  const format = ROUTER_PROMPT.slice(ROUTER_PROMPT.lastIndexOf("<output_format>"));
+  const declared = [...format.matchAll(/"([a-z_]+)":/g)].map((m) => m[1]).sort();
+  assertEquals(declared.includes("cocina_respuesta"), true);
+  assertEquals(declared.length, 16);
+  for (const example of promptExamples(ROUTER_PROMPT)) {
+    assertEquals(Object.keys(routerOut(example)).sort(), declared, example.slice(0, 80));
+  }
+});
+
+Deno.test("ROUTER_PROMPT - kitchen data is extracted only when explicit; cocina_respuesta is tied to the assistant's own question", () => {
+  const router = flat(ROUTER_PROMPT);
+  assertStringIncludes(router, "nunca los infieras");
+  assertStringIncludes(router, '"Tienen opciones sin gluten", "es sin TACC" o un elogio NO alcanzan');
+  assertStringIncludes(router, 'cualquiera de las tres implica cocina_exclusiva "no"');
+  assertStringIncludes(router, "cocina_respuesta es true SOLO cuando");
+  assertStringIncludes(router, 'nunca "fuera_de_alcance"');
+});
+
+Deno.test("ROUTER_PROMPT - examples pin the four behaviors: answer, 'no sé' + confirm, separate kitchen implies not exclusive, no inference", () => {
+  const byUser = (needle: string) => {
+    const e = promptExamples(ROUTER_PROMPT).find((x) => x.includes(needle));
+    assertEquals(e !== undefined, true, needle);
+    return routerOut(e!);
+  };
+  const answer = byUser("sí, es todo sin gluten y la dueña es celíaca");
+  assertEquals([answer.modulo, answer.cocina_exclusiva, answer.dueno_celiaco, answer.cocina_respuesta, answer.confirma_envio], ["reportar", "si", "si", true, false]);
+  const noSe = byUser("no sé, dale");
+  assertEquals([noSe.modulo, noSe.cocina_exclusiva, noSe.dueno_celiaco, noSe.cocina_respuesta, noSe.confirma_envio], ["reportar", null, null, true, true]);
+  const separate = byUser("una cocina separada para celíacos");
+  assertEquals([separate.cocina_exclusiva, separate.preparacion_celiaca, separate.cocina_respuesta], ["no", "cocina_separada", false]);
+  const noInfer = byUser("tienen opciones sin gluten muy ricas");
+  assertEquals([noInfer.cocina_exclusiva, noInfer.preparacion_celiaca, noInfer.dueno_celiaco], [null, null, null]);
 });
