@@ -234,8 +234,7 @@ GEOGRAPHIC SCOPE
   the query and dropped address (a high `out_of_scope` count flags an
   ambiguous city in `targets.yaml`). `tests/test_search_agent.py` +4/−1.
 - **`GooglePlacesClient.resolve_location()` can return the WRONG business when
-  Find Place mis-matches `name + address + city` — unresolved, pending a
-  future fix.** Find Place always returns *a* candidate if it can match
+  Find Place mis-matches `name + address + city` — fixed 2026-09-24 (name check).** Find Place always returns *a* candidate if it can match
   *anything* in the query string, and takes the first one with no
   name-similarity check. Confirmed live 2026-09-01 while recovering
   "Bienestar Gluten Free" (Fray Bentos, UY): the query
@@ -265,6 +264,15 @@ GEOGRAPHIC SCOPE
   accepting the wrong business. The manually-recovered row
   (`4300ad15-2f6f-4881-a902-b2ac5990464c`) sidestepped this by calling
   `_geocode_address` directly.
+  **Fix (2026-09-24, audit plan H6):** `resolve_location()` now drops a Find Place
+  match whose `name` does not match the searched name (`names_match()` in
+  `agents/clients/google_places.py`: accent/case-insensitive overlap of the
+  significant words — generic words like "sin", "gluten", "café", "resto" ignored —
+  ≥ 0.5 of the shorter name, one typo allowed in long words, plus a no-spaces
+  containment check) and falls through to the address-only geocode, the same path
+  the admin took by hand for Bienestar. Known limit: a real business whose name
+  *contains* the searched word still passes ("Serendipia" vs "Serendipia - CEA");
+  the Validator stays the backstop. Tests in `tests/test_google_places.py`.
 - **`VALIDATOR_RESERVE=80` (in `scripts/run_agents.py`) was sized for the old
   daily cadence, not the current monthly one — unresolved, the `pending`
   backlog is now structurally growing, not just occasionally spiking.**

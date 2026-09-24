@@ -13,6 +13,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from typing import Any
 
 import googlemaps
@@ -91,6 +92,58 @@ COUNTRY_CODES = {"argentina": "AR", "uruguay": "UY"}
 # place whose existence we cannot otherwise verify. RANGE_INTERPOLATED and
 # GEOMETRIC_CENTER are accepted (decision: CLAUDE.md Decisions Log).
 _REJECTED_LOCATION_TYPES = {"APPROXIMATE"}
+
+# Words that describe the kind of place or the GF offer rather than identify the
+# business. Ignored when comparing a searched name with the one Find Place returned,
+# so "Bienestar Gluten Free" vs "Bienestar" matches and "Sin Gluten X" vs "Sin Gluten Y"
+# does not. Compared after _normalize_text (lower case, no accents).
+_NAME_STOPWORDS = {
+    "a", "al", "de", "del", "el", "en", "la", "las", "lo", "los", "y", "e", "the", "and", "of",
+    "sin", "tacc", "gluten", "free", "glutenfree", "libre", "celiaco", "celiacos", "celiaca",
+    "celiacas", "apto", "aptos", "gf", "100", "resto", "restaurante", "restaurant", "cafe",
+    "cafeteria", "coffee", "panaderia", "pasteleria", "confiteria", "bakery", "almacen",
+    "dietetica", "tienda", "shop", "bar", "pizzeria", "casa", "espacio", "sucursal", "local",
+}
+# Two names match when this share of the shorter name's significant words is found in
+# the other (see names_match). 0.5 keeps "Café Ramona" vs "Ramona - Centro" and rejects
+# "Bienestar" vs "víaSana".
+NAME_MATCH_THRESHOLD = 0.5
+
+
+def _name_tokens(name: str) -> list[str]:
+    return [t for t in re.split(r"[^a-z0-9]+", _normalize_text(name or "")) if t]
+
+
+def _tokens_equal(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    # One typo in a long word ("Dalbertt" / "Dalbert") still names the same business.
+    return min(len(a), len(b)) >= 5 and SequenceMatcher(None, a, b).ratio() >= 0.85
+
+
+def names_match(searched: str | None, found: str | None) -> bool:
+    """Whether the business Find Place returned plausibly is the one we searched for.
+
+    Accent/case-insensitive word overlap over the significant words (``_NAME_STOPWORDS``
+    removed), plus a check on the names with spaces removed ("viaSana" / "Via Sana").
+    Unknown on either side (no name to compare) counts as a match, which keeps the
+    previous behavior for callers that pass no name.
+    """
+    all_a, all_b = _name_tokens(searched or ""), _name_tokens(found or "")
+    if not all_a or not all_b:
+        return True
+    compact_a, compact_b = "".join(all_a), "".join(all_b)
+    if compact_a == compact_b:
+        return True
+    a = [t for t in all_a if t not in _NAME_STOPWORDS] or all_a
+    b = [t for t in all_b if t not in _NAME_STOPWORDS] or all_b
+    sig_a, sig_b = "".join(a), "".join(b)
+    if len(min(sig_a, sig_b, key=len)) >= 5 and (sig_a in compact_b or sig_b in compact_a):
+        return True
+    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+    hits = sum(1 for t in shorter if any(_tokens_equal(t, u) for u in longer))
+    return hits / len(shorter) >= NAME_MATCH_THRESHOLD
+
 
 AR_PROVINCES = {
     "buenos aires", "catamarca", "chaco", "chubut", "cordoba", "corrientes",
@@ -247,6 +300,18 @@ class GooglePlacesClient:
         """
         query = " ".join(part for part in (name, address, city) if part).strip()
         match = self.find_place(query, location=location) if query else None
+        if match and match.get("place_id") and not names_match(name, match.get("name")):
+            # Find Place returns *some* candidate for almost any query and we used to take
+            # the first one blindly (e.g. "Bienestar Gluten Free, Fray Bentos" -> "víaSana"
+            # in Rivera). A business with a different name is a different business: drop
+            # it and fall through to the address-only geocode, the path an admin takes by
+            # hand for a place with no Google listing.
+            logger.warning(
+                "find_place name mismatch: searched %r, got %r — using address only",
+                name,
+                match.get("name"),
+            )
+            match = None
         if match and match.get("place_id"):
             loc = (match.get("geometry") or {}).get("location") or {}
             lat, lng = loc.get("lat"), loc.get("lng")
