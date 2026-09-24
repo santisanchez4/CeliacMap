@@ -2150,6 +2150,20 @@ deliberately not written in `validation_notes` (publicly readable): an earlier
 version of the note did state it and was rewritten the same day
 (`db/fixes/2026-09-24-lo-de-flor-note-privacy.sql`).
 
+**Fourth precedent — a manual place anchored to a real Google listing (2026-09-24).**
+**Dispensario** (café, Fray Bentos, 18 de Julio 1446) was added at Santiago's request the same way
+as Ta Bacana / Caneladesayunos: inserted directly as `approved`, `safety_level='options_available'`
+("Tiene opciones sin TACC", not declared 100%), `source='manual'`, `validation_confidence` null,
+`verified` false, with the `APROBACIÓN MANUAL` note. The difference: it **does** have a Google Place
+("Dispensario Espresso Bar"), confirmed to be the same business by three matches against its
+Instagram bio (address, phone, Tuesday–Sunday 16:00–20:00), so it is anchored to it —
+`external_id` = the Google `place_id`, `geocode_method='find_place'`, ROOFTOP coordinates, plus the
+phone, hours and rating Google returned. That anchor is what stops the monthly Search agent from
+inserting the same place again as a pending "Dispensario Espresso Bar" (`place_exists_by_external_id`),
+and lets the Updater keep it fresh. **Practical rule:** before geocoding a manual place from the
+cadastre, run Find Place on its name + city — a listing may already exist and is better than an
+address-only row. See `db/fixes/2026-09-24-fray-bentos-dispensario.sql`.
+
 **Labeling rule (decided 2026-09-24 — applies to the Validator, the public forms
 and the chatbot).** `gluten_free_100` means the establishment cooks and sells
 *only* gluten-free / celiac-safe products. "Sin gluten", "sin TACC" and "apto para
