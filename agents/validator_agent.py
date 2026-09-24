@@ -31,6 +31,15 @@ ALLOWED_SAFETY = {"gluten_free_100", "celiac_friendly", "options_available"}
 ALLOWED_VERDICTS = {"approved", "rejected", "needs_review"}
 DEFAULT_SAFETY_LEVEL = "options_available"
 
+# Community kitchen declarations (docs/superpowers/specs/2026-09-24-kitchen-info-design.md).
+MAX_CLAIMS = 5
+PENDING_ADMIN_FLAG = "100% pendiente de confirmación del administrador"
+_PREP_LABELS = {
+    "separate_kitchen": "cocina separada",
+    "separate_prep": "preparación aparte",
+    "shared_kitchen": "misma cocina",
+}
+
 # Confidence gates (health-sensitive). Auto-approval needs strong evidence; the
 # 0.7 floor is below 0.85, so any place the model would "approve" with weak
 # confidence still falls back to needs_review for a human.
@@ -125,7 +134,9 @@ class ValidatorAgent(BaseAgent):
         self.max_per_run = max_per_run
 
     @staticmethod
-    def _build_user_prompt(place: dict, reviews: list[dict] | None = None) -> str:
+    def _build_user_prompt(
+        place: dict, reviews: list[dict] | None = None, claims: list[dict] | None = None
+    ) -> str:
         fields = {
             "name": place.get("name"),
             "address": place.get("address"),
@@ -154,7 +165,42 @@ class ValidatorAgent(BaseAgent):
             prompt += "\n\nCommunity review signals:\n" + "\n".join(
                 f"- {text}" for text in snippets
             )
+
+        claims_block = ValidatorAgent._claims_block(claims)
+        if claims_block:
+            prompt += "\n\n" + claims_block
         return prompt
+
+    @staticmethod
+    def _claims_block(claims) -> str:
+        """Community kitchen declarations, rendered as clearly UNVERIFIED context.
+
+        Best-effort on purpose: anything that is not a list of dicts (None, a mock,
+        a failed read) renders nothing, so the prompt is byte-identical to today's.
+        """
+
+        def tri(value) -> str:
+            return "sí" if value is True else "no" if value is False else "sin dato"
+
+        groups = []
+        for c in list(claims or [])[:MAX_CLAIMS]:
+            if not isinstance(c, dict):
+                continue
+            groups.append(
+                [
+                    f"- cocina exclusivamente sin gluten: {tri(c.get('kitchen_exclusive'))}",
+                    f"- preparación para celíacos: {_PREP_LABELS.get(c.get('celiac_prep'), 'sin dato')}",
+                    f"- dueño/a celíaco/a: {tri(c.get('owner_celiac'))}",
+                ]
+            )
+        if not groups:
+            return ""
+        lines = ["declaraciones_comunidad (NO verificadas):"]
+        for i, group in enumerate(groups, start=1):
+            if len(groups) > 1:
+                lines.append(f"Declaración {i}:")
+            lines.extend(group)
+        return "\n".join(lines)
 
     @staticmethod
     def _clamp_confidence(raw) -> float | None:
@@ -172,21 +218,27 @@ class ValidatorAgent(BaseAgent):
             return []
         return [s.strip() for item in raw if (s := str(item).strip())]
 
-    def evaluate(self, place: dict, reviews: list[dict] | None = None) -> dict:
+    def evaluate(
+        self,
+        place: dict,
+        reviews: list[dict] | None = None,
+        claims: list[dict] | None = None,
+    ) -> dict:
         """Run the full model evaluation for a single place and return the
         normalized verdict dict (``verdict``, ``status``, ``category``,
         ``safety_level``, ``confidence``, ``reason``, ``flags``,
         ``recommendation``).
 
-        Pure: no DB reads or writes — the caller supplies any review context and
-        persists the result. This is the single-place core of ``run()``; the
-        retroactive re-validation script (``scripts/revalidate_low_confidence.py``)
-        reuses it so batch and one-off re-evaluation share one code path.
+        Pure: no DB reads or writes — the caller supplies any review / community
+        claim context and persists the result. This is the single-place core of
+        ``run()``; the retroactive re-validation script
+        (``scripts/revalidate_low_confidence.py``) reuses it so batch and one-off
+        re-evaluation share one code path.
         """
         raw = self.llm.complete_json(
-            RUBRIC, self._build_user_prompt(place, reviews), model=self.model
+            RUBRIC, self._build_user_prompt(place, reviews, claims), model=self.model
         )
-        return self._normalize(raw, place)
+        return self._normalize(raw, place, claims)
 
     @staticmethod
     def _decide_status(verdict: str, confidence: float | None) -> str:
@@ -204,7 +256,7 @@ class ValidatorAgent(BaseAgent):
             return "approved"
         return "needs_review"
 
-    def _normalize(self, verdict: dict, place: dict) -> dict:
+    def _normalize(self, verdict: dict, place: dict, claims: list[dict] | None = None) -> dict:
         """Coerce the model output into safe, schema-valid values."""
         raw = str(verdict.get("verdict", "")).strip().lower()
         verdict_label = raw if raw in ALLOWED_VERDICTS else "needs_review"
@@ -249,7 +301,12 @@ class ValidatorAgent(BaseAgent):
                 logger.exception("fetching review context failed for %s", place_id)
                 reviews = []
             try:
-                v = self.evaluate(place, reviews)
+                claims = list(self.db.fetch_community_claims(place_id) or [])
+            except Exception:  # noqa: BLE001 - claims context is best-effort
+                logger.exception("fetching community claims failed for %s", place_id)
+                claims = []
+            try:
+                v = self.evaluate(place, reviews, claims)
             except Exception as exc:  # noqa: BLE001
                 errors += 1
                 logger.exception("validation failed for %s", place_id)

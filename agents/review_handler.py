@@ -37,8 +37,13 @@ logger = logging.getLogger("celiacmap.agent")
 ACTIONABLE_STATUSES = ("approved",)
 
 
-def _build_report_prompt(place: dict, reviews: list[dict], report_description: str) -> str:
-    base = ValidatorAgent._build_user_prompt(place, reviews)
+def _build_report_prompt(
+    place: dict,
+    reviews: list[dict],
+    report_description: str,
+    claims: list[dict] | None = None,
+) -> str:
+    base = ValidatorAgent._build_user_prompt(place, reviews, claims)
     return (
         f"{base}\n\n"
         "Reporte directo de la comunidad (no verificado; puede ser un caso "
@@ -133,11 +138,17 @@ class ReviewHandler(BaseAgent):
             logger.exception("fetching review context failed for %s", place_id)
             reviews = []
 
-        prompt = _build_report_prompt(place, reviews, description)
+        try:
+            claims = list(self.db.fetch_community_claims(place_id) or [])
+        except Exception:  # noqa: BLE001 - claims context is best-effort
+            logger.exception("fetching community claims failed for %s", place_id)
+            claims = []
+
+        prompt = _build_report_prompt(place, reviews, description, claims)
 
         try:
             raw_verdict = self.llm.complete_json(RUBRIC, prompt, model=self.model)
-            v = self.validator._normalize(raw_verdict, place)
+            v = self.validator._normalize(raw_verdict, place, claims)
         except Exception as exc:  # noqa: BLE001
             self.db.update_place_report_status(report_id, "error")
             logger.exception("report re-evaluation failed for %s", place_id)

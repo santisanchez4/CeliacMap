@@ -340,3 +340,80 @@ def test_run_survives_review_fetch_failure():
     summary = agent.run()
 
     assert summary["approved"] == 1
+
+
+# --- Community kitchen claims as UNVERIFIED validator context ------------------
+
+OWNER_CLAIM = {"kitchen_exclusive": None, "celiac_prep": None, "owner_celiac": True}
+SHARED_CLAIM = {"kitchen_exclusive": False, "celiac_prep": "shared_kitchen", "owner_celiac": False}
+
+
+def test_user_prompt_includes_unverified_kitchen_claims():
+    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [OWNER_CLAIM])
+    assert "declaraciones_comunidad (NO verificadas):" in prompt
+    assert "- cocina exclusivamente sin gluten: sin dato" in prompt
+    assert "- preparación para celíacos: sin dato" in prompt
+    assert "- dueño/a celíaco/a: sí" in prompt
+
+
+def test_user_prompt_renders_each_answer_in_words():
+    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [SHARED_CLAIM])
+    assert "- cocina exclusivamente sin gluten: no" in prompt
+    assert "- preparación para celíacos: misma cocina" in prompt
+    assert "- dueño/a celíaco/a: no" in prompt
+
+
+@pytest.mark.parametrize("claims", [None, []])
+def test_user_prompt_without_claims_is_identical_to_today(claims):
+    base = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [])
+    assert ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], claims) == base
+    assert "declaraciones_comunidad" not in base
+
+
+def test_user_prompt_numbers_several_claims_and_caps_at_five():
+    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [OWNER_CLAIM] * 7)
+    assert "Declaración 1:" in prompt and "Declaración 5:" in prompt
+    assert "Declaración 6:" not in prompt
+
+
+def test_user_prompt_tolerates_a_mock_claims_object():
+    # Old tests build the db as MagicMock(); a MagicMock "claims" must degrade to no block.
+    assert "declaraciones_comunidad" not in ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], MagicMock())
+
+
+def test_run_feeds_claims_into_prompt():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
+    db.fetch_reviews_for_place.return_value = []
+    db.fetch_community_claims.return_value = [OWNER_CLAIM]
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "needs_review", "confidence_score": 0.6, "category": "cafe"}
+
+    ValidatorAgent(db, llm).run()
+
+    db.fetch_community_claims.assert_called_once_with("p1")
+    assert "dueño/a celíaco/a: sí" in llm.complete_json.call_args.args[1]
+
+
+def test_run_survives_claims_fetch_failure():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
+    db.fetch_reviews_for_place.return_value = []
+    db.fetch_community_claims.side_effect = RuntimeError("db down")
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "approved", "confidence_score": 0.9, "category": "cafe"}
+
+    summary = ValidatorAgent(db, llm).run()
+
+    assert summary["approved"] == 1
+
+
+def test_evaluate_forwards_claims_and_does_no_db_access():
+    db = MagicMock()
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "needs_review", "confidence_score": 0.6, "category": "cafe"}
+
+    ValidatorAgent(db, llm).evaluate({"name": "Cafe X"}, [], [OWNER_CLAIM])
+
+    db.fetch_community_claims.assert_not_called()
+    assert "dueño/a celíaco/a: sí" in llm.complete_json.call_args.args[1]

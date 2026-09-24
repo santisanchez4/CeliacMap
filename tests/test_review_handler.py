@@ -335,3 +335,33 @@ def test_sweep_logs_summary():
     handler.log.assert_called_once_with(
         "review_sweep_complete", summary, status="success"
     )
+
+
+# --- Community kitchen claims -------------------------------------------------
+
+
+def test_build_report_prompt_includes_unverified_kitchen_claims():
+    claims = [{"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": True}]
+    prompt = _build_report_prompt(make_place(), [], "Ya no tienen protocolo sin TACC.", claims)
+    assert "declaraciones_comunidad (NO verificadas):" in prompt
+    assert "Ya no tienen protocolo sin TACC." in prompt
+
+
+def test_handle_passes_claims_to_prompt_and_reads_them_best_effort():
+    handler, db, llm = make_handler()
+    db.fetch_community_claims.return_value = [{"kitchen_exclusive": False, "celiac_prep": "shared_kitchen"}]
+
+    handler.handle("place-1", "report-1")
+
+    db.fetch_community_claims.assert_called_once_with("place-1")
+    assert "misma cocina" in llm.complete_json.call_args.args[1]
+
+
+def test_handle_survives_claims_fetch_failure():
+    handler, db, llm = make_handler()
+    db.fetch_community_claims.side_effect = RuntimeError("db down")
+
+    result = handler.handle("place-1", "report-1")
+
+    assert "skipped" not in result
+    llm.complete_json.assert_called_once()
