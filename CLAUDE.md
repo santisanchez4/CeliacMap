@@ -106,6 +106,10 @@ GEOGRAPHIC SCOPE
   the last added for the Social agent. Social leads store the originating profile
   URL in `validation_notes` and use the geocoded Google `place_id` as `external_id`
   so a place found by both Search and Social is not duplicated.
+- **`suggestions` / `place_reports`** carry three optional, unverified kitchen
+  declarations (`kitchen_exclusive`, `celiac_prep`, `owner_celiac`) with CHECKs that
+  enforce coherence; **`places` deliberately does not** (`owner_celiac` is a named
+  third party's health condition and `places` is publicly readable). See ADR-007.
 - **`agent_log`** gains `agent`, `status`, `place_id` and a `jsonb result` for
   traceability; `timestamp` is named `created_at` for consistency.
 - **Row Level Security (RLS)** is enabled on all tables: the public **anon** key may
@@ -439,7 +443,11 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdo
 > three-tier rubric is recorded under **AI Toolkit** in the Decisions Log; the
 > later `ubicacion_geocode` paragraph — cautioning against `approved` for a
 > candidate resolved only by geocoding its address — is recorded under
-> **Geocode-gate — address fallback** there and in prompts.md §24.)
+> **Geocode-gate — address fallback** there and in prompts.md §24. The 2026-09-24
+> kitchen change — `gluten_free_100` defined as "only celiac-safe products are
+> cooked and sold" plus the `declaraciones_comunidad` paragraph, measured in four
+> real-model A/B iterations — is recorded under **Kitchen information as review
+> evidence** there, in ADR-007 and in prompts.md §31.)
 
 ## The Chatbot System Prompts — Router + Redactor
 
@@ -1034,6 +1042,7 @@ Target (functional product — see **## Architecture**):
 │   ├── config.js               # Supabase URL + anon key (public)
 │   ├── map.js                  # Leaflet init, fetch approved places, filters
 │   ├── suggest.js              # Form A: suggest a new place -> suggestions table
+│   ├── kitchen.js              # shared "Sobre la cocina" block (Forms A and B); read() returns only answered keys
 │   ├── report.js               # Form B: recommend/report an existing place -> place_reports
 │   ├── ranking.js              # community ranking (#ranking) + place_votes voting
 │   └── chat.js                 # floating assistant widget -> `chat` Edge Function
@@ -1072,6 +1081,7 @@ Target (functional product — see **## Architecture**):
 ├── scripts/
 │   ├── run_agents.py           # CI entrypoint: search → social → web → suggestion → validator → updater → outreach → review_sweep
 │   ├── purge_chat_logs.py      # weekly purge of agent_log chatbot rows > 30 days (chat-log-purge.yml)
+│   ├── sync_chat_prompts.py    # copy prompts.ts -> the 3 doc copies of the chatbot prompts (--check to verify)
 │   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
@@ -2128,6 +2138,33 @@ Chrome (ES/EN toggle, 390px, no console errors). This is **piece 1 of 3** from t
 evidence (see the labeling rule above), and (3) publicly show community
 recommendations — e.g. the 2026-09-23 positive report on *San Felipa - Sin gluten*
 (Gualeguaychú), which today sits in `place_reports` with no public read path.
+
+### Kitchen information as review evidence (2026-09-24)
+
+Implements the labeling rule above (ADR-007; spec `docs/superpowers/specs/2026-09-24-kitchen-info-design.md`,
+plan `docs/superpowers/plans/2026-09-24-kitchen-info.md`). The public forms and the chatbot now ask three
+optional questions — is the kitchen exclusively gluten free (`kitchen_exclusive`), how is celiac food prepared
+if not (`celiac_prep`: `separate_kitchen` | `separate_prep` | `shared_kitchen`), is the owner celiac
+(`owner_celiac`) — stored as **unverified evidence** on `suggestions` / `place_reports` only (**never on
+`places`**: `owner_celiac` is a named third party's health condition and `places` is publicly readable).
+`SupabaseClient.fetch_community_claims` feeds them to the Validator as a `declaraciones_comunidad (NO
+verificadas)` block; `ReviewHandler` inherits it. Two code caps (`ValidatorAgent._apply_kitchen_caps`) only ever
+**lower** `safety_level` and never touch `status`: **A)** a `source='user'` place never leaves the Validator as
+`gluten_free_100`; **B)** any declaration saying the kitchen is not exclusive caps at `celiac_friendly`.
+`owner_celiac` never participates. A community place awaiting its 100% gets the fixed flag `100% pendiente de
+confirmación del administrador` (list them with a query). **The admin keeps the final verdict on the 100%.**
+
+`RUBRIC` changed (deliberate health-gate edit, `prompts.md` §31): `gluten_free_100` now means only celiac-safe
+products are cooked and sold, plus a paragraph that scopes community declarations to their own block. The real-model
+A/B (`db/checks/validator_kitchen_ab.py`) took **four iterations**: the first wording kept the verdict right
+(never `approved`) but left the raw level at 100% for an "exclusive kitchen" claim; the reinforcement then made the
+model distrust community *reviews* too and stop approving a place with strong evidence and no declarations — a
+regression only caught because a strong-evidence case was added on purpose. The final wording scopes the rule to the
+claims block. Chatbot: router fields `cocina_exclusiva` / `preparacion_celiaca` / `dueno_celiaco` /
+`cocina_respuesta` (never inferred), drafts carry the facts plus an internal `kitchen_asked` (never written), the
+question is asked **once** together with the draft, Módulo 4 stays single-turn (no question, only recites or invites),
+and the redactor gains a glossary and a rule never to promise a 100% because an owner is celiac. This **restarts the
+chatbot soft-launch count**. Tooling: `scripts/sync_chat_prompts.py` copies `prompts.ts` into the three doc copies.
 
 ### Retroactive re-validation of pre-three-tier-rubric approvals (2026-09-06)
 
@@ -3832,6 +3869,21 @@ Function, schema or prompt change):
   bloqueante:** la reformulación del prompt de F4 (Opción 1). **Siguiente
   (Fase F):** cierre del ADR-006 (Estado → Aceptado con su sección de
   Verificación), C4 y README.
+- 🚧 **Phase 25 — Kitchen information (forms, chatbot, Validator), implemented
+  and verified offline / against the real model (2026-09-24); production
+  rollout pending.** Three optional questions about how a place cooks, stored as
+  unverified evidence on the intake tables (`places` untouched), read by the
+  Validator with two deterministic caps, asked once by the chatbot. Design and
+  decisions: **Kitchen information as review evidence** in the Decisions Log,
+  ADR-007, spec and plan. Built on branch `feat/kitchen-info` (spec/plan first;
+  then migration, `fetch_community_claims`, Validator prompt block + caps +
+  `RUBRIC`, `js/kitchen.js` + both forms, chat drafts/router/payloads/turn logic,
+  router + redactor prompts, `scripts/sync_chat_prompts.py`). Tests: Python 292 →
+  320, Deno chat 164 → 200, frontend 25 → 38. **Pending, each needing explicit OK:**
+  apply the migration in Supabase (`db/checks/2026-09-24-kitchen-columns.sql`
+  verifies it), merge + publish the frontend, deploy `chat` (v15) and run the live
+  scenarios (`db/checks/chat_kitchen_live.py`) and the jailbreak battery, reverting
+  every test row.
 
 ### GitHub Pages deploy decision
 

@@ -2151,3 +2151,75 @@ in English. The full 37-turn jailbreak battery was re-run live on v13
 by the guard. It barely exercises the label change (no turn lists places), which is why
 the label check above stands on its own.
 Changing a prompt restarts the soft-launch count (CLAUDE.md).
+
+
+## 31. Kitchen information — RUBRIC + chatbot changes (2026-09-24)
+
+Implements the labeling rule of 2026-09-24 (`CLAUDE.md`, ADR-007). Spec:
+`docs/superpowers/specs/2026-09-24-kitchen-info-design.md`. Both changes are deliberate edits to a
+health-sensitive gate and restart the chatbot soft-launch count.
+
+### 31.1 Validator `RUBRIC` (two text changes; the conservative core and the 0.85 / 0.7 / 0.5 gates are untouched)
+
+1. `gluten_free_100` is defined as "establecimiento donde se cocinan y venden ÚNICAMENTE productos aptos para
+   celíacos (cocina exclusiva / dedicada). Un local que cocina con gluten pero ofrece menú, preparación aparte o
+   cocina separada para celíacos NO es gluten_free_100."
+2. A paragraph for the new `declaraciones_comunidad` block of the user message. Final text (the 4th iteration):
+
+```text
+Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos, si el dueño es celíaco). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Que el dueño sea celíaco sube la confianza pero no prueba que la cocina sea exclusiva. Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
+```
+
+The user message gains, only when there are declarations:
+
+```text
+declaraciones_comunidad (NO verificadas):
+- cocina exclusivamente sin gluten: sí | no | sin dato
+- preparación para celíacos: cocina separada | preparación aparte | misma cocina | sin dato
+- dueño/a celíaco/a: sí | no | sin dato
+```
+
+Code caps (`ValidatorAgent._apply_kitchen_caps`) back the prompt up deterministically — see ADR-007.
+
+**Real-model A/B** (`db/checks/validator_kitchen_ab.py`, n = 4 per case and arm, `claude-sonnet-4-6`; runs in
+`db/checks/2026-09-24-validator-kitchen-ab-run{,-iter1,-iter2,-iter3}.md`). Four iterations:
+
+| iter | wording | claim-only cases | no declarations, strong evidence |
+|---|---|---|---|
+| 1 | definition + a paragraph saying the claims are unverified | verdict never `approved` (0/4) but raw level `gluten_free_100` 4/4 for "exclusive kitchen: yes" | (not measured yet) |
+| 2 | + "if the only evidence of an exclusive kitchen is declarations, level ≤ celiac_friendly" | PASS | (not measured yet); a named gluten-free place with **no** declarations already dropped 100% → celiac_friendly |
+| 3 | same + a new regression case (strong reviews, no declarations) | PASS | **REGRESSION**: OLD approved 4/4 as 100%, NEW `needs_review` 4/4 as celiac_friendly. Isolated by variants: the definition change alone equals OLD; the claims paragraph is the cause (the model also distrusted community *reviews*) |
+| 4 | paragraph scoped to its own block ("un bloque aparte de las reseñas", "sin ese bloque, evalúa exactamente como siempre") | PASS: never `approved`, never 100% (24/24 samples) | back to `approved` 100% 4/4, same as OLD |
+
+Accepted residual: a name-only place with no evidence and no declarations may now show `celiac_friendly` instead of
+`gluten_free_100` as its best-guess level in the raw output (verdict unchanged, `needs_review`; OLD itself varied
+1/4–4/4 across runs) — the conservative direction, on a row that is not public.
+
+### 31.2 Chatbot — router prompt
+
+Instructions 9–10 and four output fields (`cocina_exclusiva`, `preparacion_celiaca`, `dueno_celiaco`,
+`cocina_respuesta`), plus the four fields on every existing example and four new examples (answer, "no sé, dale",
+separate kitchen implies not exclusive, no inference from "opciones sin gluten"). The full text lives in §27 (synced
+from `supabase/functions/chat/prompts.ts` by `scripts/sync_chat_prompts.py`). Rule: extract only what the person
+says explicitly, never infer; `cocina_respuesta` is true only when the assistant's previous turn asked the kitchen
+question, and then the module is `reportar`, never `fuera_de_alcance`.
+
+**Real-model check** (`db/checks/chat_kitchen_router_check.py`, `claude-haiku-4-5`, 13 cases × 8 samples, run in
+`db/checks/2026-09-24-chat-kitchen-router-run.md`): all 13 pass 8/8 — including the four "must not infer" cases
+("tienen opciones sin gluten", "pastas sin TACC", praise only, "no sé") and no answer classified `fuera_de_alcance`.
+
+### 31.3 Chatbot — redactor prompt
+
+A `<glosario>` (Sin TACC = sin trigo, avena, cebada ni centeno; "sin gluten" can be commercial; "apto para celíacos";
+the two map labels defined exactly; no figures), the instruction to add ONE optional kitchen question with the draft
+when `<envio>` carries `preguntar_cocina: true` ("no sé" / "dale" skips it, and it never re-asks), an invitation for
+Módulo 4 (`invitar_cocina: true`), two new constraints (never say or imply a place is "Espacio 100% sin gluten"
+because an owner is celiac or a claim says so; the "no health data" rule is about **who writes**, the owner question
+is a business fact), and three examples.
+
+**Regression** (`db/checks/chat_prompt_ab.py --suite f4 legit --n 16 --old-rev main`, run in
+`db/checks/2026-09-24-chat-kitchen-responder-regression-run.md`): figure and urgency not worse than `main`
+(mg/day 3/16 → 0/16, symptoms urgency 2/16 → 0/16, "10 ppm" unchanged 16/16 — the user's own figure, caught by the
+guard as before), and **0/40** legitimate answers would be replaced by the safety net.
+
+Changing a prompt restarts the soft-launch count (CLAUDE.md).
