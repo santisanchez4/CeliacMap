@@ -267,6 +267,37 @@ class SupabaseClient:
         claims.sort(key=lambda r: r.get("created_at") or "", reverse=True)
         return claims[:limit]
 
+    def fetch_unpublished_opinions(self, limit: int = 100) -> list[dict]:
+        """Positive reports waiting for moderation: not published yet, about a place that is
+        currently ``approved``. Oldest first. The full ``description`` is returned on purpose --
+        the admin reads everything before publishing."""
+        res = (
+            self._db.table("place_reports")
+            .select("id, description, author_name, created_at, place_id, places!inner(name, city, country, status)")
+            .eq("report_type", "positive")
+            .is_("published_at", "null")
+            .eq("places.status", "approved")
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def set_opinions_published(self, ids: list[str], published: bool) -> list[dict]:
+        """Publish (``published_at = now``) or hide (``null``) positive reports. Returns the rows
+        changed. Only positive reports are touched (the table CHECK forbids publishing a negative)."""
+        if not ids:
+            return []
+        stamp = datetime.now(timezone.utc).isoformat() if published else None
+        res = (
+            self._db.table("place_reports")
+            .update({"published_at": stamp})
+            .in_("id", ids)
+            .eq("report_type", "positive")
+            .execute()
+        )
+        return res.data or []
+
     def delete_expired_google_reviews(self, cutoff_days: int = 30) -> list[str]:
         """Delete source='google' review snippets older than cutoff_days.
 

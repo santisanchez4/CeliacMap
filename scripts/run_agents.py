@@ -70,6 +70,9 @@ class DryRunSupabase:
     def fetch_community_claims(self, place_id: str, limit: int = 5) -> list[dict]:
         return self._inner.fetch_community_claims(place_id, limit=limit)
 
+    def fetch_unpublished_opinions(self, limit: int = 100) -> list[dict]:
+        return self._inner.fetch_unpublished_opinions(limit=limit)
+
     def fetch_latest_received_message(self, place_id: str) -> dict | None:
         return self._inner.fetch_latest_received_message(place_id)
 
@@ -169,6 +172,10 @@ class DryRunSupabase:
 
     def update_place_report_status(self, report_id: str, status: str) -> None:
         logger.info("[dry-run] would set place_report %s -> %s", report_id, status)
+
+    def set_opinions_published(self, ids: list[str], published: bool) -> list[dict]:
+        logger.info("[dry-run] would %s opinions %s", "publish" if published else "hide", ids)
+        return []
 
 
 class DryRunResend:

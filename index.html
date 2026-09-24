@@ -703,6 +703,19 @@
                 data-i18n-placeholder="report.form.descriptionPh"></textarea>
             </div>
 
+            <div class="field field-full" id="rp-author-field">
+              <label for="rp-author" data-i18n="report.author.label">Tu nombre (opcional)</label>
+              <input id="rp-author" name="author_name" type="text" maxlength="40" autocomplete="off"
+                placeholder="Cómo querés que aparezca tu nombre"
+                data-i18n-placeholder="report.author.ph" />
+              <p class="rp-author-notice" id="rp-author-notice-positive" data-i18n="report.author.noticePositive">
+                Si es una recomendación, puede mostrarse en el sitio después de que la revisemos. Sin nombre, aparece como Anónimo.
+              </p>
+            </div>
+            <p class="rp-author-notice field-full" id="rp-author-notice-negative" data-i18n="report.author.noticeNegative" hidden>
+              Los reportes no se publican: los revisamos internamente.
+            </p>
+
             <fieldset class="kitchen-fieldset field-full" id="rp-kitchen" data-kitchen>
               <legend data-i18n="kitchen.legend">Sobre la cocina (opcional, pero ayuda mucho)</legend>
               <p class="kitchen-intro" data-i18n="kitchen.intro">Sin gluten, sin TACC y apto para celíacos no son lo mismo. Contanos cómo trabajan; lo revisamos antes de decidir qué etiqueta lleva.</p>
@@ -766,56 +779,11 @@
           <span class="eyebrow" data-i18n="reviews.eyebrow">Reseñas</span>
           <h2 class="section-title" data-i18n="reviews.title">La voz de la comunidad</h2>
           <p class="section-lead" data-i18n="reviews.lead">
-            Experiencias reales que generan confianza.
+            Lo que cuentan quienes ya fueron a estos lugares.
           </p>
         </header>
 
-        <div class="grid grid-3">
-          <article class="review reveal">
-            <div class="review-stars" aria-label="5 de 5 estrellas">★★★★★</div>
-            <p class="review-text" data-i18n="reviews.r1.text">
-              “Por fin puedo salir a comer sin angustia. Encontré tres lugares
-              seguros a metros de casa.”
-            </p>
-            <div class="review-author">
-              <span class="avatar" aria-hidden="true">M</span>
-              <div>
-                <strong>María L.</strong>
-                <span class="muted" data-i18n="reviews.r1.role">Celíaca hace 8 años</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="review reveal">
-            <div class="review-stars" aria-label="5 de 5 estrellas">★★★★★</div>
-            <p class="review-text" data-i18n="reviews.r2.text">
-              “Las etiquetas de seguridad me dan tranquilidad. Saber que otros
-              celíacos lo validaron cambia todo.”
-            </p>
-            <div class="review-author">
-              <span class="avatar" aria-hidden="true">J</span>
-              <div>
-                <strong>Joaquín R.</strong>
-                <span class="muted" data-i18n="reviews.r2.role">Papá de una nena celíaca</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="review reveal">
-            <div class="review-stars" aria-label="5 de 5 estrellas">★★★★★</div>
-            <p class="review-text" data-i18n="reviews.r3.text">
-              “Sumé mi cafetería favorita en un minuto. Me encanta ayudar a que
-              más gente la descubra.”
-            </p>
-            <div class="review-author">
-              <span class="avatar" aria-hidden="true">V</span>
-              <div>
-                <strong>Valentina S.</strong>
-                <span class="muted" data-i18n="reviews.r3.role">Parte de la comunidad</span>
-              </div>
-            </div>
-          </article>
-        </div>
+        <div class="grid grid-3" id="opinions-grid" aria-live="polite"></div>
       </div>
     </section>
 
@@ -868,8 +836,9 @@
             <span class="eyebrow" data-i18n="about.eyebrow">Acerca del proyecto</span>
             <h2 class="section-title" data-i18n="about.title">Una idea con propósito</h2>
             <p class="section-lead" data-i18n="about.lead">
-              CeliacMap nace como proyecto académico y de portfolio: la base de una
-              futura app para que la comunidad celíaca coma de forma segura.
+              CeliacMap nace para que la comunidad celíaca de Argentina y Uruguay
+              coma afuera con más tranquilidad: lugares verificados, y la voz de
+              quienes los conocen.
             </p>
             <div class="author-card">
               <span class="avatar avatar-lg" aria-hidden="true">S</span>
@@ -944,7 +913,14 @@
           </svg>
           <span>hola@celiacmap.org</span>
         </a>
-        <a href="https://www.linkedin.com/in/santisanchez4/" target="_blank" rel="noopener" aria-label="LinkedIn">LinkedIn</a>
+        <a class="footer-contact-link" href="https://www.linkedin.com/in/santisanchez4/" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2" />
+            <circle cx="8" cy="7.8" r="1.2" fill="currentColor" />
+            <path d="M8 10.5V17M12 17v-6.5m0 2.5a3 3 0 0 1 6 0v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>LinkedIn · Santiago Sanchez</span>
+        </a>
       </div>
     </div>
     <div class="container footer-bottom">
@@ -1013,6 +989,7 @@
   <script src="js/suggest.js"></script>
   <script src="js/report.js"></script>
   <script src="js/ranking.js"></script>
+  <script src="js/opinions.js"></script>
   <script src="js/chat.js"></script>
 </body>
 </html>

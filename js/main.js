@@ -225,18 +225,16 @@
     "report.noMatch.negative.hint": "Looking for a different place? Try searching again.",
     "report.form.descriptionLabel": "Tell us what happened *",
     "report.form.descriptionPh": "Describe your experience: what you found, when, and any relevant detail.",
+    "report.author.label": "Your name (optional)",
+    "report.author.ph": "How you want your name to appear",
+    "report.author.noticePositive": "If it's a recommendation, it may be shown on the site after we review it. Without a name, it appears as Anonymous.",
+    "report.author.noticeNegative": "Reports are not published: we review them internally.",
     "report.form.submit": "Send",
     "report.form.disclaimer": "Your contribution is added as evidence and reviewed together with the place's existing information; it doesn't change its status automatically.",
 
     "reviews.eyebrow": "Reviews",
     "reviews.title": "The voice of the community",
-    "reviews.lead": "Real experiences that build trust.",
-    "reviews.r1.text": "“I can finally eat out without anxiety. I found three safe places just steps from home.”",
-    "reviews.r1.role": "Celiac for 8 years",
-    "reviews.r2.text": "“The safety labels give me peace of mind. Knowing other celiacs validated it changes everything.”",
-    "reviews.r2.role": "Father of a celiac girl",
-    "reviews.r3.text": "“I added my favorite café in a minute. I love helping more people discover it.”",
-    "reviews.r3.role": "Part of the community",
+    "reviews.lead": "What people say who have already been to these places.",
 
     "ai.eyebrow": "Future vision",
     "ai.title": "Artificial intelligence at the service of the community",
@@ -247,7 +245,7 @@
 
     "about.eyebrow": "About the project",
     "about.title": "An idea with purpose",
-    "about.lead": "CeliacMap started as an academic and portfolio project: the foundation for a future app so the celiac community can eat safely.",
+    "about.lead": "CeliacMap exists so the celiac community in Argentina and Uruguay can eat out with more peace of mind: verified places, and the voice of the people who know them.",
     "about.role": "Developer · Project author",
 
     "cta.title": "Join a safer way to eat out",

@@ -44,6 +44,13 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   on its own — community-suggested places are capped in code, and the rubric
   (measured against the real model) keeps every other source from doing it too;
   the admin decides ([`ADR-007`](docs/architecture/ADR-007-kitchen-info-as-evidence.md)).
+- ✅ **Community opinions** — the positive recommendations people leave in the
+  "Recommend / report" form (optionally with their name, otherwise "Anónimo") show up in
+  "La voz de la comunidad" **only after the admin approves them**; negative reports are never
+  shown. The public reads a single view (`community_opinions`, 8 explicit columns); the
+  underlying table stays closed. Moderate with `python -m scripts.moderate_opinions`
+  (list pending) and `--approve ID --apply` / `--hide ID --apply`
+  ([`ADR-008`](docs/architecture/ADR-008-published-community-opinions.md)).
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.
@@ -233,6 +240,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── suggest.js              # public "Suggest a Place" form → suggestions table
 │   ├── report.js               # public "recommend / report" form → place_reports
 │   ├── ranking.js              # community ranking (#ranking) + place_votes voting
+│   ├── opinions.js             # "La voz de la comunidad": approved community opinions
 │   └── chat.js                 # floating assistant widget → `chat` Edge Function
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
@@ -256,6 +264,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   └── targets.yaml            # countries/cities + search/social terms
 ├── scripts/
 │   ├── check_setup.py          # connectivity / config preflight
+│   ├── moderate_opinions.py    # list / approve / hide community opinions (dry-run unless --apply)
 │   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers

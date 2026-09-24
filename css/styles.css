@@ -538,6 +538,9 @@ h1, h2, h3 {
   color: var(--color-text);
 }
 .kitchen-intro { color: var(--color-text-muted); font-size: 0.88rem; margin: 0 0 14px; }
+.rp-author-notice { color: var(--color-text-muted); font-size: 0.88rem; margin: 6px 0 0; }
+#rp-author-field { margin-top: 20px; }
+#rp-author-notice-negative { margin-top: 16px; }
 .kitchen-q { margin: 0 0 16px; }
 .kitchen-q-title { font-size: 0.88rem; font-weight: 500; color: var(--color-text); margin: 0 0 8px; }
 .kitchen-options { display: flex; flex-direction: column; gap: 8px; }
@@ -565,6 +568,7 @@ h1, h2, h3 {
   gap: 18px;
 }
 .field { display: flex; flex-direction: column; gap: 7px; }
+.field[hidden] { display: none; }
 .field-full { grid-column: 1 / -1; }
 .field label {
   font-size: 0.85rem;
@@ -1242,8 +1246,8 @@ h1, h2, h3 {
 .review-text {
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 1.3125rem;
-  line-height: 1.55;
+  font-size: 1.125rem;
+  line-height: 1.6;
   color: var(--color-text);
 }
 .review-author { display: flex; align-items: center; gap: 14px; margin-top: 26px; }
@@ -1257,6 +1261,24 @@ h1, h2, h3 {
 }
 .avatar-lg { width: 60px; height: 60px; font-size: 1.375rem; }
 .review-author div { display: flex; flex-direction: column; line-height: 1.35; }
+.avatar--anon {
+  background: var(--color-primary-light)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232d6a4f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21c0-4 4-6 8-6s8 2 8 6'/%3E%3C/svg%3E")
+    center / 24px no-repeat;
+}
+.review-place {
+  align-self: flex-start;
+  background: none; border: 0; padding: 6px 0; margin: 0;
+  font: inherit; font-size: 0.875rem; text-align: left;
+  color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer;
+}
+#opinions-grid .review:not(.review-cta) { display: flex; flex-direction: column; }
+#opinions-grid .review-author { margin-top: auto; padding-top: 22px; }
+.review-cta { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 12px; }
+#opinions-grid > .review-cta:only-child { grid-column: 1 / -1; align-items: center; text-align: center; padding: 40px 28px; }
+.review-cta-title { margin: 0; font-family: var(--font-serif); font-size: 1.3125rem; line-height: 1.4; color: var(--color-text); }
+.review-cta-text { margin: 0; color: var(--color-text-muted); }
 
 /* ------------------------------- AI -------------------------------- */
 .ai-layout { display: grid; grid-template-columns: 1fr; gap: 48px; align-items: center; }

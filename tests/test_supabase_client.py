@@ -11,6 +11,7 @@ places — Curitiba cluster".
 
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
 from agents.clients.supabase_client import SupabaseClient, coordinates_in_scope
@@ -222,3 +223,46 @@ def test_fetch_community_claims_only_reads_positive_reports_and_the_promoted_sug
     reports_eq = tables["place_reports"].select.return_value.eq
     reports_eq.assert_called_once_with("place_id", "place-9")
     reports_eq.return_value.eq.assert_called_once_with("report_type", "positive")
+
+
+def test_fetch_unpublished_opinions_asks_only_for_positive_unpublished_reports_of_approved_places():
+    client = _client_with_mock_db()
+    table = client._db.table
+    chain = (table.return_value.select.return_value.eq.return_value.is_.return_value
+             .eq.return_value.order.return_value.limit.return_value)
+    chain.execute.return_value = MagicMock(data=[{"id": "r1"}])
+
+    assert client.fetch_unpublished_opinions(limit=7) == [{"id": "r1"}]
+
+    table.assert_called_with("place_reports")
+    selected = table.return_value.select.call_args.args[0]
+    assert "owner_celiac" not in selected, selected
+    assert "places!inner" in selected, selected
+    table.return_value.select.return_value.eq.assert_called_once_with("report_type", "positive")
+    table.return_value.select.return_value.eq.return_value.is_.assert_called_once_with("published_at", "null")
+    (table.return_value.select.return_value.eq.return_value.is_.return_value
+     .eq.assert_called_once_with("places.status", "approved"))
+    table.return_value.select.return_value.eq.return_value.is_.return_value.eq.return_value.order.return_value.limit.assert_called_once_with(7)
+    chain.execute.assert_called_once()
+
+
+def test_set_opinions_published_stamps_now_or_null_and_only_touches_positive_reports():
+    client = _client_with_mock_db()
+    update = client._db.table.return_value.update
+    update.return_value.in_.return_value.eq.return_value.execute.return_value = MagicMock(data=[{"id": "r1"}])
+
+    assert client.set_opinions_published(["r1"], True) == [{"id": "r1"}]
+    payload = update.call_args.args[0]
+    assert set(payload) == {"published_at"} and payload["published_at"]
+    datetime.fromisoformat(payload["published_at"])  # a real timestamp, not a placeholder
+    update.return_value.in_.assert_called_once_with("id", ["r1"])
+    update.return_value.in_.return_value.eq.assert_called_once_with("report_type", "positive")
+
+    client.set_opinions_published(["r1"], False)
+    assert update.call_args.args[0] == {"published_at": None}
+
+
+def test_set_opinions_published_with_no_ids_does_not_touch_the_database():
+    client = _client_with_mock_db()
+    assert client.set_opinions_published([], True) == []
+    client._db.table.assert_not_called()
