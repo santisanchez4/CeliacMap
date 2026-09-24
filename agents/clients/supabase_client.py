@@ -234,7 +234,9 @@ class SupabaseClient:
         )
         return res.data or []
 
-    _CLAIM_FACTS = ("kitchen_exclusive", "celiac_prep", "owner_celiac")
+    # owner_celiac is deliberately absent: it is a named third party's health condition and must never
+    # reach the Validator (whose free-text output is stored in publicly readable places columns).
+    _CLAIM_FACTS = ("kitchen_exclusive", "celiac_prep")
 
     def fetch_community_claims(self, place_id: str, limit: int = 5) -> list[dict]:
         """Community kitchen declarations about a place (UNVERIFIED evidence).
@@ -244,7 +246,7 @@ class SupabaseClient:
         Rows with no kitchen datum at all are dropped; newest first, at most ``limit``.
         The caller (Validator) treats these as context to weigh, never as proof.
         """
-        columns = "kitchen_exclusive, celiac_prep, owner_celiac, created_at"
+        columns = "kitchen_exclusive, celiac_prep, created_at"
         rows: list[dict] = []
         suggestions = (
             self._db.table("suggestions")

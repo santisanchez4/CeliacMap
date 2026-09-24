@@ -46,25 +46,32 @@ BASE = {
     "source": "user",
     "geocode_method": "find_place",
 }
-OWNER = {"kitchen_exclusive": None, "celiac_prep": None, "owner_celiac": True}
-EXCLUSIVE = {"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": None}
-BOTH = {"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": True}
-SHARED = {"kitchen_exclusive": False, "celiac_prep": "shared_kitchen", "owner_celiac": False}
-SEPARATE = {"kitchen_exclusive": False, "celiac_prep": "separate_kitchen", "owner_celiac": None}
+# owner_celiac is deliberately not part of any case: it never reaches the model (a named third party's
+# health condition would otherwise be able to land in publicly readable places columns).
+EXCLUSIVE = {"kitchen_exclusive": True, "celiac_prep": None}
+SHARED = {"kitchen_exclusive": False, "celiac_prep": "shared_kitchen"}
+SEPARATE = {"kitchen_exclusive": False, "celiac_prep": "separate_kitchen"}
+# A place NOT suggested by the community: Tope A (source='user') does not apply, so only the RUBRIC
+# text stands between a claim and a 100% level. This is the path the code caps do not cover.
+GOOGLE = {**BASE, "source": "google_places"}
+WEAK_REVIEWS = [
+    {"text": "Muy rico todo, lindo ambiente y buena atención"},
+    {"text": "Buena atención, volveremos"},
+]
 
 # (label, place, reviews, claims, kind)
 CASES = [
-    ("owner_celiac_only", BASE, [], [OWNER], "claim-only"),
     ("exclusive_claim_only", BASE, [], [EXCLUSIVE], "claim-only"),
-    ("exclusive_and_owner", BASE, [], [BOTH], "claim-only"),
     ("contradicting_claims", BASE, [], [EXCLUSIVE, SHARED], "claim-only"),
     ("shared_kitchen", BASE, [], [SHARED], "claim-only-low"),
     ("separate_kitchen", BASE, [], [SEPARATE], "claim-only-low"),
+    ("google_exclusive_claim_only", GOOGLE, [], [EXCLUSIVE], "claim-only"),
+    ("google_exclusive_claim_weak_reviews", GOOGLE, WEAK_REVIEWS, [EXCLUSIVE], "claim-only"),
     ("no_claims_neutral", {**BASE, "name": "Restaurante El Sol"}, [], [], "regression"),
-    ("no_claims_named_gluten_free", {**BASE, "name": "Panadería Sin Gluten Rosario", "source": "google_places"}, [], [], "regression"),
+    ("no_claims_named_gluten_free", {**GOOGLE, "name": "Panadería Sin Gluten Rosario"}, [], [], "regression"),
     (
         "no_claims_strong_evidence",
-        {**BASE, "name": "Panadería Sin Gluten Rosario", "source": "google_places"},
+        {**GOOGLE, "name": "Panadería Sin Gluten Rosario"},
         [
             {"text": "Todo el local es 100% sin gluten, certificado por ACELA; cocinan solo para celíacos"},
             {"text": "Mi hija es celíaca y comemos tranquilos, no entra nada con gluten a esa cocina"},

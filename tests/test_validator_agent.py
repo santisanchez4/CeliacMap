@@ -348,19 +348,30 @@ OWNER_CLAIM = {"kitchen_exclusive": None, "celiac_prep": None, "owner_celiac": T
 SHARED_CLAIM = {"kitchen_exclusive": False, "celiac_prep": "shared_kitchen", "owner_celiac": False}
 
 
+EXCLUSIVE_CLAIM = {"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": True}
+
+
 def test_user_prompt_includes_unverified_kitchen_claims():
-    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [OWNER_CLAIM])
+    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [EXCLUSIVE_CLAIM])
     assert "declaraciones_comunidad (NO verificadas):" in prompt
-    assert "- cocina exclusivamente sin gluten: sin dato" in prompt
+    assert "- cocina exclusivamente sin gluten: sí" in prompt
     assert "- preparación para celíacos: sin dato" in prompt
-    assert "- dueño/a celíaco/a: sí" in prompt
+
+
+def test_user_prompt_never_carries_the_owner_health_fact():
+    """owner_celiac is a named third party's health condition. If the model sees it, its free text
+    (reasoning / flags / recommendation) can carry it into publicly readable places columns. So it
+    never reaches the model: the claim's owner_celiac must not appear in the prompt in any form."""
+    for owner in (True, False, None):
+        claim = {"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": owner}
+        prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [claim]).lower()
+        assert "dueño" not in prompt and "dueña" not in prompt and "owner" not in prompt
 
 
 def test_user_prompt_renders_each_answer_in_words():
     prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [SHARED_CLAIM])
     assert "- cocina exclusivamente sin gluten: no" in prompt
     assert "- preparación para celíacos: misma cocina" in prompt
-    assert "- dueño/a celíaco/a: no" in prompt
 
 
 @pytest.mark.parametrize("claims", [None, []])
@@ -371,7 +382,7 @@ def test_user_prompt_without_claims_is_identical_to_today(claims):
 
 
 def test_user_prompt_numbers_several_claims_and_caps_at_five():
-    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [OWNER_CLAIM] * 7)
+    prompt = ValidatorAgent._build_user_prompt({"name": "Cafe X"}, [], [EXCLUSIVE_CLAIM] * 7)
     assert "Declaración 1:" in prompt and "Declaración 5:" in prompt
     assert "Declaración 6:" not in prompt
 
@@ -385,14 +396,14 @@ def test_run_feeds_claims_into_prompt():
     db = MagicMock()
     db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Cafe X"}]
     db.fetch_reviews_for_place.return_value = []
-    db.fetch_community_claims.return_value = [OWNER_CLAIM]
+    db.fetch_community_claims.return_value = [EXCLUSIVE_CLAIM]
     llm = MagicMock()
     llm.complete_json.return_value = {"verdict": "needs_review", "confidence_score": 0.6, "category": "cafe"}
 
     ValidatorAgent(db, llm).run()
 
     db.fetch_community_claims.assert_called_once_with("p1")
-    assert "dueño/a celíaco/a: sí" in llm.complete_json.call_args.args[1]
+    assert "cocina exclusivamente sin gluten: sí" in llm.complete_json.call_args.args[1]
 
 
 def test_run_survives_claims_fetch_failure():
@@ -413,10 +424,10 @@ def test_evaluate_forwards_claims_and_does_no_db_access():
     llm = MagicMock()
     llm.complete_json.return_value = {"verdict": "needs_review", "confidence_score": 0.6, "category": "cafe"}
 
-    ValidatorAgent(db, llm).evaluate({"name": "Cafe X"}, [], [OWNER_CLAIM])
+    ValidatorAgent(db, llm).evaluate({"name": "Cafe X"}, [], [EXCLUSIVE_CLAIM])
 
     db.fetch_community_claims.assert_not_called()
-    assert "dueño/a celíaco/a: sí" in llm.complete_json.call_args.args[1]
+    assert "cocina exclusivamente sin gluten: sí" in llm.complete_json.call_args.args[1]
 
 
 # --- Deterministic caps on safety_level + admin-pending flag -------------------
@@ -512,3 +523,14 @@ def test_rubric_scopes_the_claims_rule_to_the_claims_block_only():
     # no declarations at all. The rule must say it does not change how reviews / other evidence weigh.
     assert "Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia" in RUBRIC
     assert "sin ese bloque, evalúa exactamente como siempre" in RUBRIC
+
+
+def test_rubric_claims_paragraph_never_mentions_the_owner():
+    """The owner's health condition never reaches the model (see the prompt test above), so the rubric must
+    not ask it to weigh it either."""
+    from agents.validator_agent import RUBRIC
+
+    start = RUBRIC.index('Si el mensaje incluye "declaraciones_comunidad"')
+    end = RUBRIC.index('Si el mensaje incluye "ubicacion_geocode"')
+    paragraph = RUBRIC[start:end].lower()
+    assert "dueño" not in paragraph and "dueña" not in paragraph

@@ -190,6 +190,22 @@ def test_fetch_community_claims_drops_rows_with_no_kitchen_datum():
     assert client.fetch_community_claims("place-1") == []
 
 
+def test_fetch_community_claims_never_selects_the_owner_column():
+    """owner_celiac is a third party's health condition: it must not even be read into the process that
+    builds the Validator prompt."""
+    client, tables = _client_with_intake_tables()
+    client.fetch_community_claims("place-1")
+    for name in ("suggestions", "place_reports"):
+        selected = tables[name].select.call_args.args[0]
+        assert "owner_celiac" not in selected, selected
+
+
+def test_fetch_community_claims_drops_rows_that_only_carry_the_owner_fact():
+    only_owner = {"kitchen_exclusive": None, "celiac_prep": None, "owner_celiac": True, "created_at": "2026-09-01T10:00:00"}
+    client, _ = _client_with_intake_tables(suggestions=[only_owner], reports=[only_owner])
+    assert client.fetch_community_claims("place-1") == []
+
+
 def test_fetch_community_claims_respects_limit():
     rows = [
         {"kitchen_exclusive": True, "celiac_prep": None, "owner_celiac": None, "created_at": f"2026-09-0{i}T10:00:00"}

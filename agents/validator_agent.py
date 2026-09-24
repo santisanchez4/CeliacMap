@@ -102,7 +102,7 @@ términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca de
 que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es \
 escasa, mantente conservador.
 
-Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos, si el dueño es celíaco). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Que el dueño sea celíaco sube la confianza pero no prueba que la cocina sea exclusiva. Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
+Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
 
 Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la \
 dirección de texto del candidato: NO hay una ficha de Google Places que confirme \
@@ -182,6 +182,10 @@ class ValidatorAgent(BaseAgent):
 
         Best-effort on purpose: anything that is not a list of dicts (None, a mock,
         a failed read) renders nothing, so the prompt is byte-identical to today's.
+
+        ``owner_celiac`` is deliberately NEVER rendered: it is a named third party's health
+        condition, and whatever the model sees can end up in its free text (reasoning / flags /
+        recommendation), which is persisted to publicly readable ``places`` columns.
         """
 
         def tri(value) -> str:
@@ -195,7 +199,6 @@ class ValidatorAgent(BaseAgent):
                 [
                     f"- cocina exclusivamente sin gluten: {tri(c.get('kitchen_exclusive'))}",
                     f"- preparación para celíacos: {_PREP_LABELS.get(c.get('celiac_prep'), 'sin dato')}",
-                    f"- dueño/a celíaco/a: {tri(c.get('owner_celiac'))}",
                 ]
             )
         if not groups:
