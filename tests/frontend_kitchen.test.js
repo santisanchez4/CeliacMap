@@ -181,3 +181,24 @@ Deno.test("report.js: a negative report never carries kitchen keys, even if answ
   assert.equal(sent.body.report_type, "negative");
   assert.equal("kitchen_exclusive" in sent.body, false);
 });
+
+Deno.test("report.js: after a negative report is SENT the kitchen block comes back for the next recommendation", async () => {
+  const f = await page(["js/kitchen.js", "js/report.js"]);
+  const d = f.document;
+  const form = d.getElementById("report-form");
+  const pos = d.getElementById("rp-type-positive");
+  const neg = d.getElementById("rp-type-negative");
+  // linkedom has no radio-group reset: emulate a browser's form.reset(), which re-selects the default
+  // radio ("Recomendar") and fires NO change event.
+  form.reset = () => { pos.checked = true; neg.checked = false; };
+  d.getElementById("rp-place-id").value = "3f2b6c1e-8d3a-4e21-9a55-0c7d6f1b2a10";
+  d.getElementById("rp-description").value = "Me contaminaron la comida";
+  pos.checked = false;
+  neg.checked = true;
+  neg.dispatchEvent(new f.window.Event("change", { bubbles: true }));
+  assert.equal(d.getElementById("rp-kitchen").hidden, true);
+  form.dispatchEvent(new f.window.Event("submit", { cancelable: true }));
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(pos.checked, true, "the form went back to 'Recomendar'");
+  assert.equal(d.getElementById("rp-kitchen").hidden, false, "the block must follow the type after the reset");
+});

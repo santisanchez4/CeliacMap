@@ -309,6 +309,7 @@
     if ((honeypot && honeypot.value) || Date.now() - renderedAt < MIN_FILL_MS) {
       form.reset();
       clearSelection(false);
+      syncKitchen(); // form.reset() re-selects "Recomendar" without firing a change event
       show("success", "ok");
       return;
     }
@@ -363,6 +364,7 @@
         try { localStorage.setItem(COOLDOWN_KEY, String(Date.now())); } catch (e2) {}
         form.reset();
         clearSelection(false);
+        syncKitchen(); // form.reset() re-selects "Recomendar" without firing a change event
         renderedAt = Date.now();
         show("success", "ok");
       })

@@ -1432,7 +1432,12 @@ export function getReply(dict: Record<Idioma, string>, idioma: Idioma): string {
 // Request body validation
 // ---------------------------------------------------------------------------
 
-const MAX_MESSAGE_LENGTH = 2000;
+export const MAX_MESSAGE_LENGTH = 2000;
+
+// Output budget of the router call. The router copies reporte_texto verbatim (up to MAX_MESSAGE_LENGTH
+// chars) inside a JSON with ~16 fields; if that JSON is cut off it does not parse, parseRouterOutput falls
+// back to fuera_de_alcance and the person's draft is lost. It is a cap, not a cost: unused tokens are free.
+export const ROUTER_MAX_TOKENS = 1200;
 
 export function validateRequestBody(
   json: unknown,
@@ -1715,7 +1720,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   let router: RouterOutput;
   let routerUsage: { in: number; out: number };
   try {
-    const routerCall = await callModel(anthropic, model, ROUTER_PROMPT, buildRouterUserMessage(history), 400);
+    const routerCall = await callModel(anthropic, model, ROUTER_PROMPT, buildRouterUserMessage(history), ROUTER_MAX_TOKENS);
     router = parseRouterOutput(routerCall.text);
     routerUsage = routerCall.usage;
   } catch (err) {

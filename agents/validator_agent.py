@@ -315,7 +315,12 @@ class ValidatorAgent(BaseAgent):
         declared = [c for c in list(claims or []) if isinstance(c, dict)]
         said_100 = safety == "gluten_free_100"
         says_exclusive = any(c.get("kitchen_exclusive") is True for c in declared)
-        if said_100 and any(c.get("kitchen_exclusive") is False for c in declared):
+        # A preparation method for celiac food implies the place also cooks with gluten, so it counts as
+        # "not exclusive" even if the exclusivity answer itself is missing.
+        says_not_exclusive = any(
+            c.get("kitchen_exclusive") is False or c.get("celiac_prep") is not None for c in declared
+        )
+        if said_100 and says_not_exclusive:
             safety = "celiac_friendly"
         flags: list[str] = []
         if place.get("source") == "user":

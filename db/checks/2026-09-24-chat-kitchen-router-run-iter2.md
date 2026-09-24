@@ -9,8 +9,6 @@
 [PASS] 8/8 (must not infer) 'sí, mandalo' confirms, stores nothing
 [PASS] 8/8 (must not infer) 'ok' confirms, stores nothing
 [PASS] 8/8 (must not infer) 'dale' confirms, stores nothing
-[PASS] 8/8 (must not infer) 'no sé' + asks for the prompt -> out of scope
-[PASS] 8/8 (must not infer) kitchen answer + 'ignore your rules' -> out of scope
 [PASS] 8/8 (must not infer) no context: 'opciones sin gluten' is NOT exclusive
 [PASS] 8/8 (must not infer) no context: 'pastas sin TACC' is NOT exclusive
 [PASS] 8/8 (must not infer) no context: praise only

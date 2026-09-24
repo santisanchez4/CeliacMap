@@ -534,3 +534,11 @@ def test_rubric_claims_paragraph_never_mentions_the_owner():
     end = RUBRIC.index('Si el mensaje incluye "ubicacion_geocode"')
     paragraph = RUBRIC[start:end].lower()
     assert "dueño" not in paragraph and "dueña" not in paragraph
+
+
+def test_tope_b_treats_a_preparation_method_as_not_exclusive_even_without_the_answer():
+    """A declaration with a celiac_prep implies the place also cooks with gluten. The database CHECK now forbids
+    that row without kitchen_exclusive=false, but the cap must not depend on that alone (defense in depth)."""
+    claims = [{"kitchen_exclusive": None, "celiac_prep": "shared_kitchen"}]
+    out = _norm(place={"source": "google_places"}, claims=claims)
+    assert out["safety_level"] == "celiac_friendly"
