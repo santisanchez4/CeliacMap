@@ -703,6 +703,19 @@
                 data-i18n-placeholder="report.form.descriptionPh"></textarea>
             </div>
 
+            <div class="field field-full" id="rp-author-field">
+              <label for="rp-author" data-i18n="report.author.label">Tu nombre (opcional)</label>
+              <input id="rp-author" name="author_name" type="text" maxlength="40" autocomplete="off"
+                placeholder="Cómo querés que aparezca tu nombre"
+                data-i18n-placeholder="report.author.ph" />
+              <p class="rp-author-notice" id="rp-author-notice-positive" data-i18n="report.author.noticePositive">
+                Si es una recomendación, puede mostrarse en el sitio después de que la revisemos. Sin nombre, aparece como Anónimo.
+              </p>
+            </div>
+            <p class="rp-author-notice field-full" id="rp-author-notice-negative" data-i18n="report.author.noticeNegative" hidden>
+              Los reportes no se publican: los revisamos internamente.
+            </p>
+
             <fieldset class="kitchen-fieldset field-full" id="rp-kitchen" data-kitchen>
               <legend data-i18n="kitchen.legend">Sobre la cocina (opcional, pero ayuda mucho)</legend>
               <p class="kitchen-intro" data-i18n="kitchen.intro">Sin gluten, sin TACC y apto para celíacos no son lo mismo. Contanos cómo trabajan; lo revisamos antes de decidir qué etiqueta lleva.</p>

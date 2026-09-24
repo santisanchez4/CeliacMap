@@ -225,6 +225,10 @@
     "report.noMatch.negative.hint": "Looking for a different place? Try searching again.",
     "report.form.descriptionLabel": "Tell us what happened *",
     "report.form.descriptionPh": "Describe your experience: what you found, when, and any relevant detail.",
+    "report.author.label": "Your name (optional)",
+    "report.author.ph": "How you want your name to appear",
+    "report.author.noticePositive": "If it's a recommendation, it may be shown on the site after we review it. Without a name, it appears as Anonymous.",
+    "report.author.noticeNegative": "Reports are not published: we review them internally.",
     "report.form.submit": "Send",
     "report.form.disclaimer": "Your contribution is added as evidence and reviewed together with the place's existing information; it doesn't change its status automatically.",
 

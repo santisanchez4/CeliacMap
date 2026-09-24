@@ -538,6 +538,7 @@ h1, h2, h3 {
   color: var(--color-text);
 }
 .kitchen-intro { color: var(--color-text-muted); font-size: 0.88rem; margin: 0 0 14px; }
+.rp-author-notice { color: var(--color-text-muted); font-size: 0.88rem; margin: 6px 0 0; }
 .kitchen-q { margin: 0 0 16px; }
 .kitchen-q-title { font-size: 0.88rem; font-weight: 500; color: var(--color-text); margin: 0 0 8px; }
 .kitchen-options { display: flex; flex-direction: column; gap: 8px; }

@@ -31,6 +31,9 @@
   var descriptionEl = document.getElementById("rp-description");
   var kitchenRoot = document.getElementById("rp-kitchen");
   var kitchen = window.CeliacKitchen && kitchenRoot ? window.CeliacKitchen.attach(kitchenRoot) : null;
+  var authorField = document.getElementById("rp-author-field");
+  var authorEl = document.getElementById("rp-author");
+  var authorNoticeNegativeEl = document.getElementById("rp-author-notice-negative");
 
   // Spam guards: a too-fast submit and a per-browser cooldown are bot signals.
   // Independent from suggest.js's own cooldown — recommending/reporting is a
@@ -94,11 +97,16 @@
     return "positive";
   }
 
-  // The kitchen block only applies to a recommendation; a report never carries it.
-  function syncKitchen() {
-    if (kitchen) kitchen.setVisible(currentType() === "positive");
+  // The kitchen block and the public name only apply to a recommendation; a report never carries
+  // them and is never published, so its own notice replaces the name field.
+  function syncTypeFields() {
+    var positive = currentType() === "positive";
+    if (kitchen) kitchen.setVisible(positive);
+    if (authorField) authorField.hidden = !positive;
+    if (authorNoticeNegativeEl) authorNoticeNegativeEl.hidden = positive;
+    if (!positive && authorEl) authorEl.value = "";
   }
-  syncKitchen();
+  syncTypeFields();
 
   /* ------------------------- Autocomplete state ---------------------- */
   // A monotonically increasing token per query: only the response whose
@@ -280,7 +288,7 @@
 
   typeRadios.forEach(function (radio) {
     radio.addEventListener("change", function () {
-      syncKitchen();
+      syncTypeFields();
       // Only the no-match panel depends on type; a selection or an open
       // results list is left untouched (ADR-004 doesn't care about type
       // for an already-matched place).
@@ -309,7 +317,7 @@
     if ((honeypot && honeypot.value) || Date.now() - renderedAt < MIN_FILL_MS) {
       form.reset();
       clearSelection(false);
-      syncKitchen(); // form.reset() re-selects "Recomendar" without firing a change event
+      syncTypeFields(); // form.reset() re-selects "Recomendar" without firing a change event
       show("success", "ok");
       return;
     }
@@ -344,6 +352,8 @@
         if (Object.prototype.hasOwnProperty.call(facts, key)) data[key] = facts[key];
       }
     }
+    var author = (authorEl && authorEl.value || "").trim();
+    if (currentType() === "positive" && author) data.author_name = author.slice(0, 40);
 
     submitBtn.disabled = true;
     form.setAttribute("aria-busy", "true");
@@ -364,7 +374,7 @@
         try { localStorage.setItem(COOLDOWN_KEY, String(Date.now())); } catch (e2) {}
         form.reset();
         clearSelection(false);
-        syncKitchen(); // form.reset() re-selects "Recomendar" without firing a change event
+        syncTypeFields(); // form.reset() re-selects "Recomendar" without firing a change event
         renderedAt = Date.now();
         show("success", "ok");
       })
