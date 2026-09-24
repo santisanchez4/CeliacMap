@@ -1,0 +1,126 @@
+{
+  "started": "2026-09-24T16:00:02.078426+00:00",
+  "finished": "2026-09-24T16:01:14.135745+00:00",
+  "turns": [
+    {
+      "scenario": "S1",
+      "turn": 1,
+      "message": "quiero recomendar Panadería Zzqx Cocina en Rosario, muy buena atención",
+      "http": 200,
+      "reply": "No tengo ese lugar todavía. ¿Me pasás la dirección o una referencia de ubicación en Rosario para poder sugerirlo?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S1",
+      "turn": 2,
+      "message": "Calle Inventada 1234, Rosario, Argentina",
+      "http": 200,
+      "reply": "Perfecto: Panadería Zzqx Cocina, Calle Inventada 1234, Rosario, Argentina, con tu comentario \"muy buena atención\". \n\nAntes de enviarlo, si sabés: ¿la cocina es exclusivamente sin gluten? Si no lo es, ¿cómo preparan lo apto para celíacos (cocina separada, preparación aparte o misma cocina)? ¿El dueño o la dueña es celíaco/a? Si preferís no sumar nada de esto, decime \"dale\" y lo envío así.",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {
+        "kitchen_asked": true
+      },
+      "flags": []
+    },
+    {
+      "scenario": "S1",
+      "turn": 3,
+      "message": "sí, es todo sin gluten y la dueña es celíaca",
+      "http": 200,
+      "reply": "Perfecto. Queda así: Panadería Zzqx Cocina, Calle Inventada 1234, Rosario, Argentina, con tu comentario \"muy buena atención\". Contás que la cocina es exclusivamente sin gluten y que la dueña es celíaca. Es un aporte para revisión: el equipo lo confirma antes de definir la etiqueta del lugar. ¿Lo envío así?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {
+        "kitchen_exclusive": true,
+        "owner_celiac": true,
+        "kitchen_asked": true
+      },
+      "flags": []
+    },
+    {
+      "scenario": "S1",
+      "turn": 4,
+      "message": "dale, mandalo",
+      "http": 200,
+      "reply": "Listo, lo envié. Gracias por contarlo — ayuda a mantener el mapa confiable.",
+      "action": {
+        "type": "suggestion_submitted"
+      },
+      "rate_limited": false,
+      "pending_kind": null,
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S4",
+      "turn": 1,
+      "message": "quiero recomendar Cucina Paradiso Senza Glutine en Buenos Aires, la atención fue excelente",
+      "http": 200,
+      "reply": "Perfecto: Cucina Paradiso Senza Glutine en Buenos Aires, con tu comentario \"la atención fue excelente\". ¿Lo envío así?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "report",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S4",
+      "turn": 2,
+      "message": "dale",
+      "http": 200,
+      "reply": "Listo, lo envié. Gracias por contarlo — ayuda a mantener el mapa confiable.",
+      "action": {
+        "type": "report_submitted"
+      },
+      "rate_limited": false,
+      "pending_kind": null,
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S5",
+      "turn": 1,
+      "message": "quiero reportar que en Cucina Paradiso Senza Glutine me contaminaron la comida",
+      "http": 200,
+      "reply": "Te anoto un comentario negativo sobre Cucina Paradiso Senza Glutine: \"me contaminaron la comida\". ¿Lo envío así?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "report",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S11",
+      "turn": 1,
+      "message": "quiero recomendar Cucina Paradiso Senza Glutine en Buenos Aires, la atención fue excelente y tienen cocina separada para celíacos",
+      "http": 200,
+      "reply": "Perfecto: Cucina Paradiso Senza Glutine, Buenos Aires, con tu comentario \"la atención fue excelente y tienen cocina separada para celíacos\". ¿Lo envío así?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "report",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S11",
+      "turn": 2,
+      "message": "dale, mandalo",
+      "http": 200,
+      "reply": "Listo, lo envié. Gracias por contarlo — ayuda a mantener el mapa confiable.",
+      "action": {
+        "type": "report_submitted"
+      },
+      "rate_limited": false,
+      "pending_kind": null,
+      "pending_kitchen": {},
+      "flags": []
+    }
+  ]
+}

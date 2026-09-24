@@ -119,5 +119,8 @@ El bloque "Sobre la cocina" **se quitó del formulario de recomendar / reportar*
 decisión del dueño: ahí se juntan reseñas (una positiva no cambia nada por sí sola; una negativa sobre un lugar
 publicado se revisa), y cómo cocina un lugar se pregunta **solo al agregar un comercio** (Formulario A, `suggestions`).
 La decisión 1 debe leerse con esa salvedad. Las columnas de `place_reports` no cambian (las sigue escribiendo el
-Módulo 4 del chatbot). Queda abierta la alineación del chatbot, que todavía pregunta por la cocina al recomendar un
-lugar que ya está en el mapa. Ver "Form B collects reviews, not kitchen data" en `CLAUDE.md`.
+Módulo 4 del chatbot). **El chatbot se alineó el mismo día** (`chat` v17, solo código, sin cambios de prompts): un
+borrador `report` —recomendar o reportar un lugar que ya está en el mapa— ni pregunta por la cocina ni la guarda; se
+pregunta al agregar un comercio y en el Módulo 4. Verificado en vivo
+(`db/checks/2026-09-24-chat-report-no-kitchen-live-run.md`). Ver "Form B collects reviews, not kitchen data" en
+`CLAUDE.md`.

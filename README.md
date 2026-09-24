@@ -36,7 +36,7 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   GF business that only exists on Instagram still lands on the map), dedups, and
   promotes it into `places` as `pending` (`source='user'`) for the Validator to
   judge. Honeypot + timing + cooldown guard against spam. The "add a place" form (and
-  the chatbot) also asks three optional questions about **how the place cooks** —
+  the chatbot, when someone adds a business) also asks three optional questions about **how the place cooks** —
   is the kitchen exclusively gluten free, how is celiac food prepared if not, is
   the owner celiac. The answers are stored server-side as **unverified evidence**
   (never publicly readable; the owner's condition never even reaches the

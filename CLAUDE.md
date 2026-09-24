@@ -2227,11 +2227,16 @@ shown in "La voz de la comunidad"); a **negative** one on a published place is r
   change to the health gate (the rubric), not to the form.
 - **Frontend:** the `#rp-kitchen` fieldset and its wiring in `js/report.js` are gone (`js/kitchen.js` now serves Form A
   only); `tests/frontend_kitchen.test.js` asserts that form B has no kitchen block and sends no kitchen keys.
-- **Schema unchanged:** `place_reports` keeps its kitchen columns (the chatbot's Módulo 4 writes them, and so may its
-  recommend-a-known-place flow). No production data to migrate: no `place_reports` row carries kitchen data.
-- **Open:** the chatbot still asks the kitchen question when someone recommends a place that is already on the map (a
-  `report` draft). Aligning it is a code-only change (no prompt change, so no soft-launch restart) plus a redeploy of
-  `chat`; pending Santiago's decision.
+- **Schema unchanged:** `place_reports` keeps its kitchen columns (the chatbot's Módulo 4 still writes them). No
+  production data to migrate: no `place_reports` row carries kitchen data.
+- **Chatbot aligned the same day (`chat` v17, code-only):** a `report` draft (a review of a place already on the map,
+  positive or negative) never asks the kitchen question and never carries kitchen data — `mergeKitchenFacts`,
+  `applyKitchenStep`, `decideKitchenAnswer`, the draft validator and the `place_reports` row builder all enforce it, so
+  facts volunteered about a mapped place are ignored (the sentence stays only as comment text). Kitchen is asked when a
+  business is **added** (suggestion drafts) and in Módulo 4. The prompts did not change (the redactor already obeys
+  the `preguntar_cocina` flag), so the soft-launch count is not restarted. Verified live (9 turns, source identical to
+  `HEAD`, test rows reverted against the baseline): `db/checks/2026-09-24-chat-report-no-kitchen-live-run.md`. Chat
+  suite 201 → 202.
 
 ### Community opinions on the public site (2026-09-24)
 
