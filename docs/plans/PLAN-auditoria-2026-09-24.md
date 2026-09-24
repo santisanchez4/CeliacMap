@@ -244,9 +244,8 @@ En `ReviewHandler.handle`:
 
 - **1 reporte negativo** en los últimos 30 días: el lugar **sigue en el mapa** con un pin distinto (rojo/ámbar) y el
   aviso "Reportado por la comunidad — consultá en el lugar antes de ir".
-- **A partir de `REPORTS_TO_HIDE` reportes distintos** en 30 días: pasa a `needs_review` y sale del mapa hasta que
-  el admin lo revise. Valor inicial pendiente de confirmar ("más de dos" = 3; la propuesta original era 2). Queda como
-  constante para poder cambiarlo sin tocar la lógica.
+- **Con 3 reportes distintos** en 30 días (`REPORTS_TO_HIDE = 3`, confirmado): pasa a `needs_review` y sale del mapa
+  hasta que el admin lo revise. Queda como constante para poder cambiarlo sin tocar la lógica.
 - Si pasan 30 días sin reportes nuevos, el aviso se apaga solo. El admin también puede apagarlo antes.
 
 **Cambios:**
@@ -260,9 +259,11 @@ En `ReviewHandler.handle`:
   últimos 30 días del lugar: con 1, marca `community_warning_at` y **no** cambia `status`; con el umbral, `status =
   'needs_review'` con una nota antepuesta (se aplica el paso 3). La re-evaluación de Sonnet se mantiene como evidencia
   para el admin (flags + recomendación), pero no decide la salida del mapa.
-- **Excepción conservadora (a confirmar):** si el reporte describe contaminación o síntomas y el Validator lo
-  re-evalúa como `rejected`, el lugar sale al primer reporte. Sin esta excepción, un lugar con un reporte creíble de
-  contaminación sigue visible, solo con el aviso.
+- **Excepción por contaminación (confirmada):** si el reporte describe contaminación o síntomas y la re-evaluación del
+  Validator lo considera creíble (veredicto `rejected`, o `needs_review` con un flag de contaminación), el lugar sale del
+  mapa con el primer reporte. Para que esto sea verificable, la re-evaluación devuelve un campo booleano
+  `reporte_contaminacion_creible` (cambio al prompt del reporte, no al RUBRIC general), y el código decide con ese campo,
+  no con el texto libre.
 - **Frontend (`js/map.js`, `css/styles.css`):** clase de marcador `cm-marker--warning`, badge y texto en la ficha,
   entrada en la leyenda, ES + EN. `community_warning_at` va en el `select` del mapa y del ranking. Un lugar con aviso
   no debería aparecer en el Top 3.
@@ -281,6 +282,47 @@ En `ReviewHandler.handle`:
    2026-09-24). Propuesta: coincidencia de palabras entre el nombre buscado y el devuelto ≥ 0,5; si no alcanza, se
    usa solo la dirección.
 2. **Web agent:** reactivarlo después del paso 1, con límites de latencia.
+
+### Paso 8 — Que "¿Conocés un lugar? Agregalo" recorra el mismo camino que la carga manual
+
+**El caso que hay que reproducir:** Bienestar Gluten Free (Fray Bentos) no tenía ficha de Google. El admin conocía el
+negocio y su dirección: se geocodificó solo la dirección, se cargó el lugar y el admin lo aprobó con una nota de override.
+
+**Qué pasa hoy con el formulario** (`agents/suggestion_agent.py` → `resolve_location`):
+
+| Situación | Hoy | Problema |
+|-----------|-----|----------|
+| El negocio tiene ficha en Google | Find Place → `pending` → Validator | Funciona |
+| No tiene ficha, la dirección se geocodifica | `address_only` → `pending` → Validator → casi siempre `needs_review` | Queda invisible y nadie lo revisa (H7) |
+| Find Place devuelve **otro** negocio | Se carga el negocio equivocado (caso víaSana) | H6 |
+| La dirección no se geocodifica ("JC 23", Lo de Flor) | `suggestions.status='rejected'`, sin aviso | Se pierde en silencio |
+| La descripción y el link que escribió la persona | `notes` va a `validation_notes` (el Validator no lo lee y lo pisa); el link va a `social_url` (no lo lee) | H1 |
+| Tiempos | El promotor corre **una vez por mes** | Una sugerencia puede tardar hasta 30 días en llegar al Validator |
+
+**Cambios** (se apoyan en los pasos 1, 6 y H6):
+
+1. **Control de nombre (H6):** si Find Place devuelve un negocio con otro nombre, se ignora y se usa solo la dirección.
+   Es exactamente lo que se hizo a mano con Bienestar.
+2. **Dirección que no se geocodifica → cola del admin, no rechazo.** Nuevo estado `suggestions.status='needs_location'`.
+   El admin la ve en `review_queue.py --suggestions`, corrige la dirección o carga las coordenadas a mano (como con Lo de
+   Flor o con el catastro de Ta Bacana), y la promueve con un comando.
+3. **Lo que escribió la persona llega al Validator:** `notes` y `evidence_url` se guardan en `places.evidence` (paso 1)
+   como `{source:'user'}`. Siguen siendo evidencia de la comunidad, no verificada: el tope A (una sugerencia nunca sale
+   como 100% sin el admin) se mantiene.
+4. **La aprobación final de un lugar sin ficha de Google la da el admin, con un comando.**
+   `review_queue.py --suggestions` muestra juntos la sugerencia, las declaraciones de cocina, el link, el veredicto del
+   Validator y un link a Google Maps de las coordenadas. `--approve ID --level 100|options` escribe la nota
+   `APROBACIÓN MANUAL`, igual que con Bienestar. **No se publica solo:** un formulario anónimo no tiene el conocimiento
+   directo que tenía el admin, y sin revisión cualquiera podría cargar un lugar falso con etiqueta de 100%.
+5. **Más rápido:** un workflow semanal liviano (`suggestions-weekly.yml`) que corre solo el promotor + el Validator
+   sobre las sugerencias nuevas. Necesita el secreto de Google además de Supabase y Anthropic, y tiene un tope de
+   llamadas bajo.
+6. **Aviso al visitante:** el mensaje de éxito del formulario ya dice que la sugerencia se revisa antes de publicarse.
+   Agregar el plazo esperado ("en general, en una semana").
+
+**Tests:** una sugerencia con Find Place equivocado termina en `address_only`; una dirección que no se geocodifica
+queda en `needs_location` (no en `rejected`); `notes` y `evidence_url` aparecen en el prompt del Validator; `--approve`
+escribe la nota de override sin tocar `validation_confidence`.
 
 ---
 
