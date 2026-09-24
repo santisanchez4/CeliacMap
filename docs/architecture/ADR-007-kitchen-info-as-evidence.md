@@ -112,3 +112,12 @@ confirme directamente o haya una reseña que lo respalde, queda en "Tiene opcion
 - Mostrar estos datos en el mapa queda fuera de alcance; si se hiciera, debe excluir `owner_celiac`.
 - Un lugar de la comunidad no llega solo a 100%: el administrador sube la etiqueta con un override manual documentado
   (`CLAUDE.md`, "Manual Validator overrides"), como se hizo con Los Leños, Dalbertt y Pastas Lo de Flor.
+
+## Enmienda (2026-09-24, mismo día)
+
+El bloque "Sobre la cocina" **se quitó del formulario de recomendar / reportar** (Formulario B, `place_reports`) por
+decisión del dueño: ahí se juntan reseñas (una positiva no cambia nada por sí sola; una negativa sobre un lugar
+publicado se revisa), y cómo cocina un lugar se pregunta **solo al agregar un comercio** (Formulario A, `suggestions`).
+La decisión 1 debe leerse con esa salvedad. Las columnas de `place_reports` no cambian (las sigue escribiendo el
+Módulo 4 del chatbot). Queda abierta la alineación del chatbot, que todavía pregunta por la cocina al recomendar un
+lugar que ya está en el mapa. Ver "Form B collects reviews, not kitchen data" en `CLAUDE.md`.

@@ -35,8 +35,8 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   `resolve_location` (Find Place, then a Geocoding-API address fallback so a
   GF business that only exists on Instagram still lands on the map), dedups, and
   promotes it into `places` as `pending` (`source='user'`) for the Validator to
-  judge. Honeypot + timing + cooldown guard against spam. Both public forms (and
-  the chatbot) also ask three optional questions about **how the place cooks** —
+  judge. Honeypot + timing + cooldown guard against spam. The "add a place" form (and
+  the chatbot) also asks three optional questions about **how the place cooks** —
   is the kitchen exclusively gluten free, how is celiac food prepared if not, is
   the owner celiac. The answers are stored server-side as **unverified evidence**
   (never publicly readable; the owner's condition never even reaches the
@@ -236,7 +236,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── main.js                 # i18n, nav, reveal
 │   ├── config.js               # Supabase URL + anon key (public)
 │   ├── map.js                  # Leaflet + Supabase data + filters + place panel
-│   ├── kitchen.js              # shared "Sobre la cocina" block (suggest + report forms)
+│   ├── kitchen.js              # "Sobre la cocina" block of the "add a place" form
 │   ├── suggest.js              # public "Suggest a Place" form → suggestions table
 │   ├── report.js               # public "recommend / report" form → place_reports
 │   ├── ranking.js              # community ranking (#ranking) + place_votes voting

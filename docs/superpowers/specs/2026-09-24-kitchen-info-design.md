@@ -1,6 +1,7 @@
 # Información de cocina en formularios, chatbot y Validator — diseño
 
 **Fecha:** 2026-09-24 · **Estado:** diseño aprobado sección por sección por Santiago; pendiente de revisión del spec escrito.
+**Enmienda (2026-09-24):** el bloque se quitó del formulario de recomendar / reportar (solo queda en "Sumá un lugar"); ver ADR-007, "Enmienda".
 **Origen:** sesión de diseño del 2026-09-24 (pieza 2 de 3; la pieza 1, títulos de las tarjetas de `#suggest`, ya está publicada; la pieza 3, mostrar recomendaciones de la comunidad, se diseña aparte).
 
 ## 1. Propósito

@@ -32,7 +32,7 @@ function choose(f, name, value) {
 // so compare a plain copy instead.
 const plain = (x) => JSON.parse(JSON.stringify(x));
 
-const PREFIXES = [["sg", "suggest-form"], ["rp", "report-form"]];
+const PREFIXES = [["sg", "suggest-form"]];
 
 for (const [pfx, formId] of PREFIXES) {
   Deno.test(`#${pfx}-kitchen markup: a fieldset in #${formId}, three groups, "No sé" checked, question 2 hidden`, async () => {
@@ -89,9 +89,9 @@ Deno.test("read(): 'No' for the owner is a real answer (false), not 'unknown'", 
 
 Deno.test("setVisible(false) hides the block, clears the answers and read() returns {}", async () => {
   const f = await page();
-  const root = f.document.getElementById("rp-kitchen");
+  const root = f.document.getElementById("sg-kitchen");
   const kitchen = f.browser.CeliacKitchen.attach(root);
-  choose(f, "rp-kitchen-owner", "yes");
+  choose(f, "sg-kitchen-owner", "yes");
   kitchen.setVisible(false);
   assert.equal(root.hidden, true);
   kitchen.setVisible(true);
@@ -156,49 +156,25 @@ Deno.test("report.js: 'No sé' everywhere sends exactly today's payload", async 
   assert.deepEqual(Object.keys(sent.body).sort(), ["description", "place_id", "report_type"]);
 });
 
-Deno.test("report.js: a positive recommendation carries the answered kitchen keys", async () => {
-  const [sent] = await submitReport("positive", [["rp-kitchen-exclusive", "yes"], ["rp-kitchen-owner", "no"]]);
-  assert.equal(sent.body.report_type, "positive");
-  assert.equal(sent.body.kitchen_exclusive, true);
-  assert.equal(sent.body.owner_celiac, false);
-  assert.equal("celiac_prep" in sent.body, false);
+Deno.test("form B (recommend / report) has NO kitchen block: only 'add a place' asks how a place cooks", async () => {
+  // Owner decision 2026-09-24: recommending or reporting a place already on the map collects reviews
+  // (positive: nothing happens automatically; negative: it is reviewed). How a place cooks is asked only
+  // when a business is added.
+  const f = await page();
+  // booleans, never the element itself: a failing assert.equal would try to print the whole DOM node
+  assert.equal(Boolean(f.document.getElementById("rp-kitchen")), false, "#rp-kitchen must not exist");
+  assert.equal(Boolean(f.document.querySelector("#report-form [data-kitchen]")), false, "no [data-kitchen] in form B");
+  // (no [name^=...] selector: linkedom loops on it)
+  const kitchenInputs = [...f.document.querySelectorAll("#report-form input")].filter((i) => (i.getAttribute("name") || "").startsWith("rp-kitchen"));
+  assert.equal(kitchenInputs.length, 0);
+  assert.ok(f.document.getElementById("sg-kitchen"), "form A keeps its block");
 });
 
-Deno.test("report.js: a negative report never carries kitchen keys, even if answered before switching", async () => {
-  // Answers are chosen while 'positive' is selected, then the person switches to 'negative'.
-  const f = await page(["js/kitchen.js", "js/report.js"]);
-  const d = f.document;
-  d.getElementById("rp-place-id").value = "3f2b6c1e-8d3a-4e21-9a55-0c7d6f1b2a10";
-  d.getElementById("rp-description").value = "Me contaminaron la comida";
-  choose(f, "rp-kitchen-exclusive", "yes");
-  const neg = d.getElementById("rp-type-negative");
-  for (const r of d.querySelectorAll('input[name="rp-type"]')) r.checked = r === neg;
-  neg.dispatchEvent(new f.window.Event("change", { bubbles: true }));
-  assert.equal(d.getElementById("rp-kitchen").hidden, true);
-  d.getElementById("report-form").dispatchEvent(new f.window.Event("submit", { cancelable: true }));
-  await new Promise((r) => setTimeout(r, 0));
-  const [sent] = f.bodies;
-  assert.equal(sent.body.report_type, "negative");
-  assert.equal("kitchen_exclusive" in sent.body, false);
-});
-
-Deno.test("report.js: after a negative report is SENT the kitchen block comes back for the next recommendation", async () => {
-  const f = await page(["js/kitchen.js", "js/report.js"]);
-  const d = f.document;
-  const form = d.getElementById("report-form");
-  const pos = d.getElementById("rp-type-positive");
-  const neg = d.getElementById("rp-type-negative");
-  // linkedom has no radio-group reset: emulate a browser's form.reset(), which re-selects the default
-  // radio ("Recomendar") and fires NO change event.
-  form.reset = () => { pos.checked = true; neg.checked = false; };
-  d.getElementById("rp-place-id").value = "3f2b6c1e-8d3a-4e21-9a55-0c7d6f1b2a10";
-  d.getElementById("rp-description").value = "Me contaminaron la comida";
-  pos.checked = false;
-  neg.checked = true;
-  neg.dispatchEvent(new f.window.Event("change", { bubbles: true }));
-  assert.equal(d.getElementById("rp-kitchen").hidden, true);
-  form.dispatchEvent(new f.window.Event("submit", { cancelable: true }));
-  await new Promise((r) => setTimeout(r, 0));
-  assert.equal(pos.checked, true, "the form went back to 'Recomendar'");
-  assert.equal(d.getElementById("rp-kitchen").hidden, false, "the block must follow the type after the reset");
+Deno.test("report.js: neither a recommendation nor a report carries kitchen keys", async () => {
+  for (const type of ["positive", "negative"]) {
+    const [sent] = await submitReport(type);
+    for (const key of ["kitchen_exclusive", "celiac_prep", "owner_celiac"]) {
+      assert.equal(key in sent.body, false, `${type}: ${key}`);
+    }
+  }
 });

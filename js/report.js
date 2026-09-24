@@ -29,8 +29,6 @@
   var gotoSuggestLink = document.getElementById("rp-goto-suggest");
   var detailsEl = document.getElementById("rp-details");
   var descriptionEl = document.getElementById("rp-description");
-  var kitchenRoot = document.getElementById("rp-kitchen");
-  var kitchen = window.CeliacKitchen && kitchenRoot ? window.CeliacKitchen.attach(kitchenRoot) : null;
   var authorField = document.getElementById("rp-author-field");
   var authorEl = document.getElementById("rp-author");
   var authorNoticeNegativeEl = document.getElementById("rp-author-notice-negative");
@@ -97,11 +95,10 @@
     return "positive";
   }
 
-  // The kitchen block and the public name only apply to a recommendation; a report never carries
-  // them and is never published, so its own notice replaces the name field.
+  // The public name only applies to a recommendation; a report is never published, so its own
+  // notice replaces the name field.
   function syncTypeFields() {
     var positive = currentType() === "positive";
-    if (kitchen) kitchen.setVisible(positive);
     if (authorField) authorField.hidden = !positive;
     if (authorNoticeNegativeEl) authorNoticeNegativeEl.hidden = positive;
     if (!positive && authorEl) authorEl.value = "";
@@ -177,7 +174,6 @@
     searchClearBtn.hidden = true;
     detailsEl.hidden = true;
     descriptionEl.value = "";
-    if (kitchen) kitchen.reset();
     closeResults();
     hideNoMatch();
     if (focusInput) searchEl.focus();
@@ -346,12 +342,6 @@
       report_type: currentType(),
       description: description
     };
-    if (kitchen && currentType() === "positive") {
-      var facts = kitchen.read();
-      for (var key in facts) {
-        if (Object.prototype.hasOwnProperty.call(facts, key)) data[key] = facts[key];
-      }
-    }
     var author = (authorEl && authorEl.value || "").trim();
     if (currentType() === "positive" && author) data.author_name = author.slice(0, 40);
 

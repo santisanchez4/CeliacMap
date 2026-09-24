@@ -1080,7 +1080,7 @@ Target (functional product — see **## Architecture**):
 │   ├── config.js               # Supabase URL + anon key (public)
 │   ├── map.js                  # Leaflet init, fetch approved places, filters
 │   ├── suggest.js              # Form A: suggest a new place -> suggestions table
-│   ├── kitchen.js              # shared "Sobre la cocina" block (Forms A and B); read() returns only answered keys
+│   ├── kitchen.js              # "Sobre la cocina" block of Form A only (since 2026-09-24); read() returns only answered keys
 │   ├── report.js               # Form B: recommend/report an existing place -> place_reports
 │   ├── ranking.js              # community ranking (#ranking) + place_votes voting
 │   ├── opinions.js             # "La voz de la comunidad": approved opinions from the public view community_opinions
@@ -2211,6 +2211,27 @@ claims block. Chatbot: router fields `cocina_exclusiva` / `preparacion_celiaca` 
 question is asked **once** together with the draft, Módulo 4 stays single-turn (no question, only recites or invites),
 and the redactor gains a glossary and a rule never to promise a 100% because an owner is celiac. This **restarts the
 chatbot soft-launch count**. Tooling: `scripts/sync_chat_prompts.py` copies `prompts.ts` into the three doc copies.
+
+### Form B collects reviews, not kitchen data (2026-09-24)
+
+Owner decision (Santiago, right after the community-opinions rollout): the form "¿Ya fuiste a un lugar del mapa?
+Contanos cómo te fue" (Form B, `place_reports`) **no longer shows the "Sobre la cocina" block**. How a place cooks is
+asked only when a business is **added** (Form A, `suggestions`). Form B is for reviews, and what happens to them was
+already fixed by ADR-004 / ADR-008: a **positive** one changes nothing on its own (once the admin approves it, it is
+shown in "La voz de la comunidad"); a **negative** one on a published place is re-evaluated by the Validator (the
+2026-08-18 live test moved a place from `approved` to `needs_review`) and is never shown publicly.
+
+- **Deliberately not done: making a positive review raise a place's confidence.** With no accounts a positive text is
+  the cheapest thing to fake, and the rubric already tells the model never to let enthusiastic reviews push it above
+  the evidence; the reward for a positive review is being shown. It stays a possible future change, and it would be a
+  change to the health gate (the rubric), not to the form.
+- **Frontend:** the `#rp-kitchen` fieldset and its wiring in `js/report.js` are gone (`js/kitchen.js` now serves Form A
+  only); `tests/frontend_kitchen.test.js` asserts that form B has no kitchen block and sends no kitchen keys.
+- **Schema unchanged:** `place_reports` keeps its kitchen columns (the chatbot's Módulo 4 writes them, and so may its
+  recommend-a-known-place flow). No production data to migrate: no `place_reports` row carries kitchen data.
+- **Open:** the chatbot still asks the kitchen question when someone recommends a place that is already on the map (a
+  `report` draft). Aligning it is a code-only change (no prompt change, so no soft-launch restart) plus a redeploy of
+  `chat`; pending Santiago's decision.
 
 ### Community opinions on the public site (2026-09-24)
 
