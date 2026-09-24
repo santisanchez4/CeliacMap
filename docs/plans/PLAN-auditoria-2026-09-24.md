@@ -31,7 +31,7 @@ comunidad cuentan como evidencia y nunca actúan solos. La etiqueta pública est
 | H5 | Una opinión aprobada puede decir "es 100% sin gluten" sobre un lugar marcado "opciones" | Media | `scripts/moderate_opinions.py`, `js/opinions.js` |
 | H6 | `resolve_location` acepta el primer resultado de Find Place sin comparar el nombre | Media (ya conocido) | `agents/clients/google_places.py` |
 | H7 | La cola `needs_review` (~480) y los "100% pendientes" no tienen herramienta de revisión | Media | falta un script |
-| H8 | Un solo reporte negativo anónimo saca un lugar del mapa | Decisión del dueño | `review_handler.py` |
+| H8 | Un solo reporte negativo anónimo saca un lugar del mapa | Decidido: aviso con 1, salida con el umbral | `review_handler.py`, `js/map.js` |
 
 ---
 
@@ -104,11 +104,11 @@ El flag `100% pendiente de confirmación del administrador` existe, pero para ve
 Tampoco hay forma práctica de revisar los ~480 `needs_review` por tandas. `moderate_opinions.py` es el patrón que
 funciona (lista → `--approve` → dry-run por defecto).
 
-### H8 — Un reporte negativo anónimo saca un lugar del mapa (decisión, no bug)
+### H8 — Un reporte negativo anónimo saca un lugar del mapa
 
 La prueba en vivo del 2026-08-18 bajó la confianza de 0,95 a 0,52 y pasó el lugar a `needs_review` con un solo reporte.
-Por salud es conservador y correcto, pero sin cuentas cualquiera puede ocultar un lugar competidor. Lo dejo como
-decisión: ver el paso 7.
+Sin cuentas, cualquiera puede ocultar un lugar competidor. **Decidido el 2026-09-24** (ver el paso 7): con un reporte,
+el lugar queda en el mapa con un pin de aviso; a partir del umbral de reportes en 30 días, sale del mapa.
 
 ---
 
@@ -190,6 +190,9 @@ El resultado define el tamaño del paso 2b.
   no cuenta.**
 - Si no hay señal, se baja a `celiac_friendly` y se agrega el flag `100% pendiente de confirmación del administrador`
   (el mismo que ya existe).
+- **El nombre no cuenta ni a favor ni en contra.** Los Leños, Dalbertt y San Felipa son 100% y su nombre no lo dice:
+  llegan a 100% por lo que dicen su bio de Instagram, sus reseñas, un blog o un foro (evidencia del paso 1), o por
+  confirmación del admin. Un "Sin Gluten X" sin esa evidencia queda en "opciones" con el flag de pendiente.
 - Las fuentes `manual` no pasan por el Validator. Sus overrides se protegen en el paso 3.
 
 **2b (datos, una sola vez):** con el conteo del paso 0, pasar los 100% aprobados que no tengan señal explícita a
@@ -235,14 +238,49 @@ En `ReviewHandler.handle`:
 - `--approve ID [--level 100|options]` / `--discard ID`: escriben la nota `APROBACIÓN MANUAL` según la regla de
   overrides (sin inflar la confianza, `verified` sin tocar).
 
-### Paso 7 — Decisiones del dueño (no las implementaría sin una respuesta)
+### Paso 7 — Reportes negativos: aviso en el mapa y salida por umbral (H8, decidido 2026-09-24)
 
-1. **H8:** ¿un reporte negativo anónimo debe seguir sacando el lugar del mapa de inmediato? Alternativa: se queda
-   publicado con un aviso, y pasa a `needs_review` solo si llegan 2 reportes negativos distintos en 30 días o si el
-   reporte menciona contaminación o síntomas.
-2. **H6:** ¿implementamos ya el control de similitud de nombres en `resolve_location` (propuesta: coincidencia de
-   tokens ≥ 0,5; si no alcanza, se usa solo la dirección)?
-3. **Web agent:** ¿se reactiva después del paso 1, con límites de latencia?
+**Regla del dueño:**
+
+- **1 reporte negativo** en los últimos 30 días: el lugar **sigue en el mapa** con un pin distinto (rojo/ámbar) y el
+  aviso "Reportado por la comunidad — consultá en el lugar antes de ir".
+- **A partir de `REPORTS_TO_HIDE` reportes distintos** en 30 días: pasa a `needs_review` y sale del mapa hasta que
+  el admin lo revise. Valor inicial pendiente de confirmar ("más de dos" = 3; la propuesta original era 2). Queda como
+  constante para poder cambiarlo sin tocar la lógica.
+- Si pasan 30 días sin reportes nuevos, el aviso se apaga solo. El admin también puede apagarlo antes.
+
+**Cambios:**
+
+- **Esquema:** `places.community_warning_at timestamptz` (null = sin aviso). Es público, pero no es un dato de salud de
+  nadie: solo dice que hubo un reporte. **El texto del reporte nunca se publica** (no está verificado y puede ser
+  difamatorio). `place_reports.reporter_token text`, generado en el navegador como el `voter_token` del ranking, para
+  contar reportes "distintos". Es una defensa débil (se borra con el localStorage), igual que en los votos: lo
+  complementa el umbral + la revisión del admin.
+- **`review_handler.py`:** deja de mover el lugar con cada reporte. Cuenta los reportes negativos distintos de los
+  últimos 30 días del lugar: con 1, marca `community_warning_at` y **no** cambia `status`; con el umbral, `status =
+  'needs_review'` con una nota antepuesta (se aplica el paso 3). La re-evaluación de Sonnet se mantiene como evidencia
+  para el admin (flags + recomendación), pero no decide la salida del mapa.
+- **Excepción conservadora (a confirmar):** si el reporte describe contaminación o síntomas y el Validator lo
+  re-evalúa como `rejected`, el lugar sale al primer reporte. Sin esta excepción, un lugar con un reporte creíble de
+  contaminación sigue visible, solo con el aviso.
+- **Frontend (`js/map.js`, `css/styles.css`):** clase de marcador `cm-marker--warning`, badge y texto en la ficha,
+  entrada en la leyenda, ES + EN. `community_warning_at` va en el `select` del mapa y del ranking. Un lugar con aviso
+  no debería aparecer en el Top 3.
+- **Chatbot:** agregar `community_warning` a los campos que ve el redactor, con una instrucción: "si viene, avisá que
+  la comunidad lo reportó recientemente y que conviene consultar en el lugar". Cambia el prompt, así que reinicia el
+  soft-launch (conviene hacerlo junto con el paso 4).
+- **`scripts/review_queue.py` (paso 6):** `--warnings` lista los avisos activos con el texto de los reportes (solo
+  para el admin), y `--clear-warning ID`.
+- **Tests:** 1 reporte → aviso y status sin cambios; N reportes del mismo token cuentan como 1; umbral → `needs_review`;
+  aviso vencido → no se muestra; el texto del reporte nunca aparece en el `select` público.
+
+**Otras decisiones abiertas:**
+
+1. **H6:** implementar el control de nombre en `resolve_location`. No tiene que ver con que el nombre diga "sin
+   gluten": es comprobar que el negocio que devuelve Google es el que buscamos (ver la respuesta en el chat del
+   2026-09-24). Propuesta: coincidencia de palabras entre el nombre buscado y el devuelto ≥ 0,5; si no alcanza, se
+   usa solo la dirección.
+2. **Web agent:** reactivarlo después del paso 1, con límites de latencia.
 
 ---
 
