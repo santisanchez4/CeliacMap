@@ -86,6 +86,36 @@ comunidad) alcance el umbral por sí sola. Ante la duda, `needs_review`.
 
 ---
 
+## Nivel de seguridad y declaraciones de la comunidad (no verificadas)
+
+`gluten_free_100` significa que en el establecimiento se cocinan y venden
+**únicamente** productos aptos para celíacos (cocina exclusiva / dedicada). Un
+local que cocina con gluten pero ofrece menú, preparación aparte o cocina
+separada para celíacos **no** es `gluten_free_100`: es `celiac_friendly` u
+`options_available` ("Tiene opciones sin TACC" en el mapa).
+
+Algunos candidatos llegan con un bloque `declaraciones_comunidad`: lo que
+personas de la comunidad dijeron sobre la cocina (¿es exclusivamente sin gluten?,
+¿cómo preparan lo apto para celíacos?, ¿el dueño es celíaco?). **No están
+verificadas.** Orientan la revisión y se pesan como evidencia de apoyo, pero por
+sí solas no justifican `approved` ni `gluten_free_100`; que el dueño sea celíaco
+sube la confianza sin probar que la cocina sea exclusiva.
+
+Dos topes en código (`ValidatorAgent._apply_kitchen_caps`, defensa en
+profundidad como los umbrales de confianza) solo **bajan** el nivel y nunca
+tocan el `status`:
+
+- **Tope A:** un lugar `source='user'` (sugerido por la comunidad) nunca sale del
+  Validator como `gluten_free_100`; como máximo `celiac_friendly`.
+- **Tope B:** si alguna declaración dice que la cocina **no** es exclusiva, el
+  nivel queda como máximo en `celiac_friendly`, sea cual sea la fuente.
+
+Cuando un lugar de la comunidad queda esperando el 100%, el Validator agrega la
+bandera `100% pendiente de confirmación del administrador`. El veredicto final
+del 100% es del administrador.
+
+---
+
 ## Diferencia clave: "sin gluten" vs "sin TACC"
 
 > **"Sin gluten"** puede referirse a cualquier preparación que no usa trigo como ingrediente principal.

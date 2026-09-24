@@ -486,3 +486,16 @@ def test_the_pending_flag_is_not_duplicated_if_the_model_already_emitted_it():
 def test_contradicting_claims_still_cap_at_celiac_friendly():
     out = _norm(place={"source": "google_places"}, claims=[{"kitchen_exclusive": True}, SHARED_CLAIM])
     assert out["safety_level"] == "celiac_friendly"
+
+
+def test_rubric_defines_100_as_exclusive_kitchen_and_treats_claims_as_unverified():
+    from agents.validator_agent import RUBRIC
+
+    assert "ÚNICAMENTE productos aptos para celíacos" in RUBRIC
+    assert 'NO es "gluten_free_100"' in RUBRIC
+    assert 'Si el mensaje incluye "declaraciones_comunidad"' in RUBRIC
+    assert "NO están verificadas" in RUBRIC
+    assert 'por sí solas NO justifican "approved" ni "gluten_free_100"' in RUBRIC
+    # The conservative core and the thresholds are untouched.
+    assert "NUNCA sobreestimar la seguridad" in RUBRIC
+    assert "confidence_score >= 0.85" in RUBRIC

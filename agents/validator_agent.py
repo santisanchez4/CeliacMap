@@ -88,7 +88,10 @@ Asigna una categoría (exactamente una):
 - "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
 
 Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
-- "gluten_free_100": establecimiento totalmente sin gluten / dedicado a celíacos.
+- "gluten_free_100": establecimiento donde se cocinan y venden ÚNICAMENTE \
+productos aptos para celíacos (cocina exclusiva / dedicada). Un local que \
+cocina con gluten pero ofrece menú, preparación aparte o cocina separada para \
+celíacos NO es "gluten_free_100".
 - "celiac_friendly": atiende explícitamente a celíacos (certificado, "apto \
 celíacos", preparación dedicada).
 - "options_available": ofrece algunas opciones sin gluten pero no está \
@@ -98,6 +101,15 @@ También se te pueden dar fragmentos de reseñas de la comunidad que mencionan \
 términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes \
 que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es \
 escasa, mantente conservador.
+
+Si el mensaje incluye "declaraciones_comunidad", son afirmaciones de personas de \
+la comunidad sobre la cocina del lugar (si es exclusivamente sin gluten, cómo \
+preparan lo apto para celíacos, si el dueño es celíaco). NO están verificadas: \
+úsalas para orientar la revisión y pésalas como evidencia de apoyo, pero por sí \
+solas NO justifican "approved" ni "gluten_free_100". Que el dueño sea celíaco \
+sube la confianza pero no prueba que la cocina sea exclusiva. Si una declaración \
+indica que el local también cocina con gluten, el nivel no puede ser \
+"gluten_free_100". Ante la duda, "needs_review" y el nivel más bajo.
 
 Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la \
 dirección de texto del candidato: NO hay una ficha de Google Places que confirme \
