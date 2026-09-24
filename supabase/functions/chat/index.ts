@@ -726,12 +726,25 @@ export function decideSuggestionTurn(
 export type ConfirmarResult =
   | { kind: "ask_more_detail" }
   | { kind: "ask_which_place" }
-  | { kind: "insert_now"; payload: { place_id: string | null; place_name_text: string | null; report_type: "positive"; description: string } };
+  | {
+    kind: "insert_now";
+    payload: {
+      place_id: string | null;
+      place_name_text: string | null;
+      report_type: "positive";
+      description: string;
+      kitchen_exclusive?: boolean;
+      celiac_prep?: CeliacPrep;
+      owner_celiac?: boolean;
+    };
+  };
 
 export function decideConfirmarSubmission(input: {
   match: PlaceMatch | null;
   lugarNombre: string | null;
   reporteTexto: string | null;
+  // Facts the person volunteered in this same message (Módulo 4 never asks: it stays single-turn).
+  facts?: KitchenFacts;
 }): ConfirmarResult {
   const texto = input.reporteTexto?.trim() ?? "";
   if (texto.length < 5) return { kind: "ask_more_detail" };
@@ -745,6 +758,7 @@ export function decideConfirmarSubmission(input: {
       place_name_text: input.match ? null : input.lugarNombre.slice(0, 120),
       report_type: "positive",
       description,
+      ...sparseKitchen(input.facts ?? NO_KITCHEN_FACTS, false),
     },
   };
 }
@@ -852,6 +866,9 @@ export function buildPlaceReportInsertPayload(p: PendingReportSubmission) {
     place_name_text: p.place_name_text,
     report_type: p.report_type,
     description: p.description,
+    // Kitchen keys only when answered, and only on a positive report (the database CHECK
+    // forbids them on a negative one). kitchen_asked is internal and never written.
+    ...(p.report_type === "positive" ? sparseKitchen(normalizeKitchenFacts(p), false) : {}),
   };
 }
 
@@ -865,6 +882,7 @@ export function buildSuggestionInsertPayload(p: PendingSuggestionSubmission) {
     evidence_url: null,
     notes: p.notes,
     origin: "community",
+    ...sparseKitchen(normalizeKitchenFacts(p), false),
   };
 }
 

@@ -12,6 +12,7 @@ import {
   type PendingSuggestionSubmission,
 } from "./index.ts";
 import { parseRouterOutput } from "./index.ts";
+import { buildPlaceReportInsertPayload, buildSuggestionInsertPayload, decideConfirmarSubmission } from "./index.ts";
 
 const NO_FACTS = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
 const NO_ROUTER_FACTS = { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: null } as const;
@@ -191,4 +192,55 @@ Deno.test("parseRouterOutput - anything outside the vocabulary becomes null; coc
   assertEquals(out.preparacion_celiaca, null);
   assertEquals(out.dueno_celiaco, null);
   assertEquals(out.cocina_respuesta, false);
+});
+
+// ---- write payloads + Módulo 4 -------------------------------------------------
+
+Deno.test("buildSuggestionInsertPayload - no kitchen data => exactly today's row shape", () => {
+  assertEquals(
+    Object.keys(buildSuggestionInsertPayload(suggestion())).sort(),
+    ["address", "category", "city", "country", "evidence_url", "name", "notes", "origin"],
+  );
+});
+
+Deno.test("buildSuggestionInsertPayload - carries only the answered keys and never kitchen_asked", () => {
+  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", owner_celiac: true, kitchen_asked: true });
+  const payload = buildSuggestionInsertPayload(p);
+  assertEquals(payload.kitchen_exclusive, false);
+  assertEquals(payload.celiac_prep, "separate_prep");
+  assertEquals(payload.owner_celiac, true);
+  assertEquals("kitchen_asked" in payload, false);
+});
+
+Deno.test("buildPlaceReportInsertPayload - positive carries the facts; negative never does; asked never leaks", () => {
+  const positive = buildPlaceReportInsertPayload(report({ kitchen_exclusive: true, owner_celiac: false, kitchen_asked: true }));
+  assertEquals(positive.kitchen_exclusive, true);
+  assertEquals(positive.owner_celiac, false);
+  assertEquals("kitchen_asked" in positive, false);
+  const negative = buildPlaceReportInsertPayload(report({ report_type: "negative", kitchen_exclusive: true }));
+  assertEquals("kitchen_exclusive" in negative, false);
+  assertEquals(
+    Object.keys(buildPlaceReportInsertPayload(report())).sort(),
+    ["description", "place_id", "place_name_text", "report_type"],
+  );
+});
+
+Deno.test("decideConfirmarSubmission (Módulo 4) - facts volunteered in the message are stored; none => today's payload", () => {
+  const withFacts = decideConfirmarSubmission({
+    match: { id: "3f2b6c1e-8d3a-4e21-9a55-0c7d6f1b2a10", name: "Café Sol" } as never,
+    lugarNombre: "Café Sol",
+    reporteTexto: "todo sin gluten, la dueña es celíaca",
+    facts: { kitchen_exclusive: true, celiac_prep: null, owner_celiac: true },
+  });
+  assertEquals(withFacts.kind, "insert_now");
+  if (withFacts.kind === "insert_now") {
+    assertEquals(withFacts.payload.kitchen_exclusive, true);
+    assertEquals(withFacts.payload.owner_celiac, true);
+    assertEquals("celiac_prep" in withFacts.payload, false);
+  }
+  const plain = decideConfirmarSubmission({ match: null, lugarNombre: "Café Sol", reporteTexto: "lo conozco, es sin tacc" });
+  assertEquals(plain.kind, "insert_now");
+  if (plain.kind === "insert_now") {
+    assertEquals(Object.keys(plain.payload).sort(), ["description", "place_id", "place_name_text", "report_type"]);
+  }
 });
