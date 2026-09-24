@@ -464,6 +464,55 @@ begin
 end $$;
 -- KITCHEN-DECLARATIONS-END
 
+-- Community opinions (docs/superpowers/specs/2026-09-24-community-opinions-design.md)
+-- ---------------------------------------------------------------------
+-- A POSITIVE report can be shown on the public site once the admin approves it
+-- (published_at = when). author_name is what the person chose to show; empty
+-- means "Anonimo" (the frontend decides the label). place_reports itself stays
+-- closed to the public: the ONLY public read path is the view below, with an
+-- explicit column list, so kitchen_exclusive / celiac_prep / owner_celiac
+-- (a third party's health condition), status and place_name_text never leave.
+-- The view runs with its owner's rights (that is what lets it read the closed
+-- table); its WHERE is the only barrier and includes p.status = 'approved', so
+-- an opinion disappears by itself if its place stops being published.
+-- COMMUNITY-OPINIONS-BEGIN
+alter table public.place_reports add column if not exists author_name  text;
+alter table public.place_reports add column if not exists published_at timestamptz;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'place_reports_author_name_check') then
+    alter table public.place_reports add constraint place_reports_author_name_check
+      check (author_name is null or char_length(btrim(author_name)) between 1 and 40);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'place_reports_publish_positive_only_check') then
+    alter table public.place_reports add constraint place_reports_publish_positive_only_check
+      check (published_at is null or report_type = 'positive');
+  end if;
+end $$;
+
+create or replace view public.community_opinions as
+select r.id,
+       r.description,
+       r.author_name,
+       r.published_at,
+       p.id   as place_id,
+       p.name as place_name,
+       p.city,
+       p.country
+from public.place_reports r
+join public.places p on p.id = r.place_id
+where r.report_type = 'positive'
+  and r.published_at is not null
+  and p.status = 'approved';
+
+grant select on public.community_opinions to anon, authenticated;
+-- COMMUNITY-OPINIONS-END
+
 -- ---------------------------------------------------------------------
 -- Table: place_votes  (community "recommend / upvote" — the ranking signal)
 -- ---------------------------------------------------------------------
@@ -722,6 +771,8 @@ create policy "public can submit suggestions"
 -- and re-bounds description length; the column CHECKs above are the primary
 -- enforcement. No SELECT/UPDATE/DELETE policy => those are denied to anon
 -- (ReviewHandler reads/writes via the service_role key, which bypasses RLS).
+-- published_at must be NULL on insert: only the admin (service_role) publishes,
+-- otherwise the table-wide INSERT grant would let a client publish itself.
 drop policy if exists "public can submit place reports" on public.place_reports;
 create policy "public can submit place reports"
   on public.place_reports
@@ -729,6 +780,7 @@ create policy "public can submit place reports"
   to anon, authenticated
   with check (
     status = 'new'
+    and published_at is null
     and (place_id is not null or place_name_text is not null)
     and char_length(description) between 5 and 2000
   );
