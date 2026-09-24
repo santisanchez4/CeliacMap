@@ -214,6 +214,8 @@ const CATEGORIES = ["restaurant", "cafe", "shop"] as const;
 const PAISES = ["Argentina", "Uruguay"] as const;
 const REPORT_TYPES = ["positive", "negative"] as const;
 const IDIOMAS = ["es", "en"] as const;
+const SI_NO = ["si", "no"] as const;
+const PREPARACIONES = ["cocina_separada", "preparacion_aparte", "misma_cocina"] as const;
 
 export interface RouterOutput {
   modulo: (typeof MODULOS)[number];
@@ -236,6 +238,13 @@ export interface RouterOutput {
   // allowed to say, since that boundary is already enforced in the
   // RESPONDER_PROMPT itself regardless of this field.
   limite_medico: boolean;
+  // Kitchen declarations the person states EXPLICITLY about the place they are contributing
+  // (never inferred). cocina_respuesta: this message answers the kitchen question the assistant
+  // put in its previous turn — even with "no sé". See the ROUTER prompt, instructions 9-10.
+  cocina_exclusiva: (typeof SI_NO)[number] | null;
+  preparacion_celiaca: (typeof PREPARACIONES)[number] | null;
+  dueno_celiaco: (typeof SI_NO)[number] | null;
+  cocina_respuesta: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1074,6 +1083,10 @@ export function parseRouterOutput(text: string): RouterOutput {
     confirma_envio: obj.confirma_envio === true,
     idioma: asEnum(obj.idioma, IDIOMAS) ?? "es",
     limite_medico: obj.limite_medico === true,
+    cocina_exclusiva: asEnum(obj.cocina_exclusiva, SI_NO),
+    preparacion_celiaca: asEnum(obj.preparacion_celiaca, PREPARACIONES),
+    dueno_celiaco: asEnum(obj.dueno_celiaco, SI_NO),
+    cocina_respuesta: obj.cocina_respuesta === true,
   };
 }
 

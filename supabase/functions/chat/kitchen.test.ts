@@ -11,6 +11,7 @@ import {
   type PendingReportSubmission,
   type PendingSuggestionSubmission,
 } from "./index.ts";
+import { parseRouterOutput } from "./index.ts";
 
 const NO_FACTS = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
 const NO_ROUTER_FACTS = { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: null } as const;
@@ -158,4 +159,36 @@ Deno.test("producer -> JSON -> validator round-trips every draft shape unchanged
     assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(d))), d);
   }
   assertStringIncludes(JSON.stringify(drafts[0]), "kitchen_asked");
+});
+
+// ---- parseRouterOutput: the router's kitchen fields ---------------------------
+
+Deno.test("parseRouterOutput - kitchen fields default to null / false when absent", () => {
+  const out = parseRouterOutput(JSON.stringify({ modulo: "reportar" }));
+  assertEquals(out.cocina_exclusiva, null);
+  assertEquals(out.preparacion_celiaca, null);
+  assertEquals(out.dueno_celiaco, null);
+  assertEquals(out.cocina_respuesta, false);
+});
+
+Deno.test("parseRouterOutput - accepts the kitchen vocabulary", () => {
+  const out = parseRouterOutput(JSON.stringify({
+    modulo: "reportar", cocina_exclusiva: "no", preparacion_celiaca: "preparacion_aparte",
+    dueno_celiaco: "si", cocina_respuesta: true,
+  }));
+  assertEquals(out.cocina_exclusiva, "no");
+  assertEquals(out.preparacion_celiaca, "preparacion_aparte");
+  assertEquals(out.dueno_celiaco, "si");
+  assertEquals(out.cocina_respuesta, true);
+});
+
+Deno.test("parseRouterOutput - anything outside the vocabulary becomes null; cocina_respuesta needs a real true", () => {
+  const out = parseRouterOutput(JSON.stringify({
+    modulo: "reportar", cocina_exclusiva: "quizás", preparacion_celiaca: "separate_kitchen",
+    dueno_celiaco: true, cocina_respuesta: "true",
+  }));
+  assertEquals(out.cocina_exclusiva, null);
+  assertEquals(out.preparacion_celiaca, null);
+  assertEquals(out.dueno_celiaco, null);
+  assertEquals(out.cocina_respuesta, false);
 });
