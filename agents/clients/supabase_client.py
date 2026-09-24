@@ -467,6 +467,28 @@ class SupabaseClient:
         )
         return res.data or []
 
+    def fetch_recent_negative_report_count(self, place_id: str, days: int = 30) -> int:
+        """Distinct negative reports about a place in the last ``days`` (audit plan step 7).
+
+        "Distinct" = by ``reporter_token`` (one per browser); a report without a token (the
+        chatbot, older rows) counts on its own. A weak defense — the token lives in the
+        browser — backed by the threshold and the admin's review.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        res = (
+            self._db.table("place_reports")
+            .select("id, reporter_token")
+            .eq("place_id", place_id)
+            .eq("report_type", "negative")
+            .gte("created_at", cutoff)
+            .execute()
+        )
+        return len({r.get("reporter_token") or f"id:{r.get('id')}" for r in (res.data or [])})
+
+    def set_community_warning(self, place_id: str, at: str | None) -> None:
+        """Set (ISO timestamp) or clear (None) the public "reportado por la comunidad" warning."""
+        self._db.table("places").update({"community_warning_at": at}).eq("id", place_id).execute()
+
     # --- agent_log ----------------------------------------------------
     def insert_agent_log(
         self,

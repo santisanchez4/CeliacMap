@@ -2225,8 +2225,18 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
 - **Tope C** (code): `gluten_free_100` needs an explicit exclusivity phrase in the reviews/evidence the model saw; the
   name never counts. Without it → `celiac_friendly` + `100% pendiente de confirmación del administrador`. Owner-health
   sentences are scrubbed from `reasoning` / `flags` / `recommendation` before they reach public columns.
-- **Not yet done:** the real-model A/B, applying the migration (`place_evidence`), and the one-off pass over the
-  already-approved 100% places (plan step 2b).
+- **Negative reports (steps 3 + 7, owner decision 2026-09-24) — amends ADR-004.** A negative report no longer moves
+  a place according to the model's verdict. `ReviewHandler.handle()` counts distinct negative reports in 30 days
+  (`place_reports.reporter_token`, one anonymous id per browser from `js/report.js`; chatbot/older rows count one by
+  one): with 1–2 the place stays on the map and gets `places.community_warning_at` (red "!" pin + a notice in the
+  detail, "Reportado por la comunidad — consultá en el lugar antes de ir", shown for 30 days, also dropped from the
+  map's Top 3); with 3 (`REPORTS_TO_HIDE`), or with ONE report the model marks `reporte_contaminacion_creible: true`,
+  it goes to `needs_review` with a `RETIRADO DEL MAPA POR REPORTES` header prepended to its notes. The report text is
+  never public. A re-evaluation never raises `safety_level`, and on a place with a manual-override marker
+  (`agents/manual_overrides.py`, shared with the retroactive re-validation) it keeps the admin's level, confidence,
+  category and note.
+- **Not yet done:** the real-model A/B, applying the migration (`place_evidence`, `places.community_warning_at`,
+  `place_reports.reporter_token`), and the one-off pass over the already-approved 100% places (plan step 2b).
 
 ### Kitchen information as review evidence (2026-09-24)
 

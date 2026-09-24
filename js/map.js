@@ -268,10 +268,34 @@
     return safetyGroup(level) === "gluten_free_100" ? "pp-badge--dedicated" : "pp-badge--options";
   }
 
-  function icon(level, selected) {
+  // A negative community report sets places.community_warning_at; the warning shows for 30 days
+  // (audit plan step 7). The report text itself is never public.
+  var WARNING_DAYS = 30;
+  function hasWarning(p) {
+    if (!p || !p.community_warning_at) return false;
+    var t = Date.parse(p.community_warning_at);
+    return !isNaN(t) && Date.now() - t < WARNING_DAYS * 864e5;
+  }
+
+  function warningHtml(p) {
+    if (!hasWarning(p)) return "";
+    return (
+      '<p class="pp-warning" role="note"><strong>' +
+      esc(tr("Reportado por la comunidad", "Reported by the community")) + "</strong> " +
+      esc(tr(
+        "Hace poco alguien reportó un problema en este lugar. Consultá en el lugar antes de ir.",
+        "Someone recently reported a problem at this place. Check with the venue before you go."
+      )) +
+      "</p>"
+    );
+  }
+
+  function icon(place, selected) {
+    var level = place && place.safety_level;
     return L.divIcon({
       className: "",
-      html: '<span class="cm-marker ' + safetyClass(level) + (selected ? " is-selected" : "") + '"></span>',
+      html: '<span class="cm-marker ' + safetyClass(level) + (hasWarning(place) ? " cm-marker--warning" : "") +
+        (selected ? " is-selected" : "") + '"></span>',
       iconSize: [selected ? 28 : 18, selected ? 28 : 18],
       iconAnchor: [selected ? 14 : 9, selected ? 14 : 9],
       popupAnchor: [0, -10]
@@ -289,6 +313,7 @@
       '<div class="cm-popup-title">' + esc(p.name) + "</div>" +
       '<div class="cm-popup-meta">' + meta + "</div>" +
       '<span class="pp-badge ' + safetyBadgeClass(p.safety_level) + '">' + esc(saf) + "</span>" +
+      warningHtml(p) +
       addr +
       "</div>"
     );
@@ -368,7 +393,7 @@
     html += '<div class="pp-badges">' +
       '<span class="pp-badge pp-badge--cat">' + esc(cat) + "</span>" +
       '<span class="pp-badge ' + safetyBadgeClass(p.safety_level) + '">' + esc(saf) + "</span>" +
-      "</div>";
+      "</div>" + warningHtml(p);
 
     if (typeof p.rating === "number" && p.rating > 0) {
       var num = p.rating.toFixed(1);
@@ -555,7 +580,8 @@
     });
     var texts = [
       [".map-legend li:first-child span:last-child", "Espacio 100% sin gluten", "100% gluten-free venue"],
-      [".map-legend li:nth-child(2) span:last-child", "Tiene opciones sin TACC", "Has gluten-free options"]
+      [".map-legend li:nth-child(2) span:last-child", "Tiene opciones sin TACC", "Has gluten-free options"],
+      [".map-legend li:nth-child(3) span:last-child", "Reportado por la comunidad: consultá antes de ir", "Reported by the community: check before you go"]
     ];
     texts.forEach(function (item) { var node = document.querySelector(item[0]); if (node) node.textContent = tr(item[1], item[2]); });
     Array.prototype.forEach.call(document.querySelectorAll("[data-safety]"), function (button) {
@@ -639,9 +665,9 @@
     if (!panelEl.classList.contains("is-open")) previousView = { center: map.getCenter(), zoom: map.getZoom() };
     returnFocusEl = document.activeElement;
     panelExpanded = false;
-    if (selectedEntry && selectedEntry !== entry) selectedEntry.marker.setIcon(icon(selectedEntry.place.safety_level));
+    if (selectedEntry && selectedEntry !== entry) selectedEntry.marker.setIcon(icon(selectedEntry.place));
     selectedEntry = entry;
-    entry.marker.setIcon(icon(entry.place.safety_level, true));
+    entry.marker.setIcon(icon(entry.place, true));
     map.invalidateSize();
     showDetails(entry.place, entry.marker);
     frameSelectedEntry(entry);
@@ -660,7 +686,7 @@
     });
     if (selectedEntry && !matches(selectedEntry)) {
       closePanel();
-      selectedEntry.marker.setIcon(icon(selectedEntry.place.safety_level));
+      selectedEntry.marker.setIcon(icon(selectedEntry.place));
       selectedEntry = null;
     }
     updateCount(shown.length);
@@ -917,7 +943,7 @@
   var url =
     cfg.SUPABASE_URL.replace(/\/+$/, "") +
     "/rest/v1/places?select=id,name,lat,lng,category,city,safety_level,address,source," +
-    "phone,website,opening_hours,social_url,rating,user_ratings_total" +
+    "phone,website,opening_hours,social_url,rating,user_ratings_total,community_warning_at" +
     "&status=eq.approved&order=name.asc,id.asc";
 
   function fetchAllPlaces(start, collected) {
@@ -944,7 +970,7 @@
       }
       rows.forEach(function (p) {
         if (typeof p.lat !== "number" || typeof p.lng !== "number") return;
-        var marker = L.marker([p.lat, p.lng], { icon: icon(p.safety_level), title: p.name });
+        var marker = L.marker([p.lat, p.lng], { icon: icon(p), title: p.name });
         if (panelAvailable) {
           marker.on("click", (function (place, mk) {
             return function () {

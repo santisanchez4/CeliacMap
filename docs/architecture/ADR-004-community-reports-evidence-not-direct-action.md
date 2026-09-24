@@ -106,3 +106,23 @@ el 18 de agosto de 2026, ~21:49–21:58 UTC:
   desde el cliente — expone nombres/ciudades ya públicos en el mapa, sin
   dato sensible, pero es una superficie nueva de consulta directa a la
   base.
+
+## Enmienda 2026-09-24 — aviso en el mapa y salida por umbral
+
+Decisión del dueño (plan `docs/plans/PLAN-auditoria-2026-09-24.md`, pasos 3 y 7). Con la
+versión original, un solo reporte negativo anónimo podía sacar un lugar del mapa (la prueba en vivo
+del 2026-08-18 pasó de 0,95 a `needs_review`), así que cualquiera podía ocultar a un competidor.
+
+- **1 o 2 reportes negativos distintos en 30 días:** el lugar sigue publicado con un aviso público
+  (`places.community_warning_at`: pin rojo con "!" y "Reportado por la comunidad — consultá en el
+  lugar antes de ir"). El texto del reporte nunca se publica.
+- **3 reportes distintos en 30 días, o 1 reporte que la re-evaluación marca como contaminación o
+  síntomas creíbles (`reporte_contaminacion_creible: true`):** pasa a `needs_review` y sale del mapa
+  hasta que el admin lo revise.
+- "Distintos" se cuenta por `place_reports.reporter_token` (un id anónimo por navegador). Es una
+  defensa débil que complementan el umbral y la revisión del admin.
+- La re-evaluación nunca sube el `safety_level`, y en un lugar con override manual conserva el nivel,
+  la confianza, la categoría y la nota del admin.
+
+El principio de este ADR no cambia: el reporte es evidencia, y el que decide sacar un lugar sigue
+siendo el umbral o el Validator, nunca el texto del reporte por sí solo.

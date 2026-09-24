@@ -667,6 +667,27 @@ $$;
 -- code -- see db/checks/2026-09-16-chat-usage.sql.
 revoke execute on function public.bump_chat_usage(text[], date) from public, anon, authenticated;
 
+-- COMMUNITY-WARNING-BEGIN
+-- Audit plan step 7 (owner decision 2026-09-24). One or two distinct negative reports in 30
+-- days keep a place on the map with a public "reportado por la comunidad" warning; the third
+-- (or one credible contamination report) sends it to needs_review. community_warning_at is
+-- when the last warning was set; the frontend shows it for 30 days. It says only that a report
+-- exists — the report text is never public.
+alter table public.places add column if not exists community_warning_at timestamptz;
+-- One anonymous id per browser (like place_votes.voter_token), so "distinct reports" can be
+-- counted. Optional: the chatbot and older rows carry none and count one by one.
+alter table public.place_reports add column if not exists reporter_token text;
+do $$
+begin
+  alter table public.place_reports drop constraint if exists place_reports_reporter_token_check;
+  alter table public.place_reports
+    add constraint place_reports_reporter_token_check
+    check (reporter_token is null or char_length(reporter_token) between 8 and 64);
+end $$;
+create index if not exists place_reports_negative_recent_idx
+  on public.place_reports (place_id, created_at) where report_type = 'negative';
+-- COMMUNITY-WARNING-END
+
 -- PLACE-EVIDENCE-BEGIN
 -- ---------------------------------------------------------------------
 -- Table: place_evidence  (audit plan 2026-09-24, step 1)

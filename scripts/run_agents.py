@@ -76,6 +76,9 @@ class DryRunSupabase:
     def fetch_place_evidence(self, place_id: str, limit: int = 5) -> list[dict]:
         return self._inner.fetch_place_evidence(place_id, limit=limit)
 
+    def fetch_recent_negative_report_count(self, place_id: str, days: int = 30) -> int:
+        return self._inner.fetch_recent_negative_report_count(place_id, days=days)
+
     def fetch_latest_received_message(self, place_id: str) -> dict | None:
         return self._inner.fetch_latest_received_message(place_id)
 
@@ -152,6 +155,9 @@ class DryRunSupabase:
 
     def update_place(self, place_id: str, patch: dict[str, Any]) -> None:
         logger.info("[dry-run] would update place %s -> %s", place_id, patch)
+
+    def set_community_warning(self, place_id: str, at: str | None) -> None:
+        logger.info("[dry-run] would set community warning on %s -> %s", place_id, at)
 
     def add_place_evidence(self, place_id: str, source: str, text=None, url=None) -> None:
         logger.info("[dry-run] would add %s evidence for place %s", source, place_id)
