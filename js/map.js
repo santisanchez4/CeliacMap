@@ -491,7 +491,9 @@
       // clicked: its target is already detached by the time the click gets here.
       if (!e.target.isConnected) return;
       if (panelEl.contains(e.target) || mapEl.contains(e.target)) return;
-      if (e.target.closest && e.target.closest(".chat-place-link")) return;
+      // Links that open a place from elsewhere on the page (chat replies, "La voz de la comunidad" cards)
+      // dispatch celiacmap:open-place; their own click must not be read as an outside click.
+      if (e.target.closest && e.target.closest(".chat-place-link, .review-place")) return;
       closePanel();
     });
     document.addEventListener("keydown", function (e) {
@@ -751,7 +753,9 @@
     for (var i = 0; i < entries.length; i++) {
       if (entries[i].place.id === id) {
         if (!matches(entries[i])) resetFilters();
-        document.getElementById("map").scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth", block: "start" });
+        // The map itself, centered: the section heading would leave the map and its detail card half below the fold.
+        (document.querySelector("#map .map-wrap") || document.getElementById("map"))
+          .scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth", block: "center" });
         selectEntry(entries[i], true);
         return;
       }

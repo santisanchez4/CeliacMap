@@ -70,7 +70,12 @@ async function fixture(mobile = false) {
     return el;
   }
   return { document, window, browser, map, viewportListeners, click, markers, layers, mutations: () => mutations,
-    loadChat: async () => vm.runInNewContext(await Deno.readTextFile("js/chat.js"), context) };
+    loadChat: async () => vm.runInNewContext(await Deno.readTextFile("js/chat.js"), context),
+    loadOpinions: async rows => {
+      context.fetch = async () => ({ ok: true, json: async () => rows });
+      vm.runInNewContext(await Deno.readTextFile("js/opinions.js"), context);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    } };
 }
 
 Deno.test("selected pin is centered in the map area left of the desktop card", async () => {
@@ -221,6 +226,33 @@ Deno.test("real chat recommendation click keeps the map detail open", async () =
   await new Promise(resolve => setTimeout(resolve, 0));
   f.click(".chat-place-links button");
   assert.equal(f.document.getElementById("place-panel").getAttribute("aria-hidden"), "false");
+});
+
+// Same bug class as the marker click and the chat links: the click that opens a place from a
+// "La voz de la comunidad" card bubbles to the document, where "a click outside the map closes the
+// detail" ran right after the panel opened. Found live: the map flew to the place but the detail was shut.
+Deno.test("real click on a community-opinion place link opens the map detail and keeps it open", async () => {
+  const f = await fixture();
+  await f.loadOpinions([{
+    id: "o1", description: "Muy rico todo", author_name: null,
+    place_id: "place-3", place_name: "Place 03", city: "Montevideo", country: "Uruguay",
+  }]);
+  f.click("#opinions-grid .review-place");
+  const panel = f.document.getElementById("place-panel");
+  assert.equal(panel.getAttribute("aria-hidden"), "false");
+  assert.ok(panel.classList.contains("is-open"));
+});
+
+// Opening a place from a link elsewhere on the page (chat, community opinions) used to scroll to the
+// section HEADING, leaving the map and its detail card half below the fold on a laptop. It must bring the
+// map itself into view.
+Deno.test("opening a place scrolls the map itself into view, not the section heading", async () => {
+  const f = await fixture();
+  const targets = [];
+  f.window.HTMLElement.prototype.scrollIntoView = function () { targets.push(this.id || this.className); };
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
+  assert.ok(targets.includes("map-wrap"), "scrolled: " + targets.join(", "));
+  assert.equal(targets.includes("map"), false, "must not scroll to the section heading");
 });
 
 Deno.test("chat opens with only its intro: no suggested prompts", async () => {

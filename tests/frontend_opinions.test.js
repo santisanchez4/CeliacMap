@@ -182,7 +182,7 @@ Deno.test("opinions: a name is shown with its initial, no name means Anónimo wi
 
 Deno.test("opinions: each card names the place and its city", async () => {
   const f = await opinions(rowsOf(1));
-  assert.equal(cards(f)[0].querySelector(".review-place").textContent, "sobre Lugar 0 · Rosario");
+  assert.equal(cards(f)[0].querySelector(".review-place").textContent, "Sobre Lugar 0 · Rosario");
 });
 
 Deno.test("opinions: three or more show only opinions; fewer add the invitation card", async () => {
@@ -235,7 +235,7 @@ Deno.test("opinions: dynamic cards never use .reveal (the observer would leave t
 Deno.test("opinions: switching to English redraws the labels", async () => {
   const f = await opinions([{ ...rowsOf(1)[0], author_name: null }], { lang: "en" });
   assert.equal(cards(f)[0].querySelector("strong").textContent, "Anonymous");
-  assert.equal(cards(f)[0].querySelector(".review-place").textContent, "about Lugar 0 · Rosario");
+  assert.equal(cards(f)[0].querySelector(".review-place").textContent, "About Lugar 0 · Rosario");
   assert.ok(cta(f).textContent.includes("Tell us about your experience"));
 });
 

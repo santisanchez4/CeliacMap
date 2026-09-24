@@ -2270,6 +2270,15 @@ testimonials under the heading "Experiencias reales". Both are fixed:
   with `revoke all` before the `grant select` (schema + production), a test, and a check assertion that failed
   against production before the fix. **Rule: any new object exposed to the public gets `revoke all`, then the minimal
   `grant`, like the tables.**
+- **Found right after publishing (2026-09-24), fixed the same day:** (1) the card label read "sobre …" (now "Sobre" /
+  "About"); (2) **opening a place from a card opened the detail and the same click closed it** — the document-level
+  "click outside the map closes the detail" handler in `js/map.js` ran right after `celiacmap:open-place`; it already
+  exempted `.chat-place-link`, now also `.review-place` (third time this bug class showed up: marker icon swap, chat
+  links, community cards — any new link that dispatches `celiacmap:open-place` must be exempted there, and a test in
+  `tests/frontend_explorer.test.js` covers it); (3) opening a place scrolled to the section HEADING, leaving the map
+  and its detail half below the fold on a laptop — it now centers the map itself (`.map-wrap`), which also improves
+  the chat links. Clicking a card goes to that specific place: the map flies to it, its marker is selected and its
+  detail opens (verified in a real browser by geometry: map and detail fully in view).
 - **Found in the browser, invisible to the DOM-emulation tests:** `.field { display: flex }` beat the `hidden`
   attribute, so the name field stayed visible in "Reportar" mode. Fixed with `.field[hidden]` plus a regression test
   on the CSS. Lesson: a `hidden` toggle needs a check in a real browser, not only on the `.hidden` property.

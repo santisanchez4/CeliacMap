@@ -41,7 +41,7 @@ salud de un tercero; ver ADR-007).
    ADR-002, ADR-004 y ADR-005.
 8. **El chatbot no cambia.** Escribe en la misma tabla, así que sus recomendaciones se guardan sin nombre y, si se
    aprueban, salen como "Anónimo".
-9. **En el sitio:** `js/opinions.js` dibuja la sección (nombre o "Anónimo", "sobre *Lugar* · *Ciudad*" que abre el
+9. **En el sitio:** `js/opinions.js` dibuja la sección (nombre o "Anónimo", "Sobre *Lugar* · *Ciudad*" que abre el
    lugar en el mapa, sin estrellas). El texto de las personas entra **solo con `textContent`**. Se eliminan los
    testimonios inventados; con menos de tres comentarios se agrega una tarjeta que invita a contar la experiencia.
 10. **Formulario B:** campo opcional "Tu nombre" con `autocomplete="off"` y un aviso de que el comentario puede

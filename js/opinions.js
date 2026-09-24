@@ -21,7 +21,7 @@
   var MSG = {
     es: {
       anonymous: "Anónimo",
-      about: "sobre",
+      about: "Sobre",
       emptyTitle: "Todavía no hay comentarios publicados",
       emptyText: "Sé la primera persona en contar cómo te fue.",
       moreTitle: "¿Fuiste a un lugar del mapa?",
@@ -30,7 +30,7 @@
     },
     en: {
       anonymous: "Anonymous",
-      about: "about",
+      about: "About",
       emptyTitle: "No comments published yet",
       emptyText: "Be the first to tell us how it went.",
       moreTitle: "Been to a place on the map?",

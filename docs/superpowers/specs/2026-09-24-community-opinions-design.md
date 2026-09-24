@@ -88,11 +88,11 @@ Por qué una vista y no una política de lectura sobre la tabla: la vista es el 
 
 **Sección `#reviews` (`js/opinions.js`, nuevo):**
 - Lee `community_opinions?select=id,description,author_name,place_id,place_name,city,country&order=published_at.desc&limit=6` con la clave anon, igual que `ranking.js`.
-- Cada tarjeta muestra el comentario, el autor (`author_name` o **Anónimo / Anonymous**), y "sobre *Lugar* · *Ciudad*", que abre el lugar en el mapa con el evento `celiacmap:open-place` que ya usa el chat. Inicial del autor en el avatar, o un ícono neutro si es anónimo. **Sin estrellas.**
+- Cada tarjeta muestra el comentario, el autor (`author_name` o **Anónimo / Anonymous**), y "Sobre *Lugar* · *Ciudad*", que abre el lugar en el mapa con el evento `celiacmap:open-place` que ya usa el chat. Inicial del autor en el avatar, o un ícono neutro si es anónimo. **Sin estrellas.**
 - **El texto de las personas se inserta solo con `textContent`, nunca como HTML.** Los comentarios largos se recortan a ~280 caracteres en una palabra completa, con "…" (el administrador ve el texto completo al aprobar).
 - **Sin opiniones publicadas:** una tarjeta vacía que dice "Todavía no hay comentarios publicados" y un botón "Contanos tu experiencia" que lleva al formulario. **Con menos de tres:** se muestran las que haya, más esa misma tarjeta al final.
 - **Se eliminan** las tres tarjetas inventadas del HTML y sus claves de traducción (`reviews.r1/r2/r3.*`). La sección conserva el título "La voz de la comunidad"; el subtítulo "Experiencias reales que generan confianza." pasa a "Lo que cuentan quienes ya fueron a estos lugares." (ES y EN).
-- Etiquetas fijas (Anónimo, "sobre", estado vacío) en un `MSG = {es, en}` dentro de `opinions.js`, que se vuelve a dibujar con `celiacmap:lang`; mismo patrón que `chat.js` y `ranking.js`. Si la carga falla, la sección muestra el estado vacío, sin error visible.
+- Etiquetas fijas (Anónimo, "Sobre", estado vacío) en un `MSG = {es, en}` dentro de `opinions.js`, que se vuelve a dibujar con `celiacmap:lang`; mismo patrón que `chat.js` y `ranking.js`. Si la carga falla, la sección muestra el estado vacío, sin error visible.
 
 ## 6. Moderación (`scripts/moderate_opinions.py`)
 
