@@ -417,3 +417,72 @@ def test_evaluate_forwards_claims_and_does_no_db_access():
 
     db.fetch_community_claims.assert_not_called()
     assert "dueño/a celíaco/a: sí" in llm.complete_json.call_args.args[1]
+
+
+# --- Deterministic caps on safety_level + admin-pending flag -------------------
+
+from agents.validator_agent import PENDING_ADMIN_FLAG  # noqa: E402
+
+
+def _norm(verdict_extra=None, place=None, claims=None):
+    verdict = {"verdict": "approved", "confidence_score": 0.9, "safety_level": "gluten_free_100"}
+    verdict.update(verdict_extra or {})
+    return make_agent()._normalize(verdict, place or {}, claims)
+
+
+def test_tope_a_a_community_place_never_leaves_the_validator_as_100():
+    out = _norm(place={"source": "user"})
+    assert out["safety_level"] == "celiac_friendly"
+    assert out["status"] == "approved"  # the cap touches the level only, never the status
+    assert PENDING_ADMIN_FLAG in out["flags"]
+
+
+def test_tope_a_does_not_touch_other_sources():
+    out = _norm(place={"source": "google_places"})
+    assert out["safety_level"] == "gluten_free_100"
+    assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
+def test_tope_b_a_not_exclusive_claim_caps_any_source():
+    out = _norm(place={"source": "google_places"}, claims=[SHARED_CLAIM])
+    assert out["safety_level"] == "celiac_friendly"
+
+
+def test_tope_b_ignores_claims_that_do_not_say_no():
+    out = _norm(place={"source": "google_places"}, claims=[OWNER_CLAIM])
+    assert out["safety_level"] == "gluten_free_100"
+
+
+def test_owner_celiac_alone_changes_nothing_in_code():
+    place = {"source": "google_places"}
+    assert _norm(place=place) == _norm(place=place, claims=[OWNER_CLAIM])
+
+
+def test_the_pending_flag_also_fires_when_the_model_said_less_but_a_claim_says_exclusive():
+    out = _norm({"safety_level": "options_available"}, place={"source": "user"}, claims=[{"kitchen_exclusive": True}])
+    assert out["safety_level"] == "options_available"
+    assert PENDING_ADMIN_FLAG in out["flags"]
+
+
+def test_no_pending_flag_for_a_community_place_with_no_100_signal():
+    out = _norm({"safety_level": "options_available"}, place={"source": "user"}, claims=[OWNER_CLAIM])
+    assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
+def test_caps_never_raise_a_level():
+    out = _norm(
+        {"safety_level": "options_available"},
+        place={"source": "user"},
+        claims=[{"kitchen_exclusive": False, "celiac_prep": "separate_kitchen"}],
+    )
+    assert out["safety_level"] == "options_available"
+
+
+def test_the_pending_flag_is_not_duplicated_if_the_model_already_emitted_it():
+    out = _norm({"flags": [PENDING_ADMIN_FLAG]}, place={"source": "user"})
+    assert out["flags"].count(PENDING_ADMIN_FLAG) == 1
+
+
+def test_contradicting_claims_still_cap_at_celiac_friendly():
+    out = _norm(place={"source": "google_places"}, claims=[{"kitchen_exclusive": True}, SHARED_CLAIM])
+    assert out["safety_level"] == "celiac_friendly"

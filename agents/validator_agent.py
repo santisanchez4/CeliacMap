@@ -268,12 +268,16 @@ class ValidatorAgent(BaseAgent):
         safety = verdict.get("safety_level")
         if safety not in ALLOWED_SAFETY:
             safety = place.get("safety_level") or DEFAULT_SAFETY_LEVEL
+        safety, cap_flags = self._apply_kitchen_caps(safety, place, claims)
 
         # Accept both the new field name and the legacy ones, defensively.
         confidence = self._clamp_confidence(
             verdict.get("confidence_score", verdict.get("confidence"))
         )
         reasoning = str(verdict.get("reasoning", verdict.get("reason", ""))).strip()
+
+        flags = self._coerce_flags(verdict.get("flags"))
+        flags += [f for f in cap_flags if f not in flags]
 
         return {
             "verdict": verdict_label,
@@ -282,9 +286,36 @@ class ValidatorAgent(BaseAgent):
             "safety_level": safety,
             "confidence": confidence,
             "reason": reasoning or None,
-            "flags": self._coerce_flags(verdict.get("flags")),
+            "flags": flags,
             "recommendation": (str(verdict.get("recommendation", "")).strip() or None),
         }
+
+    @staticmethod
+    def _apply_kitchen_caps(safety: str, place: dict, claims) -> tuple[str, list[str]]:
+        """Deterministic ceilings on ``safety_level`` (defense in depth, like the
+        confidence gates): they only ever LOWER the level and never touch ``status``.
+
+        A) A community-suggested place (``source='user'``) never leaves the Validator
+           as ``gluten_free_100`` — only the admin raises a place to 100%.
+        B) If any community declaration says the kitchen is NOT exclusively gluten
+           free, the level is at most ``celiac_friendly``, whatever the source.
+        ``owner_celiac`` never participates: it is context for the model only.
+        Returns the (possibly lowered) level plus the fixed admin-pending flag when
+        a 100% is awaiting the admin (community place, and either the model said 100%
+        or a declaration says the kitchen is exclusive).
+        """
+        declared = [c for c in list(claims or []) if isinstance(c, dict)]
+        said_100 = safety == "gluten_free_100"
+        says_exclusive = any(c.get("kitchen_exclusive") is True for c in declared)
+        if said_100 and any(c.get("kitchen_exclusive") is False for c in declared):
+            safety = "celiac_friendly"
+        flags: list[str] = []
+        if place.get("source") == "user":
+            if safety == "gluten_free_100":
+                safety = "celiac_friendly"
+            if said_100 or says_exclusive:
+                flags.append(PENDING_ADMIN_FLAG)
+        return safety, flags
 
     def run(self) -> dict:
         pending = self.db.fetch_places_by_status("pending", limit=self.max_per_run)
