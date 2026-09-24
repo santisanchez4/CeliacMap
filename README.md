@@ -39,9 +39,11 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   the chatbot) also ask three optional questions about **how the place cooks** —
   is the kitchen exclusively gluten free, how is celiac food prepared if not, is
   the owner celiac. The answers are stored server-side as **unverified evidence**
-  (never publicly readable): the Validator weighs them but a community claim can
-  never put a place at "Espacio 100% sin gluten" on its own — the admin decides
-  ([`ADR-007`](docs/architecture/ADR-007-kitchen-info-as-evidence.md)).
+  (never publicly readable; the owner's condition never even reaches the
+  Validator): a community claim does not put a place at "Espacio 100% sin gluten"
+  on its own — community-suggested places are capped in code, and the rubric
+  (measured against the real model) keeps every other source from doing it too;
+  the admin decides ([`ADR-007`](docs/architecture/ADR-007-kitchen-info-as-evidence.md)).
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.
@@ -178,7 +180,7 @@ Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la d
 
 También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantente conservador.
 
-Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos, si el dueño es celíaco). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Que el dueño sea celíaco sube la confianza pero no prueba que la cocina sea exclusiva. Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
+Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",

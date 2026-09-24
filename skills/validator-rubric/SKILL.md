@@ -96,10 +96,10 @@ separada para celíacos **no** es `gluten_free_100`: es `celiac_friendly` u
 
 Algunos candidatos llegan con un bloque `declaraciones_comunidad`: lo que
 personas de la comunidad dijeron sobre la cocina (¿es exclusivamente sin gluten?,
-¿cómo preparan lo apto para celíacos?, ¿el dueño es celíaco?). **No están
-verificadas.** Orientan la revisión y se pesan como evidencia de apoyo, pero por
-sí solas no justifican `approved` ni `gluten_free_100`; que el dueño sea celíaco
-sube la confianza sin probar que la cocina sea exclusiva.
+¿cómo preparan lo apto para celíacos?). **No están verificadas.** Orientan la
+revisión, pero por sí solas no justifican `approved` ni `gluten_free_100`. El dato
+"el dueño es celíaco" **nunca llega al modelo**: es un dato de salud de una persona
+concreta y lo que el modelo ve puede terminar en columnas públicas.
 
 Dos topes en código (`ValidatorAgent._apply_kitchen_caps`, defensa en
 profundidad como los umbrales de confianza) solo **bajan** el nivel y nunca

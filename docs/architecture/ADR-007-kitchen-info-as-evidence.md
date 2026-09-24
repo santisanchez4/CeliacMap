@@ -39,13 +39,19 @@ confirme directamente o haya una reseña que lo respalde, queda en "Tiene opcion
    originó el lugar y sus reportes positivos; `ValidatorAgent._build_user_prompt` las incluye en un bloque rotulado
    `declaraciones_comunidad (NO verificadas)`; `ReviewHandler` lo hereda. El `RUBRIC` precisa `gluten_free_100` y agrega
    un párrafo que acota esas declaraciones **a su propio bloque** (no cambian cómo se pesan las reseñas).
+   **`owner_celiac` nunca llega al modelo** (`fetch_community_claims` no lo lee; el bloque no lo muestra): lo que el
+   modelo ve puede terminar en su texto libre (`reasoning`, `flags`, `recommendation`), que se persiste en columnas de
+   `places` legibles por la API pública, y el dato de salud de una persona concreta no puede salir por ahí (hallazgo de
+   la revisión de la rama, verificado). Queda guardado del lado servidor para el administrador.
 4. **Dos topes en código, defensa en profundidad** (como los umbrales de confianza): solo **bajan** el nivel y nunca
    tocan el `status`. **A)** un lugar `source='user'` nunca sale del Validator como `gluten_free_100`. **B)** si alguna
    declaración dice que la cocina no es exclusiva, el nivel queda como máximo en `celiac_friendly`. `owner_celiac` no
-   participa de ningún tope. Cuando un lugar de la comunidad queda esperando el 100%, se agrega la bandera fija
+   participa de ningún tope (ni del prompt). Cuando un lugar de la comunidad queda esperando el 100%, se agrega la bandera fija
    `100% pendiente de confirmación del administrador`, que permite listar con una consulta todo lo que espera decisión.
 5. **El chatbot pregunta una sola vez**, junto con el borrador ("¿Lo envío así?"), de forma opcional y salteable
-   ("no sé" / "dale"). El router extrae los datos **sin inferir** (`cocina_exclusiva`, `preparacion_celiaca`,
+   (con "dale" se envía sin esos datos; con "no sé" se vuelve a mostrar el borrador sin repetir la pregunta; el mensaje
+   termina siempre con la pregunta de envío, así un "sí" pelado confirma el envío y no cuenta como respuesta de cocina).
+   El router extrae los datos **sin inferir** (`cocina_exclusiva`, `preparacion_celiaca`,
    `dueno_celiaco`, `cocina_respuesta`); el borrador arrastra los datos y un `kitchen_asked` interno (que nunca se
    escribe). El **Módulo 4 (confirmar) sigue de un solo turno y no pregunta**: guarda los datos si la persona ya los
    dio y la respuesta la invita a sumarlos. El redactor incorpora un glosario (sin cifras) y nunca promete un 100%
@@ -67,16 +73,24 @@ confirme directamente o haya una reseña que lo respalde, queda en "Tiene opcion
 ## Verificación
 
 - **Base de datos:** `db/checks/2026-09-24-kitchen-columns.sql` (transacción con `rollback`: filas válidas, cada CHECK
-  rechaza lo que debe, y `anon` sigue pudiendo insertar).
+  debe rechazar lo que corresponde, y `anon` sigue pudiendo insertar) — **todavía no se corrió en producción**. La
+  revisión de la rama encontró que `celiac_prep is null or kitchen_exclusive = false` **acepta** un `kitchen_exclusive`
+  NULL (un CHECK pasa con NULL; verificado en Postgres): se corrigió a `kitchen_exclusive is false` antes de aplicar la
+  migración, con un test que lo fija (`tests/test_schema_kitchen_checks.py`) y un caso más en la verificación SQL.
 - **Rubric contra el modelo real:** `db/checks/validator_kitchen_ab.py`, **cuatro iteraciones**
   (`db/checks/2026-09-24-validator-kitchen-ab-run*.md`). La primera redacción dejaba el veredicto correcto (nunca
   `approved`) pero el `safety_level` crudo seguía en 100% con solo "cocina exclusiva: sí"; el refuerzo inicial hizo que
   el modelo desconfiara también de las reseñas y dejara de aprobar un lugar con evidencia fuerte y sin declaraciones
   (regresión detectada gracias a un caso agregado a propósito). La redacción final acota la regla al bloque de
-  declaraciones: ninguna declaración sola produce `approved` ni 100% (24/24 muestras), y la evidencia fuerte sin
-  declaraciones vuelve a `approved` 100%.
-- **Router:** `db/checks/chat_kitchen_router_check.py`, 13 casos × 8 muestras, todo verde (sin sobre-extracción; "no sé"
-  nunca cae en `fuera_de_alcance`). **Redactor:** `db/checks/2026-09-24-chat-kitchen-responder-regression-run.md`, sin
+  declaraciones: ninguna declaración sola produce `approved` ni 100% (también sobre un lugar que **no** es de la
+  comunidad, donde solo el prompt —no el Tope A— frena el 100%), y la evidencia fuerte sin declaraciones vuelve a
+  `approved` 100%. Deriva aceptada (spec §10 pedía "sin cambio"): un lugar con solo el nombre "Sin Gluten" y sin
+  ninguna evidencia ahora muestra `celiac_friendly` en vez de `gluten_free_100` como mejor estimación cruda (el
+  veredicto sigue en `needs_review`, y esa fila no es pública) — es la dirección conservadora y sale de la definición
+  nueva de 100% ("únicamente productos aptos").
+- **Router:** `db/checks/chat_kitchen_router_check.py`, 17 casos × 8 muestras, todo verde (sin sobre-extracción; "no sé"
+  nunca cae en `fuera_de_alcance`; "sí", "sí, mandalo", "ok" y "dale" confirman el envío sin guardar ningún dato — el
+  prompt anterior ya los manejaba con la redacción nueva de la pregunta, así que la regla agregada es defensiva). **Redactor:** `db/checks/2026-09-24-chat-kitchen-responder-regression-run.md`, sin
   regresión en cifras ni urgencia y 0/40 falsos positivos del guardián.
 - **Suites:** Python, Deno (`supabase/functions/chat/`) y frontend, todas verdes.
 - **Pendiente en producción** (requiere OK explícito): aplicar la migración, publicar el frontend, y desplegar `chat`

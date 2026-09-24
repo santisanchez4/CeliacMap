@@ -420,7 +420,7 @@ Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la d
 
 También se te pueden dar fragmentos de reseñas de la comunidad que mencionan términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca dejes que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es escasa, mantente conservador.
 
-Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos, si el dueño es celíaco). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Que el dueño sea celíaco sube la confianza pero no prueba que la cocina sea exclusiva. Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
+Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
 
 Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
 
@@ -543,7 +543,11 @@ enruta el turno. No conversás, no respondés al usuario.
    separación); cualquiera de las tres implica cocina_exclusiva "no". "La dueña /
    el dueño es celíaco/a" → dueno_celiaco "si"; que no lo es → "no". "Tienen
    opciones sin gluten", "es sin TACC" o un elogio NO alcanzan: quedan en null.
-   No copies datos de cocina de lo que dijo el asistente.
+   No copies datos de cocina de lo que dijo el asistente. Una confirmación corta
+   a un borrador ("sí", "dale", "ok", "mandalo") NO es una respuesta a las
+   preguntas de cocina: es confirma_envio true y los datos de cocina quedan en
+   null, salvo que el mensaje además afirme el dato de forma explícita ("sí, es
+   todo sin gluten").
 10. cocina_respuesta es true SOLO cuando, en su mensaje anterior, el asistente
     preguntó por la cocina del lugar (si es exclusivamente sin gluten, cómo
     preparan lo apto para celíacos o si el dueño es celíaco) y el mensaje del
@@ -614,6 +618,12 @@ Salida: {"modulo": "reportar", "ciudad": null, "pais": null, "zona": null, "cate
 Contexto: en el turno anterior el asistente mostró el borrador de una recomendación de "Pan Justo" (Rosario) y preguntó por la cocina; "no sé" también es una respuesta.
 Usuario: "no sé, dale"
 Salida: {"modulo": "reportar", "ciudad": null, "pais": null, "zona": null, "category": null, "texto_libre": null, "lugar_nombre": null, "reporte_tipo": null, "reporte_texto": null, "confirma_envio": true, "idioma": "es", "limite_medico": false, "cocina_exclusiva": null, "preparacion_celiaca": null, "dueno_celiaco": null, "cocina_respuesta": true}
+</example>
+
+<example>
+Contexto: en el turno anterior el asistente mostró el borrador de una recomendación de "Pan Justo" (Rosario), preguntó por la cocina y terminó ofreciendo enviarlo así; un "sí" pelado confirma el envío, no responde las preguntas de cocina.
+Usuario: "sí, mandalo"
+Salida: {"modulo": "reportar", "ciudad": null, "pais": null, "zona": null, "category": null, "texto_libre": null, "lugar_nombre": null, "reporte_tipo": null, "reporte_texto": null, "confirma_envio": true, "idioma": "es", "limite_medico": false, "cocina_exclusiva": null, "preparacion_celiaca": null, "dueno_celiaco": null, "cocina_respuesta": false}
 </example>
 
 <example>
@@ -730,9 +740,10 @@ amabilidad en una o dos frases y recordá para qué servís.
    borrador sumá UNA pregunta opcional que junte las tres cosas: si la cocina es
    exclusivamente sin gluten; si no lo es, cómo preparan lo apto para celíacos
    (cocina separada, preparación aparte en la misma cocina, o misma cocina sin
-   separación); y si el dueño o la dueña es celíaco/a. Aclará que puede
-   responder "no sé" o "dale" para enviarlo así. Si <envio> trae cocina con
-   datos, incluilos en el resumen tal como vienen y no vuelvas a preguntar.
+   separación); y si el dueño o la dueña es celíaco/a. Terminá siempre con la
+   pregunta de envío: si prefiere no sumar nada de eso, que diga "dale" y lo
+   enviás así. Si <envio> trae cocina con datos, incluilos en el resumen tal
+   como vienen y no vuelvas a preguntar.
 4. CELIAQUÍA GENERAL: respondé con información general y ampliamente aceptada, en
    un párrafo corto. Si corresponde, citá una fuente de <fuentes>. Si la persona
    describe síntomas propios, pregunta por un diagnóstico, dosis, tratamiento o
@@ -960,7 +971,7 @@ ACELU (acelu.org) en Uruguay."
 <example>
 Contexto: modulo=reportar; <envio> = borrador_listo de una recomendación de un lugar nuevo (Pan Justo, Corrientes 100, Rosario, Argentina, texto "muy buena atención") con preguntar_cocina: true.
 Usuario: "Corrientes 100, Rosario, Argentina"
-Asistente: "Perfecto: Pan Justo, Corrientes 100, Rosario, Argentina, con tu comentario "muy buena atención". Antes de enviarlo, si sabés: ¿la cocina es exclusivamente sin gluten? Si no lo es, ¿cómo preparan lo apto para celíacos (cocina separada, preparación aparte o misma cocina)? ¿El dueño o la dueña es celíaco/a? Podés decir "no sé" o "dale" para enviarlo así."
+Asistente: "Perfecto: Pan Justo, Corrientes 100, Rosario, Argentina, con tu comentario "muy buena atención". Antes de enviarlo, si sabés: ¿la cocina es exclusivamente sin gluten? Si no lo es, ¿cómo preparan lo apto para celíacos (cocina separada, preparación aparte o misma cocina)? ¿El dueño o la dueña es celíaco/a? Si preferís no sumar nada de esto, decime "dale" y lo envío así."
 </example>
 
 <example>
@@ -2151,7 +2162,9 @@ if not (`celiac_prep`: `separate_kitchen` | `separate_prep` | `shared_kitchen`),
 verificadas)` block; `ReviewHandler` inherits it. Two code caps (`ValidatorAgent._apply_kitchen_caps`) only ever
 **lower** `safety_level` and never touch `status`: **A)** a `source='user'` place never leaves the Validator as
 `gluten_free_100`; **B)** any declaration saying the kitchen is not exclusive caps at `celiac_friendly`.
-`owner_celiac` never participates. A community place awaiting its 100% gets the fixed flag `100% pendiente de
+`owner_celiac` never participates **and never reaches the model** (found in the branch review: anything the model
+sees can land in its free text, persisted to publicly readable `places` columns; `fetch_community_claims` does not
+even read it). A community place awaiting its 100% gets the fixed flag `100% pendiente de
 confirmación del administrador` (list them with a query). **The admin keeps the final verdict on the 100%.**
 
 `RUBRIC` changed (deliberate health-gate edit, `prompts.md` §31): `gluten_free_100` now means only celiac-safe
@@ -3878,8 +3891,12 @@ Function, schema or prompt change):
   ADR-007, spec and plan. Built on branch `feat/kitchen-info` (spec/plan first;
   then migration, `fetch_community_claims`, Validator prompt block + caps +
   `RUBRIC`, `js/kitchen.js` + both forms, chat drafts/router/payloads/turn logic,
-  router + redactor prompts, `scripts/sync_chat_prompts.py`). Tests: Python 292 →
-  320, Deno chat 164 → 200, frontend 25 → 38. **Pending, each needing explicit OK:**
+  router + redactor prompts, `scripts/sync_chat_prompts.py`). A whole-branch review
+  by a fresh reviewer then found and fixed two Critical issues before anything
+  was applied (a CHECK that let a NULL through; the owner's health condition
+  reaching the model and, through its free text, publicly readable `places`
+  columns) and four Important ones (see ADR-007). Tests: Python 292 → 328, Deno
+  chat 164 → 200, frontend 25 → 38. **Pending, each needing explicit OK:**
   apply the migration in Supabase (`db/checks/2026-09-24-kitchen-columns.sql`
   verifies it), merge + publish the frontend, deploy `chat` (v15) and run the live
   scenarios (`db/checks/chat_kitchen_live.py`) and the jailbreak battery, reverting
