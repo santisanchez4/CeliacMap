@@ -46,6 +46,12 @@ begin
     values ('__chk_bad_5', 'positive', 'descripcion valida', true, 'separate_prep');
     raise exception 'expected check violation: celiac_prep with kitchen_exclusive = true (place_reports)';
   exception when check_violation then null; end;
+
+  begin
+    insert into public.place_reports (place_name_text, report_type, description, celiac_prep)
+    values ('__chk_bad_6', 'positive', 'descripcion valida', 'shared_kitchen');
+    raise exception 'expected check violation: celiac_prep with kitchen_exclusive NULL (place_reports)';
+  exception when check_violation then null; end;
 end $$;
 
 -- 3) El público (anon) sigue pudiendo insertar (los GRANT de tabla cubren las columnas nuevas).

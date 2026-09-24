@@ -434,7 +434,7 @@ do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'suggestions_celiac_prep_requires_mixed_check') then
     alter table public.suggestions add constraint suggestions_celiac_prep_requires_mixed_check
-      check (celiac_prep is null or kitchen_exclusive = false);
+      check (celiac_prep is null or kitchen_exclusive is false);
   end if;
 end $$;
 
@@ -450,7 +450,7 @@ do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'place_reports_celiac_prep_requires_mixed_check') then
     alter table public.place_reports add constraint place_reports_celiac_prep_requires_mixed_check
-      check (celiac_prep is null or kitchen_exclusive = false);
+      check (celiac_prep is null or kitchen_exclusive is false);
   end if;
 end $$;
 
