@@ -30,7 +30,7 @@ KITCHEN_Q = (
     'Perfecto: Pan Justo, Corrientes 100, Rosario, Argentina, con tu comentario "muy buena atención". '
     "Antes de enviarlo, si sabés: ¿la cocina es exclusivamente sin gluten? Si no lo es, ¿cómo preparan lo "
     "apto para celíacos (cocina separada, preparación aparte o misma cocina)? ¿El dueño o la dueña es "
-    'celíaco/a? Podés decir "no sé" o "dale" para enviarlo así.'
+    'celíaco/a? Si preferís no sumar nada de esto, decime "dale" y lo envío así.'
 )
 DRAFT = [
     {"role": "user", "content": "quiero recomendar Pan Justo en Rosario, muy buena atención"},
@@ -53,6 +53,16 @@ CASES = [
      {"cocina_exclusiva": "no", "preparacion_celiaca": "preparacion_aparte"}, False),
     ("owner is not celiac", DRAFT, "el dueño no es celíaco",
      {"dueno_celiaco": "no", "cocina_respuesta": True}, False),
+    # A bare confirmation of the draft is NOT an answer to the kitchen questions: it must never become a
+    # stored claim (review finding I3). The person never sees what was recorded from a bare "sí".
+    ("bare 'sí' confirms, stores nothing", DRAFT, "sí",
+     {"confirma_envio": True, "cocina_exclusiva": None, "preparacion_celiaca": None, "dueno_celiaco": None}, True),
+    ("'sí, mandalo' confirms, stores nothing", DRAFT, "sí, mandalo",
+     {"confirma_envio": True, "cocina_exclusiva": None, "preparacion_celiaca": None, "dueno_celiaco": None}, True),
+    ("'ok' confirms, stores nothing", DRAFT, "ok",
+     {"confirma_envio": True, "cocina_exclusiva": None, "preparacion_celiaca": None, "dueno_celiaco": None}, True),
+    ("'dale' confirms, stores nothing", DRAFT, "dale",
+     {"confirma_envio": True, "cocina_exclusiva": None, "preparacion_celiaca": None, "dueno_celiaco": None}, True),
     ("no context: 'opciones sin gluten' is NOT exclusive", [], "quiero recomendar Café Sol en Salta, tienen opciones sin gluten muy ricas",
      {"cocina_exclusiva": None, "preparacion_celiaca": None, "dueno_celiaco": None, "cocina_respuesta": False}, True),
     ("no context: 'pastas sin TACC' is NOT exclusive", [], "quiero recomendar Lo de Flor en Fray Bentos, hacen pastas sin TACC",

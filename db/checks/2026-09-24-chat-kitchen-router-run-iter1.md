@@ -5,10 +5,6 @@
 [PASS] 8/8 same kitchen, no separation
 [PASS] 8/8 separate prep, same kitchen
 [PASS] 8/8 owner is not celiac
-[PASS] 8/8 (must not infer) bare 'sí' confirms, stores nothing
-[PASS] 8/8 (must not infer) 'sí, mandalo' confirms, stores nothing
-[PASS] 8/8 (must not infer) 'ok' confirms, stores nothing
-[PASS] 8/8 (must not infer) 'dale' confirms, stores nothing
 [PASS] 8/8 (must not infer) no context: 'opciones sin gluten' is NOT exclusive
 [PASS] 8/8 (must not infer) no context: 'pastas sin TACC' is NOT exclusive
 [PASS] 8/8 (must not infer) no context: praise only

@@ -67,6 +67,12 @@ class DryRunSupabase:
     def fetch_reviews_for_place(self, place_id: str, limit: int = 5) -> list[dict]:
         return self._inner.fetch_reviews_for_place(place_id, limit=limit)
 
+    def fetch_community_claims(self, place_id: str, limit: int = 5) -> list[dict]:
+        return self._inner.fetch_community_claims(place_id, limit=limit)
+
+    def fetch_latest_received_message(self, place_id: str) -> dict | None:
+        return self._inner.fetch_latest_received_message(place_id)
+
     def place_exists_by_external_id(self, external_id: str) -> bool:
         return self._inner.place_exists_by_external_id(external_id)
 

@@ -339,6 +339,7 @@ Deno.test("ROUTER_PROMPT - kitchen data is extracted only when explicit; cocina_
   assertStringIncludes(router, 'cualquiera de las tres implica cocina_exclusiva "no"');
   assertStringIncludes(router, "cocina_respuesta es true SOLO cuando");
   assertStringIncludes(router, 'nunca "fuera_de_alcance"');
+  assertStringIncludes(router, 'Una confirmación corta a un borrador ("sí", "dale", "ok", "mandalo") NO es una respuesta a las preguntas de cocina');
 });
 
 Deno.test("ROUTER_PROMPT - examples pin the four behaviors: answer, 'no sé' + confirm, separate kitchen implies not exclusive, no inference", () => {
@@ -353,6 +354,8 @@ Deno.test("ROUTER_PROMPT - examples pin the four behaviors: answer, 'no sé' + c
   assertEquals([noSe.modulo, noSe.cocina_exclusiva, noSe.dueno_celiaco, noSe.cocina_respuesta, noSe.confirma_envio], ["reportar", null, null, true, true]);
   const separate = byUser("una cocina separada para celíacos");
   assertEquals([separate.cocina_exclusiva, separate.preparacion_celiaca, separate.cocina_respuesta], ["no", "cocina_separada", false]);
+  const bare = byUser("sí, mandalo");
+  assertEquals([bare.confirma_envio, bare.cocina_exclusiva, bare.preparacion_celiaca, bare.dueno_celiaco, bare.cocina_respuesta], [true, null, null, null, false]);
   const noInfer = byUser("tienen opciones sin gluten muy ricas");
   assertEquals([noInfer.cocina_exclusiva, noInfer.preparacion_celiaca, noInfer.dueno_celiaco], [null, null, null]);
 });
@@ -371,7 +374,7 @@ Deno.test("RESPONDER_PROMPT - the glossary defines the two map labels exactly an
 Deno.test("RESPONDER_PROMPT - the kitchen question: only with preguntar_cocina, ONE, skippable; recap never re-asks", () => {
   const r = flat(RESPONDER_PROMPT);
   assertStringIncludes(r, "Si <envio> trae preguntar_cocina: true");
-  assertStringIncludes(r, 'Aclará que puede responder "no sé" o "dale" para enviarlo así');
+  assertStringIncludes(r, "Terminá siempre con la pregunta de envío");
   assertStringIncludes(r, "no vuelvas a preguntar");
   assertStringIncludes(r, "Si <envio> trae invitar_cocina: true");
 });
@@ -392,7 +395,7 @@ Deno.test("RESPONDER_PROMPT - kitchen examples ask once, cite only what was said
   const ex = promptExamples(RESPONDER_PROMPT);
   const asking = ex.find((e) => e.includes("preguntar_cocina: true"));
   assertEquals(asking !== undefined, true);
-  assertStringIncludes(asking!, "no sé");
+  assertStringIncludes(asking!, 'decime "dale"');
   assertEquals(/100%/.test(asking!.split("Asistente:")[1]), false);
   const recap = ex.find((e) => e.includes('"dueno_celiaco": "si"'));
   assertEquals(recap !== undefined, true);
