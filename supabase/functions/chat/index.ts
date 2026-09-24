@@ -161,7 +161,9 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
     if (placeId === null && placeNameText === null) return null; // schema requires one of the two
     if (obj.report_type !== "positive" && obj.report_type !== "negative") return null;
     if (!isNonEmptyString(obj.description, 2000)) return null;
-    const facts = obj.report_type === "positive" ? normalizeKitchenFacts(obj) : NO_KITCHEN_FACTS;
+    // A review of a place that is already on the map never carries kitchen data (owner decision
+    // 2026-09-24: how a place cooks is asked only when a business is ADDED), so whatever a client
+    // echoes is clamped away here rather than rejected (the draft itself must survive).
     return {
       kind: "report",
       place_id: placeId as string | null,
@@ -169,7 +171,6 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
       place_name: placeName as string | null,
       report_type: obj.report_type,
       description: obj.description as string,
-      ...sparseKitchen(facts, obj.kitchen_asked === true),
     };
   }
 
@@ -866,9 +867,8 @@ export function buildPlaceReportInsertPayload(p: PendingReportSubmission) {
     place_name_text: p.place_name_text,
     report_type: p.report_type,
     description: p.description,
-    // Kitchen keys only when answered, and only on a positive report (the database CHECK
-    // forbids them on a negative one). kitchen_asked is internal and never written.
-    ...(p.report_type === "positive" ? sparseKitchen(normalizeKitchenFacts(p), false) : {}),
+    // No kitchen keys, ever: a review of a mapped place collects the experience only (Módulo 4 and
+    // the "add a place" flow are the ones that carry kitchen data).
   };
 }
 
@@ -951,14 +951,15 @@ export function kitchenFactsFromRouter(
   return normalizeKitchenFacts({ kitchen_exclusive: exclusive, celiac_prep: prep, owner_celiac: yesNo(r.dueno_celiaco) });
 }
 
-/** `p` with `facts` merged over its own (a new non-null value wins). A negative report never
- * carries kitchen facts. Keys exist only when meaningful, so no facts => the same shape as before. */
+/** `p` with `facts` merged over its own (a new non-null value wins). A report (a review of a place
+ * that is already on the map, positive or negative) never carries kitchen facts: only a suggestion
+ * does. Keys exist only when meaningful, so no facts => the same shape as before. */
 export function mergeKitchenFacts<T extends PendingSubmission>(p: T, facts: KitchenFacts): T {
   const next = { ...p } as T & { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: boolean | null };
   delete next.kitchen_exclusive;
   delete next.celiac_prep;
   delete next.owner_celiac;
-  if (p.kind === "report" && p.report_type === "negative") return next;
+  if (p.kind === "report") return next;
   const current = normalizeKitchenFacts(p);
   const merged = normalizeKitchenFacts({
     kitchen_exclusive: facts.kitchen_exclusive ?? current.kitchen_exclusive,
@@ -973,13 +974,14 @@ export function mergeKitchenFacts<T extends PendingSubmission>(p: T, facts: Kitc
 
 /** One kitchen step for a draft turn: merge what the router extracted this turn and, ONLY the
  * first time a complete draft has no kitchen data, mark it as asked so the redactor puts the
- * optional question together with the "¿Lo envío así?". Never asks about a negative report. */
+ * optional question together with the "¿Lo envío así?". Never asks about a report (a review of a
+ * place already on the map), and drops any facts volunteered about one. */
 export function applyKitchenStep<T extends PendingSubmission>(
   pending: T,
   router: Parameters<typeof kitchenFactsFromRouter>[0],
   opts: { complete: boolean },
 ): { pending: T; preguntarCocina: boolean } {
-  if (pending.kind === "report" && pending.report_type === "negative") return { pending, preguntarCocina: false };
+  if (pending.kind === "report") return { pending: mergeKitchenFacts(pending, NO_KITCHEN_FACTS), preguntarCocina: false };
   const merged = mergeKitchenFacts(pending, kitchenFactsFromRouter(router));
   const ask = opts.complete && merged.kitchen_asked !== true && !hasKitchenFacts(normalizeKitchenFacts(merged));
   return { pending: ask ? ({ ...merged, kitchen_asked: true } as T) : merged, preguntarCocina: ask };
@@ -996,7 +998,7 @@ export function decideKitchenAnswer(
   if (!pending || pending.kitchen_asked !== true) return null;
   if (!router.cocina_respuesta || router.confirma_envio) return null;
   if (router.modulo === "fuera_de_alcance" || router.modulo === "cortesia") return null;
-  if (pending.kind === "report") return pending.report_type === "positive" ? pending : null;
+  if (pending.kind === "report") return null; // a report is never asked, so it cannot own a kitchen answer
   return pending.address && pending.country && pending.city ? pending : null;
 }
 
