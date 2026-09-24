@@ -29,6 +29,8 @@
   var gotoSuggestLink = document.getElementById("rp-goto-suggest");
   var detailsEl = document.getElementById("rp-details");
   var descriptionEl = document.getElementById("rp-description");
+  var kitchenRoot = document.getElementById("rp-kitchen");
+  var kitchen = window.CeliacKitchen && kitchenRoot ? window.CeliacKitchen.attach(kitchenRoot) : null;
 
   // Spam guards: a too-fast submit and a per-browser cooldown are bot signals.
   // Independent from suggest.js's own cooldown — recommending/reporting is a
@@ -91,6 +93,12 @@
     }
     return "positive";
   }
+
+  // The kitchen block only applies to a recommendation; a report never carries it.
+  function syncKitchen() {
+    if (kitchen) kitchen.setVisible(currentType() === "positive");
+  }
+  syncKitchen();
 
   /* ------------------------- Autocomplete state ---------------------- */
   // A monotonically increasing token per query: only the response whose
@@ -161,6 +169,7 @@
     searchClearBtn.hidden = true;
     detailsEl.hidden = true;
     descriptionEl.value = "";
+    if (kitchen) kitchen.reset();
     closeResults();
     hideNoMatch();
     if (focusInput) searchEl.focus();
@@ -271,6 +280,7 @@
 
   typeRadios.forEach(function (radio) {
     radio.addEventListener("change", function () {
+      syncKitchen();
       // Only the no-match panel depends on type; a selection or an open
       // results list is left untouched (ADR-004 doesn't care about type
       // for an already-matched place).
@@ -327,6 +337,12 @@
       report_type: currentType(),
       description: description
     };
+    if (kitchen && currentType() === "positive") {
+      var facts = kitchen.read();
+      for (var key in facts) {
+        if (Object.prototype.hasOwnProperty.call(facts, key)) data[key] = facts[key];
+      }
+    }
 
     submitBtn.disabled = true;
     form.setAttribute("aria-busy", "true");

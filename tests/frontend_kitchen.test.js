@@ -10,7 +10,8 @@ async function page(scripts = ["js/kitchen.js"]) {
   const { window, document } = parseHTML(html);
   const browser = { CELIACMAP_CONFIG: { SUPABASE_URL: "https://fixture.invalid", SUPABASE_ANON_KEY: "fixture" } };
   const bodies = [];
-  let now = 10000;
+  // A realistic epoch: with a tiny value, `Date.now() - 0` is under the forms' 60 s cooldown.
+  let now = 1_700_000_000_000;
   const context = {
     window: browser, document, setTimeout, clearTimeout,
     Date: { now: () => (now += 5000) },
@@ -104,4 +105,79 @@ Deno.test("EN dictionary carries every kitchen key (copy test covers the rest)",
     "kitchen.q2.sharedKitchen", "kitchen.q3", "kitchen.yes", "kitchen.no", "kitchen.ownerNote"]) {
     assert.ok(main.includes(`"${key}":`), key);
   }
+});
+
+async function submitSuggest(choices = []) {
+  const f = await page(["js/kitchen.js", "js/suggest.js"]);
+  const d = f.document;
+  d.getElementById("sg-name").value = "Pan Justo";
+  d.getElementById("sg-address").value = "Corrientes 100";
+  d.getElementById("sg-city").value = "Rosario";
+  // linkedom <select>: define value explicitly, as the explorer test does.
+  Object.defineProperty(d.getElementById("sg-country"), "value", { writable: true, value: "Argentina" });
+  Object.defineProperty(d.getElementById("sg-category"), "value", { writable: true, value: "" });
+  for (const [name, value] of choices) choose(f, name, value);
+  d.getElementById("suggest-form").dispatchEvent(new f.window.Event("submit", { cancelable: true }));
+  await new Promise((r) => setTimeout(r, 0));
+  return f.bodies;
+}
+
+Deno.test("suggest.js: everything on 'No sé' sends exactly today's payload (no kitchen keys)", async () => {
+  const [sent] = await submitSuggest();
+  assert.deepEqual(Object.keys(sent.body).sort(),
+    ["address", "category", "city", "country", "evidence_url", "name", "notes", "origin"]);
+});
+
+Deno.test("suggest.js: answered kitchen questions travel with the suggestion", async () => {
+  const [sent] = await submitSuggest([
+    ["sg-kitchen-exclusive", "no"], ["sg-kitchen-prep", "separate_kitchen"], ["sg-kitchen-owner", "yes"],
+  ]);
+  assert.equal(sent.body.kitchen_exclusive, false);
+  assert.equal(sent.body.celiac_prep, "separate_kitchen");
+  assert.equal(sent.body.owner_celiac, true);
+});
+
+async function submitReport(type, choices = []) {
+  const f = await page(["js/kitchen.js", "js/report.js"]);
+  const d = f.document;
+  d.getElementById("rp-place-id").value = "3f2b6c1e-8d3a-4e21-9a55-0c7d6f1b2a10";
+  d.getElementById("rp-description").value = "Muy buena atención y opciones para celíacos";
+  const radio = d.getElementById(`rp-type-${type}`);
+  for (const r of d.querySelectorAll('input[name="rp-type"]')) r.checked = r === radio;
+  for (const [name, value] of choices) choose(f, name, value);
+  radio.dispatchEvent(new f.window.Event("change", { bubbles: true }));
+  d.getElementById("report-form").dispatchEvent(new f.window.Event("submit", { cancelable: true }));
+  await new Promise((r) => setTimeout(r, 0));
+  return f.bodies;
+}
+
+Deno.test("report.js: 'No sé' everywhere sends exactly today's payload", async () => {
+  const [sent] = await submitReport("positive");
+  assert.deepEqual(Object.keys(sent.body).sort(), ["description", "place_id", "report_type"]);
+});
+
+Deno.test("report.js: a positive recommendation carries the answered kitchen keys", async () => {
+  const [sent] = await submitReport("positive", [["rp-kitchen-exclusive", "yes"], ["rp-kitchen-owner", "no"]]);
+  assert.equal(sent.body.report_type, "positive");
+  assert.equal(sent.body.kitchen_exclusive, true);
+  assert.equal(sent.body.owner_celiac, false);
+  assert.equal("celiac_prep" in sent.body, false);
+});
+
+Deno.test("report.js: a negative report never carries kitchen keys, even if answered before switching", async () => {
+  // Answers are chosen while 'positive' is selected, then the person switches to 'negative'.
+  const f = await page(["js/kitchen.js", "js/report.js"]);
+  const d = f.document;
+  d.getElementById("rp-place-id").value = "3f2b6c1e-8d3a-4e21-9a55-0c7d6f1b2a10";
+  d.getElementById("rp-description").value = "Me contaminaron la comida";
+  choose(f, "rp-kitchen-exclusive", "yes");
+  const neg = d.getElementById("rp-type-negative");
+  for (const r of d.querySelectorAll('input[name="rp-type"]')) r.checked = r === neg;
+  neg.dispatchEvent(new f.window.Event("change", { bubbles: true }));
+  assert.equal(d.getElementById("rp-kitchen").hidden, true);
+  d.getElementById("report-form").dispatchEvent(new f.window.Event("submit", { cancelable: true }));
+  await new Promise((r) => setTimeout(r, 0));
+  const [sent] = f.bodies;
+  assert.equal(sent.body.report_type, "negative");
+  assert.equal("kitchen_exclusive" in sent.body, false);
 });

@@ -24,6 +24,8 @@
   var categoryEl = document.getElementById("sg-category");
   var urlEl = document.getElementById("sg-url");
   var notesEl = document.getElementById("sg-notes");
+  var kitchenRoot = document.getElementById("sg-kitchen");
+  var kitchen = window.CeliacKitchen && kitchenRoot ? window.CeliacKitchen.attach(kitchenRoot) : null;
 
   // Spam guards: a too-fast submit and a per-browser cooldown are bot signals.
   var MIN_FILL_MS = 3000;
@@ -88,6 +90,13 @@
       notes: (notesEl.value || "").trim() || null,
       origin: "community"
     };
+
+    if (kitchen) {
+      var facts = kitchen.read();
+      for (var key in facts) {
+        if (Object.prototype.hasOwnProperty.call(facts, key)) data[key] = facts[key];
+      }
+    }
 
     if (!data.name || !data.address || !data.city || !data.country) {
       show("missing", "err");
