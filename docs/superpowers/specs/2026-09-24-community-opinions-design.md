@@ -1,6 +1,6 @@
 # Opiniones de la comunidad visibles en el sitio — diseño
 
-**Fecha:** 2026-09-24 · **Estado:** aprobado por Santiago (2026-09-24); plan en `docs/superpowers/plans/2026-09-24-community-opinions.md`.
+**Fecha:** 2026-09-24 · **Estado:** implementado y verificado en producción (2026-09-24); plan en `docs/superpowers/plans/2026-09-24-community-opinions.md`, evidencia en `db/checks/2026-09-24-opinions-live-run.md`.
 **Origen:** pieza 3 de 3 de la sesión de diseño del 2026-09-24 (la 1, títulos de `#suggest`, y la 2, información de cocina, ya están en producción).
 
 ## 1. Propósito

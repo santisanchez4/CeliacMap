@@ -2237,6 +2237,13 @@ testimonials under the heading "Experiencias reales". Both are fixed:
   `autocomplete="off"` so a browser does not autofill a real name that would be published), and `js/opinions.js`
   drawing the section (`textContent` only — never HTML).
 - **The chatbot did not change:** its recommendations are saved without a name and, if approved, show as "Anónimo".
+- **Found in the rollout — view privileges:** Supabase grants every privilege on new objects to `anon` /
+  `authenticated`, and a `grant select` only adds, so the view was left writable-by-grant (`INSERT/UPDATE/DELETE/
+  TRUNCATE`). No exploitable path (a `JOIN` view is not updatable — measured), but the view runs with its owner's
+  rights and bypasses RLS, so a future simplification would have opened a write path into `place_reports`. Fixed
+  with `revoke all` before the `grant select` (schema + production), a test, and a check assertion that failed
+  against production before the fix. **Rule: any new object exposed to the public gets `revoke all`, then the minimal
+  `grant`, like the tables.**
 - **Found in the browser, invisible to the DOM-emulation tests:** `.field { display: flex }` beat the `hidden`
   attribute, so the name field stayed visible in "Reportar" mode. Fixed with `.field[hidden]` plus a regression test
   on the CSS. Lesson: a `hidden` toggle needs a check in a real browser, not only on the `.hidden` property.
@@ -3980,15 +3987,23 @@ Function, schema or prompt change):
   publicly readable `places.validation_notes`; it was rewritten in production
   (`db/fixes/2026-09-24-lo-de-flor-note-privacy.sql`) and scrubbed from the repo
   going forward (git history keeps the old text).
-- 🚧 **Phase 26 — Community opinions on the public site (2026-09-24), implemented
-  on branch `feat/community-opinions`; production rollout pending.** Design and
-  decisions: **Community opinions on the public site** in the Decisions Log, ADR-008,
-  spec and plan. Schema (columns, hardened insert policy, public view), the moderation
-  script, the optional name in Form B and the new section are built and tested
-  (Python 332 → 351, frontend 39 → 62; the chat suite is untouched). The
-  rollout order is fixed: migration first (additive, nullable columns), then the
-  frontend, then a live verification with a test row that is reverted, and finally
-  the admin approves what he wants with `moderate_opinions.py`.
+- ✅ **Phase 26 — Community opinions on the public site, live in production and
+  verified (2026-09-24).** Design and decisions: **Community opinions on the public
+  site** in the Decisions Log, ADR-008, spec and plan. Schema (columns, hardened insert
+  policy, public view), the moderation script, the optional name in Form B and the new
+  section are built and tested (Python 332 → 352, frontend 39 → 62; the chat suite is
+  untouched). **Rollout, in the fixed order:** the migration was rehearsed inside a
+  rolled-back transaction, then applied; the frontend was published by merging to
+  `main`; a live verification (`db/checks/2026-09-24-opinions-live-run.md`, 6/6) proved
+  that an anonymous client cannot publish itself, that a recommendation only shows up
+  after approval (with its name) and disappears when hidden, and that the public reads
+  200 through the view, 401 through the closed table and 400 for sensitive columns; the
+  test row was reverted against the baseline. The 2026-09-23 comment on *San Felipa - Sin
+  gluten* was approved and shows as "Anónimo". Findings: the view had inherited every
+  privilege for `anon` (fixed, see the Decisions Log), and a `hidden` toggle lost to
+  `.field { display: flex }` — visible only in a real browser (fixed with `.field[hidden]`
+  and a CSS test). The academic wording was removed from the public site and LinkedIn
+  joined Instagram and email in the footer.
 
 ### GitHub Pages deploy decision
 

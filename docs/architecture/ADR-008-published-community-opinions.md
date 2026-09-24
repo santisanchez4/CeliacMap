@@ -1,6 +1,6 @@
 # ADR-008: Opiniones de la comunidad visibles en el sitio, solo con aprobación previa del administrador
 
-**Estado:** Propuesto (2026-09-24) — implementado; pasa a *Aceptado* cuando la migración y el sitio estén verificados en producción (ver **Verificación**).
+**Estado:** Aceptado (2026-09-24) — implementado y verificado en producción (ver **Verificación**).
 
 **Spec:** `docs/superpowers/specs/2026-09-24-community-opinions-design.md` · **Plan:** `docs/superpowers/plans/2026-09-24-community-opinions.md`
 
@@ -62,7 +62,19 @@ salud de un tercero; ver ADR-007).
 
 ## Verificación
 
-Pendiente: aplicar la migración, publicar el frontend y correr la verificación en vivo del plan (Tarea 6).
+Todo en `db/checks/2026-09-24-opinions-live-run.md`. En resumen: la migración se ensayó en una transacción con
+`ROLLBACK` y se aplicó (el check SQL falla sin ella y pasa con ella); la verificación en vivo pasó 6 de 6 (un anónimo no
+puede publicarse, una recomendación con nombre no aparece hasta aprobarla, aparece con el nombre al aprobarla y
+desaparece al retirarla); la lectura pública devuelve 200 por la vista, 401 por la tabla y 400 al pedir columnas
+sensibles; la fila de prueba se revirtió contra la línea base. Se publicó el comentario de San Felipa como Anónimo.
+
+**Hallazgo — privilegios de la vista.** Supabase otorga todos los privilegios a `anon`/`authenticated` sobre los objetos
+nuevos, y un `grant select` solo suma: la vista quedó con `INSERT/UPDATE/DELETE/TRUNCATE` para `anon`. No había camino
+explotable (una vista con `JOIN` no es actualizable), pero la vista corre con los permisos del dueño y se salta la RLS,
+así que si se simplificara sería una vía de escritura a `place_reports`. Se corrigió con `revoke all` antes del `grant
+select` (en `db/schema.sql` y en producción), con un test y una aserción en el check SQL que fallaba antes de la
+corrección. Regla para el futuro: **toda vista u objeto nuevo expuesto al público lleva `revoke all` y después el
+`grant` mínimo**, como las tablas.
 
 ## Consecuencias
 
