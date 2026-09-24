@@ -234,13 +234,7 @@
 
     "reviews.eyebrow": "Reviews",
     "reviews.title": "The voice of the community",
-    "reviews.lead": "Real experiences that build trust.",
-    "reviews.r1.text": "“I can finally eat out without anxiety. I found three safe places just steps from home.”",
-    "reviews.r1.role": "Celiac for 8 years",
-    "reviews.r2.text": "“The safety labels give me peace of mind. Knowing other celiacs validated it changes everything.”",
-    "reviews.r2.role": "Father of a celiac girl",
-    "reviews.r3.text": "“I added my favorite café in a minute. I love helping more people discover it.”",
-    "reviews.r3.role": "Part of the community",
+    "reviews.lead": "What people say who have already been to these places.",
 
     "ai.eyebrow": "Future vision",
     "ai.title": "Artificial intelligence at the service of the community",
