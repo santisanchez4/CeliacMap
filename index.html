@@ -590,6 +590,39 @@
                 autocomplete="off" placeholder="Instagram, Google Maps o sitio web"
                 data-i18n-placeholder="suggest.form.urlPh" />
             </div>
+            <fieldset class="kitchen-fieldset field-full" id="sg-kitchen" data-kitchen>
+              <legend data-i18n="kitchen.legend">Sobre la cocina (opcional, pero ayuda mucho)</legend>
+              <p class="kitchen-intro" data-i18n="kitchen.intro">Sin gluten, sin TACC y apto para celíacos no son lo mismo. Contanos cómo trabajan; lo revisamos antes de decidir qué etiqueta lleva.</p>
+
+              <div class="kitchen-q">
+                <p class="kitchen-q-title" id="sg-kq1" data-i18n="kitchen.q1">¿La cocina es exclusivamente sin gluten?</p>
+                <div class="kitchen-options" role="radiogroup" aria-labelledby="sg-kq1">
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-exclusive" value="yes" data-kitchen-q="exclusive" /><span data-i18n="kitchen.q1.yes">Sí: solo se cocinan y venden productos para celíacos</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-exclusive" value="no" data-kitchen-q="exclusive" /><span data-i18n="kitchen.q1.no">No: también se cocina con gluten</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-exclusive" value="unknown" data-kitchen-q="exclusive" checked /><span data-i18n="kitchen.unknown">No sé</span></label>
+                </div>
+              </div>
+
+              <div class="kitchen-q" data-kitchen-prep hidden>
+                <p class="kitchen-q-title" id="sg-kq2" data-i18n="kitchen.q2">¿Cómo preparan lo apto para celíacos?</p>
+                <div class="kitchen-options" role="radiogroup" aria-labelledby="sg-kq2">
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-prep" value="separate_kitchen" data-kitchen-q="prep" /><span data-i18n="kitchen.q2.separateKitchen">Cocina separada</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-prep" value="separate_prep" data-kitchen-q="prep" /><span data-i18n="kitchen.q2.separatePrep">Misma cocina, con preparación aparte (utensilios, superficies, horarios)</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-prep" value="shared_kitchen" data-kitchen-q="prep" /><span data-i18n="kitchen.q2.sharedKitchen">Misma cocina, sin separación</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-prep" value="unknown" data-kitchen-q="prep" checked /><span data-i18n="kitchen.unknown">No sé</span></label>
+                </div>
+              </div>
+
+              <div class="kitchen-q">
+                <p class="kitchen-q-title" id="sg-kq3" data-i18n="kitchen.q3">¿El dueño o la dueña es celíaco/a?</p>
+                <div class="kitchen-options" role="radiogroup" aria-labelledby="sg-kq3">
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-owner" value="yes" data-kitchen-q="owner" /><span data-i18n="kitchen.yes">Sí</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-owner" value="no" data-kitchen-q="owner" /><span data-i18n="kitchen.no">No</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="sg-kitchen-owner" value="unknown" data-kitchen-q="owner" checked /><span data-i18n="kitchen.unknown">No sé</span></label>
+                </div>
+                <p class="kitchen-note" data-i18n="kitchen.ownerNote">Solo lo usamos para la revisión interna; no se muestra en el mapa.</p>
+              </div>
+            </fieldset>
             <div class="field field-full">
               <label for="sg-notes" data-i18n="suggest.form.notes">Notas (opcional)</label>
               <textarea id="sg-notes" name="notes" rows="3" maxlength="1000"
@@ -669,6 +702,40 @@
                 placeholder="Describí tu experiencia: qué encontraste, cuándo, y cualquier detalle relevante."
                 data-i18n-placeholder="report.form.descriptionPh"></textarea>
             </div>
+
+            <fieldset class="kitchen-fieldset field-full" id="rp-kitchen" data-kitchen>
+              <legend data-i18n="kitchen.legend">Sobre la cocina (opcional, pero ayuda mucho)</legend>
+              <p class="kitchen-intro" data-i18n="kitchen.intro">Sin gluten, sin TACC y apto para celíacos no son lo mismo. Contanos cómo trabajan; lo revisamos antes de decidir qué etiqueta lleva.</p>
+
+              <div class="kitchen-q">
+                <p class="kitchen-q-title" id="rp-kq1" data-i18n="kitchen.q1">¿La cocina es exclusivamente sin gluten?</p>
+                <div class="kitchen-options" role="radiogroup" aria-labelledby="rp-kq1">
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-exclusive" value="yes" data-kitchen-q="exclusive" /><span data-i18n="kitchen.q1.yes">Sí: solo se cocinan y venden productos para celíacos</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-exclusive" value="no" data-kitchen-q="exclusive" /><span data-i18n="kitchen.q1.no">No: también se cocina con gluten</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-exclusive" value="unknown" data-kitchen-q="exclusive" checked /><span data-i18n="kitchen.unknown">No sé</span></label>
+                </div>
+              </div>
+
+              <div class="kitchen-q" data-kitchen-prep hidden>
+                <p class="kitchen-q-title" id="rp-kq2" data-i18n="kitchen.q2">¿Cómo preparan lo apto para celíacos?</p>
+                <div class="kitchen-options" role="radiogroup" aria-labelledby="rp-kq2">
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-prep" value="separate_kitchen" data-kitchen-q="prep" /><span data-i18n="kitchen.q2.separateKitchen">Cocina separada</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-prep" value="separate_prep" data-kitchen-q="prep" /><span data-i18n="kitchen.q2.separatePrep">Misma cocina, con preparación aparte (utensilios, superficies, horarios)</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-prep" value="shared_kitchen" data-kitchen-q="prep" /><span data-i18n="kitchen.q2.sharedKitchen">Misma cocina, sin separación</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-prep" value="unknown" data-kitchen-q="prep" checked /><span data-i18n="kitchen.unknown">No sé</span></label>
+                </div>
+              </div>
+
+              <div class="kitchen-q">
+                <p class="kitchen-q-title" id="rp-kq3" data-i18n="kitchen.q3">¿El dueño o la dueña es celíaco/a?</p>
+                <div class="kitchen-options" role="radiogroup" aria-labelledby="rp-kq3">
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-owner" value="yes" data-kitchen-q="owner" /><span data-i18n="kitchen.yes">Sí</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-owner" value="no" data-kitchen-q="owner" /><span data-i18n="kitchen.no">No</span></label>
+                  <label class="kitchen-opt"><input type="radio" name="rp-kitchen-owner" value="unknown" data-kitchen-q="owner" checked /><span data-i18n="kitchen.unknown">No sé</span></label>
+                </div>
+                <p class="kitchen-note" data-i18n="kitchen.ownerNote">Solo lo usamos para la revisión interna; no se muestra en el mapa.</p>
+              </div>
+            </fieldset>
 
             <!-- Honeypot: off-screen, never shown to humans; bots fill it and are dropped. -->
             <div class="suggest-hp" aria-hidden="true">
@@ -942,6 +1009,7 @@
   <script src="js/main.js"></script>
   <script src="js/config.js"></script>
   <script src="js/map.js"></script>
+  <script src="js/kitchen.js"></script>
   <script src="js/suggest.js"></script>
   <script src="js/report.js"></script>
   <script src="js/ranking.js"></script>
