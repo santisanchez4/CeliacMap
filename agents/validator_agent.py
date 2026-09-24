@@ -102,14 +102,7 @@ términos sin gluten / celíaco. Pésalos como evidencia de apoyo, pero nunca de
 que reseñas entusiastas te empujen por encima de la evidencia: cuando la señal es \
 escasa, mantente conservador.
 
-Si el mensaje incluye "declaraciones_comunidad", son afirmaciones de personas de \
-la comunidad sobre la cocina del lugar (si es exclusivamente sin gluten, cómo \
-preparan lo apto para celíacos, si el dueño es celíaco). NO están verificadas: \
-úsalas para orientar la revisión y pésalas como evidencia de apoyo, pero por sí \
-solas NO justifican "approved" ni "gluten_free_100". Que el dueño sea celíaco \
-sube la confianza pero no prueba que la cocina sea exclusiva. Si una declaración \
-indica que el local también cocina con gluten, el nivel no puede ser \
-"gluten_free_100". Ante la duda, "needs_review" y el nivel más bajo.
+Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos, si el dueño es celíaco). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Que el dueño sea celíaco sube la confianza pero no prueba que la cocina sea exclusiva. Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
 
 Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la \
 dirección de texto del candidato: NO hay una ficha de Google Places que confirme \

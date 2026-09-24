@@ -499,3 +499,16 @@ def test_rubric_defines_100_as_exclusive_kitchen_and_treats_claims_as_unverified
     # The conservative core and the thresholds are untouched.
     assert "NUNCA sobreestimar la seguridad" in RUBRIC
     assert "confidence_score >= 0.85" in RUBRIC
+
+
+def test_rubric_scopes_the_claims_rule_to_the_claims_block_only():
+    from agents.validator_agent import RUBRIC
+
+    assert 'Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas)' in RUBRIC
+    assert "Si ese bloque es la única evidencia de que la cocina es exclusiva" in RUBRIC
+    assert 'como máximo "celiac_friendly"' in RUBRIC
+    # The A/B (db/checks/2026-09-24-validator-kitchen-ab-run-iter*.md) showed a rubric that treated the
+    # community REVIEWS as unverified too, and stopped approving a place with strong real evidence and
+    # no declarations at all. The rule must say it does not change how reviews / other evidence weigh.
+    assert "Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia" in RUBRIC
+    assert "sin ese bloque, evalúa exactamente como siempre" in RUBRIC
