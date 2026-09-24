@@ -87,3 +87,15 @@ def test_view_only_shows_published_positive_reports_of_approved_places():
 def test_view_is_public_but_the_table_stays_closed():
     assert "grant select on public.community_opinions to anon, authenticated" in " ".join(_block().split())
     assert not re.search(r"grant\s+select[^;]*on\s+public\.place_reports", _text(), re.IGNORECASE)
+
+
+def test_view_privileges_are_reset_to_select_only():
+    """Supabase grants every privilege on new objects to anon/authenticated by default, and the view runs with
+    its owner's rights (bypassing RLS): if it ever became auto-updatable, anon could write through it. So the
+    block must REVOKE first and only then grant SELECT (the same revoke-then-grant shape used for the tables)."""
+    block = " ".join(_block().split())
+    revoke = "revoke all on public.community_opinions from anon, authenticated"
+    grant = "grant select on public.community_opinions to anon, authenticated"
+    assert revoke in block, "the default privileges on the view are never removed"
+    assert grant in block
+    assert block.index(revoke) < block.index(grant), "the revoke must come first or it would remove the grant"

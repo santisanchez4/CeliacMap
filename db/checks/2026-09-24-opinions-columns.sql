@@ -50,6 +50,15 @@ begin
     raise exception 'expected the public view columns, got %', cols;
   end if;
 
+  -- 5b) privilegios de la vista: anon solo puede leer (Supabase otorga todo por defecto a objetos nuevos)
+  if not has_table_privilege('anon', 'public.community_opinions', 'SELECT') then
+    raise exception 'expected anon to be able to SELECT the public view';
+  end if;
+  if has_table_privilege('anon', 'public.community_opinions', 'INSERT, UPDATE, DELETE, TRUNCATE')
+     or has_table_privilege('authenticated', 'public.community_opinions', 'INSERT, UPDATE, DELETE, TRUNCATE') then
+    raise exception 'expected the public view to be read-only for anon and authenticated';
+  end if;
+
   -- 6) violaciones de CHECK
   begin
     insert into public.place_reports (place_id, report_type, description, published_at)

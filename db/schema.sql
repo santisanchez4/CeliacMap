@@ -510,6 +510,10 @@ where r.report_type = 'positive'
   and r.published_at is not null
   and p.status = 'approved';
 
+-- Supabase grants every privilege on new objects to anon/authenticated by default,
+-- and this view runs with its owner's rights (it bypasses RLS): reset to SELECT only,
+-- so it can never become a write path if it is ever simplified into an updatable view.
+revoke all on public.community_opinions from anon, authenticated;
 grant select on public.community_opinions to anon, authenticated;
 -- COMMUNITY-OPINIONS-END
 
