@@ -96,3 +96,14 @@ def test_an_invalid_id_is_rejected_before_touching_anything():
 def test_approve_and_hide_together_are_refused():
     with pytest.raises(ValueError):
         run(FakeDB([]), approve=[ID_A], hide=[ID_B], apply=True, out=lambda *_: None)
+
+
+def test_warns_when_the_text_claims_100_but_the_map_says_options():
+    r = row(ID_A, text="Es un lugar 100% sin TACC, todo apto")
+    r["places"]["safety_level"] = "options_available"
+    ok = row(ID_B, text="Es un lugar 100% sin TACC")
+    ok["places"] = {**ok["places"], "safety_level": "gluten_free_100"}
+    lines, out = capture()
+    run(FakeDB([r, ok]), [], [], False, out=out)
+    text = "\n".join(lines)
+    assert text.count("⚠ AVISO") == 1

@@ -403,3 +403,13 @@ Deno.test("the map reads community_warning_at, and the warning pin is styled", a
   assert.match(css, /\.cm-marker\.cm-marker--warning \{/);
   assert.match(css, /\.pp-warning \{/);
 });
+
+// Audit plan step 5: the detail explains what each label means.
+Deno.test("the place detail explains the level label", async () => {
+  const f = await fixture();
+  const body = f.document.getElementById("place-panel-body");
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-0" } }));
+  assert.match(body.textContent, /se cocinan y venden solo productos aptos para celíacos/);
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-1" } }));
+  assert.match(body.textContent, /puede que también cocine con gluten/);
+});

@@ -1134,6 +1134,8 @@ Target (functional product — see **## Architecture**):
 │   ├── purge_chat_logs.py      # weekly purge of agent_log chatbot rows > 30 days (chat-log-purge.yml)
 │   ├── sync_chat_prompts.py    # copy prompts.ts -> the 3 doc copies of the chatbot prompts (--check to verify)
 │   ├── moderate_opinions.py    # list / --approve / --hide community opinions (dry-run unless --apply)
+│   ├── review_queue.py         # admin queue: 100% pending, needs_review, needs_location, warnings; --approve/--discard/--locate
+│   ├── cap_unsupported_100.py  # one-off: approved 100% places without explicit evidence -> options + admin flag
 │   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
@@ -1142,7 +1144,7 @@ Target (functional product — see **## Architecture**):
 │                               # and chat_prompt_ab.py (offline A/B of the chatbot prompts vs the real model)
 ├── tests/                      # offline unit tests (external calls mocked)
 │                               # incl. test_chat_prompts_sync.py: the 4 copies of the chatbot prompts must match
-├── .github/workflows/{agents-monthly,validator-midmonth,deploy-pages,
+├── .github/workflows/{agents-monthly,validator-midmonth,suggestions-weekly,deploy-pages,
 │       outreach-reply,place-report-review,chat-log-purge}.yml
 ├── requirements.txt
 ├── .env.example
@@ -2235,8 +2237,23 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   never public. A re-evaluation never raises `safety_level`, and on a place with a manual-override marker
   (`agents/manual_overrides.py`, shared with the retroactive re-validation) it keeps the admin's level, confidence,
   category and note.
+- **Suggest form = the manual-load path (step 8).** With the name check, a wrong Find Place match falls back to the
+  address alone (what was done by hand for Bienestar). A suggestion whose address cannot be placed ("JC 23") now goes
+  to `suggestions.status='needs_location'` instead of `rejected`. The person's note + link reach the Validator
+  (`place_evidence`). `.github/workflows/suggestions-weekly.yml` runs the promoter + Validator every Monday (small
+  caps), so a suggestion no longer waits up to a month. A community place with no Google listing still needs the
+  admin for the final approval: an anonymous form does not carry the admin's direct knowledge.
+- **Admin tools (steps 6, 2b, 5).** `scripts/review_queue.py` lists the "100% pendiente" places, the `needs_review`
+  queue, the `needs_location` suggestions and the places with a community warning (with evidence, kitchen answers —
+  owner-celiac included, admin only — report texts and a Google Maps link), and writes `--approve ID --level
+  100|options --note`, `--discard`, `--clear-warning` and `--locate SUGGESTION_ID --lat --lng` (dry run unless
+  `--apply`; a decision needs a note; the note refuses owner-health text because it goes to a public column).
+  `scripts/cap_unsupported_100.py` applies Tope C once to the already-approved 100% places (dry run first — it changes
+  the map). `scripts/moderate_opinions.py` warns when an opinion says "100%" about a place labelled "opciones". The
+  place detail on the map now explains its label in one line.
 - **Not yet done:** the real-model A/B, applying the migration (`place_evidence`, `places.community_warning_at`,
-  `place_reports.reporter_token`), and the one-off pass over the already-approved 100% places (plan step 2b).
+  `place_reports.reporter_token`, `suggestions` `needs_location`), the dry run of `cap_unsupported_100.py`, and
+  steps 4 (chatbot) and 9 (email).
 
 ### Kitchen information as review evidence (2026-09-24)
 

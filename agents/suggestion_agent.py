@@ -141,12 +141,12 @@ class SuggestionAgent(BaseAgent):
 
     def run(self) -> dict:
         if self.max_per_run <= 0:
-            return {"seen": 0, "promoted": 0, "duplicate": 0, "rejected": 0,
+            return {"seen": 0, "promoted": 0, "duplicate": 0, "needs_location": 0,
                     "skipped": 0, "geocodes": 0, "errors": 0}
 
         suggestions = self.db.fetch_new_suggestions(limit=self.max_per_run)
 
-        seen = promoted = duplicate = rejected = skipped = geocodes = errors = 0
+        seen = promoted = duplicate = needs_location = skipped = geocodes = errors = 0
 
         for s in suggestions:
             seen += 1
@@ -193,11 +193,14 @@ class SuggestionAgent(BaseAgent):
                     status="success",
                 )
             elif outcome == "unresolved":
-                rejected += 1
-                self.db.update_suggestion_status(s["id"], "rejected")
+                # Neither Find Place nor the street address could be placed ("JC 23"). Not a
+                # rejection: a person who knows the place wrote it, so it waits for the admin to
+                # fix the address or set the coordinates (scripts/review_queue.py, plan step 8).
+                needs_location += 1
+                self.db.update_suggestion_status(s["id"], "needs_location")
                 self.log(
-                    "suggestion_unresolved",
-                    {"name": result["name"]},
+                    "suggestion_needs_location",
+                    {"id": s.get("id"), "name": result["name"], "address": s.get("address")},
                     status="success",
                 )
             else:  # insert_failed — the upsert returned no row (an ignored
@@ -215,7 +218,7 @@ class SuggestionAgent(BaseAgent):
             "seen": seen,
             "promoted": promoted,
             "duplicate": duplicate,
-            "rejected": rejected,
+            "needs_location": needs_location,
             "skipped": skipped,
             "geocodes": geocodes,
             "errors": errors,

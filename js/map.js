@@ -290,6 +290,17 @@
     );
   }
 
+  // One line under the badge that says what the label means (same definitions as the
+  // chatbot's glossary), so the difference between the two levels is explicit.
+  function levelNoteHtml(p) {
+    var text = safetyGroup(p.safety_level) === "gluten_free_100"
+      ? tr("En este lugar se cocinan y venden solo productos aptos para celíacos.",
+        "Only celiac-safe products are cooked and sold here.")
+      : tr("Tiene opciones para celíacos, pero puede que también cocine con gluten: preguntá en el lugar cómo las preparan.",
+        "It has options for celiacs, but it may also cook with gluten: ask the venue how they prepare them.");
+    return '<p class="pp-level-note">' + esc(text) + "</p>";
+  }
+
   function icon(place, selected) {
     var level = place && place.safety_level;
     return L.divIcon({
@@ -393,7 +404,7 @@
     html += '<div class="pp-badges">' +
       '<span class="pp-badge pp-badge--cat">' + esc(cat) + "</span>" +
       '<span class="pp-badge ' + safetyBadgeClass(p.safety_level) + '">' + esc(saf) + "</span>" +
-      "</div>" + warningHtml(p);
+      "</div>" + levelNoteHtml(p) + warningHtml(p);
 
     if (typeof p.rating === "number" && p.rating > 0) {
       var num = p.rating.toFixed(1);

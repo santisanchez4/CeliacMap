@@ -1748,6 +1748,7 @@ h1, h2, h3 {
   background: #fdf0ee; color: #7a1a12; font-size: .84rem; line-height: 1.45;
 }
 .pp-warning strong { display: block; margin-bottom: 2px; }
+.pp-level-note { margin: 8px 0 0; font-size: .82rem; line-height: 1.45; color: var(--color-text-muted); }
 .pp-badge--options::before { background: var(--color-options); }
 
 .pp-badge.pp-badge--dedicated,

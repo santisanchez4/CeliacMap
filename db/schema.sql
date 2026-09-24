@@ -319,9 +319,12 @@ create table if not exists public.suggestions (
   --   new       -> awaiting the next pipeline run
   --   promoted  -> a places row was created (promoted_place_id set)
   --   duplicate -> geocoded place_id already exists in places
-  --   rejected  -> could not geocode to a real Google place_id
+  --   rejected  -> could not geocode to a real Google place_id (legacy; since
+  --                2026-09-24 an unresolved suggestion goes to needs_location)
+  --   needs_location -> neither Find Place nor the address geocoded: waits for the
+  --                admin to fix the address / coordinates (scripts/review_queue.py)
   status            text not null default 'new'
-                      check (status in ('new', 'promoted', 'rejected', 'duplicate')),
+                      check (status in ('new', 'promoted', 'rejected', 'duplicate', 'needs_location')),
   promoted_place_id uuid references public.places(id) on delete set null,
   created_at        timestamptz not null default now()
 );
@@ -666,6 +669,19 @@ $$;
 -- this. Confirmed against the real anon role, not just checked by reading the
 -- code -- see db/checks/2026-09-16-chat-usage.sql.
 revoke execute on function public.bump_chat_usage(text[], date) from public, anon, authenticated;
+
+-- SUGGESTION-NEEDS-LOCATION-BEGIN
+-- Audit plan step 8: a suggestion whose address could not be placed waits for the admin
+-- instead of being rejected silently. Widens the inline CHECK above for databases created
+-- before this value existed (the anon INSERT policy still forces status='new').
+do $$
+begin
+  alter table public.suggestions drop constraint if exists suggestions_status_check;
+  alter table public.suggestions
+    add constraint suggestions_status_check
+    check (status in ('new', 'promoted', 'rejected', 'duplicate', 'needs_location'));
+end $$;
+-- SUGGESTION-NEEDS-LOCATION-END
 
 -- COMMUNITY-WARNING-BEGIN
 -- Audit plan step 7 (owner decision 2026-09-24). One or two distinct negative reports in 30

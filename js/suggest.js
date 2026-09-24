@@ -38,7 +38,7 @@
       missing: "Completá nombre, dirección, ciudad y país.",
       cooldown: "Esperá un momento antes de enviar otra sugerencia.",
       sending: "Enviando…",
-      success: "¡Gracias! Tu sugerencia se revisará y, si se confirma, aparecerá en el mapa.",
+      success: "¡Gracias! Revisamos las sugerencias cada semana; si se confirma, el lugar aparecerá en el mapa.",
       error: "No se pudo enviar. Probá de nuevo en unos minutos.",
       config: "El formulario no está disponible en este momento."
     },
@@ -46,7 +46,7 @@
       missing: "Please fill in name, address, city and country.",
       cooldown: "Please wait a moment before sending another suggestion.",
       sending: "Sending…",
-      success: "Thanks! Your suggestion will be reviewed and, if confirmed, it will appear on the map.",
+      success: "Thanks! We review suggestions every week; if it is confirmed, the place will appear on the map.",
       error: "Could not send. Please try again in a few minutes.",
       config: "The form is not available right now."
     }

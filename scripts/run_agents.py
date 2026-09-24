@@ -79,6 +79,21 @@ class DryRunSupabase:
     def fetch_recent_negative_report_count(self, place_id: str, days: int = 30) -> int:
         return self._inner.fetch_recent_negative_report_count(place_id, days=days)
 
+    def fetch_places_for_admin(self, status=None, **kwargs: Any) -> list[dict]:
+        return self._inner.fetch_places_for_admin(status, **kwargs)
+
+    def fetch_suggestions_by_status(self, status: str, limit: int = 50) -> list[dict]:
+        return self._inner.fetch_suggestions_by_status(status, limit=limit)
+
+    def fetch_suggestion_by_id(self, suggestion_id: str) -> dict | None:
+        return self._inner.fetch_suggestion_by_id(suggestion_id)
+
+    def fetch_suggestion_for_place(self, place_id: str) -> dict | None:
+        return self._inner.fetch_suggestion_for_place(place_id)
+
+    def fetch_recent_negative_reports(self, place_id: str, days: int = 30) -> list[dict]:
+        return self._inner.fetch_recent_negative_reports(place_id, days=days)
+
     def fetch_latest_received_message(self, place_id: str) -> dict | None:
         return self._inner.fetch_latest_received_message(place_id)
 
