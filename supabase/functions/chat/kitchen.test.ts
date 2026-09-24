@@ -21,7 +21,7 @@ import {
   withConfirmFacts,
   type ConfirmTurnResult,
 } from "./index.ts";
-import { ROUTER_PROMPT } from "./prompts.ts";
+import { RESPONDER_PROMPT, ROUTER_PROMPT } from "./prompts.ts";
 
 const NO_FACTS = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
 const NO_ROUTER_FACTS = { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: null } as const;
@@ -355,4 +355,47 @@ Deno.test("ROUTER_PROMPT - examples pin the four behaviors: answer, 'no sé' + c
   assertEquals([separate.cocina_exclusiva, separate.preparacion_celiaca, separate.cocina_respuesta], ["no", "cocina_separada", false]);
   const noInfer = byUser("tienen opciones sin gluten muy ricas");
   assertEquals([noInfer.cocina_exclusiva, noInfer.preparacion_celiaca, noInfer.dueno_celiaco], [null, null, null]);
+});
+
+// ---- RESPONDER prompt: glossary, the one-time kitchen question, no 100% promise ----
+
+Deno.test("RESPONDER_PROMPT - the glossary defines the two map labels exactly and carries no figure", () => {
+  const glosario = /<glosario>([\s\S]*?)<\/glosario>/.exec(RESPONDER_PROMPT)![1];
+  const g = flat(glosario);
+  assertStringIncludes(g, '"Espacio 100% sin gluten" (etiqueta del mapa): en ese lugar se cocinan y venden únicamente productos aptos para celíacos');
+  assertStringIncludes(g, '"Tiene opciones sin TACC" (etiqueta del mapa): hay opciones para celíacos, pero el lugar también cocina con gluten');
+  assertStringIncludes(g, "sin trigo, avena, cebada ni centeno");
+  assertEquals(/\d/.test(glosario.replace(/100%/g, "")), false); // no number other than the label's own "100%"
+});
+
+Deno.test("RESPONDER_PROMPT - the kitchen question: only with preguntar_cocina, ONE, skippable; recap never re-asks", () => {
+  const r = flat(RESPONDER_PROMPT);
+  assertStringIncludes(r, "Si <envio> trae preguntar_cocina: true");
+  assertStringIncludes(r, 'Aclará que puede responder "no sé" o "dale" para enviarlo así');
+  assertStringIncludes(r, "no vuelvas a preguntar");
+  assertStringIncludes(r, "Si <envio> trae invitar_cocina: true");
+});
+
+Deno.test("RESPONDER_PROMPT - an owner being celiac or a kitchen claim never becomes a 100% promise", () => {
+  const r = flat(RESPONDER_PROMPT);
+  assertStringIncludes(r, 'NUNCA digas ni insinúes que un lugar es "Espacio 100% sin gluten" porque el dueño sea celíaco');
+  assertStringIncludes(r, "el equipo la confirma antes de definir la etiqueta");
+});
+
+Deno.test("RESPONDER_PROMPT - the health-data rule is about who writes; the owner question is a business fact", () => {
+  const r = flat(RESPONDER_PROMPT);
+  assertStringIncludes(r, "datos personales de salud de la persona que escribe");
+  assertStringIncludes(r, "es un dato del negocio, no de quien escribe");
+});
+
+Deno.test("RESPONDER_PROMPT - kitchen examples ask once, cite only what was said, and never volunteer urgency or a figure", () => {
+  const ex = promptExamples(RESPONDER_PROMPT);
+  const asking = ex.find((e) => e.includes("preguntar_cocina: true"));
+  assertEquals(asking !== undefined, true);
+  assertStringIncludes(asking!, "no sé");
+  assertEquals(/100%/.test(asking!.split("Asistente:")[1]), false);
+  const recap = ex.find((e) => e.includes('"dueno_celiaco": "si"'));
+  assertEquals(recap !== undefined, true);
+  assertStringIncludes(recap!, "el equipo lo confirma antes de definir la etiqueta");
+  for (const e of ex) assertEquals(/urgen/i.test(e.split("Asistente:")[1] ?? ""), false);
 });
