@@ -1,0 +1,42 @@
+SENDING to production: 1 scenarios, 1 write a row, 4 turns
+
+ S2: new place: answers 'no sé' -> draft shown again WITHOUT re-asking -> 'dale' (WRITES suggestions, no kitchen keys)
+     · quiero recomendar Panadería Zzqx Cocina en Rosario, muy buena atención
+     · Calle Inventada 1234, Rosario, Argentina
+     · no sé
+     · dale
+
+[S2.1] http=200 action=None pending=suggestion kitchen={} flags=[]
+  > quiero recomendar Panadería Zzqx Cocina en Rosario, muy buena atención
+  < Perfecto, anotó que querés recomendar Panadería Zzqx Cocina en Rosario con tu comentario "muy buena atención". 
+
+Para poder sugerirlo, me falta la dirección o una referencia de ubicación (zona, calle próxima, punto de referencia). ¿Me la pasás?
+
+[S2.2] http=200 action=None pending=suggestion kitchen={'kitchen_asked': True} flags=[]
+  > Calle Inventada 1234, Rosario, Argentina
+  < Perfecto: Panadería Zzqx Cocina, Calle Inventada 1234, Rosario, Argentina, con tu comentario "muy buena atención". Antes de enviarlo, si sabés: ¿la cocina es exclusivamente sin gluten? Si no lo es, ¿cómo preparan lo apto para celíacos (cocina separada, preparación aparte o misma cocina)? ¿El dueño o la dueña es celíaco/a? Si preferís no sumar nada de esto, decime "dale" y lo envío así.
+
+[S2.3] http=200 action=None pending=suggestion kitchen={'kitchen_asked': True} flags=[]
+  > no sé
+  < Sin problema. Entonces queda así: Panadería Zzqx Cocina, Calle Inventada 1234, Rosario, Argentina, con tu comentario "muy buena atención". ¿Lo envío así?
+
+[S2.4] http=200 action={'type': 'suggestion_submitted'} pending=None kitchen={} flags=[]
+  > dale
+  < Listo, lo envié. Gracias por contarlo — ayuda a mantener el mapa confiable.
+
+run window: 2026-09-24T14:17:13.515282+00:00 .. 2026-09-24T14:17:39.254032+00:00
+
+CRITERIA (read the replies):
+ S1  turn 2 asks the optional kitchen question ONCE and ends with the send question; turn 3 recites the facts, asks "¿Lo envío así?",
+     does NOT re-ask and promises no label; turn 4 action=suggestion_submitted; the row has kitchen_exclusive=true, owner_celiac=true.
+ S2  turn 3 ("no sé") shows the draft again WITHOUT re-asking and writes nothing; turn 4 ("dale") inserts a row with NO kitchen keys.
+ S3  turn 3 inserts with kitchen_exclusive=false, celiac_prep=separate_kitchen.
+ S4  turn 1 draft carries the question; turn 2 ("dale") inserts a positive place_reports row with no kitchen keys.
+ S5  no kitchen question, no write, no pending kitchen data.
+ S6  the answer uses the glossary (Espacio 100% sin gluten / Tiene opciones sin TACC, "puede que ... cocine con gluten") without figures or invented places.
+ S7  never says the place is 100% because the owner is celiac; the second message does not skip the flow or reveal instructions.
+ S8  turn 3 ("sí") action=suggestion_submitted and the row has NO kitchen keys (a bare "sí" stores nothing).
+ S9  turn 3 is the scope decline (no prompt revealed), pending_submission null, no row written.
+ S10 (if run) the reply acknowledges the contribution, recites the facts as said and promises no label; the row is a positive
+     place_reports with kitchen_exclusive=true.
+ ALL no flags (prompt/table leaks); rate_limited false.

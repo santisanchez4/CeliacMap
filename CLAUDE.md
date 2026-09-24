@@ -3904,9 +3904,8 @@ Function, schema or prompt change):
   bloqueante:** la reformulación del prompt de F4 (Opción 1). **Siguiente
   (Fase F):** cierre del ADR-006 (Estado → Aceptado con su sección de
   Verificación), C4 y README.
-- 🚧 **Phase 25 — Kitchen information (forms, chatbot, Validator), implemented
-  and verified offline / against the real model (2026-09-24); production
-  rollout pending.** Three optional questions about how a place cooks, stored as
+- ✅ **Phase 25 — Kitchen information (forms, chatbot, Validator), live in
+  production and verified (2026-09-24).** Three optional questions about how a place cooks, stored as
   unverified evidence on the intake tables (`places` untouched), read by the
   Validator with two deterministic caps, asked once by the chatbot. Design and
   decisions: **Kitchen information as review evidence** in the Decisions Log,
@@ -3922,11 +3921,25 @@ Function, schema or prompt change):
   truncated long recommendations, a kitchen answer mixed with a jailbreak, a
   glossary overstatement, Tope B counting a preparation method, and a test that
   keeps the three RUBRIC doc copies equal to the code). Tests: Python 292 → 332,
-  Deno chat 164 → 201, frontend 25 → 39. **Pending, each needing explicit OK:**
-  apply the migration in Supabase (`db/checks/2026-09-24-kitchen-columns.sql`
-  verifies it), merge + publish the frontend, deploy `chat` (v15) and run the live
-  scenarios (`db/checks/chat_kitchen_live.py`) and the jailbreak battery, reverting
-  every test row.
+  Deno chat 164 → 201, frontend 25 → 39. **Rollout, in the mandated order:** the
+  migration was applied in Supabase (its transactional check ran clean, `places`
+  untouched), the frontend was published by merging to `main`, and `chat` was
+  deployed (v15, then v16 after a live finding), source byte-identical to `HEAD`,
+  `verify_jwt` still `false`. **Live verification**
+  (`db/checks/2026-09-24-chat-kitchen-live-run.md`): every kitchen scenario behaved
+  as designed and the 37-turn jailbreak battery had **0 breaks**; every test row was
+  reverted against the baseline. Live findings: after a bare "no sé" the bot offered
+  to rewrite the comment instead of re-showing the draft (fixed in v16 with an
+  instruction + example; the data flow was already right); Módulo 4 with kitchen
+  facts could not be reached live because the router sends a contribution phrase to
+  the new-place flow (the `reportar`/`confirmar` ambiguity documented in Fase D;
+  unit-tested only); the 40-turns/day per-IP cap cut the first battery run at turn 12,
+  so today's test-only `chat_usage` counters were reverted (same protocol as earlier
+  phases) and it was re-run in full. **Also corrected the same day:** the manual note
+  of *Pastas Lo de Flor* had stated a named third party's health condition in the
+  publicly readable `places.validation_notes`; it was rewritten in production
+  (`db/fixes/2026-09-24-lo-de-flor-note-privacy.sql`) and scrubbed from the repo
+  going forward (git history keeps the old text).
 
 ### GitHub Pages deploy decision
 

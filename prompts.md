@@ -2261,4 +2261,10 @@ is a business fact), and three examples.
 (mg/day 3/16 → 0/16, symptoms urgency 2/16 → 0/16, "10 ppm" unchanged 16/16 — the user's own figure, caught by the
 guard as before), and **0/40** legitimate answers would be replaced by the safety net.
 
+**Live finding (chat v15, then v16):** after a bare "no sé" to the kitchen question the redactor offered to rewrite
+the comment instead of re-showing the draft (the draft itself persisted and "dale" sent it). Instruction 3 gained: when
+`<envio>` is a `borrador_listo` with no `preguntar_cocina` and no `cocina`, re-summarize the draft in one sentence and
+ask "¿Lo envío así?" — do not offer to rewrite it or leave it for later — plus one example. Verified live in v16
+(`db/checks/2026-09-24-chat-kitchen-live-run.md`).
+
 Changing a prompt restarts the soft-launch count (CLAUDE.md).

@@ -1,7 +1,6 @@
 # ADR-007: Información de cocina como evidencia para revisión, no como autoridad sobre la etiqueta
 
-**Estado:** Implementado; verificación en producción pendiente (ver **Verificación**). Pasa a *Aceptado* cuando el
-chat `v15` y la migración estén verificados en vivo.
+**Estado:** Aceptado (2026-09-24) — implementado y verificado en producción (ver **Verificación**).
 
 **Spec:** `docs/superpowers/specs/2026-09-24-kitchen-info-design.md` · **Plan:** `docs/superpowers/plans/2026-09-24-kitchen-info.md`
 
@@ -94,8 +93,14 @@ confirme directamente o haya una reseña que lo respalde, queda en "Tiene opcion
   prompt anterior ya los manejaba con la redacción nueva de la pregunta, así que la regla agregada es defensiva). **Redactor:** `db/checks/2026-09-24-chat-kitchen-responder-regression-run.md`, sin
   regresión en cifras ni urgencia y 0/40 falsos positivos del guardián.
 - **Suites:** Python, Deno (`supabase/functions/chat/`) y frontend, todas verdes.
-- **Pendiente en producción** (requiere OK explícito): aplicar la migración, publicar el frontend, y desplegar `chat`
-  con `db/checks/chat_kitchen_live.py` y la batería de jailbreak, revirtiendo las filas de prueba.
+- **En producción (2026-09-24), en el orden fijado:** la migración se aplicó y `db/checks/2026-09-24-kitchen-columns.sql`
+  corrió sin errores (seis columnas solo en las tablas de intake, `places` sin cambios, cinco CHECK); el frontend se
+  publicó al mergear a `main`; `chat` se desplegó (v15 y luego v16), con el código descargado idéntico a `HEAD` y
+  `verify_jwt` en `false`. Los escenarios en vivo y la batería de jailbreak de 37 turnos (**0 rupturas**) están en
+  `db/checks/2026-09-24-chat-kitchen-live-run.md`. Hallazgos: tras un "no sé" el bot ofrecía reescribir el comentario
+  en vez de volver a mostrar el borrador (corregido en v16; los datos ya iban bien); el Módulo 4 con datos de cocina no
+  pudo ejercitarse en vivo por la ambigüedad de ruteo `reportar`/`confirmar` que ya existía (solo tests unitarios). Todas
+  las filas de prueba se revirtieron contra la línea base.
 
 ## Consecuencias
 
