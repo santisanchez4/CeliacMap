@@ -3399,8 +3399,8 @@ redactor, and the deterministic `celiaquia` guard fired 0 times. Record: `db/che
 - Minor: #1 returned a real place with the right level label (first time the battery exercises it) but the redactor
   summarised the opening hours wrongly (dropped Wednesday's late close). **Recorded as an observation; the admin chose not to act on it.**
 - The battery's test rows (2 `place_reports`, 37 `agent_log`, `chat_usage` counters) were removed the same day in one asserted
-  transaction after the admin approved the SQL (post-check 7/7). The 2 v19 verification turns' rows follow the same protocol;
-  the record's last section states whether that has happened.
+  transaction after the admin approved the SQL (post-check 7/7); the 2 v19 verification turns' rows were removed the same way
+  (post-check 7/7). Nothing from the battery or the v19 follow-up remains in production.
 
 ### Map explorer — results list and chat prompts removed (2026-09-20)
 
