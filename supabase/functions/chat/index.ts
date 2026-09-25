@@ -1331,11 +1331,15 @@ export const RATE_LIMIT_REPLIES: Record<Idioma, string> = {
     "We've hit the assistant's message limit for now. Please try again later — the map and search are still available in the meantime.",
 };
 
+// The last sentence is ALWAYS present (not conditioned on detecting symptoms): a personal health
+// question can be routed here and never reach the redactor (chat v18 battery, #8/#9/#24), so this fixed
+// text is then the only thing the person reads and it must point them to a professional. A fixed sentence
+// cannot misfire; it is the same referral the redactor's instruction 4 and CELIAQUIA_GUARD_REPLIES give.
 export const SCOPE_DECLINE_REPLIES: Record<Idioma, string> = {
   es:
-    "Solo puedo ayudarte a buscar lugares sin TACC en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía.",
+    "Solo puedo ayudarte a buscar lugares sin TACC en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía. Si es una consulta de salud personal, consultala con un profesional de la salud; también podés orientarte con ACELA (acela.org.ar) o ACA (celiaco.org.ar) en Argentina y ACELU (acelu.org) en Uruguay.",
   en:
-    "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease.",
+    "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease. If it's a personal health question, talk to a health professional; you can also get guidance from ACELA (acela.org.ar) or ACA (celiaco.org.ar) in Argentina and ACELU (acelu.org) in Uruguay.",
 };
 
 // Deterministic ack for an explicit cancel-intent mid-suggestion-collection

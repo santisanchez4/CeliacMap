@@ -1723,6 +1723,35 @@ Deno.test("CELIAQUIA_GUARD_REPLIES - the fixed messages pass their own detector 
   }
 });
 
+Deno.test("SCOPE_DECLINE_REPLIES - the fixed decline always carries the health referral and every association in <fuentes>", () => {
+  // A person asking for a diagnosis or a dose can be routed to fuera_de_alcance and never reach the redactor
+  // (chat v18 battery, #24): the canned decline is then the ONLY thing they read, so it must point to a professional.
+  const es = getReply(SCOPE_DECLINE_REPLIES, "es");
+  const en = getReply(SCOPE_DECLINE_REPLIES, "en");
+  // The scope sentence stays first and unchanged.
+  assertStringIncludes(es, "Solo puedo ayudarte a buscar lugares sin TACC en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía.");
+  assertStringIncludes(en, "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease.");
+  assertStringIncludes(es, "Si es una consulta de salud personal, consultala con un profesional de la salud");
+  assertStringIncludes(en, "If it's a personal health question, talk to a health professional");
+  for (const reply of [es, en]) {
+    for (const association of ["ACELA (acela.org.ar)", "ACA (celiaco.org.ar)", "ACELU (acelu.org)"]) {
+      assertStringIncludes(reply, association);
+    }
+  }
+});
+
+Deno.test("SCOPE_DECLINE_REPLIES - the referral is one fixed sentence, not conditioned on symptoms, and passes the celiaquia detector", () => {
+  for (const idioma of ["es", "en"] as const) {
+    const reply = getReply(SCOPE_DECLINE_REPLIES, idioma);
+    // Same self-consistency rule as the guard replies: the fixed text must not carry a gluten figure or an urgency judgment.
+    assertEquals(detectCeliaquiaGuard(reply), []);
+    // Fixed, so it cannot depend on detecting anything in the person's message.
+    assertEquals(/s[ií]ntoma|symptom/i.test(reply), false);
+    // Still recognisable as the scope decline (the cortesia replies are asserted NOT to start like this).
+    assertEquals(/^(Solo puedo|I can only)/.test(reply), true);
+  }
+});
+
 Deno.test("buildChatLogResult - an ordinary unmarked turn keeps its metadata-only shape (no raw text, no guard)", () => {
   const result = buildChatLogResult({
     action: "chat_turn",
