@@ -6,6 +6,7 @@ dry run unless ``--apply`` is given. Same shape as ``scripts/moderate_opinions.p
     python -m scripts.review_queue                          # summary of every queue
     python -m scripts.review_queue --pending-100            # places the Validator left "100% pendiente"
     python -m scripts.review_queue --needs-review --city "Fray Bentos" --limit 15
+    python -m scripts.review_queue --pending-100 --limit 20 --offset 20   # second page of 20 (places lists only)
     python -m scripts.review_queue --suggestions            # suggestions whose address could not be placed
     python -m scripts.review_queue --warnings               # places with a recent community report
 
@@ -101,12 +102,14 @@ def list_queues(db, args, out) -> int:
     only = [k for k in ("pending_100", "needs_review", "suggestions", "warnings") if getattr(args, k)]
     show_all = not only
     if show_all or args.pending_100:
-        rows = db.fetch_places_for_admin(None, flag=PENDING_ADMIN_FLAG, city=args.city, limit=args.limit)
+        rows = db.fetch_places_for_admin(
+            None, flag=PENDING_ADMIN_FLAG, city=args.city, limit=args.limit, offset=args.offset
+        )
         out(f"== 100% pendientes de tu confirmación: {len(rows)} ==")
         for p in rows:
             _print_place(db, p, out)
     if show_all or args.needs_review:
-        rows = db.fetch_places_for_admin("needs_review", city=args.city, limit=args.limit)
+        rows = db.fetch_places_for_admin("needs_review", city=args.city, limit=args.limit, offset=args.offset)
         out(f"== En revisión humana (needs_review), los {len(rows)} más viejos ==")
         for p in rows:
             _print_place(db, p, out)
@@ -115,7 +118,9 @@ def list_queues(db, args, out) -> int:
         out(f"== Sugerencias sin ubicar: {len(rows)} ==")
         _print_suggestions(rows, out)
     if show_all or args.warnings:
-        rows = db.fetch_places_for_admin(None, warned_since=_warned_since(), city=args.city, limit=args.limit)
+        rows = db.fetch_places_for_admin(
+            None, warned_since=_warned_since(), city=args.city, limit=args.limit, offset=args.offset
+        )
         out(f"== Lugares reportados por la comunidad (últimos {WARNING_DAYS} días): {len(rows)} ==")
         for p in rows:
             _print_place(db, p, out, reports=True)
@@ -167,13 +172,19 @@ def discard(db, place_id: str, note: str, apply: bool, out) -> int:
         return 1
     old_notes = (place.get("validation_notes") or "").strip()
     header = _header("DESCARTE MANUAL", note, place)
+    # --pending-100 has no status filter, so a discarded place would stay in that queue for good.
+    flags = [f for f in (place.get("flags") or []) if f != PENDING_ADMIN_FLAG]
     out(f"{place.get('name')}: {place.get('status')} → discarded")
     if not apply:
         out("DRY RUN — agregá --apply para escribir.")
         return 0
     db.update_place(
         place_id,
-        {"status": "discarded", "validation_notes": f"{header}\n\n{old_notes}" if old_notes else header},
+        {
+            "status": "discarded",
+            "flags": flags,
+            "validation_notes": f"{header}\n\n{old_notes}" if old_notes else header,
+        },
     )
     out("Listo.")
     return 0
@@ -272,6 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--warnings", action="store_true", help="places with a recent community report")
     parser.add_argument("--city", help="filter the lists by city")
     parser.add_argument("--limit", type=int, default=15)
+    parser.add_argument("--offset", type=int, default=0, help="skip this many places (next page of a long list)")
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument("--approve", metavar="PLACE_ID")
     actions.add_argument("--discard", metavar="PLACE_ID")

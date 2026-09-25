@@ -31,6 +31,14 @@ descartados (no son comercios); 5 ciudades mal cargadas. Los 100% aprobados pasa
 base del paso 2b. **Deuda conocida:** las 12 filas `discarded` con país equivocado no se corrigieron (no son
 públicas; cada ciudad exige investigación). Detalle en CLAUDE.md → "Audit data-quality pass 2026-09-25".
 
+**2026-09-25 — paso 2b, cambio de enfoque:** `cap_unsupported_100.py` ganó `--flag-only`: para los mismos lugares solo
+agrega la marca `100% pendiente de confirmación del administrador` (nivel, status, confianza y notas intactos, un
+`agent_log` por corrida). Motivo: `place_evidence` está vacía para lugares viejos y las reseñas de Google se borran a
+los 30 días, así que bajar el nivel de 277 de 313 de golpe confundía "sin evidencia guardada" con "sin respaldo".
+`review_queue.py` suma `--offset` (junto a `--limit` y `--city`) y `--discard` ahora también quita la marca, para que un
+lugar decidido salga de `--pending-100`. Dry run de `--flag-only` sobre producción antes de la limpieza: 277 a marcar.
+`--flag-only --apply` **todavía no se corrió**: se repite el dry run tras la limpieza (esperado ~271 de 306) y lo confirma el admin.
+
 ## Resumen
 
 La arquitectura es sólida. Hay una sola compuerta de seguridad, con umbrales que aplica el código. Los aportes de la

@@ -1162,8 +1162,8 @@ Target (functional product — see **## Architecture**):
 │   ├── purge_chat_logs.py      # weekly purge of agent_log chatbot rows > 30 days (chat-log-purge.yml)
 │   ├── sync_chat_prompts.py    # copy prompts.ts -> the 3 doc copies of the chatbot prompts (--check to verify)
 │   ├── moderate_opinions.py    # list / --approve / --hide community opinions (dry-run unless --apply)
-│   ├── review_queue.py         # admin queue: 100% pending, needs_review, needs_location, warnings; --approve/--discard/--locate
-│   ├── cap_unsupported_100.py  # one-off: approved 100% places without explicit evidence -> options + admin flag
+│   ├── review_queue.py         # admin queue: 100% pending, needs_review, needs_location, warnings (--limit/--offset/--city); --approve/--discard/--locate
+│   ├── cap_unsupported_100.py  # one-off: approved 100% places without explicit evidence -> admin flag (--flag-only) or options + flag
 │   ├── admin_digest.py         # daily email to the admin (admin-digest.yml); agents/admin_notify.py sends urgent alerts
 │   └── check_setup.py
 ├── db/
@@ -2279,7 +2279,17 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   100|options --note`, `--discard`, `--clear-warning` and `--locate SUGGESTION_ID --lat --lng` (dry run unless
   `--apply`; a decision needs a note; the note refuses owner-health text because it goes to a public column).
   `scripts/cap_unsupported_100.py` applies Tope C once to the already-approved 100% places (dry run first — it changes
-  the map). `scripts/moderate_opinions.py` warns when an opinion says "100%" about a place labelled "opciones". The
+  the map). **`--flag-only` (2026-09-25) is the gentle variant and the one to run first:** for the same places it only
+  appends `PENDING_ADMIN_FLAG` (no duplicates, existing flags kept) — level, status, confidence, `verified` and
+  `validation_notes` are not touched, so the map does not change — and leaves one `agent_log` row
+  (`validator` / `flag_unsupported_100`, with counts). Reason: "no stored evidence" is not "no backing" —
+  `place_evidence` starts empty for old places and Google review snippets are deleted after 30 days, so the
+  level-lowering pass would have moved 277 of 313 places at once. Dry run 2026-09-25, before the seed cleanup:
+  12 manual markers + 24 explicit evidence kept, 277 to flag (241 `google_places`, 31 `social`, 5 seed places). The
+  admin then confirms them one by one with `review_queue.py --pending-100` (`--limit`, `--offset` and `--city` page
+  through the queue); `--approve` (either level) and `--discard` both drop the flag, so a decided place leaves the
+  queue. The daily digest reports "50+" while that queue is long: expected, it drains as the admin decides.
+  `scripts/moderate_opinions.py` warns when an opinion says "100%" about a place labelled "opciones". The
   place detail on the map now explains its label in one line.
 - **Admin email (step 9).** `agents/admin_notify.py`: `AdminNotifier.urgent()` emails the admin right away when a
   negative report arrives (warning or taken off the map, with the report text and the commands to act) and when a
@@ -2305,7 +2315,7 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   (both new columns present, `place_evidence` RLS on, 0 public grants); (3) ~~A/B against the real model~~ done 2026-09-25
   (`db/checks/2026-09-25-audit-ab-run.md`: no regression; router 10/10; the model keeps exclusivity evidence at
   `celiac_friendly`, so Tope C now flags it for the admin's 100% queue — the jailbreak battery runs after deploy); (4) merge (frontend) and deploy `chat`; (5) set the `ADMIN_EMAIL` secret (optional, falls back to
-  santiagosanchez@celiacmap.org); (6) dry run `scripts/cap_unsupported_100.py`, review the list, then `--apply`.
+  santiagosanchez@celiacmap.org); (6) dry run `scripts/cap_unsupported_100.py --flag-only` (after the 2026-09-25 seed cleanup the expected list is ~271 of 306), review it, then `--flag-only --apply` — the level-lowering mode stays available but changes the map.
 
 ### Audit data-quality pass 2026-09-25 — fictional seed places, wrong country/city, non-business rows
 

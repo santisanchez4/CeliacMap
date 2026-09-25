@@ -320,3 +320,40 @@ def test_audit_migration_matches_the_schema_blocks():
         assert blk in migration, begin
     assert "'admin_notify'" in migration
     assert "revoke all on public.place_evidence from anon, authenticated;" in migration
+
+
+# --- fetch_places_for_admin: paging for the admin queue ---------------------------------------
+
+
+def _chain():
+    """A query builder where every method returns itself and records the call."""
+    calls: list[tuple[str, tuple]] = []
+    q = MagicMock()
+
+    def record(name):
+        def fn(*a, **k):
+            calls.append((name, a))
+            return q
+
+        return fn
+
+    for name in ("select", "eq", "ilike", "contains", "gte", "order", "limit", "range"):
+        setattr(q, name, record(name))
+    q.execute.return_value = MagicMock(data=[{"id": "p1"}])
+    return q, calls
+
+
+def test_fetch_places_for_admin_pages_with_offset():
+    client = _client_with_mock_db()
+    q, calls = _chain()
+    client._db.table.return_value = q
+    assert client.fetch_places_for_admin(None, flag="x", limit=5, offset=10) == [{"id": "p1"}]
+    assert ("range", (10, 14)) in calls  # rows 10..14 = the third page of 5
+
+
+def test_fetch_places_for_admin_first_page_is_unchanged_without_an_offset():
+    client = _client_with_mock_db()
+    q, calls = _chain()
+    client._db.table.return_value = q
+    client.fetch_places_for_admin("approved", limit=15)
+    assert ("range", (0, 14)) in calls

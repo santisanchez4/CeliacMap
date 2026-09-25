@@ -118,6 +118,34 @@ def test_clear_warning_and_discard():
     assert db.updates[-1][1]["status"] == "discarded"
 
 
+def test_discard_takes_the_place_out_of_the_pending_100_queue():
+    """A discarded place must not stay in --pending-100 (that list has no status filter): the flag goes."""
+    db = FakeDB()
+    go(db, "--discard", PID, "--note", "cerró", "--apply")
+    patch = db.updates[-1][1]
+    assert PENDING_ADMIN_FLAG not in patch["flags"] and "sin ficha" in patch["flags"]
+    assert patch["validation_notes"].startswith("DESCARTE MANUAL")
+    assert "validation_confidence" not in patch
+
+
+def test_approving_at_either_level_clears_the_pending_100_flag():
+    for level in ("100", "options"):
+        db = FakeDB()
+        go(db, "--approve", PID, "--level", level, "--note", "lo conozco", "--apply")
+        flags = db.updates[0][1]["flags"]
+        assert PENDING_ADMIN_FLAG not in flags and "sin ficha" in flags, level
+
+
+def test_offset_pages_through_the_queue_and_defaults_to_the_first_page():
+    db = FakeDB()
+    go(db, "--pending-100", "--limit", "5")
+    assert db.queries[-1][1]["limit"] == 5 and db.queries[-1][1]["offset"] == 0
+    go(db, "--pending-100", "--limit", "5", "--offset", "10", "--city", "Rosario")
+    kw = db.queries[-1][1]
+    assert (kw["limit"], kw["offset"], kw["city"]) == (5, 10, "Rosario")
+    assert kw["flag"] == PENDING_ADMIN_FLAG
+
+
 def test_locate_places_a_needs_location_suggestion_as_pending():
     sug = {"id": SID, "status": "needs_location", "name": "Pastas Lo de Flor", "address": "JC 23", "city": "Fray Bentos",
            "country": "Uruguay", "category": "shop", "notes": "pastas", "evidence_url": None}

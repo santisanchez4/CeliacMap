@@ -505,10 +505,11 @@ class SupabaseClient:
         warned_since: str | None = None,
         safety_level: str | None = None,
         limit: int = 15,
+        offset: int = 0,
     ) -> list[dict]:
         """Places for the admin to review, oldest first. ``flag`` matches a value inside the
         ``flags`` jsonb list; ``warned_since`` keeps only places with a community warning set
-        at or after that ISO timestamp."""
+        at or after that ISO timestamp; ``offset`` skips that many rows (paging a long queue)."""
         q = self._db.table("places").select(self.ADMIN_PLACE_COLUMNS)
         if status:
             q = q.eq("status", status)
@@ -520,7 +521,7 @@ class SupabaseClient:
             q = q.gte("community_warning_at", warned_since)
         if safety_level:
             q = q.eq("safety_level", safety_level)
-        res = q.order("created_at").limit(limit).execute()
+        res = q.order("created_at").range(offset, offset + limit - 1).execute()
         return res.data or []
 
     def fetch_suggestions_by_status(self, status: str, limit: int = 50) -> list[dict]:
