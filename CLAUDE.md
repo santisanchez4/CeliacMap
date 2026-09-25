@@ -2324,6 +2324,12 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   admin then confirms them one by one with `review_queue.py --pending-100` (`--limit`, `--offset` and `--city` page
   through the queue); `--approve` (either level) and `--discard` both drop the flag, so a decided place leaves the
   queue. The daily digest reports "50+" while that queue is long: expected, it drains as the admin decides.
+  **Found live 2026-09-25 (fixed):** `SupabaseClient.fetch_places_for_admin(flag=…)` passed a Python list to
+  `contains()`, which supabase-py sends as the Postgres array literal `cs.{…}`; `places.flags` is **jsonb** and needs
+  `cs.["…"]`, so PostgREST answered 22P02 — it broke `review_queue --pending-100` and `scripts/admin_digest.py` (the
+  daily digest would have failed on its first scheduled run). It is now sent as `json.dumps([flag])`, and the regression
+  test builds the real postgrest query and asserts the wire format (the earlier mocked-builder tests could not see it).
+  **Lesson:** a new PostgREST filter is smoke-tested live (read-only) before it is relied on.
   `scripts/moderate_opinions.py` warns when an opinion says "100%" about a place labelled "opciones". The
   place detail on the map now explains its label in one line.
 - **Admin email (step 9).** `agents/admin_notify.py`: `AdminNotifier.urgent()` emails the admin right away when a
@@ -2350,7 +2356,7 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   (both new columns present, `place_evidence` RLS on, 0 public grants); (3) ~~A/B against the real model~~ done 2026-09-25
   (`db/checks/2026-09-25-audit-ab-run.md`: no regression; router 10/10; the model keeps exclusivity evidence at
   `celiac_friendly`, so Tope C now flags it for the admin's 100% queue — the jailbreak battery runs after deploy); (4) merge (frontend) and deploy `chat`; (5) set the `ADMIN_EMAIL` secret (optional, falls back to
-  santiagosanchez@celiacmap.org); (6) dry run `scripts/cap_unsupported_100.py --flag-only` (after the 2026-09-25 seed cleanup the expected list is ~271 of 306), review it, then `--flag-only --apply` — the level-lowering mode stays available but changes the map.
+  santiagosanchez@celiacmap.org); (6) ~~dry run `scripts/cap_unsupported_100.py --flag-only`, then `--apply`~~ done 2026-09-25 (271 flagged, nothing else changed — see **Audit data-quality pass 2026-09-25**); the admin now confirms them with `review_queue.py --pending-100`. The level-lowering mode stays available but changes the map.
 
 ### Audit data-quality pass 2026-09-25 — fictional seed places, wrong country/city, non-business rows
 
@@ -2399,7 +2405,7 @@ on any drift). Approved 100% places went 313 → 306.
   (Chile, `discarded`) still says `country='Uruguay'`.
 - **Flag pass after the cleanup:** with the data-correction rule of **Manual Validator overrides**, the 306 approved
   100% places are 12 protected + 23 with explicit evidence + **271 to flag** (`cap_unsupported_100 --flag-only`
-  dry run; víaSana included, seeds / ExpoCelíaca gone). `--flag-only --apply` is the admin's call and has not been run.
+  dry run; víaSana included, seeds / ExpoCelíaca gone). `--flag-only --apply` was run the same day, by the admin's go-ahead: **271 places flagged**, and against a before/after hash of `status` / `safety_level` / `validation_confidence` / `verified` / `validation_notes` over all 1,312 places **0 rows changed** (the map is untouched, approved 100% is still 306), plus exactly 1 new `agent_log` row.
 
 ### Kitchen information as review evidence (2026-09-24)
 

@@ -37,9 +37,8 @@ agrega la marca `100% pendiente de confirmación del administrador` (nivel, stat
 los 30 días, así que bajar el nivel de 277 de 313 de golpe confundía "sin evidencia guardada" con "sin respaldo".
 `review_queue.py` suma `--offset` (junto a `--limit` y `--city`) y `--discard` ahora también quita la marca, para que un
 lugar decidido salga de `--pending-100`. Dry run de `--flag-only` sobre producción antes de la limpieza: 277 a marcar.
-`--flag-only --apply` **todavía no se corrió**: es decisión del admin. Dry run tras la limpieza y la regla de marcas: de
-306 lugares 100% aprobados, 12 protegidos por decisión manual + 23 con evidencia explícita + **271 a marcar** (víaSana
-incluida).
+Dry run tras la limpieza y la regla de marcas: de 306 lugares 100% aprobados, 12 protegidos por decisión manual + 23 con
+evidencia explícita + **271 a marcar** (víaSana incluida). `--flag-only --apply` se corrió después (ver más abajo).
 
 **2026-09-25 — cierre de la pasada de datos:** (1) `resolve_location` ya no toma como buena una dirección de Find Place
 fuera de Uruguay/Argentina (`GooglePlacesClient.is_foreign_address`): el país caía al de la búsqueda (caso *Goût Gluten
@@ -48,6 +47,29 @@ Free*, Vitacura); ahora cae al geocode de solo dirección. Las 2 filas chilenas 
 es solo una corrección de datos (`DATA_CORRECTION_PHRASES` en `agents/manual_overrides.py`) ya no cuenta como decisión de
 seguridad; los 12 lugares 100% con decisión manual real siguen protegidos. (3) Deuda conocida: las 12 filas descartadas con
 país equivocado y el parser que devuelve la ciudad `Departamento de X` (4 filas, no públicas).
+
+**2026-09-25 — `--flag-only --apply` aplicado (paso 2b hecho).** `python -m scripts.cap_unsupported_100 --flag-only --apply`,
+autorizado por el admin tras ver el dry run. Comprobado con consultas de solo lectura contra un baseline tomado antes:
+
+| Comprobación | Antes | Después |
+|---|---|---|
+| lugares con la marca `100% pendiente de confirmación del administrador` | 0 | **271** |
+| hash de `id`+`status`+`safety_level`+`validation_confidence`+`verified`+`validation_notes` de los 1.312 lugares | `2aca1662…` | `2aca1662…` (idéntico: **0 lugares cambiaron** de nivel, status, confianza, `verified` ni notas) |
+| hash de `id`+`status`+`safety_level` | `6cc5eb68…` | `6cc5eb68…` (idéntico) |
+| filas de `agent_log` con `flag_unsupported_100` | 0 | **1** (`validator` / `success`: `{approved_100: 306, manual: 12, explicit_evidence: 23, candidates: 271, flagged: 271, already_flagged: 0}`) |
+| filas totales de `agent_log` | 5.332 | 5.333 |
+
+Además: los 271 marcados son exactamente los ids del dry run; los 271 siguen `approved` + `gluten_free_100` (el mapa no cambió, los
+100% aprobados siguen siendo 306); ningún lugar tiene la marca duplicada. El admin los confirma de a uno con
+`python -m scripts.review_queue --pending-100` (`--limit`, `--offset`, `--city`); `--approve` y `--discard` la quitan.
+
+**Hallazgo al verificar la cola (corregido):** `review_queue --pending-100` fallaba en vivo con `22P02`. `fetch_places_for_admin(flag=…)`
+pasaba una lista de Python a `contains()`, que supabase-py manda como literal de array de Postgres (`cs.{…}`), y `places.flags` es
+`jsonb` (necesita `cs.["…"]`). El mismo llamado está en `scripts/admin_digest.py`: el digest diario habría fallado en su primera
+corrida programada. Corregido enviando `json.dumps([flag])`; el test nuevo arma la consulta real de postgrest y comprueba el formato
+en el cable (los tests anteriores mockeaban el builder y no podían verlo). Verificado en vivo: la cola lista y pagina, `--city`
+funciona y `admin_digest --dry-run` arma la sección "100% PENDIENTES (50+)". **Lección:** un filtro nuevo de PostgREST se prueba en
+vivo (solo lectura) antes de darlo por bueno.
 
 ## Resumen
 
