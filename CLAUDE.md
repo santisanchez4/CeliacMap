@@ -163,8 +163,11 @@ GEOGRAPHIC SCOPE
 - **Auth deferred.** Phase 1 is public read-only via the anon key; reviews are
   seed/agent-sourced and display-only. Supabase Auth + user-submitted reviews
   come in a later phase.
-- **Manual seed.** A small hand-curated set (~10–20 approved places in UY/AR) seeds
-  the map so it is alive immediately; agents grow it over time.
+- **Manual seed.** ~~A small hand-curated set (~10–20 approved places in UY/AR) seeds
+  the map so it is alive immediately.~~ **Withdrawn 2026-09-25:** the 13 "sample" places
+  of `db/seed.sql` were invented names, not businesses, and had been live on the public map;
+  they were discarded and removed from the seed (see **Audit data-quality pass 2026-09-25**
+  in the Decisions Log). Agents grow the map; a place is never added without a real business behind it.
 
 ### Key risks to keep in mind
 
@@ -273,6 +276,15 @@ GEOGRAPHIC SCOPE
   the admin took by hand for Bienestar. Known limit: a real business whose name
   *contains* the searched word still passes ("Serendipia" vs "Serendipia - CEA");
   the Validator stays the backstop. Tests in `tests/test_google_places.py`.
+  **Clarification (2026-09-25) — do not delete the víaSana row.** The `víaSana` place
+  (`f91f627a-2cc1-4fcf-b6eb-aaa08b04656a`, Faustino Carámbula 1121, Rivera, UY) is a **legitimate,
+  independent business**: a real Google listing (4.9 from 7 ratings, own phone and Facebook page)
+  that the Search agent inserted on 2026-06-05 with its own `external_id`. What was wrong was only
+  the Find Place *match* returned for "Bienestar Gluten Free" on 2026-09-01; the Bienestar row
+  (`4300ad15-…`) has its own `external_id` and a Fray Bentos address and never shared víaSana's data.
+  Its actual open issue is the one it shares with the other approved 100% places without explicit
+  evidence (`gluten_free_100` at 0.82, approved under the old binary rubric): the
+  `--flag-only` pass of `scripts/cap_unsupported_100.py` sends it to the admin's `--pending-100` queue.
 - **`VALIDATOR_RESERVE=80` (in `scripts/run_agents.py`) was sized for the old
   daily cadence, not the current monthly one — unresolved, the `pending`
   backlog is now structurally growing, not just occasionally spiking.**
@@ -1156,7 +1168,7 @@ Target (functional product — see **## Architecture**):
 │   └── check_setup.py
 ├── db/
 │   ├── schema.sql              # tables, constraints, indexes, RLS, triggers
-│   ├── seed.sql                # manual seed (UY/AR)
+│   ├── seed.sql                # community-ranking votes on real places (the fictional sample places were removed 2026-09-25)
 │   ├── migrations/             # one-shot files to apply a group of schema.sql changes (2026-09-24-audit-plan.sql)
 │   └── checks/                 # verification evidence: begin;…rollback; SQL, batteries, live runs,
 │                               # and chat_prompt_ab.py (offline A/B of the chatbot prompts vs the real model)
@@ -2294,6 +2306,42 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   (`db/checks/2026-09-25-audit-ab-run.md`: no regression; router 10/10; the model keeps exclusivity evidence at
   `celiac_friendly`, so Tope C now flags it for the admin's 100% queue — the jailbreak battery runs after deploy); (4) merge (frontend) and deploy `chat`; (5) set the `ADMIN_EMAIL` secret (optional, falls back to
   santiagosanchez@celiacmap.org); (6) dry run `scripts/cap_unsupported_100.py`, review the list, then `--apply`.
+
+### Audit data-quality pass 2026-09-25 — fictional seed places, wrong country/city, non-business rows
+
+A read-only sweep of production (admin request) found four classes of bad rows, all corrected in one
+transaction, `db/fixes/2026-09-25-seed-and-data-quality.sql` (42 rows; applied 2026-09-25 after a
+`begin; … rollback;` rehearsal; every block asserts its exact row count, a snapshot table asserts that
+`lat` / `lng` / `validation_confidence` / `safety_level` / `flags` never changed, and the transaction aborts
+on any drift). Approved 100% places went 313 → 306.
+
+- **Fictional seed places live on the public map.** The 13 "sample" places of `db/seed.sql` (Sin Gluten
+  Pocitos, Palermo Sin TACC, …) were *invented* names at real neighbourhood coordinates, `approved` +
+  `verified=true` since Phase 3. They had no votes, reports, opinions or evidence. Discarded (not deleted —
+  auditable; a DELETE would also cascade the 4 fake reviews and a test `outreach_messages` row), unverified,
+  `outreach_opt_out=true`, with a `CORRECCIÓN MANUAL` header. `db/seed.sql` no longer inserts them (it keeps
+  only the ranking votes on real places). Side finding: a fake seed review ("Cocina 100% sin TACC y separada")
+  made Sin Gluten Pocitos count as *explicit exclusivity evidence* for the cap pass — fake data can defeat the
+  rule that guards the 100% label. `db/checks/2026-09-01-place-votes.sql` used that place as its "approved"
+  fixture; repointed to Sin Gluten Colonia (`06065939-…`), 6/6 PASS.
+- **Argentine places labelled Uruguay: 35 rows, all `source='social'`.** Sweep:
+  `address ~* 'argentina' and country='Uruguay'` (the reverse direction finds 0). Created 2026-06-04 → 2026-08-01
+  (12 in Jun, 21 in Jul, 2 on 08-01): **0 after the 2026-08-08 fix, 0 after 2026-09-01**. The 2026-08-08 fix
+  (`a4bff4b`) covered the Search agent only; Social got its own country-from-address fix in `03cb7c2`
+  (2026-08-19), then `resolve_location` in Phase 20. Fixed: **23** (8 `approved` — which were on the public map
+  and on the *Uruguay* tab of the ranking — and 15 `needs_review`): country → Argentina, city too where it was
+  wrong (MisiaMasa "Villa Pueyrredón" → Buenos Aires, Dietéticas Tomy "Montevideo" → Boulogne, …).
+  **Known debt: the 12 `discarded` rows of the same kind are deliberately left as they are** — not public, and
+  correcting their city needs per-row research (Doña Laura has `Nueva Palmira` for an address in Oberá,
+  Misiones, etc.). Find them with the sweep above restricted to `status='discarded'`.
+- **Rows that are not a business:** ExpoCelíaca (a trade fair at Costa Salguero, approved as a 100% "shop" at
+  0.85), Celi events and Asociación Celíaca Argentina (both `needs_review`) → `discarded`.
+- **City that is not a city:** two postal codes (Venekafe `C1425ESA`, Pilar Sin Gluten `B1629ETD`) plus a barrio
+  (TACCOFF "Palermo"), the long official form (Cucinetta "Cdad. Autónoma de Buenos Aires") and a stale query
+  target (Donato "Salto" for a CABA address). **CABA is `Buenos Aires`** everywhere else (108 rows) — keep that
+  convention; the frontend and the chatbot filter by city.
+- **Deliberately not touched:** the víaSana row (a legitimate Rivera business — see the clarification under
+  **Key risks**) and the `Mensaje de prueba` `outreach_messages` row on the discarded seed place.
 
 ### Kitchen information as review evidence (2026-09-24)
 

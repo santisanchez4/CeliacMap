@@ -13,7 +13,7 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 🚧 Evolving from a portfolio landing page into a functional product.
 
 - ✅ Landing page (single page, fully responsive, bilingual ES/EN).
-- ✅ Supabase backend (`places` / `reviews` / `agent_log`, RLS, manual UY/AR seed).
+- ✅ Supabase backend (`places` / `reviews` / `agent_log`, RLS, community-ranking seed).
 - ✅ Live Leaflet map backed by Supabase (reads approved places, category filters).
 - ✅ **Search agent** — discovers places via Google Places, inserts candidates as
   `pending`, and enriches them with gluten-free review snippets.
@@ -282,7 +282,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers
-│   ├── seed.sql                # manual seed (UY/AR) + community-ranking seed (15 places)
+│   ├── seed.sql                # community-ranking votes on 15 real places (fictional sample places removed 2026-09-25)
 │   └── checks/                 # verification evidence: BEGIN;…ROLLBACK; scripts, jailbreak battery, live runs, prompt A/B tool
 ├── tests/                      # offline unit tests (all external calls mocked)
 ├── .github/workflows/          # agents-monthly cron + Pages deploy

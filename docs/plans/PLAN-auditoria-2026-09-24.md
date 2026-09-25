@@ -24,6 +24,13 @@ Implementado en la rama `claude/celiacmap-audit-agents-chatbot-0ohie6`. DNS revi
 desplegar `chat`, y correr `scripts/cap_unsupported_100.py` en modo prueba antes de `--apply`. El web agent sigue
 apagado.
 
+**2026-09-25 — limpieza de datos aplicada** (`db/fixes/2026-09-25-seed-and-data-quality.sql`, 42 filas, 8/8
+verificaciones): los 13 lugares de ejemplo del seed (inventados, estaban en el mapa público) pasaron a `discarded`;
+23 lugares argentinos con `country='Uruguay'` corregidos; ExpoCelíaca, Celi events y Asociación Celíaca Argentina
+descartados (no son comercios); 5 ciudades mal cargadas. Los 100% aprobados pasaron de 313 a **306**, que es la
+base del paso 2b. **Deuda conocida:** las 12 filas `discarded` con país equivocado no se corrigieron (no son
+públicas; cada ciudad exige investigación). Detalle en CLAUDE.md → "Audit data-quality pass 2026-09-25".
+
 ## Resumen
 
 La arquitectura es sólida. Hay una sola compuerta de seguridad, con umbrales que aplica el código. Los aportes de la

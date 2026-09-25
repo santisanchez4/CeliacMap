@@ -9,7 +9,9 @@
 --     --file db/checks/2026-09-01-place-votes.sql
 --
 -- Fixtures (real production rows, stable):
---   approved     = 00000000-0000-0000-0000-000000000001  ("Sin Gluten Pocitos", db/seed.sql)
+--   approved     = 06065939-2465-466a-a751-041a6abe0bb4  ("Sin Gluten Colonia", a real approved place;
+--                  it was 00000000-…-0001 "Sin Gluten Pocitos" until the fictional seed places were
+--                  discarded on 2026-09-25, see db/fixes/2026-09-25-seed-and-data-quality.sql)
 --   needs_review = 985fd078-41b6-4839-a3ad-882df3dbf24a  (an out-of-scope place, not on the map)
 -- =====================================================================
 begin;
@@ -18,7 +20,7 @@ create temp table _r (n int, step text, detail text, pass boolean) on commit dro
 
 do $$
 declare
-  p_ok  uuid := '00000000-0000-0000-0000-000000000001';
+  p_ok  uuid := '06065939-2465-466a-a751-041a6abe0bb4';
   b int; a int;
 begin
   -- 1. INSERT bumps places.vote_count (trigger AFTER INSERT)
@@ -76,17 +78,17 @@ end $$;
 do $$
 declare b int; a int; estate text := ''; emsg text := ''; ok boolean := false;
 begin
-  select vote_count into b from public.places where id = '00000000-0000-0000-0000-000000000001';
+  select vote_count into b from public.places where id = '06065939-2465-466a-a751-041a6abe0bb4';
   begin
     set local role anon;
     insert into public.place_votes (place_id, voter_token)
-      values ('00000000-0000-0000-0000-000000000001', 'chk-20260901-rls-ok');
+      values ('06065939-2465-466a-a751-041a6abe0bb4', 'chk-20260901-rls-ok');
     ok := true;
   exception when others then
     estate := sqlstate; emsg := sqlerrm;
   end;
   reset role;
-  select vote_count into a from public.places where id = '00000000-0000-0000-0000-000000000001';
+  select vote_count into a from public.places where id = '06065939-2465-466a-a751-041a6abe0bb4';
   insert into _r values (6, 'RLS: anon vote on approved place inserts + trigger bumps',
     case when ok then format('inserted; vote_count %s -> %s', b, a)
          else format('%s | %s', estate, emsg) end,
