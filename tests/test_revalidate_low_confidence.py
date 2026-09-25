@@ -98,3 +98,12 @@ def test_metered_client_cost_uses_sonnet_rates():
     }
     # 3.00 + 15.00 + 0.30 + 3.75
     assert round(client.cost_usd(), 2) == 22.05
+
+
+def test_protected_marker_is_its_own_matcher_and_is_unchanged_by_the_data_correction_rule():
+    """revalidate_low_confidence matches the marker tuple itself (it does not call
+    manual_override_marker), so the 2026-09-25 rule that lets the cap/flag pass ignore pure data-correction
+    headers does not reach it: a note with only such a header is STILL skipped here, as before."""
+    data_only = "CORRECCIÓN MANUAL 2026-09-25: país/ciudad corregidos según la dirección.\n\nTexto del Validator."
+    assert protected_marker({"validation_notes": data_only}) == "correccion manual"
+    assert protected_marker({"validation_notes": "RE-VALIDACIÓN RETROACTIVA (2026-09-06): fila re-evaluada."}) == "validacion retroactiva"

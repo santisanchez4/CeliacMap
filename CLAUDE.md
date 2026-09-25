@@ -2225,6 +2225,24 @@ and lets the Updater keep it fresh. **Practical rule:** before geocoding a manua
 cadastre, run Find Place on its name + city — a listing may already exist and is better than an
 address-only row. See `db/fixes/2026-09-24-fray-bentos-dispensario.sql`.
 
+**Data corrections are not overrides (2026-09-25).** A `CORRECCIÓN MANUAL` header whose text is a pure *data*
+correction — a geography fix, "not a business", a sample place — is not a decision about the place's safety and
+protects nothing. `agents/manual_overrides.py` names the phrases (`DATA_CORRECTION_PHRASES`, an explicit reviewed
+list): "país/ciudad corregidos", "ciudad corregida", "lugar de ejemplo del seed", "no es un comercio", "fuera del
+alcance geográfico". Rules: each header line is judged on its own (a data header on top of a safety header still
+protects); only `CORRECCIÓN MANUAL` lines are releasable — `OVERRIDE MANUAL` and `APROBACIÓN MANUAL` always protect;
+any other `CORRECCIÓN MANUAL` keeps protecting (label corrections like Los Leños / Dalbertt / ACELU, discards with a
+reason, Marce Cakes' 2026-09-02 city relabel, whose phrase is not in the list). **Why:** the headers of the
+2026-09-25 cleanup were read as admin safety decisions and pulled 9 approved 100% places out of the
+`cap_unsupported_100 --flag-only` pass (dry run 262 instead of 271), and would have kept a community report from
+lowering their level (`ReviewHandler`). Consumers: `manual_override_marker()` is used by `ReviewHandler` and
+`cap_unsupported_100`; **`revalidate_low_confidence` has its own matcher (`PROTECTED_NOTE_MARKERS`) and is unchanged**
+— it still skips a note that carries only a data header (a test pins that). Checked against production before the
+change: 78 places carried a marker, 50 were released (every one a data header: the 13 seeds, the non-businesses, the
+country/city fixes, the Brazil and Chile out-of-scope rows), 28 stay protected; among approved 100% places the
+protected set went 21 → 12 and the 12 originals are exactly the ones that were protected before. **When writing a
+fix script:** put a data-only note in one of those phrases, and a safety decision on its own line.
+
 **Labeling rule (decided 2026-09-24 — applies to the Validator, the public forms
 and the chatbot).** `gluten_free_100` means the establishment cooks and sells
 *only* gluten-free / celiac-safe products. "Sin gluten", "sin TACC" and "apto para
@@ -2379,6 +2397,9 @@ on any drift). Approved 100% places went 313 → 306.
   (1 `discarded`, 3 `needs_review`, all `Departamento de Montevideo`) of 299 Uruguayan social/web/user rows; a
   one-token fix in `_PROVINCE_WRAP_RE` that would change city output, so it is left as debt; (3) *Goût Gluten Free*
   (Chile, `discarded`) still says `country='Uruguay'`.
+- **Flag pass after the cleanup:** with the data-correction rule of **Manual Validator overrides**, the 306 approved
+  100% places are 12 protected + 23 with explicit evidence + **271 to flag** (`cap_unsupported_100 --flag-only`
+  dry run; víaSana included, seeds / ExpoCelíaca gone). `--flag-only --apply` is the admin's call and has not been run.
 
 ### Kitchen information as review evidence (2026-09-24)
 

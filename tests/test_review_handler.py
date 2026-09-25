@@ -296,6 +296,39 @@ def test_hiding_a_manual_override_keeps_the_admin_record_and_level():
     assert kwargs["notes"].endswith(notes)  # the override record is kept below the new header
 
 
+def test_hiding_a_place_with_only_a_data_correction_header_is_not_treated_as_an_admin_decision():
+    """A geography / not-a-business header (2026-09-25) is not an admin safety call: the model's
+    re-evaluation applies to the level and confidence, and the note text is still kept below."""
+    handler, db, llm = make_handler()
+    notes = "CORRECCIÓN MANUAL 2026-09-25: país/ciudad corregidos según la dirección.\n\nEl Validator dejó 0.87."
+    db.fetch_place_by_id.return_value = make_place(safety_level="gluten_free_100", validation_notes=notes)
+    llm.complete_json.return_value = HIDING_VERDICT
+
+    handler.handle("place-1", "report-1")
+
+    kwargs = db.update_place_validation.call_args.kwargs
+    assert kwargs["status"] == "needs_review"
+    assert kwargs["safety_level"] == "options_available"  # lowered by the report, not held at the admin's level
+    assert kwargs["confidence"] is not None and kwargs["category"] == "cafe"
+    assert kwargs["notes"].endswith(notes)
+
+
+def test_hiding_a_place_with_a_data_header_on_top_of_a_safety_header_keeps_the_admin_level():
+    handler, db, llm = make_handler()
+    notes = (
+        "CORRECCIÓN MANUAL 2026-09-25: país/ciudad corregidos según la dirección.\n\n"
+        "CORRECCIÓN MANUAL (2026-09-24, admin): confirma que es 100% sin gluten; se corrige safety_level a gluten_free_100."
+    )
+    db.fetch_place_by_id.return_value = make_place(safety_level="gluten_free_100", validation_notes=notes)
+    llm.complete_json.return_value = HIDING_VERDICT
+
+    handler.handle("place-1", "report-1")
+
+    kwargs = db.update_place_validation.call_args.kwargs
+    assert kwargs["safety_level"] is None and kwargs["confidence"] is None and kwargs["category"] is None
+    assert kwargs["notes"].endswith(notes)
+
+
 # --- Error handling ------------------------------------------------------------
 
 
