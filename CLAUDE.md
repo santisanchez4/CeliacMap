@@ -2288,9 +2288,11 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   gluten" instead of "no encontré nada" when that search is empty; places with a recent community warning carry
   `reportado_por_la_comunidad: true` and the redactor mentions it. prompts.md §33. **Restarts the soft-launch count;
   `chat` not redeployed yet.**
-- **Rollout, in order (nothing of this is live yet):** (1) ~~check the MX records~~ done 2026-09-25; (2) apply
-  `db/migrations/2026-09-24-audit-plan.sql` in Supabase; (3) A/B the RUBRIC and the chat prompts against the real
-  model; (4) merge (frontend) and deploy `chat`; (5) set the `ADMIN_EMAIL` secret (optional, falls back to
+- **Rollout, in order (nothing of this is live yet):** (1) ~~check the MX records~~ done 2026-09-25; (2) ~~apply
+  `db/migrations/2026-09-24-audit-plan.sql` in Supabase~~ applied 2026-09-25 in the SQL Editor, verified
+  (both new columns present, `place_evidence` RLS on, 0 public grants); (3) A/B the RUBRIC and the chat prompts against the real
+  model (`db/checks/validator_audit_ab.py`, `db/checks/chat_nivel_router_check.py`, plus the existing
+  `chat_prompt_ab.py` and jailbreak battery); (4) merge (frontend) and deploy `chat`; (5) set the `ADMIN_EMAIL` secret (optional, falls back to
   santiagosanchez@celiacmap.org); (6) dry run `scripts/cap_unsupported_100.py`, review the list, then `--apply`.
 
 ### Kitchen information as review evidence (2026-09-24)
