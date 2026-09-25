@@ -173,6 +173,20 @@ _PROVINCE_WRAP_RE = re.compile(
     r"^(?:provincia de |province of )?(.+?)(?: province)?$", re.IGNORECASE
 )
 
+# Like _PROVINCE_WRAP_RE, plus the Uruguayan "Departamento de X" wrapper, for is_foreign_address.
+# (parse_city_country_from_address keeps its own narrower regex: its city output is unchanged.)
+_REGION_WRAP_RE = re.compile(
+    r"^(?:provincia de |province of |departamento de |department of )?(.+?)(?: province| department)?$",
+    re.IGNORECASE,
+)
+
+# C.A.B.A. is neither an AR province nor a department, and its address has no province line; these
+# spellings of it (normalized) still mean "inside Argentina" when the country line is missing.
+_CABA_NAMES = {
+    "ciudad autonoma de buenos aires", "cdad. autonoma de buenos aires", "cdad autonoma de buenos aires",
+    "autonomous city of buenos aires", "capital federal", "caba", "c.a.b.a.",
+}
+
 # Google's `locality` component is occasionally a stray fragment rather than
 # a real place name -- confirmed live for "Palluzzi Libre de gluten"
 # (locality="CFX", the 3-letter suffix of an Argentine CPA postal code like
@@ -312,6 +326,19 @@ class GooglePlacesClient:
                 match.get("name"),
             )
             match = None
+        if match and match.get("place_id") and self.is_foreign_address(match.get("formatted_address")):
+            # Find Place is location-biased, not bounded: a lead searched under a Uruguayan city can
+            # match a real business in Chile ("Goût Gluten Free" -> Vitacura). parse_city_country_from_address
+            # gives (None, None) for such an address and the country below would fall back to the QUERY's
+            # ("Uruguay" on a Chilean address). Treat it as no match: the address-only geocode below is
+            # restricted server-side to the target country and rejects anything outside UY/AR.
+            logger.warning(
+                "find_place match outside Uruguay/Argentina: searched %r, got %r (%s) — using address only",
+                name,
+                match.get("name"),
+                match.get("formatted_address"),
+            )
+            match = None
         if match and match.get("place_id"):
             loc = (match.get("geometry") or {}).get("location") or {}
             lat, lng = loc.get("lat"), loc.get("lng")
@@ -385,6 +412,30 @@ class GooglePlacesClient:
             geocode_method="address_only",
             business_status=None,
         )
+
+    @staticmethod
+    def is_foreign_address(formatted_address: str | None) -> bool:
+        """True when a Google ``formatted_address`` is clearly outside Uruguay/Argentina.
+
+        Foreign = a full address (2+ comma segments) whose LAST segment is neither Argentina/Uruguay nor
+        a known Argentine province, Uruguayan department or C.A.B.A. (with or without its postal prefix
+        and its "Provincia de" / "Departamento de" wrapper). So "…, Región Metropolitana, Chile" and
+        "…, Valparaíso, Chile" are foreign, while "…, Provincia de Buenos Aires" (no country line) and
+        "…, C1424 Cdad. Autónoma de Buenos Aires" are not. An empty or single-segment address cannot be
+        judged and is not foreign. Limit: a domestic address that ends in a bare city name with neither a
+        province nor a country ("Rivera 1967, Fray Bentos") also reads as foreign; the caller then only
+        loses the Find Place match and still gets the address-only geocode.
+        """
+        if not formatted_address:
+            return False
+        parts = [p.strip() for p in formatted_address.split(",") if p.strip()]
+        if len(parts) < 2:
+            return False
+        last = parts[-1]
+        if _normalize_text(last) in SUPPORTED_COUNTRIES:
+            return False
+        region = _normalize_text(_REGION_WRAP_RE.sub(r"\1", _POSTAL_PREFIX_RE.sub("", last)).strip())
+        return region not in AR_PROVINCES and region not in UY_DEPARTMENTS and region not in _CABA_NAMES
 
     @staticmethod
     def parse_city_country_from_address(formatted_address: str | None) -> tuple[str | None, str | None]:

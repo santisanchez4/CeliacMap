@@ -260,3 +260,110 @@ def test_resolve_drops_mismatched_find_place_and_returns_none_without_address():
 
     assert client.resolve_location("Bienestar Gluten Free", None, "Fray Bentos", "Uruguay") is None
     client._client.geocode.assert_not_called()
+
+
+# --- Find Place matches outside Uruguay/Argentina (the Goût Gluten Free / Vitacura case) ---------
+#
+# Find Place is location-*biased*, not bounded, so a lead searched under a Uruguayan city can match a
+# real business in Chile. parse_city_country_from_address() returns (None, None) for such an address and
+# the country used to fall back to the query's (-> "Uruguay" on a Vitacura address). A match whose
+# address does not end in Argentina/Uruguay nor in a known province/department is now "no match".
+
+VITACURA = "Av. Alonso de Córdova 4098, 7658234 Vitacura, Región Metropolitana, Chile"
+VINA_DEL_MAR = "Av. José Manuel Balmaceda 287, 2540183 Viña del Mar, Valparaíso, Chile"
+
+
+def test_resolve_drops_a_find_place_match_in_vitacura_chile():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(
+        place_id="chile-1", name="Goût Gluten Free", lat=-33.39, lng=-70.57, formatted_address=VITACURA
+    )
+
+    resolved = client.resolve_location("Goût Gluten Free", "Alonso de Córdova 4098", "Montevideo", "Uruguay")
+
+    assert resolved is None  # the address-only geocode (restricted to UY) found nothing either
+    assert client._client.geocode.call_args.kwargs["components"] == {"country": "UY"}
+
+
+def test_resolve_drops_a_find_place_match_in_vina_del_mar_chile():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(
+        place_id="chile-2", name="Quimey Fusion & Gluten Free", lat=-33.02, lng=-71.55, formatted_address=VINA_DEL_MAR
+    )
+
+    resolved = client.resolve_location("Quimey Fusion & Gluten Free", "Balmaceda 287", "Montevideo", "Uruguay")
+
+    assert resolved is None
+
+
+def test_a_foreign_match_falls_through_to_the_address_only_geocode_and_never_keeps_the_foreign_point():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(
+        place_id="chile-1", name="Goût Gluten Free", lat=-33.39, lng=-70.57, formatted_address=VITACURA
+    )
+    client._client.geocode.return_value = geocode_result()  # a Uruguayan point for the lead's own address
+
+    resolved = client.resolve_location("Goût Gluten Free", "Rivera 1967", "Fray Bentos", "Uruguay")
+
+    assert resolved.geocode_method == "address_only"
+    assert resolved.place_id == "addr-1" and resolved.country == "Uruguay"
+    assert (resolved.lat, resolved.lng) != (-33.39, -70.57)
+
+
+def test_a_foreign_match_with_no_lead_address_is_unresolved_without_geocoding():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(name="Goût Gluten Free", formatted_address=VITACURA)
+
+    assert client.resolve_location("Goût Gluten Free", None, "Montevideo", "Uruguay") is None
+    client._client.geocode.assert_not_called()
+
+
+def test_an_argentine_address_without_a_country_line_but_with_a_known_province_is_accepted():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(
+        place_id="ar-1", name="QQ Quinoa Queen", lat=-34.3, lng=-58.7,
+        formatted_address="Mendoza 1578, B1623CSD Ingeniero Maschwitz, Provincia de Buenos Aires",
+    )
+
+    resolved = client.resolve_location("QQ Quinoa Queen", "Mendoza 1578", "Escobar", "Argentina")
+
+    assert resolved.geocode_method == "find_place" and resolved.place_id == "ar-1"
+    client._client.geocode.assert_not_called()
+
+
+def test_a_uruguayan_address_ending_in_its_department_is_accepted():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(
+        place_id="uy-1", name="víaSana", formatted_address="Faustino Carámbula 1121, 40000 Rivera, Departamento de Rivera"
+    )
+
+    resolved = client.resolve_location("víaSana", "Faustino Carámbula 1121", "Rivera", "Uruguay")
+
+    assert resolved.geocode_method == "find_place" and resolved.place_id == "uy-1"
+
+
+def test_a_caba_address_is_accepted_with_or_without_the_country_line():
+    for address in (
+        "Av. Rivadavia 4702, C1424 Cdad. Autónoma de Buenos Aires, Argentina",
+        "Av. Rivadavia 4702, C1424 Cdad. Autónoma de Buenos Aires",
+        "Av. Rivadavia 4702, C1424 Ciudad Autónoma de Buenos Aires",
+    ):
+        client = make_client()
+        client._client.find_place.return_value = find_place_candidate(
+            place_id="caba-1", name="Celi Café", lat=-34.6, lng=-58.44, formatted_address=address
+        )
+
+        resolved = client.resolve_location("Celi Café", "Av. Rivadavia 4702", "Buenos Aires", "Argentina")
+
+        assert resolved.geocode_method == "find_place" and resolved.place_id == "caba-1", address
+        client._client.geocode.assert_not_called()
+
+
+def test_a_match_with_no_address_or_a_single_segment_address_is_not_judged_foreign():
+    for address in (None, "", "Montevideo"):
+        client = make_client()
+        client._client.find_place.return_value = find_place_candidate(place_id="x", name="Café X", formatted_address=address)
+
+        resolved = client.resolve_location("Café X", None, "Montevideo", "Uruguay")
+
+        assert resolved is not None and resolved.geocode_method == "find_place", address

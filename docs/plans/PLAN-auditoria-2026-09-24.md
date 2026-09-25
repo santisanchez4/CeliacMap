@@ -37,7 +37,13 @@ agrega la marca `100% pendiente de confirmación del administrador` (nivel, stat
 los 30 días, así que bajar el nivel de 277 de 313 de golpe confundía "sin evidencia guardada" con "sin respaldo".
 `review_queue.py` suma `--offset` (junto a `--limit` y `--city`) y `--discard` ahora también quita la marca, para que un
 lugar decidido salga de `--pending-100`. Dry run de `--flag-only` sobre producción antes de la limpieza: 277 a marcar.
-`--flag-only --apply` **todavía no se corrió**: se repite el dry run tras la limpieza (esperado ~271 de 306) y lo confirma el admin.
+`--flag-only --apply` **todavía no se corrió**: es decisión del admin.
+
+**2026-09-25 — cierre de la pasada de datos:** (1) `resolve_location` ya no toma como buena una dirección de Find Place
+fuera de Uruguay/Argentina (`GooglePlacesClient.is_foreign_address`): el país caía al de la búsqueda (caso *Goût Gluten
+Free*, Vitacura); ahora cae al geocode de solo dirección. Las 2 filas chilenas de `needs_review` se corrigieron con
+`db/fixes/2026-09-25-chile-out-of-scope.sql` (precedente Brasil). (2) Deuda conocida: las 12 filas descartadas con
+país equivocado y el parser que devuelve la ciudad `Departamento de X` (4 filas, no públicas).
 
 ## Resumen
 

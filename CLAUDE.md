@@ -236,6 +236,23 @@ GEOGRAPHIC SCOPE
   `skipped` + a new `out_of_scope` summary field and logs a `WARNING` with
   the query and dropped address (a high `out_of_scope` count flags an
   ambiguous city in `targets.yaml`). `tests/test_search_agent.py` +4/−1.
+
+  **Hardening for Social / Web / Suggestion (2026-09-25):** the same hole was still open in
+  `GooglePlacesClient.resolve_location()`. In its Find Place branch the country was
+  `parsed_country or <query country>` (`parse_city_country_from_address` returns `(None, None)` for any address
+  that does not end in Argentina/Uruguay), so a match in Chile got the country of the *search*: *Goût Gluten Free*
+  (Vitacura) was stamped `country='Uruguay'` on 2026-09-01 (the Validator discarded it) and two more Chilean rows
+  sat in `needs_review` (Las Petunias, Quimey Fusion; corrected in `db/fixes/2026-09-25-chile-out-of-scope.sql`).
+  `GooglePlacesClient.is_foreign_address()` now treats a Find Place match as **no match** — falling through to the
+  address-only geocode, which is restricted to the target country and rejects anything outside UY/AR — when its
+  address has 2+ segments and the last one is neither Argentina/Uruguay nor a known province, department or
+  C.A.B.A. spelling (with or without postal prefix and "Provincia de" / "Departamento de"). Measured on all 1,312
+  real addresses in production: 0 false positives among approved / `needs_review` / pending rows; it flags the 6
+  Brazil rows, the 2 Chile rows and non-public leftovers. Known limits: a domestic address that ends in a bare city
+  with neither province nor country ("Rivera 1967, Fray Bentos") also reads as foreign (the lead only loses the
+  Find Place match and still gets the address-only geocode); and a domestic address with a province but no country
+  line still takes the *query* country (a border case: only `Río Negro` exists in both countries). 8 new tests in
+  `tests/test_google_places.py`.
 - **`GooglePlacesClient.resolve_location()` can return the WRONG business when
   Find Place mis-matches `name + address + city` — fixed 2026-09-24 (name check).** Find Place always returns *a* candidate if it can match
   *anything* in the query string, and takes the first one with no
@@ -2350,8 +2367,18 @@ on any drift). Approved 100% places went 313 → 306.
   (TACCOFF "Palermo"), the long official form (Cucinetta "Cdad. Autónoma de Buenos Aires") and a stale query
   target (Donato "Salto" for a CABA address). **CABA is `Buenos Aires`** everywhere else (108 rows) — keep that
   convention; the frontend and the chatbot filter by city.
+- **Chile (same day, second file `db/fixes/2026-09-25-chile-out-of-scope.sql`, 2 rows):** *Las Petunias* and *Quimey
+  Fusion* (`needs_review`, Chilean addresses stamped `country='Uruguay'`) → `country='Chile'`, `outreach_opt_out=true`,
+  header prepended, `status` / coordinates / confidence untouched — the Brazil precedent of 2026-09-01. The code
+  hole that produced them is closed in `resolve_location` (see **Key risks**).
 - **Deliberately not touched:** the víaSana row (a legitimate Rivera business — see the clarification under
   **Key risks**) and the `Mensaje de prueba` `outreach_messages` row on the discarded seed place.
+- **Known debt (found, not fixed — none is public):** (1) the **12 `discarded` rows** with an Argentine address
+  labelled Uruguay (see above); (2) `parse_city_country_from_address` returns the city **`Departamento de X`** for a
+  Find-Place-resolved Uruguayan address (its province-wrapper regex does not strip "Departamento de") — 4 rows today
+  (1 `discarded`, 3 `needs_review`, all `Departamento de Montevideo`) of 299 Uruguayan social/web/user rows; a
+  one-token fix in `_PROVINCE_WRAP_RE` that would change city output, so it is left as debt; (3) *Goût Gluten Free*
+  (Chile, `discarded`) still says `country='Uruguay'`.
 
 ### Kitchen information as review evidence (2026-09-24)
 
