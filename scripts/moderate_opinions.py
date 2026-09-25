@@ -19,6 +19,7 @@ import re
 import sys
 
 from agents.clients.supabase_client import SupabaseClient
+from agents.validator_agent import ValidatorAgent
 from config.settings import get_settings
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
@@ -38,6 +39,11 @@ def _print_pending(pending: list[dict], out) -> None:
         out(f"  autor:  {name}")
         out(f"  fecha:  {r.get('created_at')}")
         out(f"  texto:  {r.get('description')}")
+        if place.get("safety_level") != "gluten_free_100" and ValidatorAgent.has_exclusive_signal([r.get("description")]):
+            # Audit plan step 5: a public card must not contradict the map's label.
+            out("  ⚠ AVISO: el texto dice que el lugar es 100% / exclusivo sin gluten, pero en el mapa figura como")
+            out("    'Tiene opciones sin TACC'. Si lo publicás, la tarjeta contradice la etiqueta. Revisá el nivel")
+            out("    (scripts/review_queue.py --approve ID --level 100) o no la publiques así.")
 
 
 def run(db, approve: list[str], hide: list[str], apply: bool, out=print) -> int:

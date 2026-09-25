@@ -267,13 +267,45 @@ class SupabaseClient:
         claims.sort(key=lambda r: r.get("created_at") or "", reverse=True)
         return claims[:limit]
 
+    # --- place_evidence (server-only) -------------------------------
+    EVIDENCE_TEXT_MAX = 1000
+    EVIDENCE_URL_MAX = 500
+
+    def add_place_evidence(
+        self, place_id: str, source: str, text: str | None = None, url: str | None = None
+    ) -> None:
+        """Keep what a discovery agent / person told us about a place (audit plan step 1).
+
+        Clamped to the table's CHECK bounds on the way in; a row with neither text nor URL
+        is skipped rather than rejected by the database.
+        """
+        text = (text or "").strip()[: self.EVIDENCE_TEXT_MAX] or None
+        url = (url or "").strip()[: self.EVIDENCE_URL_MAX] or None
+        if not text and not url:
+            return
+        self._db.table("place_evidence").insert(
+            {"place_id": place_id, "source": source, "text": text, "url": url}
+        ).execute()
+
+    def fetch_place_evidence(self, place_id: str, limit: int = 5) -> list[dict]:
+        """Newest-first evidence rows for a place (``source``, ``text``, ``url``)."""
+        res = (
+            self._db.table("place_evidence")
+            .select("source, text, url, created_at")
+            .eq("place_id", place_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
     def fetch_unpublished_opinions(self, limit: int = 100) -> list[dict]:
         """Positive reports waiting for moderation: not published yet, about a place that is
         currently ``approved``. Oldest first. The full ``description`` is returned on purpose --
         the admin reads everything before publishing."""
         res = (
             self._db.table("place_reports")
-            .select("id, description, author_name, created_at, place_id, places!inner(name, city, country, status)")
+            .select("id, description, author_name, created_at, place_id, places!inner(name, city, country, status, safety_level)")
             .eq("report_type", "positive")
             .is_("published_at", "null")
             .eq("places.status", "approved")
@@ -429,6 +461,151 @@ class SupabaseClient:
             .eq("report_type", "negative")
             .in_("status", ["new", "dispatched"])
             .not_.is_("place_id", "null")
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def fetch_recent_negative_report_count(self, place_id: str, days: int = 30) -> int:
+        """Distinct negative reports about a place in the last ``days`` (audit plan step 7).
+
+        "Distinct" = by ``reporter_token`` (one per browser); a report without a token (the
+        chatbot, older rows) counts on its own. A weak defense — the token lives in the
+        browser — backed by the threshold and the admin's review.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        res = (
+            self._db.table("place_reports")
+            .select("id, reporter_token")
+            .eq("place_id", place_id)
+            .eq("report_type", "negative")
+            .gte("created_at", cutoff)
+            .execute()
+        )
+        return len({r.get("reporter_token") or f"id:{r.get('id')}" for r in (res.data or [])})
+
+    def set_community_warning(self, place_id: str, at: str | None) -> None:
+        """Set (ISO timestamp) or clear (None) the public "reportado por la comunidad" warning."""
+        self._db.table("places").update({"community_warning_at": at}).eq("id", place_id).execute()
+
+    # --- admin review queue (scripts/review_queue.py, audit plan step 6) ---------
+    ADMIN_PLACE_COLUMNS = (
+        "id, name, city, country, address, category, safety_level, status, source, lat, lng, "
+        "geocode_method, social_url, website, validation_confidence, validation_notes, flags, "
+        "recommendation, community_warning_at, created_at"
+    )
+
+    def fetch_places_for_admin(
+        self,
+        status: str | None = None,
+        *,
+        city: str | None = None,
+        flag: str | None = None,
+        warned_since: str | None = None,
+        safety_level: str | None = None,
+        limit: int = 15,
+    ) -> list[dict]:
+        """Places for the admin to review, oldest first. ``flag`` matches a value inside the
+        ``flags`` jsonb list; ``warned_since`` keeps only places with a community warning set
+        at or after that ISO timestamp."""
+        q = self._db.table("places").select(self.ADMIN_PLACE_COLUMNS)
+        if status:
+            q = q.eq("status", status)
+        if city:
+            q = q.ilike("city", f"%{city}%")
+        if flag:
+            q = q.contains("flags", [flag])
+        if warned_since:
+            q = q.gte("community_warning_at", warned_since)
+        if safety_level:
+            q = q.eq("safety_level", safety_level)
+        res = q.order("created_at").limit(limit).execute()
+        return res.data or []
+
+    def fetch_suggestions_by_status(self, status: str, limit: int = 50) -> list[dict]:
+        res = (
+            self._db.table("suggestions")
+            .select("*")
+            .eq("status", status)
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def fetch_suggestion_by_id(self, suggestion_id: str) -> dict | None:
+        res = self._db.table("suggestions").select("*").eq("id", suggestion_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def fetch_suggestion_for_place(self, place_id: str) -> dict | None:
+        """The community suggestion that was promoted into this place, if any (admin only:
+        it can carry the owner_celiac declaration, which never goes to a public column)."""
+        res = (
+            self._db.table("suggestions")
+            .select("*")
+            .eq("promoted_place_id", place_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def fetch_recent_negative_reports(self, place_id: str, days: int = 30) -> list[dict]:
+        """Negative report texts about a place (admin only — never public)."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        res = (
+            self._db.table("place_reports")
+            .select("id, description, reporter_token, created_at")
+            .eq("place_id", place_id)
+            .eq("report_type", "negative")
+            .gte("created_at", cutoff)
+            .order("created_at")
+            .execute()
+        )
+        return res.data or []
+
+    # --- admin notifications (audit plan step 9) ------------------------------
+    def fetch_agent_log_count(self, action: str, since: str) -> int:
+        res = (
+            self._db.table("agent_log")
+            .select("id", count="exact")
+            .eq("action", action)
+            .gte("created_at", since)
+            .limit(1)
+            .execute()
+        )
+        return int(res.count or 0)
+
+    def fetch_agent_log_since(self, since: str, limit: int = 2000) -> list[dict]:
+        """agent_log rows since ``since`` (the digest counts chatbot rows but never prints them)."""
+        res = (
+            self._db.table("agent_log")
+            .select("agent, action, status, result, place_id, created_at")
+            .gte("created_at", since)
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def fetch_suggestions_since(self, since: str, limit: int = 200) -> list[dict]:
+        res = (
+            self._db.table("suggestions")
+            .select("*")
+            .gte("created_at", since)
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    def fetch_place_reports_since(self, since: str, limit: int = 200) -> list[dict]:
+        res = (
+            self._db.table("place_reports")
+            .select("id, report_type, description, author_name, place_name_text, created_at, "
+                    "place_id, places(name, city, country, safety_level)")
+            .gte("created_at", since)
             .order("created_at")
             .limit(limit)
             .execute()

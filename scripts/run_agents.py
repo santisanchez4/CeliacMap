@@ -73,6 +73,39 @@ class DryRunSupabase:
     def fetch_unpublished_opinions(self, limit: int = 100) -> list[dict]:
         return self._inner.fetch_unpublished_opinions(limit=limit)
 
+    def fetch_place_evidence(self, place_id: str, limit: int = 5) -> list[dict]:
+        return self._inner.fetch_place_evidence(place_id, limit=limit)
+
+    def fetch_recent_negative_report_count(self, place_id: str, days: int = 30) -> int:
+        return self._inner.fetch_recent_negative_report_count(place_id, days=days)
+
+    def fetch_places_for_admin(self, status=None, **kwargs: Any) -> list[dict]:
+        return self._inner.fetch_places_for_admin(status, **kwargs)
+
+    def fetch_suggestions_by_status(self, status: str, limit: int = 50) -> list[dict]:
+        return self._inner.fetch_suggestions_by_status(status, limit=limit)
+
+    def fetch_suggestion_by_id(self, suggestion_id: str) -> dict | None:
+        return self._inner.fetch_suggestion_by_id(suggestion_id)
+
+    def fetch_suggestion_for_place(self, place_id: str) -> dict | None:
+        return self._inner.fetch_suggestion_for_place(place_id)
+
+    def fetch_recent_negative_reports(self, place_id: str, days: int = 30) -> list[dict]:
+        return self._inner.fetch_recent_negative_reports(place_id, days=days)
+
+    def fetch_agent_log_count(self, action: str, since: str) -> int:
+        return self._inner.fetch_agent_log_count(action, since)
+
+    def fetch_agent_log_since(self, since: str, limit: int = 2000) -> list[dict]:
+        return self._inner.fetch_agent_log_since(since, limit=limit)
+
+    def fetch_suggestions_since(self, since: str, limit: int = 200) -> list[dict]:
+        return self._inner.fetch_suggestions_since(since, limit=limit)
+
+    def fetch_place_reports_since(self, since: str, limit: int = 200) -> list[dict]:
+        return self._inner.fetch_place_reports_since(since, limit=limit)
+
     def fetch_latest_received_message(self, place_id: str) -> dict | None:
         return self._inner.fetch_latest_received_message(place_id)
 
@@ -149,6 +182,12 @@ class DryRunSupabase:
 
     def update_place(self, place_id: str, patch: dict[str, Any]) -> None:
         logger.info("[dry-run] would update place %s -> %s", place_id, patch)
+
+    def set_community_warning(self, place_id: str, at: str | None) -> None:
+        logger.info("[dry-run] would set community warning on %s -> %s", place_id, at)
+
+    def add_place_evidence(self, place_id: str, source: str, text=None, url=None) -> None:
+        logger.info("[dry-run] would add %s evidence for place %s", source, place_id)
 
     def update_place_validation(self, place_id: str, **kwargs: Any) -> None:
         logger.info("[dry-run] would set validation on %s -> %s", place_id, kwargs)

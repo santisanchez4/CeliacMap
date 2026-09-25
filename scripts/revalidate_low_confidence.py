@@ -47,6 +47,7 @@ from datetime import date
 
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.manual_overrides import MANUAL_OVERRIDE_MARKERS
 from agents.validator_agent import ValidatorAgent
 from config.settings import get_settings
 from scripts.run_agents import DryRunSupabase
@@ -67,10 +68,7 @@ DEFAULT_THRESHOLD = 0.7
 # (first-hand knowledge of the business), or a prior run of this script already
 # re-evaluated it. Matched accent- and case-insensitively. See CLAUDE.md
 # "Manual Validator overrides — allowed, but never silent".
-PROTECTED_NOTE_MARKERS = (
-    "override",              # "OVERRIDE MANUAL ...", "override del Validator"
-    "aprobacion manual",     # "APROBACIÓN MANUAL (override del Validator)"
-    "correccion manual",     # "CORRECCIÓN MANUAL ..." (geography fixes)
+PROTECTED_NOTE_MARKERS = MANUAL_OVERRIDE_MARKERS + (
     "validacion retroactiva",  # a previous run of this script (idempotency)
 )
 
@@ -417,7 +415,13 @@ def main() -> int:
             reviews = []
 
         try:
-            v = agent.evaluate(place, reviews)
+            evidence = list(db.fetch_place_evidence(pid) or [])
+        except Exception:  # noqa: BLE001 - evidence context is best-effort
+            logger.exception("fetching evidence failed for %s", pid)
+            evidence = []
+
+        try:
+            v = agent.evaluate(place, reviews, None, evidence)
         except Exception as exc:  # noqa: BLE001
             logger.exception("re-validation failed for %s", pid)
             errors.append((place, str(exc)))

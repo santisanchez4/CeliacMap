@@ -151,6 +151,7 @@ class WebAgent(BaseAgent):
             "category": category,
             "address": (lead.get("address") or "").strip() or None,
             "source_url": (lead.get("source_url") or "").strip() or None,
+            "evidence": (lead.get("evidence") or "").strip() or None,
         }
 
     def run(self) -> dict:
@@ -274,6 +275,12 @@ class WebAgent(BaseAgent):
 
                 if row:
                     inserted += 1
+                    try:
+                        self.db.add_place_evidence(
+                            row.get("id"), "web", lead["evidence"], lead["source_url"]
+                        )
+                    except Exception:  # noqa: BLE001 - evidence is best-effort
+                        logger.exception("storing evidence failed for %s", row.get("id"))
                     self.log(
                         "web_candidate_inserted",
                         {

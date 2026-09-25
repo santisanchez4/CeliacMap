@@ -290,3 +290,16 @@ def test_leads_per_city_cap():
     summary = agent.run()
 
     assert summary["leads_found"] == 2  # capped before geocoding
+
+
+# --- Audit plan step 1: the model's evidence sentence is kept for the Validator --
+
+
+def test_inserted_candidate_keeps_the_evidence_sentence_and_url():
+    agent, db, _, _ = make_agent(max_cities=1)
+
+    agent.run()
+
+    db.add_place_evidence.assert_called_once_with(
+        "row-1", "web", "Reseña local lo recomienda como 100% sin TACC.", "https://blog.example/sin-tacc-mvd"
+    )

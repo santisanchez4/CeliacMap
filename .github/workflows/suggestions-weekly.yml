@@ -1,0 +1,54 @@
+# Suggestions - weekly run (audit plan step 8).
+# The public "¿Conocés un lugar? Agregalo" form (and the chatbot) write to `suggestions`;
+# the monthly pipeline used to be the only thing that promoted them, so a suggestion could
+# wait up to 30 days. This job runs once a week, with small caps and its own budget:
+#   1. Suggestion promoter: geocode -> dedup -> places (status 'pending'), or
+#      'needs_location' for the admin when the address can't be placed.
+#   2. Validator: judges the pending queue (new suggestions included).
+# Nothing is published without the Validator; a place with no Google listing normally ends
+# in needs_review and the admin approves it (scripts/review_queue.py).
+name: Suggestions - weekly run
+
+on:
+  schedule:
+    # Mondays 10:47 UTC (07:47 Uruguay).
+    - cron: '47 10 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Same group as the monthly pipeline and the mid-month Validator: they share the
+# `pending` queue with no row-claiming, so an overlap would only waste API calls.
+concurrency:
+  group: agents-monthly
+  cancel-in-progress: false
+
+jobs:
+  suggestions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MAX_SUGGESTIONS_PER_RUN: "20"
+      MAX_VALIDATIONS_PER_RUN: "40"
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Promote new suggestions
+        run: python -m agents.suggestion_agent
+
+      - name: Validate pending places
+        run: python -m agents.validator_agent

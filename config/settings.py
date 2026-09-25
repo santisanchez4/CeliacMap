@@ -95,6 +95,10 @@ class Settings:
     # to actually deliver (see .env.example); the recipient stays the fixed
     # test address regardless (ADR-003 not yet resolved).
     outreach_sender_email: str = "outreach@celiacmap.org"
+    # Admin notifications (audit plan step 9): urgent alerts + the daily digest go to
+    # ADMIN_EMAIL from ADMIN_SENDER_EMAIL. Empty ADMIN_EMAIL = notifications off.
+    admin_email: str = ""
+    admin_sender_email: str = "CeliacMap <avisos@celiacmap.org>"
     # Outreach Etapa 2 (reply webhook): the account's <id>.resend.app inbound
     # receiving domain, used to build a unique outreach+<place_id>@<domain>
     # Reply-To per send so a business's reply can be matched back to its
@@ -150,6 +154,10 @@ class Settings:
                 "OUTREACH_SENDER_EMAIL", "outreach@celiacmap.org"
             ).strip(),
             outreach_inbound_domain=os.getenv("OUTREACH_INBOUND_DOMAIN", "").strip(),
+            admin_email=os.getenv("ADMIN_EMAIL", "").strip(),
+            admin_sender_email=os.getenv(
+                "ADMIN_SENDER_EMAIL", "CeliacMap <avisos@celiacmap.org>"
+            ).strip(),
             outreach_monthly_limit=_int("OUTREACH_MONTHLY_LIMIT", 20),
             outreach_live_mode=_bool("OUTREACH_LIVE_MODE", False),
             max_email_scrapes_per_run=_int("MAX_EMAIL_SCRAPES_PER_RUN", 30),

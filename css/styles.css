@@ -1699,6 +1699,7 @@ h1, h2, h3 {
   --color-options: #a4670f;
   --color-options-bg: #fff0ce;
   --color-options-text: #75450b;
+  --color-warning: #b42318;
   --surface-raised: #fffefa;
 }
 
@@ -1730,6 +1731,24 @@ h1, h2, h3 {
 .dot-safe { background: var(--color-dedicated); }
 .dot-options { background: var(--color-options); }
 .pp-badge--dedicated::before { background: var(--color-dedicated); }
+/* Community warning (audit plan step 7): one or two recent negative reports. The pin turns
+   red with a "!"; the level badge in the detail still says 100% / options. */
+.cm-marker.cm-marker--warning {
+  position: relative; background: var(--color-warning);
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, .22), 0 4px 10px rgba(26, 58, 42, .30);
+}
+.cm-marker.cm-marker--warning::after {
+  content: "!"; position: absolute; inset: 0; display: grid; place-items: center;
+  color: #fff; font: 800 11px/1 var(--font-sans);
+}
+.cm-marker.cm-marker--warning.is-selected::after { font-size: 15px; }
+.dot-warning { background: var(--color-warning); }
+.pp-warning {
+  margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid #f3c1bb;
+  background: #fdf0ee; color: #7a1a12; font-size: .84rem; line-height: 1.45;
+}
+.pp-warning strong { display: block; margin-bottom: 2px; }
+.pp-level-note { margin: 8px 0 0; font-size: .82rem; line-height: 1.45; color: var(--color-text-muted); }
 .pp-badge--options::before { background: var(--color-options); }
 
 .pp-badge.pp-badge--dedicated,

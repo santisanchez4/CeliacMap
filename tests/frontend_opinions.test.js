@@ -65,7 +65,7 @@ Deno.test("form B: a positive recommendation sends the trimmed name", async () =
 
 Deno.test("form B: without a name the payload is exactly today's (no author_name key)", async () => {
   const { sent } = await submitReport({});
-  assert.deepEqual(Object.keys(sent[0]).sort(), ["description", "place_id", "report_type"]);
+  assert.deepEqual(Object.keys(sent[0]).sort(), ["description", "place_id", "report_type", "reporter_token"]);
 });
 
 Deno.test("form B: a name of only spaces is not sent", async () => {
@@ -257,4 +257,12 @@ Deno.test("form B: `.field { display: flex }` must not beat [hidden], or the nam
   // so any author rule that sets `display` wins over it.
   const css = await Deno.readTextFile("css/styles.css");
   assert.ok(/\.field\[hidden\]\s*\{\s*display:\s*none/.test(css));
+});
+
+// Audit plan step 7: each browser sends the same anonymous reporter_token, so three reports from one
+// browser count as one when deciding whether a place leaves the map.
+Deno.test("form B sends a stable, bounded reporter_token", async () => {
+  const src = await Deno.readTextFile("js/report.js");
+  assert.match(src, /reporter_token: reporterToken\(\)/);
+  assert.match(src, /tok\.length >= 8 && tok\.length <= 64/);
 });

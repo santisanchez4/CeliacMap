@@ -153,7 +153,7 @@ async function submitReport(type, choices = []) {
 
 Deno.test("report.js: 'No sé' everywhere sends exactly today's payload", async () => {
   const [sent] = await submitReport("positive");
-  assert.deepEqual(Object.keys(sent.body).sort(), ["description", "place_id", "report_type"]);
+  assert.deepEqual(Object.keys(sent.body).sort(), ["description", "place_id", "report_type", "reporter_token"]);
 });
 
 Deno.test("form B (recommend / report) has NO kitchen block: only 'add a place' asks how a place cooks", async () => {

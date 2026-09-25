@@ -39,6 +39,20 @@
   var MIN_FILL_MS = 3000;
   var COOLDOWN_MS = 60000;
   var COOLDOWN_KEY = "celiacmap-report-last";
+  // One anonymous id per browser so the backend can count "distinct" negative reports
+  // (3 in 30 days take a place off the map). Weak on purpose: clearing the browser resets it.
+  var REPORTER_KEY = "celiacmap-reporter-token";
+
+  function reporterToken() {
+    var tok = null;
+    try { tok = localStorage.getItem(REPORTER_KEY); } catch (e) {}
+    if (tok && tok.length >= 8 && tok.length <= 64) return tok;
+    tok = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+    try { localStorage.setItem(REPORTER_KEY, tok); } catch (e) {}
+    return tok;
+  }
   var renderedAt = Date.now();
 
   var MIN_CHARS = 2;
@@ -340,7 +354,8 @@
     var data = {
       place_id: placeId,
       report_type: currentType(),
-      description: description
+      description: description,
+      reporter_token: reporterToken()
     };
     var author = (authorEl && authorEl.value || "").trim();
     if (currentType() === "positive" && author) data.author_name = author.slice(0, 40);

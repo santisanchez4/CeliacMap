@@ -12,21 +12,30 @@ Re-evaluates a single approved place after a negative report arrives,
 combining the original evidence with the report through the *same*
 Validator rubric (RUBRIC, ValidatorAgent._normalize) — zero duplicated
 rubric/gate logic, same reuse pattern as outreach_reply_handler.py.
-Per ADR-004, the Validator's own verdict is trusted directly — approved
-stays approved (confirmed), needs_review downgrades, discarded
-discards — unlike outreach's ADR-002 special case, since the place
-already passed this gate once and this is the same gate reconsidering
-it with new evidence, not a new source trying to fast-track approval.
+What the report DOES to the map (owner decision 2026-09-24, audit plan step 7)
+no longer follows the model's verdict directly — one anonymous report could hide
+any place:
+
+- 1 or 2 distinct negative reports in 30 days: the place stays on the map with a
+  public warning (``places.community_warning_at``, "reportado por la comunidad").
+- 3 distinct reports in 30 days (``REPORTS_TO_HIDE``), or ONE report the model judges
+  a credible contamination / symptoms report: ``status='needs_review'`` (off the map)
+  until the admin reviews it.
+
+The re-evaluation also never raises the safety level, and never erases or overturns an
+admin's manual decision (audit plan step 3).
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+from datetime import date, datetime, timezone
 
 from agents.base import BaseAgent
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.manual_overrides import manual_override_marker
 from agents.validator_agent import RUBRIC, ValidatorAgent
 
 logger = logging.getLogger("celiacmap.agent")
@@ -36,32 +45,89 @@ logger = logging.getLogger("celiacmap.agent")
 # same batch (needs_review/discarded) is left alone — no re-triggering.
 ACTIONABLE_STATUSES = ("approved",)
 
+# Owner decision 2026-09-24: the third distinct negative report in 30 days hides a place.
+REPORTS_TO_HIDE = 3
+REPORT_WINDOW_DAYS = 30
+# Lowest -> highest. A report can only keep or LOWER a place's level.
+SAFETY_ORDER = ("options_available", "celiac_friendly", "gluten_free_100")
+
 
 def _build_report_prompt(
     place: dict,
     reviews: list[dict],
     report_description: str,
     claims: list[dict] | None = None,
+    evidence: list[dict] | None = None,
 ) -> str:
-    base = ValidatorAgent._build_user_prompt(place, reviews, claims)
+    base = ValidatorAgent._build_user_prompt(place, reviews, claims, evidence)
     return (
         f"{base}\n\n"
         "Reporte directo de la comunidad (no verificado; puede ser un caso "
         "aislado, un error, o mal intencionado — pesar con la misma cautela "
         "que cualquier fuente sin verificar, nunca como confirmación "
         "automática):\n"
-        f"{report_description}"
+        f"{report_description}\n\n"
+        "Además de los campos pedidos, agregá al JSON el campo "
+        '"reporte_contaminacion_creible": true si el reporte describe contaminación '
+        "con gluten o síntomas después de comer en el lugar Y te resulta creíble "
+        "(concreto, coherente con el resto de la evidencia); en cualquier otro caso, false."
     )
+
+
+def _lower_level(current: str | None, proposed: str | None) -> str | None:
+    """The lower of two safety levels; an unknown value never wins."""
+    if current not in SAFETY_ORDER:
+        return proposed
+    if proposed not in SAFETY_ORDER:
+        return current
+    return min(current, proposed, key=SAFETY_ORDER.index)
 
 
 class ReviewHandler(BaseAgent):
     name = "review_handler"
 
-    def __init__(self, db: SupabaseClient, llm: LLMClient, model: str | None = None):
+    def __init__(self, db: SupabaseClient, llm: LLMClient, model: str | None = None, notifier=None):
         super().__init__(db)
         self.llm = llm
         self.model = model
         self.validator = ValidatorAgent(db, llm)  # reused only for ._normalize()
+        self.notifier = notifier  # AdminNotifier or None (audit plan step 9)
+
+    def _alert_admin(self, place: dict, description: str, v: dict, hide: bool,
+                     contamination: bool, distinct_reports: int) -> None:
+        if not self.notifier:
+            return
+        name = place.get("name") or place.get("id")
+        where = ", ".join(x for x in (place.get("city"), place.get("country")) if x)
+        if hide:
+            subject = f"URGENTE: retirado del mapa por reportes — {name}"
+            outcome = ("Salió del mapa (needs_review): "
+                       + ("reporte creíble de contaminación o síntomas." if contamination
+                          else f"{distinct_reports} reportes distintos en {REPORT_WINDOW_DAYS} días."))
+        else:
+            subject = f"Reporte negativo — {name} (aviso en el mapa)"
+            outcome = (f"Sigue en el mapa con el aviso 'Reportado por la comunidad' "
+                       f"({distinct_reports} de {REPORTS_TO_HIDE} reportes para sacarlo).")
+        text = "\n".join([
+            f"Lugar: {name} — {where}",
+            f"Nivel: {place.get('safety_level')} · id {place.get('id')}",
+            "",
+            outcome,
+            "",
+            "Reporte (no verificado, no se publica):",
+            description,
+            "",
+            f"Re-evaluación del Validator: {v.get('verdict')} @ {v.get('confidence')}",
+            v.get("reason") or "",
+            f"Flags: {', '.join(v.get('flags') or []) or '-'}",
+            f"Sugiere: {v.get('recommendation') or '-'}",
+            "",
+            "Qué podés hacer:",
+            "  python -m scripts.review_queue --warnings",
+            f"  python -m scripts.review_queue --clear-warning {place.get('id')} --apply   # si el reporte no aplica",
+            f"  python -m scripts.review_queue --approve {place.get('id')} --level options --note \"...\" --apply",
+        ])
+        self.notifier.urgent(subject, text, agent=self.name, place_id=place.get("id"))
 
     def handle(self, place_id: str, report_id: str) -> dict:
         # Atomic claim (CAS: status new/dispatched -> processing). This is
@@ -144,11 +210,19 @@ class ReviewHandler(BaseAgent):
             logger.exception("fetching community claims failed for %s", place_id)
             claims = []
 
-        prompt = _build_report_prompt(place, reviews, description, claims)
+        try:
+            evidence = list(self.db.fetch_place_evidence(place_id) or [])
+        except Exception:  # noqa: BLE001 - evidence context is best-effort
+            logger.exception("fetching evidence failed for %s", place_id)
+            evidence = []
+
+        prompt = _build_report_prompt(place, reviews, description, claims, evidence)
 
         try:
             raw_verdict = self.llm.complete_json(RUBRIC, prompt, model=self.model)
-            v = self.validator._normalize(raw_verdict, place, claims)
+            v = self.validator._normalize(
+                raw_verdict, place, claims, reviews=reviews, evidence=evidence
+            )
         except Exception as exc:  # noqa: BLE001
             self.db.update_place_report_status(report_id, "error")
             logger.exception("report re-evaluation failed for %s", place_id)
@@ -160,21 +234,49 @@ class ReviewHandler(BaseAgent):
             )
             return {"skipped": "evaluation failed"}
 
-        # No remapping (unlike ADR-002's outreach_confirmed): the place
-        # already passed this gate once, so its own verdict is trusted as-is.
-        db_status = v["status"]
+        contamination = raw_verdict.get("reporte_contaminacion_creible") is True
+        try:
+            distinct_reports = int(
+                self.db.fetch_recent_negative_report_count(place_id, days=REPORT_WINDOW_DAYS)
+            )
+        except Exception:  # noqa: BLE001 - count once, conservatively, if the read fails
+            logger.exception("counting recent reports failed for %s", place_id)
+            distinct_reports = 1
+        hide = contamination or distinct_reports >= REPORTS_TO_HIDE
+        manual = manual_override_marker(place.get("validation_notes"))
 
         try:
-            self.db.update_place_validation(
-                place_id,
-                status=db_status,
-                confidence=v["confidence"],
-                notes=v["reason"],
-                category=v["category"],
-                safety_level=v["safety_level"],
-                flags=v["flags"],
-                recommendation=v["recommendation"],
-            )
+            if hide:
+                reason = (
+                    "reporte creíble de contaminación o síntomas"
+                    if contamination
+                    else f"{distinct_reports} reportes negativos distintos en {REPORT_WINDOW_DAYS} días"
+                )
+                header = (
+                    f"RETIRADO DEL MAPA POR REPORTES ({date.today().isoformat()}): {reason}. "
+                    f"Re-evaluación del Validator: {v['reason'] or 'sin detalle'}"
+                )
+                old_notes = (place.get("validation_notes") or "").strip()
+                self.db.update_place_validation(
+                    place_id,
+                    status="needs_review",
+                    # An admin's number stays the admin's (never deflated to match the report).
+                    confidence=None if manual else v["confidence"],
+                    # The previous notes (and any manual-override record) are kept below.
+                    notes=f"{header}\n\n{old_notes}" if old_notes else header,
+                    category=None if manual else v["category"],
+                    safety_level=(
+                        None if manual else _lower_level(place.get("safety_level"), v["safety_level"])
+                    ),
+                    flags=v["flags"],
+                    recommendation=v["recommendation"],
+                )
+                db_status = "needs_review"
+            else:
+                # Stays on the map, with the public warning. The model's assessment is kept
+                # in agent_log for the admin; the place's validation columns are untouched.
+                self.db.set_community_warning(place_id, datetime.now(timezone.utc).isoformat())
+                db_status = place.get("status") or "approved"
             self.db.update_place_report_status(report_id, "processed")
         except Exception as exc:  # noqa: BLE001
             logger.exception("persisting report verdict failed for %s", place_id)
@@ -188,11 +290,24 @@ class ReviewHandler(BaseAgent):
 
         self.log(
             "review_evaluated",
-            {"place_id": place_id, "report_id": report_id, "verdict": v["verdict"], "status": db_status},
+            {
+                "place_id": place_id,
+                "report_id": report_id,
+                "verdict": v["verdict"],
+                "status": db_status,
+                "outcome": "hidden" if hide else "warning",
+                "contamination_credible": contamination,
+                "distinct_reports_30d": distinct_reports,
+                "manual_override": bool(manual),
+                "reasoning": v["reason"],
+                "flags": v["flags"],
+                "recommendation": v["recommendation"],
+            },
             status="success",
             place_id=place_id,
         )
-        return {"place_id": place_id, "status": db_status}
+        self._alert_admin(place, description, v, hide, contamination, distinct_reports)
+        return {"place_id": place_id, "status": db_status, "outcome": "hidden" if hide else "warning"}
 
     def sweep(self, limit: int = 50) -> dict:
         """Monthly safety net (8th pipeline stage): re-drive any negative
@@ -254,7 +369,11 @@ def main() -> int:
     db = SupabaseClient(settings.supabase_url, settings.supabase_service_role_key)
     llm = LLMClient(settings.anthropic_api_key, settings.validator_model)
 
-    result = ReviewHandler(db, llm).handle(args.place_id, args.report_id)
+    from agents.admin_notify import build_notifier
+
+    result = ReviewHandler(db, llm, notifier=build_notifier(settings, db)).handle(
+        args.place_id, args.report_id
+    )
     print("Review handled:", result)
     return 0
 

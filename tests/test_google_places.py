@@ -194,3 +194,69 @@ def test_resolve_geocode_error_returns_none():
     )
 
     assert resolved is None
+
+
+# --- Name check: Find Place must return the business we searched for ----------
+
+import pytest  # noqa: E402
+
+from agents.clients.google_places import names_match  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "searched, found",
+    [
+        ("Los Leños", "Los Leños Parrilla"),
+        ("Dalbertt", "Dalbert Pastas"),  # one typo in a long word
+        ("Café Ramona", "Ramona Café - Centro"),
+        ("viaSana", "Via Sana"),
+        ("Pastas Lo de Flor", "Lo de Flor"),
+        ("Casa & Dispensa", "Casa y Dispensa"),
+        ("La Espiga", "Panadería La Espiga Sin TACC"),
+        ("Glúten Pra Quê?", "Gluten Pra Que"),
+    ],
+)
+def test_names_match_same_business(searched, found):
+    assert names_match(searched, found)
+
+
+@pytest.mark.parametrize(
+    "searched, found",
+    [
+        ("Bienestar Gluten Free", "víaSana"),  # the real 2026-09-01 mis-match
+        ("Serendipia Gluten Free", "Selkkis Gluten Free"),
+        ("Serendipia Gluten Free", "Delirio Sin Gluten"),
+        ("Sin Gluten Palermo", "Sin Gluten Belgrano"),  # generic words don't count
+    ],
+)
+def test_names_match_different_business(searched, found):
+    assert not names_match(searched, found)
+
+
+def test_names_match_unknown_name_is_accepted():
+    assert names_match("Café X", None)
+    assert names_match(None, "Café X")
+
+
+def test_resolve_drops_find_place_match_with_another_name_and_geocodes_address():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(
+        place_id="viasana", name="víaSana", formatted_address="Rivera 500, Rivera, Uruguay"
+    )
+    client._client.geocode.return_value = geocode_result()
+
+    resolved = client.resolve_location(
+        "Bienestar Gluten Free", "Rivera 1967", "Fray Bentos", "Uruguay"
+    )
+
+    assert resolved.geocode_method == "address_only"
+    assert resolved.place_id == "addr-1"
+    assert resolved.city == "Fray Bentos"
+
+
+def test_resolve_drops_mismatched_find_place_and_returns_none_without_address():
+    client = make_client()
+    client._client.find_place.return_value = find_place_candidate(name="víaSana")
+
+    assert client.resolve_location("Bienestar Gluten Free", None, "Fray Bentos", "Uruguay") is None
+    client._client.geocode.assert_not_called()

@@ -252,10 +252,18 @@
     });
   }
 
+  function recentlyReported(p) {
+    var t = p && p.community_warning_at ? Date.parse(p.community_warning_at) : NaN;
+    return !isNaN(t) && Date.now() - t < 30 * 864e5;
+  }
+
   function renderTop3() {
     if (!top3ListEl || !loaded) return;
-    top3ListEl.innerHTML = rows.length
-      ? rows.slice(0, 3).map(function (p, i) { return top3RowHtml(p, i + 1); }).join("")
+    // A place with a recent community report keeps its place in the full ranking, but is not
+    // highlighted as a top pick next to the map (audit plan step 7).
+    var picks = rows.filter(function (p) { return !recentlyReported(p); });
+    top3ListEl.innerHTML = picks.length
+      ? picks.slice(0, 3).map(function (p, i) { return top3RowHtml(p, i + 1); }).join("")
       : '<li class="map-top3-empty">' + esc(t("top3Empty")) + "</li>";
     if (top3El) top3El.hidden = false;
   }
@@ -264,7 +272,7 @@
     if (!listEl) return;
     loaded = false;
     setStatus("");
-    var url = REST + "/places?select=id,name,city,country,category,safety_level,vote_count,rating" +
+    var url = REST + "/places?select=id,name,city,country,category,safety_level,vote_count,rating,community_warning_at" +
       "&status=eq.approved&country=eq." + encodeURIComponent(country) +
       "&vote_count=gt.0" +
       "&order=vote_count.desc,rating.desc.nullslast,name.asc&limit=" + TOP_N;

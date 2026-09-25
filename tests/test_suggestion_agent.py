@@ -75,7 +75,10 @@ def test_promote_inserts_user_candidate():
     assert candidate["lat"] == -34.9 and candidate["lng"] == -56.2
     assert candidate["safety_level"] == DEFAULT_SAFETY_LEVEL
     assert candidate["social_url"] == "https://instagram.com/cafex"
-    assert candidate["validation_notes"] == "menú sin TACC"
+    # The note + link go to the server-only place_evidence the Validator reads, never to the
+    # publicly readable validation_notes.
+    assert "validation_notes" not in candidate
+    db.add_place_evidence.assert_called_once_with("row-1", "user", "menú sin TACC", "https://instagram.com/cafex")
     assert candidate["geocode_method"] == "find_place"
 
 
@@ -205,14 +208,17 @@ def test_run_marks_duplicate():
     db.insert_place_candidate.assert_not_called()
 
 
-def test_run_marks_unresolved_as_rejected():
+def test_run_sends_an_unplaceable_suggestion_to_the_admin_not_to_rejected():
+    """Audit plan step 8: "JC 23" (Pastas Lo de Flor) could not be geocoded and used to be
+    rejected silently; now it waits for the admin to fix the address."""
     db, places = make_db(), make_places(match=None)
     db.fetch_new_suggestions.return_value = [make_suggestion()]
 
     summary = SuggestionAgent(db, places, max_per_run=10).run()
 
-    assert summary["rejected"] == 1
-    db.update_suggestion_status.assert_called_once_with("s-1", "rejected")
+    assert summary["needs_location"] == 1
+    assert "rejected" not in summary
+    db.update_suggestion_status.assert_called_once_with("s-1", "needs_location")
 
 
 def test_run_counts_geocode_error_and_leaves_suggestion():
@@ -232,5 +238,5 @@ def test_run_zero_cap_does_nothing():
     db, places = make_db(), make_places()
     summary = SuggestionAgent(db, places, max_per_run=0).run()
     assert summary == {"seen": 0, "promoted": 0, "duplicate": 0,
-                       "rejected": 0, "skipped": 0, "geocodes": 0, "errors": 0}
+                       "needs_location": 0, "skipped": 0, "geocodes": 0, "errors": 0}
     db.fetch_new_suggestions.assert_not_called()

@@ -266,7 +266,8 @@ create index if not exists agent_log_agent_idx      on public.agent_log (agent);
 -- base (search/validator/updater/social/web/pipeline/suggestion) -> +outreach
 -- (Phase 15) -> +outreach_reply (Etapa 2) -> +review_handler (ADR-004,
 -- docs/plans/PLAN-community-reviews.md) -> +chatbot (ADR-006,
--- docs/plans/PLAN-chatbot-rag.md — the chat Edge Function's turn log).
+-- docs/plans/PLAN-chatbot-rag.md — the chat Edge Function's turn log) ->
+-- +admin_notify (audit plan step 9: the daily admin digest).
 -- Collapsed into a single widening here instead of a chain of separate DO
 -- blocks: applied one at a time, incrementally, each was always safe — but
 -- with real production rows already using 'outreach' (19) and
@@ -281,7 +282,7 @@ begin
     add constraint agent_log_agent_check
     check (agent in
       ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion',
-       'outreach', 'outreach_reply', 'review_handler', 'chatbot'));
+       'outreach', 'outreach_reply', 'review_handler', 'chatbot', 'admin_notify'));
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -319,9 +320,12 @@ create table if not exists public.suggestions (
   --   new       -> awaiting the next pipeline run
   --   promoted  -> a places row was created (promoted_place_id set)
   --   duplicate -> geocoded place_id already exists in places
-  --   rejected  -> could not geocode to a real Google place_id
+  --   rejected  -> could not geocode to a real Google place_id (legacy; since
+  --                2026-09-24 an unresolved suggestion goes to needs_location)
+  --   needs_location -> neither Find Place nor the address geocoded: waits for the
+  --                admin to fix the address / coordinates (scripts/review_queue.py)
   status            text not null default 'new'
-                      check (status in ('new', 'promoted', 'rejected', 'duplicate')),
+                      check (status in ('new', 'promoted', 'rejected', 'duplicate', 'needs_location')),
   promoted_place_id uuid references public.places(id) on delete set null,
   created_at        timestamptz not null default now()
 );
@@ -667,6 +671,65 @@ $$;
 -- code -- see db/checks/2026-09-16-chat-usage.sql.
 revoke execute on function public.bump_chat_usage(text[], date) from public, anon, authenticated;
 
+-- SUGGESTION-NEEDS-LOCATION-BEGIN
+-- Audit plan step 8: a suggestion whose address could not be placed waits for the admin
+-- instead of being rejected silently. Widens the inline CHECK above for databases created
+-- before this value existed (the anon INSERT policy still forces status='new').
+do $$
+begin
+  alter table public.suggestions drop constraint if exists suggestions_status_check;
+  alter table public.suggestions
+    add constraint suggestions_status_check
+    check (status in ('new', 'promoted', 'rejected', 'duplicate', 'needs_location'));
+end $$;
+-- SUGGESTION-NEEDS-LOCATION-END
+
+-- COMMUNITY-WARNING-BEGIN
+-- Audit plan step 7 (owner decision 2026-09-24). One or two distinct negative reports in 30
+-- days keep a place on the map with a public "reportado por la comunidad" warning; the third
+-- (or one credible contamination report) sends it to needs_review. community_warning_at is
+-- when the last warning was set; the frontend shows it for 30 days. It says only that a report
+-- exists — the report text is never public.
+alter table public.places add column if not exists community_warning_at timestamptz;
+-- One anonymous id per browser (like place_votes.voter_token), so "distinct reports" can be
+-- counted. Optional: the chatbot and older rows carry none and count one by one.
+alter table public.place_reports add column if not exists reporter_token text;
+do $$
+begin
+  alter table public.place_reports drop constraint if exists place_reports_reporter_token_check;
+  alter table public.place_reports
+    add constraint place_reports_reporter_token_check
+    check (reporter_token is null or char_length(reporter_token) between 8 and 64);
+end $$;
+create index if not exists place_reports_negative_recent_idx
+  on public.place_reports (place_id, created_at) where report_type = 'negative';
+-- COMMUNITY-WARNING-END
+
+-- PLACE-EVIDENCE-BEGIN
+-- ---------------------------------------------------------------------
+-- Table: place_evidence  (audit plan 2026-09-24, step 1)
+-- ---------------------------------------------------------------------
+-- The text a discovery agent or a person gave us about a place: the Instagram /
+-- Facebook snippet (Social), the "why is this GF" sentence + URL (Web), the note +
+-- link from the suggest form (user), or the admin's own evidence (admin). The
+-- Validator reads it and nothing ever overwrites it (validation_notes is rewritten on
+-- every validation, so evidence kept there was lost). SERVER-ONLY: it can carry
+-- unverified claims and third-party details, and places is publicly readable.
+create table if not exists public.place_evidence (
+  id         uuid primary key default gen_random_uuid(),
+  place_id   uuid not null references public.places(id) on delete cascade,
+  source     text not null
+               check (source in ('social', 'web', 'user', 'admin')),
+  text       text
+               check (text is null or char_length(text) between 1 and 1000),
+  url        text
+               check (url is null or char_length(url) <= 500),
+  created_at timestamptz not null default now(),
+  constraint place_evidence_has_content check (text is not null or url is not null)
+);
+create index if not exists place_evidence_place_id_idx on public.place_evidence (place_id);
+-- PLACE-EVIDENCE-END
+
 -- ---------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------
@@ -678,6 +741,7 @@ alter table public.outreach_messages enable row level security;
 alter table public.place_reports enable row level security;
 alter table public.place_votes enable row level security;
 alter table public.chat_usage enable row level security;
+alter table public.place_evidence enable row level security;
 
 -- Table-level privileges (RLS still gates rows).
 grant select on public.places  to anon, authenticated;
@@ -713,6 +777,8 @@ grant insert on public.place_votes to anon, authenticated;
 -- public. Only the chat Edge Function (service_role key, bypasses RLS) reads
 -- or writes it, via bump_chat_usage (itself EXECUTE-revoked from anon above).
 revoke all on public.chat_usage from anon, authenticated;
+-- place_evidence is server-only: no grant, no policy => fully denied to the public.
+revoke all on public.place_evidence from anon, authenticated;
 
 -- places: anyone may read ONLY approved rows.
 drop policy if exists "public read approved places" on public.places;

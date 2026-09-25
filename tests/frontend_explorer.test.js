@@ -21,6 +21,8 @@ async function fixture(mobile = false) {
   const rows = Array.from({ length: 12 }, (_, i) => ({
     id: "place-" + i, name: "Place " + String(i).padStart(2, "0"), city: "Montevideo",
     category: i === 0 ? "cafe" : "restaurant", safety_level: levels[i % 3], lat: -34.9, lng: -56.1,
+    // The fixture clock starts at epoch + 10 s: place-3 was reported "now", place-6 over 30 days ago.
+    community_warning_at: i === 3 ? "1970-01-01T00:00:05Z" : i === 6 ? "1969-11-01T00:00:00Z" : null,
   }));
   const markers = [];
   let mutations = 0;
@@ -56,7 +58,7 @@ async function fixture(mobile = false) {
   let now = 10000;
   const context = {
     window: browser, document, L, navigator: {}, CustomEvent: window.CustomEvent,
-    Date: { now: () => (now += 3000) },
+    Date: { now: () => (now += 3000), parse: Date.parse },
     fetch: async url => ({ ok: true, json: async () => String(url).includes("functions/v1/chat")
       ? { reply: "Found a place", places: [rows[0]], pending_submission: null } : rows }),
     setTimeout, clearTimeout,
@@ -140,7 +142,9 @@ Deno.test("safety filters and legend expose two levels", async () => {
   const chips = Array.from(f.document.querySelectorAll(".safety-chip")).map(c => c.getAttribute("data-safety"));
   assert.deepEqual(chips, ["all", "gluten_free_100", "options_available"]);
   const legend = Array.from(f.document.querySelectorAll(".map-legend li span:last-child")).map(s => s.textContent);
-  assert.deepEqual(legend, ["Espacio 100% sin gluten", "Tiene opciones sin TACC"]);
+  assert.deepEqual(legend, [
+    "Espacio 100% sin gluten", "Tiene opciones sin TACC", "Reportado por la comunidad: consultá antes de ir",
+  ]);
   assert.equal(f.document.querySelector('[data-safety="options_available"]').textContent, "Tiene opciones sin TACC");
 });
 
@@ -371,4 +375,41 @@ Deno.test("mobile chat follows viewport, isolates background and opens without f
   assert.equal(f.document.documentElement.classList.contains("chat-mobile-open"), false);
   assert.equal(f.document.querySelector("main").hasAttribute("inert"), false);
   assert.equal(f.document.body.classList.contains("chat-mobile-open"), false);
+});
+
+// Audit plan step 7: a recent negative report keeps the place on the map with a red "!" pin and
+// a notice in the detail; the level badge still says 100% / options. Older than 30 days: gone.
+Deno.test("a recently reported place gets the warning pin and notice; an old report does not", async () => {
+  const f = await fixture();
+  const cls = m => m.options.icon.html;
+  assert.ok(cls(f.markers[3]).includes("cm-marker--warning"));
+  assert.ok(cls(f.markers[3]).includes("cm-marker--dedicated"));
+  assert.equal(cls(f.markers[6]).includes("cm-marker--warning"), false);
+  assert.equal(cls(f.markers[0]).includes("cm-marker--warning"), false);
+
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
+  const body = f.document.getElementById("place-panel-body");
+  assert.match(body.textContent, /Reportado por la comunidad/);
+  assert.match(body.textContent, /Espacio 100% sin gluten/);
+  assert.ok(cls(f.markers[3]).includes("cm-marker--warning"), "the selected pin keeps the warning");
+
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-6" } }));
+  assert.equal(/Reportado por la comunidad/.test(body.textContent), false);
+});
+
+Deno.test("the map reads community_warning_at, and the warning pin is styled", async () => {
+  assert.match(await Deno.readTextFile("js/map.js"), /community_warning_at/);
+  const css = await Deno.readTextFile("css/styles.css");
+  assert.match(css, /\.cm-marker\.cm-marker--warning \{/);
+  assert.match(css, /\.pp-warning \{/);
+});
+
+// Audit plan step 5: the detail explains what each label means.
+Deno.test("the place detail explains the level label", async () => {
+  const f = await fixture();
+  const body = f.document.getElementById("place-panel-body");
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-0" } }));
+  assert.match(body.textContent, /se cocinan y venden solo productos aptos para celíacos/);
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-1" } }));
+  assert.match(body.textContent, /puede que también cocine con gluten/);
 });

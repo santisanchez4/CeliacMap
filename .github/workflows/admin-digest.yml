@@ -1,0 +1,45 @@
+# Admin digest - daily email (audit plan step 9).
+# One email a day to the admin with what people and agents left to review: new suggestions,
+# suggestions that could not be placed, negative reports, recommendations waiting for
+# approval, community warnings, "100% pendiente" places, Validator results and agent errors.
+# Sent only when there is something to tell. Urgent events are also emailed right away by
+# the review / outreach-reply handlers (agents/admin_notify.py).
+name: Admin digest - daily email
+
+on:
+  schedule:
+    # 11:45 UTC = 08:45 in Uruguay.
+    - cron: '45 11 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the email in the log instead of sending it"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL || 'santiagosanchez@celiacmap.org' }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build and send the digest
+        run: python -m scripts.admin_digest ${{ inputs.dry_run && '--dry-run' || '' }}

@@ -51,6 +51,14 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   underlying table stays closed. Moderate with `python -m scripts.moderate_opinions`
   (list pending) and `--approve ID --apply` / `--hide ID --apply`
   ([`ADR-008`](docs/architecture/ADR-008-published-community-opinions.md)).
+- 🚧 **Audit 2026-09-24** ([plan](docs/plans/PLAN-auditoria-2026-09-24.md), built, not deployed yet) —
+  the Validator now reads the evidence the agents and people gave (post text, blog sentence,
+  form note) and a place is "Espacio 100% sin gluten" only with an explicit exclusivity phrase
+  or the admin's confirmation, never from its name; one or two negative reports put a red
+  "Reportado por la comunidad" pin on the map and the third (or one credible contamination
+  report) takes the place off it; unplaceable suggestions wait for the admin instead of being
+  rejected; the chatbot can search "only 100%"; and the admin gets urgent emails plus a daily
+  digest. Admin tool: `python -m scripts.review_queue`.
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.
@@ -191,6 +199,10 @@ Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseña
 
 Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
 
+Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
+
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
 {"verdict": "approved" | "rejected" | "needs_review",
  "confidence_score": <número entre 0.0 y 1.0>,
@@ -265,6 +277,8 @@ serif display headings over a clean sans body, and generous spacing.
 ├── scripts/
 │   ├── check_setup.py          # connectivity / config preflight
 │   ├── moderate_opinions.py    # list / approve / hide community opinions (dry-run unless --apply)
+│   ├── review_queue.py         # admin queue: 100% pending, needs_review, unplaceable suggestions, warnings
+│   ├── admin_digest.py         # daily email to the admin (admin-digest.yml)
 │   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers

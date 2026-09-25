@@ -5,8 +5,10 @@ ValidatorAgent itself is NOT mocked — the handler is designed to reuse its rea
 (APPROVE_THRESHOLD/REJECT_THRESHOLD) to prove that reuse actually holds, not just
 that a mock was called. Same rigor as test_outreach_reply_handler.py.
 
-Per ADR-004, the verdict is used AS-IS (no remap like outreach's outreach_confirmed):
-the place is already approved, so 'approved' stays 'approved'.
+What a report does to the map follows the owner decision of 2026-09-24 (audit plan
+step 7): 1-2 distinct reports in 30 days -> public warning, the place stays; 3, or one
+credible contamination report -> needs_review (off the map). A report never raises the
+level and never erases or overturns an admin's manual decision (step 3).
 """
 
 from __future__ import annotations
@@ -18,13 +20,18 @@ import pytest
 from agents.review_handler import ReviewHandler, _build_report_prompt
 
 
-def make_place(id="place-1", name="Cafe X", category="cafe", city="Montevideo", status="approved"):
+def make_place(
+    id="place-1", name="Cafe X", category="cafe", city="Montevideo", status="approved",
+    safety_level="celiac_friendly", validation_notes=None,
+):
     return {
         "id": id,
         "name": name,
         "category": category,
         "city": city,
         "status": status,
+        "safety_level": safety_level,
+        "validation_notes": validation_notes,
     }
 
 
@@ -48,6 +55,8 @@ def make_handler():
     db.fetch_place_by_id.return_value = make_place()
     db.fetch_place_report_by_id.return_value = make_report()
     db.fetch_reviews_for_place.return_value = []
+    db.fetch_place_evidence.return_value = []
+    db.fetch_recent_negative_report_count.return_value = 1
     llm = MagicMock()
     llm.complete_json.return_value = {
         "verdict": "approved",
@@ -168,72 +177,123 @@ def test_handle_skips_when_report_description_is_blank():
     llm.complete_json.assert_not_called()
 
 
-# --- Real _decide_status output, no remap (ADR-004) ---------------------------
+# --- Warning vs off the map (owner decision 2026-09-24) -------------------------
+
+HIDING_VERDICT = {
+    "verdict": "needs_review",
+    "confidence_score": 0.52,
+    "category": "cafe",
+    "safety_level": "options_available",
+    "reasoning": "El reporte describe contaminación concreta.",
+    "flags": ["Reseñas negativas de celíacos"],
+    "recommendation": "Revisar con el comercio.",
+    "reporte_contaminacion_creible": True,
+}
 
 
-def test_approved_verdict_stays_approved():
+def test_first_report_only_sets_the_public_warning():
     handler, db, llm = make_handler()
+    llm.complete_json.return_value = {**HIDING_VERDICT, "reporte_contaminacion_creible": False}
 
     result = handler.handle("place-1", "report-1")
 
-    assert result == {"place_id": "place-1", "status": "approved"}
-    db.update_place_validation.assert_called_once()
-    call = db.update_place_validation.call_args
-    assert call.args[0] == "place-1"
-    assert call.kwargs["status"] == "approved"
+    assert result == {"place_id": "place-1", "status": "approved", "outcome": "warning"}
+    db.set_community_warning.assert_called_once()
+    assert db.set_community_warning.call_args.args[0] == "place-1"
+    db.update_place_validation.assert_not_called()  # the place stays exactly as it was
+    db.update_place_report_status.assert_called_once_with("report-1", "processed")
 
 
-def test_needs_review_verdict_downgrades_to_needs_review():
+def test_even_a_rejected_verdict_only_warns_below_the_threshold():
     handler, db, llm = make_handler()
-    llm.complete_json.return_value = {
-        "verdict": "needs_review",
-        "confidence_score": 0.6,
-        "category": "cafe",
-        "safety_level": "options_available",
-        "reasoning": "Reporte ambiguo, requiere confirmación humana.",
-        "flags": ["Descripción ambigua"],
-        "recommendation": "Revisar manualmente.",
-    }
+    llm.complete_json.return_value = {**HIDING_VERDICT, "verdict": "rejected", "confidence_score": 0.1,
+                                      "reporte_contaminacion_creible": False}
+
+    assert handler.handle("place-1", "report-1")["outcome"] == "warning"
+    db.update_place_validation.assert_not_called()
+
+
+@pytest.mark.parametrize("count, outcome", [(1, "warning"), (2, "warning"), (3, "hidden"), (5, "hidden")])
+def test_the_third_distinct_report_hides_the_place(count, outcome):
+    handler, db, llm = make_handler()
+    llm.complete_json.return_value = {**HIDING_VERDICT, "reporte_contaminacion_creible": False}
+    db.fetch_recent_negative_report_count.return_value = count
+
+    assert handler.handle("place-1", "report-1")["outcome"] == outcome
+    db.fetch_recent_negative_report_count.assert_called_once_with("place-1", days=30)
+    if outcome == "hidden":
+        assert db.update_place_validation.call_args.kwargs["status"] == "needs_review"
+
+
+def test_one_credible_contamination_report_hides_the_place():
+    handler, db, llm = make_handler()
+    llm.complete_json.return_value = HIDING_VERDICT
 
     result = handler.handle("place-1", "report-1")
 
-    assert result["status"] == "needs_review"
-    assert db.update_place_validation.call_args.kwargs["status"] == "needs_review"
+    assert result == {"place_id": "place-1", "status": "needs_review", "outcome": "hidden"}
+    kwargs = db.update_place_validation.call_args.kwargs
+    assert kwargs["status"] == "needs_review"
+    assert kwargs["notes"].startswith("RETIRADO DEL MAPA POR REPORTES")
+    assert "contaminación" in kwargs["notes"]
+    db.set_community_warning.assert_not_called()
 
 
-def test_rejected_verdict_discards():
+def test_contamination_must_be_literally_true():
     handler, db, llm = make_handler()
-    llm.complete_json.return_value = {
-        "verdict": "rejected",
-        "confidence_score": 0.1,
-        "category": "cafe",
-        "safety_level": "options_available",
-        "reasoning": "El reporte confirma que ya no ofrecen opciones sin TACC.",
-        "flags": ["Información contradictoria"],
-        "recommendation": "Descartar.",
-    }
+    llm.complete_json.return_value = {**HIDING_VERDICT, "reporte_contaminacion_creible": "true"}
 
-    result = handler.handle("place-1", "report-1")
-
-    assert result["status"] == "discarded"
-    assert db.update_place_validation.call_args.kwargs["status"] == "discarded"
+    assert handler.handle("place-1", "report-1")["outcome"] == "warning"
 
 
-def test_low_confidence_approved_falls_back_to_needs_review():
+def test_prompt_asks_for_the_contamination_field():
+    prompt = _build_report_prompt(make_place(), [], "me contaminé")
+    assert '"reporte_contaminacion_creible"' in prompt
+
+
+def test_count_failure_counts_this_report_once():
     handler, db, llm = make_handler()
-    llm.complete_json.return_value = {
-        "verdict": "approved",
-        "confidence_score": 0.6,
-        "category": "cafe",
-        "safety_level": "options_available",
-        "reasoning": "El reporte no alcanza para confirmar con certeza.",
-        "flags": [],
-        "recommendation": "Confirmar protocolo de contaminación cruzada.",
-    }
+    llm.complete_json.return_value = {**HIDING_VERDICT, "reporte_contaminacion_creible": False}
+    db.fetch_recent_negative_report_count.side_effect = RuntimeError("db down")
 
-    result = handler.handle("place-1", "report-1")
+    assert handler.handle("place-1", "report-1")["outcome"] == "warning"
 
-    assert result["status"] == "needs_review"
+
+# --- A report never raises the level, never overturns the admin (step 3) ------
+
+
+def test_hiding_never_raises_the_safety_level():
+    handler, db, llm = make_handler()
+    db.fetch_place_by_id.return_value = make_place(safety_level="options_available")
+    llm.complete_json.return_value = {**HIDING_VERDICT, "safety_level": "celiac_friendly"}
+
+    handler.handle("place-1", "report-1")
+
+    assert db.update_place_validation.call_args.kwargs["safety_level"] == "options_available"
+
+
+def test_hiding_can_lower_the_safety_level():
+    handler, db, llm = make_handler()
+    llm.complete_json.return_value = HIDING_VERDICT  # celiac_friendly -> options_available
+
+    handler.handle("place-1", "report-1")
+
+    assert db.update_place_validation.call_args.kwargs["safety_level"] == "options_available"
+
+
+def test_hiding_a_manual_override_keeps_the_admin_record_and_level():
+    handler, db, llm = make_handler()
+    notes = "CORRECCIÓN MANUAL 2026-09-24: cocina exclusivamente sin gluten (admin)."
+    db.fetch_place_by_id.return_value = make_place(safety_level="gluten_free_100", validation_notes=notes)
+    llm.complete_json.return_value = HIDING_VERDICT
+
+    handler.handle("place-1", "report-1")
+
+    kwargs = db.update_place_validation.call_args.kwargs
+    assert kwargs["status"] == "needs_review"  # off the map until the admin looks
+    assert kwargs["safety_level"] is None  # the admin's 100% is not overwritten
+    assert kwargs["confidence"] is None and kwargs["category"] is None
+    assert kwargs["notes"].endswith(notes)  # the override record is kept below the new header
 
 
 # --- Error handling ------------------------------------------------------------
@@ -252,7 +312,7 @@ def test_llm_failure_is_skipped_without_persisting():
 
 def test_persist_failure_is_skipped():
     handler, db, llm = make_handler()
-    db.update_place_validation.side_effect = RuntimeError("db down")
+    db.set_community_warning.side_effect = RuntimeError("db down")
 
     result = handler.handle("place-1", "report-1")
 
