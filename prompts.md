@@ -2318,10 +2318,11 @@ the model could set `gluten_free_100` from the name alone (the Serendipia-cea / 
   `source='user'`).
 - `_scrub_owner_health`: sentences/flags tying an owner to celiac disease are dropped before persisting.
 
-**Verification status:** offline tests only (`tests/test_validator_agent.py`). **Not yet A/B-tested against the real
-model** — this environment has no Anthropic/Supabase access. Before deploying, run
-`db/checks/validator_kitchen_ab.py`-style cases (strong evidence without claims, name-only "Sin Gluten X",
-social evidence with "100% sin TACC") on `main` vs this branch.
+**Verification (real model, 2026-09-25, `db/checks/2026-09-25-audit-ab-run.md`):** no regression vs `main` (same
+verdict and level in 7/8 cases, nothing approved or at 100% in either arm); the "not the name" paragraph moved
+"Sin Gluten Palermo" with no evidence from `celiac_friendly` 4/4 (OLD) to `options_available` 3/4 (NEW). Explicit
+exclusivity evidence stays at `celiac_friendly` in both arms (lowest level when in doubt), so Tope C now also flags
+those places for the admin's 100% queue instead of raising the level in code.
 
 ## 33. Audit 2026-09-24 — chatbot: "only 100%" filter + community warning (router + redactor)
 
@@ -2340,6 +2341,7 @@ the chat.
   `filtro_nivel: 100` and empty `<datos>`, say no 100% venues were found for that search and offer places with
   options.
 
-**Verification status:** offline tests only (`supabase/functions/chat/index.test.ts`, `kitchen.test.ts`). Before
-deploying: `db/checks/chat_prompt_ab.py` against `main`, the 37-turn jailbreak battery, and a live "solo 100%" turn.
+**Verification (real model, 2026-09-25, `db/checks/2026-09-25-audit-ab-run.md`):** router 10/10 cases 8/8 (plain
+"sin TACC" never sets `nivel`); redactor regression vs `main`: figures unchanged, 0/40 false positives, labels 96/96.
+Still pending after deploy: the 37-turn jailbreak battery and a live "solo 100%" turn.
 Changing a prompt restarts the soft-launch count (CLAUDE.md).

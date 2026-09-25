@@ -424,12 +424,19 @@ class ValidatorAgent(BaseAgent):
         """Tope C: "gluten_free_100" only survives with an explicit exclusivity phrase in the
         evidence the model saw (reviews + place_evidence) — never from the name, never from the
         model's own knowledge. Without it the level drops to "celiac_friendly" (public label
-        "Tiene opciones sin TACC") and the place is flagged for the admin, who confirms 100%."""
-        if safety != "gluten_free_100":
-            return safety, []
+        "Tiene opciones sin TACC") and the place is flagged for the admin, who confirms 100%.
+
+        The reverse case is flagged too: the evidence DOES state exclusivity but the model kept a
+        lower level (measured 2026-09-25: a Los Leños-like place with "todo es sin gluten" on its
+        Instagram stays "celiac_friendly" 4/4 — the rubric says "the lowest level when in doubt").
+        The level is not raised here; the flag puts the place in the admin's 100% queue with its
+        evidence, so the 100% comes from a person, as the labeling rule requires."""
         texts = [r.get("text") for r in list(reviews or []) if isinstance(r, dict)]
         texts += [e.get("text") for e in list(evidence or []) if isinstance(e, dict)]
-        if cls.has_exclusive_signal(texts):
+        signal = cls.has_exclusive_signal(texts)
+        if safety != "gluten_free_100":
+            return safety, ([PENDING_ADMIN_FLAG] if signal else [])
+        if signal:
             return safety, []
         return "celiac_friendly", [PENDING_ADMIN_FLAG]
 

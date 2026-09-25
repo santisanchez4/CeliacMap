@@ -481,7 +481,7 @@ def test_the_pending_flag_also_fires_when_the_model_said_less_but_a_claim_says_e
 
 
 def test_no_pending_flag_for_a_community_place_with_no_100_signal():
-    out = _norm({"safety_level": "options_available"}, place={"source": "user"}, claims=[OWNER_CLAIM])
+    out = _norm({"safety_level": "options_available"}, place={"source": "user"}, claims=[OWNER_CLAIM], evidence=None)
     assert PENDING_ADMIN_FLAG not in out["flags"]
 
 
@@ -692,3 +692,18 @@ def test_owner_health_sentences_are_scrubbed_from_public_text():
     assert "celíac" not in out["reason"] and "Falta confirmar la cocina." in out["reason"]
     assert out["flags"] == ["sin reseñas"]
     assert out["recommendation"] is None
+
+
+def test_tope_c_flags_exclusive_evidence_the_model_kept_below_100():
+    """Real-model A/B 2026-09-25: explicit "todo es sin gluten" evidence stays celiac_friendly. The level
+    is not raised in code; the place goes to the admin's 100% queue instead."""
+    out = _norm({"safety_level": "celiac_friendly"}, place={"source": "social"},
+                evidence=[{"source": "social", "text": "Todo es sin gluten: cocina 100% sin TACC"}])
+    assert out["safety_level"] == "celiac_friendly"
+    assert PENDING_ADMIN_FLAG in out["flags"]
+
+
+def test_tope_c_no_flag_for_options_evidence():
+    out = _norm({"safety_level": "options_available"}, place={"source": "social"},
+                evidence=[{"source": "social", "text": "Tenemos opciones sin TACC"}])
+    assert PENDING_ADMIN_FLAG not in out["flags"]
