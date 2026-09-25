@@ -357,3 +357,27 @@ def test_fetch_places_for_admin_first_page_is_unchanged_without_an_offset():
     client._db.table.return_value = q
     client.fetch_places_for_admin("approved", limit=15)
     assert ("range", (0, 14)) in calls
+
+
+def test_the_flag_filter_reaches_postgrest_as_a_jsonb_array_not_a_postgres_array_literal(monkeypatch):
+    """`flags` is jsonb: PostgREST needs `cs.["…"]`. supabase-py turns a Python list into `cs.{…}` (a Postgres array
+    literal), which a jsonb column rejects with 22P02 — it broke `review_queue --pending-100` and the daily digest.
+    Built on the REAL postgrest builder (no mock of the query) so the wire format is what is asserted."""
+    from postgrest import SyncPostgrestClient
+    from postgrest._sync.request_builder import SyncSelectRequestBuilder
+
+    from agents.validator_agent import PENDING_ADMIN_FLAG
+
+    captured = {}
+
+    def fake_execute(self):
+        captured.update(dict(self.request.params))
+        return MagicMock(data=[])
+
+    monkeypatch.setattr(SyncSelectRequestBuilder, "execute", fake_execute)
+    client = _client_with_mock_db()
+    client._db.table.side_effect = lambda name: SyncPostgrestClient("http://localhost/rest/v1").from_(name)
+
+    client.fetch_places_for_admin(None, flag=PENDING_ADMIN_FLAG, limit=5)
+
+    assert captured["flags"] == 'cs.["' + PENDING_ADMIN_FLAG + '"]'

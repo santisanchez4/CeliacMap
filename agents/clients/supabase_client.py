@@ -7,6 +7,7 @@ server-side (local .env or CI) — never in the browser.
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -516,7 +517,9 @@ class SupabaseClient:
         if city:
             q = q.ilike("city", f"%{city}%")
         if flag:
-            q = q.contains("flags", [flag])
+            # `flags` is jsonb: a str goes through as `cs.["…"]`; a Python list would be sent as the Postgres
+            # array literal `cs.{…}`, which a jsonb column rejects (22P02).
+            q = q.contains("flags", json.dumps([flag], ensure_ascii=False))
         if warned_since:
             q = q.gte("community_warning_at", warned_since)
         if safety_level:
