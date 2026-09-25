@@ -42,7 +42,10 @@ jobs:
       OUTREACH_TEST_RECIPIENT: ${{ secrets.OUTREACH_TEST_RECIPIENT }}
       OUTREACH_LIVE_MODE: ${{ secrets.OUTREACH_LIVE_MODE }}
       OUTREACH_SENDER_EMAIL: outreach@celiacmap.org
-      OUTREACH_INBOUND_DOMAIN: celiacmap.org
+      # Resend receives mail on the reply. subdomain (MX reply.celiacmap.org -> Amazon SES inbound);
+      # the root domain's MX is Zoho (the admin mailbox), so a Reply-To on celiacmap.org never
+      # reached the webhook. Checked against the DNS on 2026-09-25.
+      OUTREACH_INBOUND_DOMAIN: reply.celiacmap.org
       # Initial bounded volume per ADR-003, not the code default of 20.
       OUTREACH_MONTHLY_LIMIT: "3"
       PYTHONPATH: ${{ github.workspace }}

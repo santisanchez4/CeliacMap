@@ -374,7 +374,22 @@ Se envía con Resend (ya configurado, dominio `celiacmap.org` verificado) al buz
 - Privacidad: el email lleva el dato "dueño celíaco" de una sugerencia porque es para la revisión del admin, pero nunca
   va a un canal público. No lleva el texto de los turnos del chatbot.
 
-**Antes de implementar — verificar el DNS del correo.** En agosto se configuró Resend para **recibir** mail en
+**DNS revisado el 2026-09-25 (captura de Cloudflare):**
+
+- MX de `celiacmap.org` → solo Zoho (`mx`, `mx2`, `mx3.zoho.com`). No hay conflicto: el buzón del admin recibe bien.
+- Resend **recibe** en `reply.celiacmap.org` (MX → `inbound-smtp.sa-east-1.amazonaws.com`) y **envía** con
+  `celiacmap.org` y `reply.celiacmap.org` (DKIM `resend._domainkey` en los dos, SPF y MX de rebote en `send.*`).
+- SPF raíz `include:zohomail.com`: correcto. Resend no lo necesita, porque su SPF va en `send.celiacmap.org`
+  (dominio de rebote) y alinea con DMARC en modo relajado. DKIM de Zoho (`zmail._domainkey`) presente.
+- **Error encontrado:** `agents-monthly.yml` tenía `OUTREACH_INBOUND_DOMAIN: celiacmap.org`, así que el Reply-To
+  de cada email de outreach era `outreach+<id>@celiacmap.org`, que va a **Zoho** y no a Resend: una respuesta de
+  un comercio nunca llegaba al webhook. Corregido a `reply.celiacmap.org` (el webhook ya acepta cualquier
+  dominio). La respuesta que pudiera haber mandado Niter (2026-09-01) habría ido a Zoho.
+- Sin identificar: `rsend.reply` CNAME → `send.forge.rmta.net` (no es un registro de Resend ni de Zoho).
+- Pendiente opcional: DMARC está en `p=none`; con Zoho y Resend firmando DKIM se puede pasar a `p=quarantine`
+  más adelante.
+
+**Antes de implementar — verificar el DNS del correo** (hecho, ver arriba). En agosto se configuró Resend para **recibir** mail en
 `celiacmap.org` (las respuestas al outreach llegan a `outreach+<id>@celiacmap.org`), y el buzón de Zoho usa el mismo
 dominio. Si los dos tienen registros MX en `celiacmap.org`, el mail entrante se reparte entre Resend y Zoho según la
 prioridad, y se pierden las respuestas al outreach o los emails del buzón. Hay que mirar los MX en el panel del DNS. Si

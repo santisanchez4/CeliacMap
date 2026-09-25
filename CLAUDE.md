@@ -2276,14 +2276,19 @@ Plan: `docs/plans/PLAN-auditoria-2026-09-24.md` (steps 1, 2a and H6 implemented 
   `needs_location` ones, negative reports, recommendations to approve, warnings, "100% pendiente" places, Validator
   results, agent errors, and chatbot COUNTS only (turn text never goes by email). From `avisos@celiacmap.org` to
   `ADMIN_EMAIL` (secret; falls back to santiagosanchez@celiacmap.org), subjects prefixed `[CeliacMap]`.
-  `agent_log.agent` gained `'admin_notify'`. **Check the MX records first** (plan step 9): Resend receives outreach
-  replies on `celiacmap.org`, the same domain as the Zoho mailbox.
+  `agent_log.agent` gained `'admin_notify'`.
+- **DNS checked 2026-09-25 — outreach Reply-To was wrong.** Root `celiacmap.org` MX is Zoho only (the admin
+  mailbox); Resend receives on **`reply.celiacmap.org`** (MX → Amazon SES inbound) and sends with DKIM on both
+  domains. `agents-monthly.yml` had `OUTREACH_INBOUND_DOMAIN: celiacmap.org`, so every outreach Reply-To
+  (`outreach+<id>@celiacmap.org`) went to Zoho and could never reach the `outreach-reply` webhook — fixed to
+  `reply.celiacmap.org` (the webhook's regex accepts any domain). Any local `.env` needs the same value. Not
+  yet re-verified with a real reply to the new address.
 - **Chatbot (step 4).** Router field `nivel: "100"|null` (only an explicit "100% / exclusivo / dedicado" ask) filters
   the search to `gluten_free_100`; the redactor gets `filtro_nivel: 100` and says "no encontré espacios 100% sin
   gluten" instead of "no encontré nada" when that search is empty; places with a recent community warning carry
   `reportado_por_la_comunidad: true` and the redactor mentions it. prompts.md §33. **Restarts the soft-launch count;
   `chat` not redeployed yet.**
-- **Rollout, in order (nothing of this is live yet):** (1) check the MX records; (2) apply
+- **Rollout, in order (nothing of this is live yet):** (1) ~~check the MX records~~ done 2026-09-25; (2) apply
   `db/migrations/2026-09-24-audit-plan.sql` in Supabase; (3) A/B the RUBRIC and the chat prompts against the real
   model; (4) merge (frontend) and deploy `chat`; (5) set the `ADMIN_EMAIL` secret (optional, falls back to
   santiagosanchez@celiacmap.org); (6) dry run `scripts/cap_unsupported_100.py`, review the list, then `--apply`.
