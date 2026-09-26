@@ -2202,6 +2202,96 @@ Function, schema or prompt change):
   note. `supabase/functions/chat/index.test.ts` (161) gained two prompt guards
   for the level labels; both fail against the previous prompt.
 
+### Department / province search — `places.region` (2026-09-26)
+
+**The bug.** A real conversation (agent_log 2026-09-25 04:32–04:33 UTC): "…cerca de Fraile Muerto Cerro Largo?" →
+"no tengo lugares confirmados"; "y en cerro largo?" → the same; "veo en el mapa 2 lugares en Melo" → only then the two
+places. The router had put `ciudad="Fraile Muerto"`, `zona="Cerro Largo"` (turn 1) and `ciudad="Cerro Largo"` (turn 2). Root
+cause: the chat filtered `city ilike`, and `places` had no department, so a department never matched the town under
+which its places are filed (Melo). The old nearby fallback (`zona` + `ciudad`) counted the same city, so it answered 0.
+
+**Measured before designing (read-only).** Region is recoverable from Google's own address for **422 of 422 approved**
+places (1 263 of 1 312 in the table; the 49 without one are Brasil/Chile `needs_review` and `discarded` rows, where NULL
+is right). Typing a region as `ciudad` reached only **226 of 422**; 11 of 25 regions returned fewer places than exist
+(Entre Ríos 0/25, Santa Fe 1/24, Buenos Aires province 6/117, Maldonado 1/16, Soriano, Lavalleja, Canelones, Cerro Largo…).
+`address ilike` is not a substitute: **52** false positives on the current data (Av. Córdoba, "Salta 529" in CABA,
+"Rio Negro 1185" in Dolores). Router shapes (real model, N=8, `db/checks/chat_region_router_check.py`): a province arrives
+in `zona` with `ciudad=null` (Córdoba 8/8, "provincia de Buenos Aires" 8/8 with the marker inside the value, Entre Ríos 3/8)
+or as `ciudad` (Maldonado 8/8, Entre Ríos 5/8, Cerro Largo 8/8). Google returns `administrative_area_level_1 = "Departamento
+de X"` for the 16 Uruguayan departments sampled (es and en); Canelones and the Argentine provinces were not sampled live.
+
+**Decisions.**
+- `places.region text`, nullable, no CHECK, no index, no RLS change (public like `city`). Canonical accented names
+  (`Entre Ríos`); C.A.B.A. is **`Ciudad Autónoma de Buenos Aires`**, never the province `Buenos Aires`; `Río Negro` is the same
+  string in both countries (the row's `country` tells them apart). The lists live in code twice —
+  `AR_REGION_NAMES` / `UY_REGION_NAMES` (`agents/clients/google_places.py`) and `AR_REGIONS` / `UY_REGIONS`
+  (`supabase/functions/chat/regions.ts`) — and `tests/test_region_lists_sync.py` fails if they drift.
+- **Derived from the address, never from the search target or the city** (`GooglePlacesClient.region_from_address`; the
+  components' `administrative_area_level_1` only when the address names none). It never guesses: an out-of-scope country, a
+  bare "Buenos Aires" (CABA's city line in some results, the province in others) or an address whose country contradicts the
+  row's `country` gives NULL. That last rule came from the data: 12 `discarded` rows say `country='Uruguay'` with an Argentine
+  address, and would otherwise have got an incoherent pair (`Mendoza` / Uruguay).
+- **Where it is filled.** Search: `to_candidate`. Social, Web, Suggestion and `review_queue locate`: the single chokepoint
+  `SupabaseClient.insert_place_candidate` (all four already pass `address = formatted_address`), so no `ResolvedLocation.region`.
+  Updater: `extract_rich_fields` returns `region`, so `_build_patch` recomputes it in the same path that rewrites `address`,
+  fills a NULL, and never overwrites a stored region with None. **Manual inserts and fix scripts must set it** (standing rule).
+- **Backfill** (`db/fixes/2026-09-26-places-region-backfill.sql`): the (id, region) pairs come from the same Python helper (no
+  second parser in SQL); one transaction with a snapshot hash proving no other column changed, the `updated_at` trigger
+  switched off and asserted back on (nothing in agents/, scripts/ or js/ orders or filters by `places.updated_at`; only the MCP
+  shows it), and assertions on the row count, the NULLs, each value's country and the 25 approved (country, region) counts.
+  **Applied to production 2026-09-26**: a clean dry run (`ROLLBACK`), then a negative control (one expected count changed,
+  1263 → 1262) that aborted with the `RAISE` and left nothing behind (no column, trigger on, `max(updated_at)` unchanged), then
+  the real migration and backfill. Verified read-only: 1 263 rows with a region (all 422 approved; the 49 NULL are 8 Brasil/Chile
+  `needs_review` + 41 `discarded`), the 25 approved (country, region) counts equal the offline computation, the trigger is back
+  on and **0** rows had `updated_at` touched. The anon key filters `region=eq.<name>` (accented values included) and still sees
+  approved rows only. **The migration must reach production before any agent code that writes `region`, and before the `chat`
+  deploy** (an unknown column fails the upsert and the search).
+
+**Chat search** (`supabase/functions/chat/regions.ts`, `planRegionSearch`; the whole lookup is `searchPlacesForChat`).
+1. An explicit marker ("provincia de", "departamento de", "dpto", "province of"…, in the router's fields or the message)
+   searches the region outright, unless a different city was named (then the city first, widened afterwards).
+2. `ciudad` empty and `zona` a region (after stripping the marker): region search.
+3. **2b** — `ciudad` is exactly a region name: search the region instead of the city, ranking first the places whose `city`
+   equals what was asked (accent/case blind; `orderRegionRows`, fetched up to 500 and ranked in TS, cut at 8): "Córdoba"
+   returns the capital's places first, then the rest of the province. Needed because the router files "Maldonado" as
+   `ciudad` 8/8, and the city step returned 1 place and hid the other 15 (Punta del Este).
+4. A real city that gives nothing, with a region in `zona`, an explicit marker or a bare non-ambiguous region name in the
+   message: `fallback` (below).
+- **Ambiguous names** (`AMBIGUOUS_REGION_NAMES`: Flores, Florida, Colonia, Rivera, Corrientes, Misiones, San José, Salto,
+  Río Negro, Santa Cruz, San Juan, San Luis) are also a barrio, a street, a town in the other country or a region of both:
+  alone they are a region only if `router.pais` resolves them or an explicit marker does; otherwise, or if the country
+  contradicts, the city filter runs exactly as before. Bare in the message they are never a region. `Buenos Aires` bare is
+  only CABA (the city filter); the province needs its marker. A `router.pais` that contradicts the region keeps the city filter.
+- **What the redactor receives (Option A — no prompt change).** A region asked for outright returns its places as `<datos>`
+  (each carries its own city, so nothing implies another town). A region that only *widens* a city that gave nothing never
+  goes in `<datos>`: it stays empty and `<datos_cercanos>` gets `{city: "Cerro Largo (Melo)", count: 2}` (same keys as before,
+  filtered by the category and level asked, so the number is what "¿cuáles?" will list), which `RESPONDER_PROMPT` already tells
+  it to offer. Measured against the real model with the real code path (`db/checks/chat_region_redactor_check.py`, N=16, the
+  two places of Melo): widened 16/16 says Cerro Largo + Melo, 0/16 says there are places in Fraile Muerto, 0/16 names or lists a
+  place; asked outright 16/16 lists both places in Melo and Cerro Largo, 0 stray names; control (production before) 0/16.
+  Logged: `query.region` and `query.region_plan`.
+
+**Noted, deliberately not fixed here (next chat prompt change).** `RESPONDER_PROMPT` instruction 2c says "no afirmes que…
+toda la zona carece de lugares" while examples 2 and 6 model "por ahora no tengo lugares confirmados en X" (and the
+`datos_cercanos` example "Cerca hay 3 en Villa Crespo"): the model copies the examples. Consequence measured here: **16/16**
+widened replies say "Cerca hay 2 … en Melo (Cerro Largo)", a proximity claim the system does not verify (same department, no
+distance). Fixing it needs a prompt edit (a `<busqueda_ampliada>` block, "Option B", or rewording the examples), so it waits
+for the next deliberate prompt change, with the jailbreak battery and a soft-launch restart. Also open: a `category` the router
+carries over ("locales" → `shop`) can hide a café in the same region; the components path was checked live only for Uruguay; 11
+approved rows have the wrong `city` (Fray Bentos ×3 that are in Dolores/Mercedes/Maldonado, Ciudad de la Costa ×2 filed as
+Maldonado/Montevideo, `Buenos Aires` ×6 that are in the province) — their `region` is right, their `city` is data debt to fix
+separately with literal SQL.
+
+**Future improvement (scale).** A region search that has to rank by the requested city fetches the whole region
+(`REGION_FETCH_LIMIT` = 500 rows, ~120 approved in the largest region today) and orders it in code. If a region ever passes
+**~300 places**, fetch only `id` + `city` first, order those, and then request the full detail of the 8 chosen ones (the
+named-lookup path in `fetchSearchPlaces` already works in those two steps). Not needed at today's sizes.
+
+**Tests.** Python 477 → 528 (`test_places_region.py`, `test_schema_places_region.py`, `test_region_lists_sync.py`, additions to
+`test_supabase_client.py` and `test_updater_agent.py`); Deno 209 → 239 (`regions.test.ts`, with a fake PostgREST that reads
+the real query strings). Mutation check: removing the ambiguity rule, the city-first ranking or the Buenos Aires exception
+each fails 3–4 tests.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

@@ -78,7 +78,8 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - ✅ **Chatbot assistant** — a floating widget on the site (`js/chat.js`) backed by a
   Supabase Edge Function (`supabase/functions/chat/`, `claude-haiku-4-5`: a router
   call plus a redactor call per turn). It finds **approved** places in natural
-  language, helps leave a comment or recommend a place (writing to the same
+  language (by city, neighborhood, **department or province** — each place carries a
+  `region` derived from its Google address), helps leave a comment or recommend a place (writing to the same
   `place_reports` / `suggestions` intake tables as the public forms, under the same
   RLS), and answers general celiac-disease questions, always inside a closed scope.
   It has **zero authority over `places.status`**. Hardened with a 37-turn jailbreak
@@ -270,7 +271,7 @@ serif display headings over a clean sans body, and generous spacing.
 ├── skills/                     # AI toolkit — reusable skills
 │   └── validator-rubric/SKILL.md
 ├── supabase/functions/         # Deno/TypeScript Edge Functions
-│   └── chat/                   # the chatbot: router + redactor, safety net, rate limits (ADR-006)
+│   └── chat/                   # the chatbot: router + redactor, safety net, rate limits (ADR-006); regions.ts = department / province search
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
 │   └── targets.yaml            # countries/cities + search/social terms

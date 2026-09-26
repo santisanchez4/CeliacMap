@@ -42,6 +42,7 @@
 import Anthropic from "npm:@anthropic-ai/sdk@0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { RESPONDER_PROMPT, ROUTER_PROMPT } from "./prompts.ts";
+import { orderRegionRows, planRegionSearch, type RegionTarget, widenedLabel } from "./regions.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -339,7 +340,15 @@ interface PlacesQueryParams {
   texto_libre?: string | null;
   lugar_nombre?: string | null;
   nivel?: string | null;
+  // Department / province (places.region, canonical name). When set it replaces the city filter.
+  region?: string | null;
+  // The normalized city to rank first inside a region search (see orderRegionRows).
+  regionPrefer?: string | null;
+  limit?: number;
 }
+
+// A region search that has to rank its rows in code fetches this many (a region holds ~120 approved places today).
+const REGION_FETCH_LIMIT = 500;
 
 export function buildPlacesSearchUrl(supabaseUrl: string, params: PlacesQueryParams): string {
   // `id` is selected only for the client-side map reference below. filterPlaceFields
@@ -347,14 +356,15 @@ export function buildPlacesSearchUrl(supabaseUrl: string, params: PlacesQueryPar
   // community_warning_at is read only to derive reportado_por_la_comunidad (toRedactorPlace);
   // the raw column is not in the allowlist, so the redactor never sees it.
   const parts = [`select=id,community_warning_at,${PLACES_SELECT_FIELDS.join(",")}`, "status=eq.approved"];
-  if (params.ciudad) parts.push(`city=ilike.*${encodeURIComponent(params.ciudad)}*`);
+  if (params.region) parts.push(`region=eq.${encodeURIComponent(params.region)}`);
+  else if (params.ciudad) parts.push(`city=ilike.*${encodeURIComponent(params.ciudad)}*`);
   if (params.pais) parts.push(`country=eq.${encodeURIComponent(params.pais)}`);
   if (params.zona) parts.push(`address=ilike.*${encodeURIComponent(params.zona)}*`);
   if (params.category) parts.push(`category=eq.${encodeURIComponent(params.category)}`);
   if (params.texto_libre) parts.push(`name=ilike.*${encodeURIComponent(params.texto_libre)}*`);
   if (params.nivel === "100") parts.push("safety_level=eq.gluten_free_100");
   parts.push("order=vote_count.desc,rating.desc.nullslast,name.asc");
-  parts.push(`limit=${PLACES_SEARCH_LIMIT}`);
+  parts.push(`limit=${params.limit ?? PLACES_SEARCH_LIMIT}`);
   return `${supabaseUrl}/rest/v1/places?${parts.join("&")}`;
 }
 
@@ -416,12 +426,20 @@ export async function fetchSearchPlaces(
   };
   const names = (params.lugar_nombre || params.texto_libre || "")
     .split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
-  if (!names.length) return read(buildPlacesSearchUrl(supabaseUrl, params));
+  if (!names.length) {
+    if (params.region && params.regionPrefer) {
+      const rows = await read(buildPlacesSearchUrl(supabaseUrl, { ...params, limit: REGION_FETCH_LIMIT }));
+      return orderRegionRows(rows, params.regionPrefer, PLACES_SEARCH_LIMIT);
+    }
+    return read(buildPlacesSearchUrl(supabaseUrl, params));
+  }
 
   // Named lookups ignore stale neighborhood/category filters (a cafe may have
   // been requested after "restaurants"). Scan only public names, paginated so
   // the general search's top-eight cutoff cannot hide a business.
-  const url = new URL(buildPlacesSearchUrl(supabaseUrl, { ciudad: params.ciudad, pais: params.pais }));
+  const url = new URL(
+    buildPlacesSearchUrl(supabaseUrl, { ciudad: params.ciudad, pais: params.pais, region: params.region }),
+  );
   url.searchParams.set("select", "id,name");
   url.searchParams.set("order", "id.asc");
   url.searchParams.set("limit", "500");
@@ -463,6 +481,84 @@ export function buildNearbyCountUrl(supabaseUrl: string, ciudad: string): string
   return `${supabaseUrl}/rest/v1/places?select=id&status=eq.approved&city=ilike.*${
     encodeURIComponent(ciudad)
   }*&limit=1`;
+}
+
+/**
+ * When a city gave nothing but the router named its department / province, how many places that region has and in
+ * which towns ("Cerro Largo (Melo)"), for <datos_cercanos>. It keeps the category and level the person asked for, so
+ * the number is what the follow-up "¿cuáles?" (a region search with the same filters) will list. Null when it has none.
+ * Throws on a failed request: the caller treats the lookup as best-effort.
+ */
+export async function fetchRegionSummary(
+  supabaseUrl: string, anonKey: string, target: RegionTarget, filters: { category?: string | null; nivel?: string | null },
+): Promise<{ city: string; count: number } | null> {
+  const url = new URL(buildPlacesSearchUrl(supabaseUrl, {
+    region: target.region, pais: target.country, category: filters.category, nivel: filters.nivel, limit: REGION_FETCH_LIMIT,
+  }));
+  url.searchParams.set("select", "city");
+  const res = await fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` } });
+  if (!res.ok) throw new Error(`region summary failed: ${res.status}`);
+  const rows: { city: string | null }[] = await res.json();
+  return rows.length ? widenedLabel(target.region, rows) : null;
+}
+
+export interface ChatSearchResult {
+  rows: Record<string, unknown>[];
+  datosCercanos: { city: string; count: number } | null;
+  // null = no nearby lookup ran (logged as nearby_count: null); a number = it ran and counted this many.
+  nearbyCount: number | null;
+  queryLog: Record<string, unknown>;
+}
+
+/**
+ * The whole Módulo 1 (buscar) lookup: which filter the search uses (city, or department / province — see
+ * planRegionSearch), the rows, and the <datos_cercanos> the redactor gets when there are none.
+ *
+ * A region asked for outright ("y en cerro largo?") returns its places as <datos>: each carries its own city, so
+ * nothing implies they are in some other town. A region that only WIDENS a city that gave nothing ("cerca de
+ * Fraile Muerto") is never listed as if it were that city: <datos> stays empty and the redactor gets the region's
+ * count and towns in <datos_cercanos>, which RESPONDER_PROMPT already tells it to offer as an alternative.
+ */
+export async function searchPlacesForChat(
+  supabaseUrl: string, anonKey: string, router: RouterOutput, message: string,
+): Promise<ChatSearchResult> {
+  const plan = planRegionSearch({ ciudad: router.ciudad, zona: router.zona, pais: router.pais, message });
+  const queryLog: Record<string, unknown> = {
+    ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category,
+    texto_libre: router.texto_libre, lugar_nombre: router.lugar_nombre, region_plan: plan.kind,
+  };
+  if (plan.kind !== "city") queryLog.region = plan.target.region;
+
+  const params: PlacesQueryParams = plan.kind === "region"
+    ? {
+      ...router, ciudad: null, zona: plan.dropZona ? null : router.zona, pais: plan.target.country,
+      region: plan.target.region, regionPrefer: plan.prefer,
+    }
+    : router;
+  const rows = await fetchSearchPlaces(supabaseUrl, anonKey, params);
+
+  let datosCercanos: { city: string; count: number } | null = null;
+  let nearbyCount: number | null = null;
+  if (rows.length === 0 && plan.kind === "fallback") {
+    try {
+      datosCercanos = await fetchRegionSummary(supabaseUrl, anonKey, plan.target, router);
+      nearbyCount = datosCercanos?.count ?? 0;
+    } catch {
+      // Best-effort — a failed region lookup must not fail the whole turn.
+    }
+  } else if (rows.length === 0 && router.zona && router.ciudad) {
+    try {
+      const nearbyRes = await fetch(buildNearbyCountUrl(supabaseUrl, router.ciudad), {
+        headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Prefer: "count=exact" },
+      });
+      const total = parseContentRange(nearbyRes.headers.get("content-range"));
+      nearbyCount = total ?? 0;
+      if (total !== null && total > 0) datosCercanos = { city: router.ciudad, count: total };
+    } catch {
+      // Best-effort — a failed nearby lookup must not fail the whole turn.
+    }
+  }
+  return { rows, datosCercanos, nearbyCount, queryLog };
 }
 
 // ---------------------------------------------------------------------------
@@ -2030,25 +2126,14 @@ export async function handleRequest(req: Request): Promise<Response> {
       responsePending = courtesy.pending;
     } else {
       // buscar
-      queryLog = { ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category, texto_libre: router.texto_libre, lugar_nombre: router.lugar_nombre };
-      const rows = await fetchSearchPlaces(supabaseUrl, anonKey, router);
+      const search = await searchPlacesForChat(supabaseUrl, anonKey, router, lastUserMessage);
+      queryLog = search.queryLog;
+      const rows = search.rows;
       const datos = rows.map((row) => toRedactorPlace(row));
       responsePlaces = toChatPlaceReferences(rows);
       resultCount = datos.length;
-
-      let datosCercanos: { city: string; count: number } | null = null;
-      if (datos.length === 0 && router.zona && router.ciudad) {
-        try {
-          const nearbyRes = await fetch(buildNearbyCountUrl(supabaseUrl, router.ciudad), {
-            headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Prefer: "count=exact" },
-          });
-          const total = parseContentRange(nearbyRes.headers.get("content-range"));
-          nearbyCount = total ?? 0;
-          if (total !== null && total > 0) datosCercanos = { city: router.ciudad, count: total };
-        } catch {
-          // Best-effort — a failed nearby lookup must not fail the whole turn.
-        }
-      }
+      nearbyCount = search.nearbyCount;
+      const datosCercanos = search.datosCercanos;
 
       const redactorCall = await callModel(
         anthropic,

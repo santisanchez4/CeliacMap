@@ -225,7 +225,7 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 │               review_handler.py · manual_overrides.py · admin_notify.py · clients/ (supabase, google_places, tavily,
 │               llm, resend, website_scraper)
 ├── mcp_server/ server.py (6 tools over Supabase + the RUBRIC) · skills/validator-rubric/SKILL.md (academic deliverable)
-├── supabase/functions/  outreach-reply/ · place-report-created/ · chat/ (index.ts, prompts.ts, index.test.ts) — Deno/TS
+├── supabase/functions/  outreach-reply/ · place-report-created/ · chat/ (index.ts, prompts.ts, regions.ts, index.test.ts, regions.test.ts) — Deno/TS
 ├── config/     settings.py (env-driven) · targets.yaml (countries, cities, search terms, `web: true` opt-in)
 ├── scripts/    run_agents.py (CI: search -> social -> web -> suggestion -> validator -> updater -> outreach -> review_sweep)
 │               plus admin tools (review_queue, moderate_opinions, cap_unsupported_100, revalidate_low_confidence,
@@ -353,6 +353,11 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **CABA is `Buenos Aires`** in `city` everywhere; the frontend and the chatbot filter by it.
 - **Country comes from the result's own address, never from the query target.** Discovery agents share
   `resolve_location()` and `insert_place_candidate()` (UY+AR bounding box; out-of-scope rows are never inserted).
+- **`places.region` (department / province) comes from the address too** [Department / province search].
+  `GooglePlacesClient.region_from_address` is the only parser: `insert_place_candidate` fills it, the Updater keeps it in
+  step with `address`, and it is NULL rather than guessed. **Manual inserts and fix scripts set `region`** (canonical accented
+  name; CABA is `Ciudad Autónoma de Buenos Aires`, never `Buenos Aires`). The chat's lists (`regions.ts`) and the agents' must
+  match (`test_region_lists_sync.py`). Apply the migration before deploying agents or `chat` code that uses the column.
 
 **Production and security**
 - **Secrets boundary:** only the anon key reaches the browser. Server-only tables (`agent_log`, `reviews`, `place_evidence`,
@@ -394,6 +399,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **Department / province search (2026-09-26)** — `places.region` from the address; the chat searches by region (ambiguous names guarded), the redactor via `datos_cercanos` with no prompt change; the 2c-vs-examples contradiction is noted for the next prompt edit. [→](docs/DECISIONS.md#department--province-search--placesregion-2026-09-26)
 - **Chatbot — named place retrieval (2026-09-23)** — search by business name, accent/typo tolerant (chat v14). [→](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23)
 - **Base landing decisions (s/f)** — ES/EN toggle, fonts, CSS-only mockup, SVG icons, favicons; unheaded, at the end of the entry above. [→](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23)
 - **Editorial redesign (s/f)** — warm editorial look, green-first palette. [→](docs/DECISIONS.md#editorial-redesign-visual--content)
@@ -461,6 +467,7 @@ Detail of every phase, with its verification notes: [Build status (phases)](docs
 - ✅ 24 Chatbot Fase E: jailbreak battery, F3/F4, guard (chat v11)
 - ✅ 25 Kitchen information (2026-09-24)
 - ✅ 26 Community opinions (2026-09-24)
+- 🚧 27 Department / province search (2026-09-26): code + tests done; migration and backfill applied to production (1 263 rows, all 422 approved); `chat` deploy and live verification pending
 - **Open:** chatbot soft-launch with organic traffic (Fase F: ADR-006 closure, C4, README); F4 Option 1 prompt
   reformulation (non-blocking); live confirmation of a real outreach reply and opt-out.
 
