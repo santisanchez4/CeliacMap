@@ -2282,6 +2282,15 @@ approved rows have the wrong `city` (Fray Bentos ×3 that are in Dolores/Mercede
 Maldonado/Montevideo, `Buenos Aires` ×6 that are in the province) — their `region` is right, their `city` is data debt to fix
 separately with literal SQL.
 
+**Deployed and verified live (`chat` v20, 2026-09-26).** Deployed only after the column was confirmed in production;
+`verify_jwt=false` by API and the deployed `index.ts`, `regions.ts` and `prompts.ts` identical to `HEAD` (hash without CR). Six
+live turns (the real conversation, "provincia de Buenos Aires", "Córdoba", "Maldonado"), each checked against the database's own
+approved places: 6/6 pass, and `agent_log` shows the plan taken (`fallback` / `region` / `city`). "Córdoba" cannot show the
+capital-first ordering with today's data (all 46 are in the capital); "Maldonado" (1 place in the city, 15 elsewhere in the
+department) does. The rows the run wrote (6 `agent_log`, the `chat_usage` counters) were reverted with a guarded transaction
+back to the baseline; record: `db/checks/2026-09-26-chat-region-live-run.md`. The prompt is unchanged, so the soft-launch count
+is not restarted. Next, separately: the 11 approved rows with the wrong `city`.
+
 **Future improvement (scale).** A region search that has to rank by the requested city fetches the whole region
 (`REGION_FETCH_LIMIT` = 500 rows, ~120 approved in the largest region today) and orders it in code. If a region ever passes
 **~300 places**, fetch only `id` + `city` first, order those, and then request the full detail of the 8 chosen ones (the

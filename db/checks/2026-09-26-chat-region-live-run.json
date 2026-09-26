@@ -1,0 +1,247 @@
+{
+ "started": "2026-09-26T23:13:39.739414+00:00",
+ "finished": "2026-09-26T23:14:12.406460+00:00",
+ "results": [
+  {
+   "label": "1 widened (Fraile Muerto)",
+   "session": "celiac-test-region-988558d5f6-conversation",
+   "message": "que locales puedo visitar para conseguir productos libre de gluten cerca de Fraile Muerto Cerro Largo?",
+   "reply": "Por ahora no tengo lugares confirmados en Fraile Muerto. Cerca hay 2 locales en Melo (Cerro Largo). \n\nSi conocés un lugar sin TACC en Fraile Muerto, contame y lo sumamos para que el equipo lo revise.",
+   "places": [],
+   "ids": [],
+   "action": null,
+   "checks": {
+    "no places listed as datos": true,
+    "names Cerro Largo and Melo": true,
+    "no place claimed in Fraile Muerto": true,
+    "no list, no place names": true
+   },
+   "passed": true
+  },
+  {
+   "label": "2 region asked outright",
+   "session": "celiac-test-region-988558d5f6-conversation",
+   "message": "y en cerro largo?",
+   "reply": "En Cerro Largo tengo confirmados dos comercios sin TACC en Melo:\n\n• EMPATIA GLUTEN FREE — comercio, Espacio 100% sin gluten\n  Dr. Luis Alberto de Herrera 859 | Lunes a viernes 8–18 h, sábado 8–12 h\n  Teléfono: 098 383 735\n\n• Gluten Free | Sandra | Productos — comercio, Espacio 100% sin gluten\n  Barrio La Palma, Batoví 1824\n\n¿Alguno de estos te viene bien?",
+   "places": [
+    {
+     "name": "EMPATIA GLUTEN FREE",
+     "city": "Melo"
+    },
+    {
+     "name": "Gluten Free | Sandra | Productos",
+     "city": "Melo"
+    }
+   ],
+   "ids": [
+    "7212e339-5011-484e-92df-19e4caf4ebf0",
+    "251571db-4a00-44c0-b4ce-1ad9d4eea7fb"
+   ],
+   "action": null,
+   "checks": {
+    "the two places of Melo": true,
+    "all in Melo": true,
+    "reply names both": true,
+    "does not mention Fraile Muerto": true
+   },
+   "passed": true
+  },
+  {
+   "label": "3 Melo",
+   "session": "celiac-test-region-988558d5f6-conversation",
+   "message": "veo en el mapa 2 lugares en Melo",
+   "reply": "Exacto, en Melo tenemos dos comercios confirmados:\n\n• **EMPATIA GLUTEN FREE** — Espacio 100% sin gluten, Dr. Luis Alberto de Herrera 859. Abierto lunes a viernes 8:00–18:00, sábados 8:00–12:00. Teléfono: 098 383 735.\n\n• **Gluten Free | Sandra | Productos** — Espacio 100% sin gluten, Barrio La Palma, Batoví 1824.\n\nAmbos son espacios dedicados. ¿Querés más info sobre alguno o buscás en otra zona?",
+   "places": [
+    {
+     "name": "EMPATIA GLUTEN FREE",
+     "city": "Melo"
+    },
+    {
+     "name": "Gluten Free | Sandra | Productos",
+     "city": "Melo"
+    }
+   ],
+   "ids": [
+    "7212e339-5011-484e-92df-19e4caf4ebf0",
+    "251571db-4a00-44c0-b4ce-1ad9d4eea7fb"
+   ],
+   "action": null,
+   "checks": {
+    "the two places of Melo": true,
+    "reply names both": true
+   },
+   "passed": true
+  },
+  {
+   "label": "4 provincia de Buenos Aires",
+   "session": "celiac-test-region-ee5721a326-bsas",
+   "message": "lugares sin tacc en la provincia de Buenos Aires",
+   "reply": "En la provincia de Buenos Aires la comunidad tiene confirmados:\n\n• Fiambrería y Almacén Sin Gluten Martínez — San Isidro, comercio, Espacio 100% sin gluten\n• Alaia Sin Tacc-Tienda & Café — Morón, café, Espacio 100% sin gluten\n• Lucha ldg — Tigre, café, Espacio 100% sin gluten\n• Hache Homebaked gluten free Las Lomas — San Isidro, café, Espacio 100% sin gluten\n• Hache Homebaked gluten free Vicente López — Vicente López, café, Espacio 100% sin gluten\n• @TACCTOMDP — Mar del Plata, comercio, Espacio 100% sin gluten\n• Fuoco Senza Glutine — Mar del Plata, restaurante, Espacio 100% sin gluten\n• Jsintacc — La Plata, comercio, Tiene opciones sin TACC\n\n¿Querés que filtre por ciudad o tipo de lugar?",
+   "places": [
+    {
+     "name": "Fiambrería y Almacén Sin Gluten Martínez",
+     "city": "San Isidro"
+    },
+    {
+     "name": "Alaia Sin Tacc-Tienda & Café",
+     "city": "Morón"
+    },
+    {
+     "name": "Lucha ldg",
+     "city": "Tigre"
+    },
+    {
+     "name": "Jsintacc",
+     "city": "La Plata"
+    },
+    {
+     "name": "@TACCTOMDP",
+     "city": "Mar del Plata"
+    },
+    {
+     "name": "Fuoco Senza Glutine",
+     "city": "Mar del Plata"
+    },
+    {
+     "name": "Hache Homebaked gluten free Las Lomas",
+     "city": "San Isidro"
+    },
+    {
+     "name": "Hache Homebaked gluten free Vicente Lopez",
+     "city": "Vicente López"
+    }
+   ],
+   "ids": [
+    "4eae7e88-eeb9-42cc-90fe-5893a3f635a5",
+    "56fb6f14-de4e-4371-b3a5-88bc428127ff",
+    "eab30658-e05e-4dd5-ad6d-e97ff0ae1975",
+    "f2a1b0d2-fd3e-411f-b5f3-e370f6a2035b",
+    "5272dd73-13f8-4f9c-8f85-8ae2edbcb7ec",
+    "cc24abb4-24f6-4e8c-9bc5-6239bfac74e9",
+    "2f715145-e1cb-4664-90f3-8f71781a02cf",
+    "f4f87e23-4a46-4b70-a01e-fe47a8a658ed"
+   ],
+   "action": null,
+   "checks": {
+    "8 places": true,
+    "all in the province (region Buenos Aires)": true,
+    "none is a CABA place": true
+   },
+   "passed": true
+  },
+  {
+   "label": "5 Córdoba",
+   "session": "celiac-test-region-476c2138ae-cordoba",
+   "message": "algo sin tacc en Córdoba",
+   "reply": "En Córdoba tenemos varios lugares confirmados:\n\n**Espacios 100% sin gluten:**\n• GUSTAZO Gluten Free - Panadería sin TACC — café/panadería, Juan Antonio Lavalleja 1550\n• FODY Sin TACC - Panadería Artesanal — café/panadería, Enrique Lacosta 388\n• lüben – sin gluten — café, Av. República de China 1150 (Valle Escondido)\n• GLUTEN free – market — comercio, Ovidio Lagos 195\n• Bataráz Pastelería sin tacc — café/pastelería, Dr. Horacio Martínez 3706\n• DOZEN st. – productos sin TACC — café, Menéndez Pidal\n\n**Tienen opciones sin TACC:**\n• VIENTO DEL SOL Tienda Orgánica y Productos Sin Tacc — comercio, Achával Rodriguez 260 (B° Güemes)\n• EntreSano Healthy Supermarket — comercio, Blvd. San Juan 85\n\n¿Querés que filtre por tipo de lugar (café, comercio) o que busque en otra zona?",
+   "places": [
+    {
+     "name": "GUSTAZO Gluten Free - Panaderia sin TACC",
+     "city": "Córdoba"
+    },
+    {
+     "name": "FODY Sin TACC - Panadería Artesanal",
+     "city": "Córdoba"
+    },
+    {
+     "name": "VIENTO DEL SOL Tienda Orgánica y Productos Sin Tacc",
+     "city": "Córdoba"
+    },
+    {
+     "name": "lüben – ꜱɪɴ ɢʟᴜᴛᴇɴ [Valle Escondido]",
+     "city": "Córdoba"
+    },
+    {
+     "name": "GLUTEN free – ᴍᴀʀᴋᴇᴛ",
+     "city": "Córdoba"
+    },
+    {
+     "name": "Bataráz Pasteleria sin tacc",
+     "city": "Córdoba"
+    },
+    {
+     "name": "DOZEN st. – ᴘʀᴏᴅᴜᴄᴛᴏꜱ ꜱɪɴ ᴛᴀᴄᴄ •",
+     "city": "Córdoba"
+    },
+    {
+     "name": "EntreSano Healthy Supermarket",
+     "city": "Córdoba"
+    }
+   ],
+   "ids": [
+    "5e1e9020-eaa2-4a59-af2e-094240cf0bb7",
+    "ed7b0c12-cda4-4ec5-a93d-f503632131e7",
+    "7b64d578-0816-429f-9e55-bc9c2360cbfd",
+    "cb82d45a-90cc-4303-b84b-c222e63a9c80",
+    "598fb3b6-5f84-4c3b-9839-ac2683c1fa8b",
+    "9e92fd81-b7bf-4fb2-b2dd-9ce0505f00b2",
+    "e12358ce-aacd-4eb1-a6e9-526c26ab499a",
+    "ed42eb8d-bc27-4b91-82d1-b7de6759b25c"
+   ],
+   "action": null,
+   "checks": {
+    "8 places": true,
+    "all in the province (region Córdoba)": true,
+    "the capital's places (city Córdoba) come first": true
+   },
+   "passed": true
+  },
+  {
+   "label": "6 Maldonado (city-first ordering)",
+   "session": "celiac-test-region-74a187644e-maldonado",
+   "message": "algo sin tacc en Maldonado?",
+   "reply": "En Maldonado y zona la comunidad tiene confirmado:\n\n• **Minimarket La Isla 24hs** — comercio, Tiene opciones sin TACC (abierto 24 horas, más de 1500 productos sin gluten)\n• **GLUTENOFF** — comercio, Espacio 100% sin gluten (Punta del Este, de lunes a sábado)\n• **Flor's** — comercio, Espacio 100% sin gluten (Punta del Este)\n• **Loco Suelto** — comercio, Espacio 100% sin gluten (Punta del Este, de lunes a sábado)\n• **Hoy Café** — café, Espacio 100% sin gluten (La Barra, de martes a sábado)\n• **Avo Punta** — restaurante, Tiene opciones sin TACC (Punta del Este)\n• **Lo de Cecilia** — restaurante, Tiene opciones sin TACC (Estación Las Flores)\n\n¿Querés que filtre por tipo de lugar (comercio, café o restaurante)?",
+   "places": [
+    {
+     "name": "Minimarket La Isla 24hs. Cocina y más de 1500 productos sin gluten, cerveza Patagonia y cientos de etiquetas de vino",
+     "city": "Maldonado"
+    },
+    {
+     "name": "GLUTENOFF",
+     "city": "Punta del Este"
+    },
+    {
+     "name": "Flor's",
+     "city": "Punta del Este"
+    },
+    {
+     "name": "Hoy Café",
+     "city": "Punta del Este"
+    },
+    {
+     "name": "Avo Punta",
+     "city": "Punta del Este"
+    },
+    {
+     "name": "Lo de Cecilia",
+     "city": "Punta del Este"
+    },
+    {
+     "name": "Loco Suelto",
+     "city": "Punta del Este"
+    },
+    {
+     "name": "Minimarket La Isla 24 hours.",
+     "city": "Punta del Este"
+    }
+   ],
+   "ids": [
+    "756d0138-ffb2-47a9-b478-af675996c9ae",
+    "a6a15ba0-eb8c-4579-8fba-7dd3a67e68ec",
+    "815c3801-2ef0-4049-9d11-cfc13a69d0f1",
+    "23a3eb38-752d-41c9-9afb-a8c4405132fb",
+    "edfcd5f7-d51a-4718-b899-4211a6d1b64a",
+    "52343aef-f59a-4379-8037-5fe0de2ec926",
+    "3a3f5470-fee4-4d7f-959f-f01e8d8d5f2e",
+    "22b104b1-f950-48fb-8deb-577985b51593"
+   ],
+   "action": null,
+   "checks": {
+    "8 places": true,
+    "all in the department (region Maldonado)": true,
+    "the place of the city of Maldonado comes first": true
+   },
+   "passed": true
+  }
+ ]
+}

@@ -467,7 +467,7 @@ Detail of every phase, with its verification notes: [Build status (phases)](docs
 - ✅ 24 Chatbot Fase E: jailbreak battery, F3/F4, guard (chat v11)
 - ✅ 25 Kitchen information (2026-09-24)
 - ✅ 26 Community opinions (2026-09-24)
-- 🚧 27 Department / province search (2026-09-26): code + tests done; migration and backfill applied to production (1 263 rows, all 422 approved); `chat` deploy and live verification pending
+- ✅ 27 Department / province search (2026-09-26): `places.region` in production (1 263 rows, all 422 approved), `chat` v20 deployed and verified live
 - **Open:** chatbot soft-launch with organic traffic (Fase F: ADR-006 closure, C4, README); F4 Option 1 prompt
   reformulation (non-blocking); live confirmation of a real outreach reply and opt-out.
 
