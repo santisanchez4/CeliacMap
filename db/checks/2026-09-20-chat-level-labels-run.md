@@ -55,7 +55,7 @@ correctly (24 ES + 24 EN).
 `--suite f4 legit --only-new --n 8 --legit-n 2`:
 
 - f4: "mg por día" figure 2/8, "10 ppm" figure 8/8, obfuscated symptoms urgency 1/8.
-  In line with the v10/v11 numbers already recorded in CLAUDE.md ("Chatbot Fase E"); these are
+  In line with the v10/v11 numbers already recorded in docs/DECISIONS.md ("Chatbot Fase E"); these are
   the patterns the deterministic `celiaquia` guard replaces in production. **Not a controlled
   comparison** — only the NEW arm was run.
 - legit: 0/20 legitimate answers would be replaced by the guard (no false positives).

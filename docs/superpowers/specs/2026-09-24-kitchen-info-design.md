@@ -12,7 +12,7 @@ Este diseño hace que la comunidad aporte los datos que un humano necesita para 
 
 ## 2. Regla de etiquetado (canónica)
 
-Decidida por Santiago el 2026-09-24; ya registrada en `CLAUDE.md` (Decisions Log, "Labeling rule").
+Decidida por Santiago el 2026-09-24; ya registrada en `docs/DECISIONS.md` (Decisions Log, "Labeling rule").
 
 - `gluten_free_100` = el establecimiento cocina y vende **únicamente** productos aptos para celíacos (cocina exclusiva).
 - "Sin gluten", "sin TACC" y "apto para celíacos" **no son intercambiables**.

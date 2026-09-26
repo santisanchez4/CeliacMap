@@ -1,14 +1,15 @@
-"""The chatbot's two system prompts (ROUTER + REDACTOR) live in four places:
+"""The chatbot's two system prompts (ROUTER + REDACTOR) live in three places:
 
     supabase/functions/chat/prompts.ts   -- the source of truth (what actually runs)
-    CLAUDE.md                            -- "The Chatbot System Prompts"
     prompts.md                           -- section 27
     docs/architecture/ADR-006-chatbot-rag.md -- "Los prompts del chatbot"
 
-Same triple-copy discipline as the Validator RUBRIC: they are the only gate
+Same copy discipline as the Validator RUBRIC: they are the only gate
 between a user's message and what the bot does or says on a health-sensitive
 product, so a copy that silently drifts is a real defect. This test extracts the
 prompt from every location and demands exact equality with prompts.ts.
+
+CLAUDE.md used to carry a fourth copy; it was removed on 2026-09-26 and now only points at prompts.ts.
 
 Line endings are normalised (the working tree is CRLF on Windows, git stores LF);
 everything else -- every character of every instruction and example -- must match.
@@ -25,7 +26,6 @@ PROMPTS_TS = ROOT / "supabase" / "functions" / "chat" / "prompts.ts"
 
 # (file, heading that opens the prompt section, heading that closes it or None)
 DOCS = [
-    (ROOT / "CLAUDE.md", "## The Chatbot System Prompts", "## Technical Scope"),
     (ROOT / "prompts.md", "## 27. Chatbot RAG (ADR-006)", "## 28."),
     (ROOT / "docs" / "architecture" / "ADR-006-chatbot-rag.md", "## Los prompts del chatbot", None),
 ]

@@ -88,7 +88,7 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   [`ADR-006`](docs/architecture/ADR-006-chatbot-rag.md); the soft-launch with organic
   traffic is still pending.
 
-See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the full technical design.
+See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the summary and [`docs/DECISIONS.md`](docs/DECISIONS.md) for the full technical design and every design decision.
 
 ## Tech Stack
 
@@ -134,7 +134,7 @@ CeliacMap has three layers:
    **Validator** uses Claude to approve/discard → **Updater** keeps published places
    current. Orchestrated by GitHub Actions.
 
-Full details, schema, and design decisions: [`CLAUDE.md`](CLAUDE.md#architecture).
+Summary: [`CLAUDE.md`](CLAUDE.md#architecture). Full details, schema, and design decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## The Core Prompt — Validator Rubric
 
@@ -284,6 +284,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers
 │   ├── seed.sql                # community-ranking votes on 15 real places (fictional sample places removed 2026-09-25)
 │   └── checks/                 # verification evidence: BEGIN;…ROLLBACK; scripts, jailbreak battery, live runs, prompt A/B tool
+├── docs/                       # DECISIONS.md (decisions log + design detail), architecture/ (ADRs, C4), plans/
 ├── tests/                      # offline unit tests (all external calls mocked)
 ├── .github/workflows/          # agents-monthly cron + Pages deploy
 ├── requirements.txt

@@ -254,7 +254,7 @@ def test_user_prompt_without_reviews_has_no_signals_section():
 
 def test_user_prompt_flags_address_only_geocode():
     """A candidate resolved only by geocoding its address must carry the
-    ubicacion_geocode weakness note (the RUBRIC keys off it — CLAUDE.md
+    ubicacion_geocode weakness note (the RUBRIC keys off it — docs/DECISIONS.md
     Decisions Log: geocode-gate address fallback)."""
     weak = ValidatorAgent._build_user_prompt(
         {"name": "Bienestar", "geocode_method": "address_only"}, []

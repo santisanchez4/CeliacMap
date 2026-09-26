@@ -2,7 +2,7 @@
 
 resolve_location is the shared geocode entrypoint for the Social, Web and
 Suggestion agents: Find Place first, then the Geocoding API on the street
-address alone as an ``address_only`` fallback (see CLAUDE.md Decisions Log —
+address alone as an ``address_only`` fallback (see docs/DECISIONS.md, Decisions Log —
 "geocode-gate: address fallback").
 """
 

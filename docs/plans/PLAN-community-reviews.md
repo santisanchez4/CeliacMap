@@ -851,7 +851,7 @@ en `agent_log` con `agent='review_handler'`).
      actual: limpio, 6/6 tests pasan** (requieren `--allow-env`, un
      permiso de sandboxing de Deno para que el SDK de Resend lea
      `RESEND_BASE_URL` — no relacionado al lockfile). Coincide
-     exactamente con lo ya documentado en CLAUDE.md antes de que
+     exactamente con lo ya documentado en docs/DECISIONS.md (entonces CLAUDE.md) antes de que
      existiera este lock ("deno test passes 6/6"). Cero regresión
      funcional detectable.
   2. **Historial de deploys reales** (`supabase functions list`, CLI ya
@@ -906,4 +906,4 @@ en `agent_log` con `agent='review_handler'`).
   `@2` y un futuro `@3` convivirían sin problema), así que un conflicto
   real de versiones en el futuro tampoco forzaría la separación — se
   resolvería dentro del mismo lock. Registrada también en el Decisions
-  Log de `CLAUDE.md`.
+  Log de `docs/DECISIONS.md`.

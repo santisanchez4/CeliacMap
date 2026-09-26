@@ -29,7 +29,7 @@ verificaciones): los 13 lugares de ejemplo del seed (inventados, estaban en el m
 23 lugares argentinos con `country='Uruguay'` corregidos; ExpoCelíaca, Celi events y Asociación Celíaca Argentina
 descartados (no son comercios); 5 ciudades mal cargadas. Los 100% aprobados pasaron de 313 a **306**, que es la
 base del paso 2b. **Deuda conocida:** las 12 filas `discarded` con país equivocado no se corrigieron (no son
-públicas; cada ciudad exige investigación). Detalle en CLAUDE.md → "Audit data-quality pass 2026-09-25".
+públicas; cada ciudad exige investigación). Detalle en docs/DECISIONS.md → "Audit data-quality pass 2026-09-25".
 
 **2026-09-25 — paso 2b, cambio de enfoque:** `cap_unsupported_100.py` ganó `--flag-only`: para los mismos lugares solo
 agrega la marca `100% pendiente de confirmación del administrador` (nivel, status, confianza y notas intactos, un
@@ -103,7 +103,7 @@ comunidad cuentan como evidencia y nunca actúan solos. La etiqueta pública est
 - **Social agent:** el título y el snippet de Instagram/Facebook (donde suele decir "100% sin TACC",
   "cocina exclusiva") se usan para extraer el lead y **se descartan**.
 - **Admin:** la evidencia manual en `validation_notes` es invisible para el Validator y cada validación la pisa
-  (riesgo ya documentado en CLAUDE.md; el caso de los 16 lugares de Montevideo del 2026-09-07).
+  (riesgo ya documentado en docs/DECISIONS.md, Key risks; el caso de los 16 lugares de Montevideo del 2026-09-07).
 
 **Consecuencia para el objetivo:** justo la frase que separa "100%" de "opciones" (la bio de Instagram, el post del
 blog) la vemos en el descubrimiento y la tiramos. El Validator termina en `needs_review` por falta de señal
@@ -228,7 +228,7 @@ El resultado define el tamaño del paso 2b.
 - **Validator:** `_build_user_prompt` agrega un bloque `evidencia_descubrimiento` (máx. 5 items, recortados).
   `update_place_validation` no toca `evidence`.
 - **RUBRIC:** un párrafo que diga que ese bloque es evidencia citada de fuentes públicas: sirve para decidir el nivel,
-  pero **no es verificación**, y el `approved` sigue exigiendo la misma confianza. Además, agregar la línea que CLAUDE.md
+  pero **no es verificación**, y el `approved` sigue exigiendo la misma confianza. Además, agregar la línea que el Decisions Log (docs/DECISIONS.md)
   ya dejó escrita como mitigación pendiente: **"no emitas un veredicto a partir de conocimiento previo del negocio ni
   de la interpretación del nombre: toda evidencia citada debe estar en el mensaje"** (cierra Enharinate y Serendipia).
 - **Tests:** el prompt incluye el bloque; `update_place_validation` no lo pisa; Social y Web lo guardan.

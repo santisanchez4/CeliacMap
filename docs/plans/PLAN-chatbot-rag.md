@@ -538,7 +538,7 @@ Cada fase = un commit separado, mismo patrón que ADR-004 / ADR-005.
 ### Fase D — Widget de frontend
 
 > **Estado (2026-09-19): implementada y verificada localmente, sin commitear.**
-> Desvíos respecto de lo que sigue (el detalle y el porqué están en `CLAUDE.md`,
+> Desvíos respecto de lo que sigue (el detalle y el porqué están en `docs/DECISIONS.md`,
 > **Chatbot Fase D**): el copy vive entero en `MSG` de `chat.js` — no se toca
 > `main.js` (no soporta `data-i18n-aria-label`) y el markup no lleva texto; se
 > agregó `celiacmap:panel-close` en `map.js`; la atribución CARTO se corre solo

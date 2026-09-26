@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Copy ROUTER_PROMPT / RESPONDER_PROMPT from supabase/functions/chat/prompts.ts (the source of
-truth) into the three doc copies. Only the two ```xml blocks after each section heading are
+truth) into the two doc copies. Only the two ```xml blocks after each section heading are
 rewritten; line endings of each file are preserved; everything else is left byte-identical.
 
   python scripts/sync_chat_prompts.py           # rewrite the copies
   python scripts/sync_chat_prompts.py --check   # exit 1 if any copy is out of date (no writes)
 
-tests/test_chat_prompts_sync.py is the gate that proves the four copies match.
+tests/test_chat_prompts_sync.py is the gate that proves the three copies match.
 """
 from __future__ import annotations
 
@@ -18,7 +18,6 @@ ROOT = Path(__file__).resolve().parent.parent
 PROMPTS_TS = ROOT / "supabase" / "functions" / "chat" / "prompts.ts"
 # (file, heading that opens the section, heading that closes it or None) — same as the sync test.
 DOCS = [
-    (ROOT / "CLAUDE.md", "## The Chatbot System Prompts", "## Technical Scope"),
     (ROOT / "prompts.md", "## 27. Chatbot RAG (ADR-006)", "## 28."),
     (ROOT / "docs" / "architecture" / "ADR-006-chatbot-rag.md", "## Los prompts del chatbot", None),
 ]

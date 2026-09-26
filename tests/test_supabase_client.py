@@ -5,7 +5,7 @@ agent (Search / Social / Web / Suggestion) funnels new places through it, so
 an approximate Uruguay+Argentina bounding-box check here is a last-resort net
 against a place landing far outside the project's scope — a location-biased
 Google search, or a mis-matched Find Place result, that slipped past
-`to_candidate()` / `resolve_location()`. See CLAUDE.md "Brazil out-of-scope
+`to_candidate()` / `resolve_location()`. See docs/DECISIONS.md "Brazil out-of-scope
 places — Curitiba cluster".
 """
 

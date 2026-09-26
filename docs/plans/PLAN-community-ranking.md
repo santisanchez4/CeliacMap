@@ -2,7 +2,7 @@
 
 **Estado:** Completado (2026-09-02 — Fases A–F, verificado end-to-end en
 producción; ver `## Verificación` en el ADR-005 y la Phase 21 del build
-status de CLAUDE.md)
+status de docs/DECISIONS.md)
 **ADR relacionado:** `docs/architecture/ADR-005-community-ranking.md` (Aceptado)
 
 ## Objetivo
@@ -528,7 +528,7 @@ Cada fase = un commit separado, mismo patrón que la sesión de hoy. La
   coinciden exactamente con lo planeado vía el trigger.
 - De paso: corrección puntual de `places.city` de "Marce Cakes® Gluten
   Free" (`Paraná` → `Santa Fe`); duplicado de "JANA GLUTEN FREE"
-  registrado como deuda de datos (CLAUDE.md).
+  registrado como deuda de datos (docs/DECISIONS.md).
 
 ### Fase E — Tests + verificación  ✅ HECHA
 

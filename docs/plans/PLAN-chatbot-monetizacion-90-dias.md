@@ -43,7 +43,7 @@ El chatbot **nunca inventa ni completa información que no esté en la base de d
 - [ ] Construir el widget en el sitio (posición decidida en semana 1-2), probar responsive.
 - [ ] Testear casos límite: sin resultados, intentos de "jailbreak" (pedir que ignore instrucciones, que hable de otro tema, que actúe como asistente general), volumen alto simulado contra los caps de presupuesto.
 - [ ] Soft launch: monitorear `agent_log`/logs del chatbot los primeros días, confirmar costo real vs. estimado.
-- [ ] Documentar en `CLAUDE.md` (Decisions Log) y evaluar si amerita un ADR formal en el repo.
+- [ ] Documentar en `docs/DECISIONS.md` (Decisions Log, con una línea de índice en `CLAUDE.md`) y evaluar si amerita un ADR formal en el repo.
 
 ---
 
@@ -78,7 +78,7 @@ Evaluar, sin comprometerse a implementar, las siguientes vías (recordando el pr
 ### Semanas 11-12 — Evaluación y decisión
 - [ ] Revisar resultados del prototipo: ¿hay señales reales de demanda o interés?
 - [ ] Decidir si se sigue invirtiendo en esa vía, se prueba otra, o se pospone la monetización otra vez.
-- [ ] Documentar la decisión (con razones) en `CLAUDE.md` o como ADR formal si se decide seguir adelante.
+- [ ] Documentar la decisión (con razones) en `docs/DECISIONS.md` o como ADR formal si se decide seguir adelante.
 
 ---
 

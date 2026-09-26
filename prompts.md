@@ -642,7 +642,7 @@ Google Find Place, dedups, and promotes each into `places` as `pending`
 (`source='user'`) for the unchanged Validator gate. New `js/suggest.js` submits via
 the Supabase REST API with the public anon key.
 
-**Key decisions made during this prompt** (full rationale in CLAUDE.md →
+**Key decisions made during this prompt** (full rationale in docs/DECISIONS.md →
 **Suggest-a-Place public form design decisions**):
 - **Intake table + pipeline promotion**, chosen over a Supabase Edge Function or a
   map-pin direct `places` insert — no new server tech, keeps `places` always-mappable
@@ -684,7 +684,7 @@ standalone ADR file for academic deliverables.
 
 **Input variables:** None — the prompt embeds the full ADR content verbatim
 (title, Estado, Contexto, Decisión, Consecuencias), derived from the three-tier
-rubric decision already documented in `CLAUDE.md`'s Decisions Log (see §12 above).
+rubric decision already documented in the Decisions Log, now `docs/DECISIONS.md` (see §12 above).
 
 **Worked example (the prompt used to generate
 `docs/architecture/ADR-001-three-tier-validation-rubric.md`):**
@@ -743,7 +743,7 @@ Do not modify any other file.
 
 **Used for:** Producing `docs/architecture/ADR-001-three-tier-validation-rubric.md`
 verbatim from content already decided and documented in prose form in `CLAUDE.md`
-(§12 in this log; **AI Toolkit** in the Decisions Log). No new decision was made —
+(§12 in this log; **AI Toolkit** in the Decisions Log, now `docs/DECISIONS.md`). No new decision was made —
 the prompt only reformats an existing decision into the standalone ADR format
 required by the academic deliverable, and `CLAUDE.md`'s Decisions Log was updated
 with a one-line pointer to the new file.
@@ -1197,12 +1197,12 @@ existing full re-evaluation unchanged.
   live-mode candidates before activation surfaced a `website_scraper.py`
   false-positive bug (image-filename and platform-domain emails matching the
   regex) — fixed separately (`fix: reject false-positive emails from website
-  scraper`) before enabling live mode for real. See CLAUDE.md's updated
+  scraper`) before enabling live mode for real. See docs/DECISIONS.md's updated
   `contact_email` bullet under **Outreach agent design decisions**.
 - **CI wiring (later session):** `OUTREACH_LIVE_MODE` added as a GitHub
   Secret and forwarded into `agents-monthly.yml`'s `env:` block — closing the
   gap where the secret existed but the workflow never passed it through to
-  `scripts/run_agents.py`. See CLAUDE.md's Phase 18 build-status entry.
+  `scripts/run_agents.py`. See docs/DECISIONS.md's Phase 18 build-status entry.
 
 ## 23. ADR-004 + PLAN-community-reviews.md — Community Reports Design
 
@@ -1321,7 +1321,7 @@ message carries the `ubicacion_geocode:` note. Expected verdict: `needs_review`
 (the address is real, "sin TACC" is claimed in the user's notes, but nothing
 external confirms the business operates there) — not `approved`.
 
-**Full rationale + investigation:** CLAUDE.md Decisions Log,
+**Full rationale + investigation:** docs/DECISIONS.md Decisions Log,
 "Geocode-gate — address fallback (`resolve_location`)".
 
 ---
@@ -1348,7 +1348,7 @@ eyebrow trimmed from "Visión futura · Roadmap" to "Visión futura"),
 removed, `ai.eyebrow` EN trimmed), `css/styles.css` (dead `.timeline*` rules
 removed). No CSS change was needed for the lone CTA button — `.cta-actions`
 was already `justify-content: center`. Docs kept in sync: `README.md` section
-count 12→11, this entry, and the CLAUDE.md Decisions Log entry **"Public site
+count 12→11, this entry, and the docs/DECISIONS.md Decisions Log entry **"Public site
 — Roadmap section & GitHub links removed (2026-09-01)"** (full rationale +
 scope note there). GitHub Actions / Pages / repo-URL mentions in `README.md`
 were deliberately left — they document infrastructure, not the public site.
@@ -1439,7 +1439,7 @@ Validator's `RUBRIC` — the only thing standing between a user's message and
 what the bot says or does. Documented verbatim in four places (same
 redundancy as the `RUBRIC`): `agents/validator_agent.py`-equivalent constants
 in `supabase/functions/chat/prompts.ts` (Fase B; the source of truth),
-`CLAUDE.md` ("The Chatbot System Prompts — Router + Redactor"),
+`CLAUDE.md` ("The Chatbot System Prompts — Router + Redactor"; a copy until 2026-09-26, now only a pointer to `prompts.ts`),
 `docs/architecture/ADR-006-chatbot-rag.md`, and here.
 `tests/test_chat_prompts_sync.py` fails if any copy drifts from `prompts.ts`.
 The blocks below are the **current** text (as of Fase E).
@@ -1451,7 +1451,7 @@ The blocks below are the **current** text (as of Fase E).
   jailbreak attempt already dressed up as a normal request.
 - **The "never name a place outside `<datos>`" rule is the load-bearing
   constraint.** It is the direct chatbot analogue of the "Validator —
-  parametric knowledge vs. provided evidence" lesson (CLAUDE.md Decisions
+  parametric knowledge vs. provided evidence" lesson (docs/DECISIONS.md Decisions
   Log, the "Enharinate Mendoza" case): a model that "knows" a well-known
   chain can approve/recommend it with zero evidence in front of it. The
   redactor's examples rehearse the exact pressure patterns that lesson
@@ -2041,7 +2041,7 @@ decisión 11, `PLAN-chatbot-rag.md` (Fase D + the Edge Function contract),
 wireframe, the class/ID list (a grep confirmed zero existing `chat` matches)
 and seven decisions where the request and the code disagreed. Implementation
 started only after approval. Findings that changed the design — full list in
-CLAUDE.md **Chatbot Fase D**:
+docs/DECISIONS.md **Chatbot Fase D**:
 
 - the "Top 3 widget pattern" for hiding on `panel-open` didn't exist
   (`.map-top3` is a static aside) and `map.js` had no close event → added
@@ -2111,7 +2111,7 @@ mg/day, with individual variation. So the instruction was written to avoid
 **every** figure and to say "no amount can be assured safe for every celiac
 person; the medical indication is to avoid it entirely", instead of asserting
 either "20 ppm" or "tolerance zero". Full evidence and its quality:
-CLAUDE.md, Decisions Log, "Chatbot Fase E".
+docs/DECISIONS.md, Decisions Log, "Chatbot Fase E".
 
 **Key decisions carried by the revised prompts:**
 - **REDACTOR instruction 4a/4b + constraint + example.** No gluten figure at
@@ -2140,7 +2140,7 @@ un médico" kept appearing, and in an offline A/B (N=8) urgency mentions went
 quoting the forbidden phrases inside the prompt primes them. So the prompt was
 not left carrying the safety on its own: a deterministic guard in code now
 replaces any `celiaquia` reply carrying a gluten figure or "urgen…" with a fixed
-message (CLAUDE.md, Decisions Log, "Chatbot Fase E"). Reformulating instruction 4
+message (docs/DECISIONS.md, Decisions Log, "Chatbot Fase E"). Reformulating instruction 4
 without naming the forbidden phrases is **in progress, not blocking**; its gate is
 `db/checks/chat_prompt_ab.py` (N >= 16, must beat the deployed prompt on both
 metrics, no new false positives). When that revision exists, its prompt text and

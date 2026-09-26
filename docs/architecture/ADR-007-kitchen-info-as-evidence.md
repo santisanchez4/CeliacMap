@@ -15,9 +15,9 @@ para celíacos" **no son lo mismo**.
 Hasta ahora ninguno de los canales de la comunidad (formulario "Sumá un lugar", formulario "Recomendar / reportar",
 chatbot) pedía nada de eso: solo había un campo de notas libre. Y esas notas terminaban en `places.validation_notes`,
 que el Validator **no lee** y pisa en cada validación (ver "`validation_notes` es invisible para el Validator" en
-`CLAUDE.md`). No hay cuentas: cualquiera puede enviar cualquier cosa, y los límites anti-spam viven en `localStorage`.
+`docs/DECISIONS.md`, Key risks). No hay cuentas: cualquiera puede enviar cualquier cosa, y los límites anti-spam viven en `localStorage`.
 
-La regla de etiquetado la fijó Santiago el 2026-09-24 (registrada en `CLAUDE.md`): `gluten_free_100` significa que se
+La regla de etiquetado la fijó Santiago el 2026-09-24 (registrada en `docs/DECISIONS.md` y resumida en `CLAUDE.md` → "Reglas vigentes"): `gluten_free_100` significa que se
 cocinan y venden **únicamente** productos aptos para celíacos; un local que cocina con gluten pero tiene menú,
 preparación aparte o cocina separada es "opciones"; una cocina única en un emprendimiento chico no es 100% por
 defecto; y que el dueño sea celíaco sube la confianza pero **nunca cambia la etiqueta solo**: hasta que el dueño lo
@@ -111,7 +111,7 @@ confirme directamente o haya una reseña que lo respalde, queda en "Tiene opcion
   como comportamiento conservador y queda registrado.
 - Mostrar estos datos en el mapa queda fuera de alcance; si se hiciera, debe excluir `owner_celiac`.
 - Un lugar de la comunidad no llega solo a 100%: el administrador sube la etiqueta con un override manual documentado
-  (`CLAUDE.md`, "Manual Validator overrides"), como se hizo con Los Leños, Dalbertt y Pastas Lo de Flor.
+  (`docs/DECISIONS.md`, "Manual Validator overrides"), como se hizo con Los Leños, Dalbertt y Pastas Lo de Flor.
 
 ## Enmienda (2026-09-24, mismo día)
 
@@ -123,4 +123,4 @@ Módulo 4 del chatbot). **El chatbot se alineó el mismo día** (`chat` v17, sol
 borrador `report` —recomendar o reportar un lugar que ya está en el mapa— ni pregunta por la cocina ni la guarda; se
 pregunta al agregar un comercio y en el Módulo 4. Verificado en vivo
 (`db/checks/2026-09-24-chat-report-no-kitchen-live-run.md`). Ver "Form B collects reviews, not kitchen data" en
-`CLAUDE.md`.
+`docs/DECISIONS.md`.

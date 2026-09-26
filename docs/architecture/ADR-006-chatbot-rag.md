@@ -135,7 +135,7 @@ browser. Es la **primera Edge Function del proyecto que llama a un LLM**.
 (¿este lugar es seguro?). El chatbot **nunca toma esa decisión** — solo
 relata datos que el Validator ya produjo y enruta entradas hacia las tablas
 intake. Su prompt de sistema es su propia fuente de verdad (documentada en
-`prompts.md` y `CLAUDE.md`, igual que el `RUBRIC`), no una copia de nada.
+`prompts.md` y este ADR; `CLAUDE.md` solo apunta a `prompts.ts`, a diferencia del `RUBRIC`), no una copia de nada.
 No hay lógica de decisión de seguridad duplicada porque el chatbot no tiene
 ninguna.
 
@@ -375,7 +375,7 @@ se clasifica `fuera_de_alcance` y el redactor solo declina.
 
 Ambos prompts completos están en la sección **## Los prompts del chatbot**
 más abajo, y se documentan en `prompts.md` §27 y en una sección de
-`CLAUDE.md` con el mismo tratamiento que "The Core Prompt — Validator
+`CLAUDE.md` (hasta 2026-09-26; hoy solo apunta a `prompts.ts`) con el mismo tratamiento que "The Core Prompt — Validator
 Rubric" (no se pierden ni se cambian sin consideración).
 
 ### 8. Presupuesto y rate limiting: propio y separado del pipeline batch (2b)
@@ -633,7 +633,7 @@ de 10 mg/kg) y «hablá urgente con un médico».
   convertiría en rechazo la pregunta general de tolerancia, que queremos responder en
   términos generales.
 
-Detalle, mediciones y límites: CLAUDE.md, Decisions Log, «Chatbot Fase E».
+Detalle, mediciones y límites: docs/DECISIONS.md, Decisions Log, «Chatbot Fase E».
 
 ### 15. Las etiquetas de nivel del chat son las del mapa (2026-09-20)
 
@@ -679,9 +679,9 @@ más permisiva en el chat que en el mapa.
 > edición al alcance, a los límites, o a la lista de fuentes se registra
 > acá y en el Decisions Log, igual que el `RUBRIC`.
 
-Se documentan también en `prompts.md` §27 y en `CLAUDE.md`. Viven como
+Se documentan también en `prompts.md` §27. Viven como
 constantes en `supabase/functions/chat/` (TS), que es la fuente de verdad;
-`tests/test_chat_prompts_sync.py` compara las cuatro copias.
+`tests/test_chat_prompts_sync.py` compara las tres copias (`prompts.ts`, `prompts.md` y este ADR).
 
 > **Estos bloques son el texto vigente, no el de la Fase B.** Dos revisiones
 > posteriores ya están reflejadas acá: la **Fase C** (bloque `<envio>`, estados
@@ -690,7 +690,7 @@ constantes en `supabase/functions/chat/` (TS), que es la fuente de verdad;
 > recibido hasta la Fase E, y la **Fase E** (2026-09-20): el ROUTER gana el sexto
 > módulo `cortesia` y el REDACTOR pasa a no dar ninguna cifra de gluten ni
 > juicios de gravedad o urgencia (instrucción 4a/4b). Investigación, decisiones
-> y qué se descartó: CLAUDE.md, Decisions Log, "Chatbot Fase E".
+> y qué se descartó: docs/DECISIONS.md, Decisions Log, "Chatbot Fase E".
 
 ### Prompt del ROUTER de intención (llamada 1)
 
@@ -1295,7 +1295,7 @@ simuló.
 (decisiones 4 y 6) se verificaron end-to-end en producción, incluido que un reporte
 `negative` sobre un lugar `approved` dispara la cadena de re-evaluación de Phase 19 y
 uno `positive` no, con todas las filas de prueba revertidas después. Detalle: **Phase
-22** de `CLAUDE.md`.
+22** de `docs/DECISIONS.md` (Build status).
 
 **Fase D (widget).** `js/chat.js` se verificó en Chrome contra el endpoint real
 (búsqueda con y sin resultados, fuera de alcance, celiaquía, borrador de reporte en

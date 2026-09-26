@@ -329,7 +329,7 @@ def test_extract_gf_snippets_handles_none():
     assert GooglePlacesClient.extract_gf_snippets(None) == []
 
 
-# --- city/country derivation (CLAUDE.md "Key risks": Search agent stamps
+# --- city/country derivation (docs/DECISIONS.md "Key risks": Search agent stamps
 # city/country from the query target, not the result) ----------------------
 
 
@@ -337,7 +337,7 @@ def test_to_candidate_derives_country_from_result_address_not_target():
     # Regression for the real production bug: searching "Fray Bentos,
     # Uruguay" can legitimately return a business actually located across
     # the border in Gualeguaychú, Argentina (confirmed live for 16 rows,
-    # see CLAUDE.md). to_candidate must reflect the RESULT's own address,
+    # see docs/DECISIONS.md). to_candidate must reflect the RESULT's own address,
     # never the query target it happened to be searched under.
     result = {
         "name": "San Felipa - Sin gluten",
@@ -385,7 +385,7 @@ def test_parse_address_returns_none_for_empty_address():
 
 
 def test_to_candidate_discards_result_outside_uy_ar():
-    # CLAUDE.md "Brazil out-of-scope places — Curitiba cluster": Google Text
+    # docs/DECISIONS.md "Brazil out-of-scope places — Curitiba cluster": Google Text
     # Search is location-BIASED, not bounded, so a query for an ambiguous
     # city name ("Paraná" = an Argentine city AND a Brazilian state) can
     # return a business in another country. to_candidate() must DISCARD it,

@@ -38,4 +38,4 @@ seconds. It has **zero authority over `places.status`** — it only relates
 what the Validator already approved and routes input into the existing
 `place_reports` / `suggestions` intake tables. See ADR-006 for the full design
 and the two prompts (ROUTER + REDACTOR), also documented verbatim in
-`CLAUDE.md` ("The Chatbot System Prompts") and `prompts.md` §27.
+`prompts.md` §27 (`CLAUDE.md` "The Chatbot System Prompts" only points to `prompts.ts`).

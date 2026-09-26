@@ -33,3 +33,6 @@ __pycache__/
 venv/
 .pytest_cache/
 .mypy_cache/
+
+# Generated / scratch outputs
+outputs/
