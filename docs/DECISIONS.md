@@ -2278,9 +2278,8 @@ widened replies say "Cerca hay 2 … en Melo (Cerro Largo)", a proximity claim t
 distance). Fixing it needs a prompt edit (a `<busqueda_ampliada>` block, "Option B", or rewording the examples), so it waits
 for the next deliberate prompt change, with the jailbreak battery and a soft-launch restart. Also open: a `category` the router
 carries over ("locales" → `shop`) can hide a café in the same region; the components path was checked live only for Uruguay; 11
-approved rows have the wrong `city` (Fray Bentos ×3 that are in Dolores/Mercedes/Maldonado, Ciudad de la Costa ×2 filed as
-Maldonado/Montevideo, `Buenos Aires` ×6 that are in the province) — their `region` is right, their `city` is data debt to fix
-separately with literal SQL.
+approved rows had the wrong `city` (Fray Bentos ×3 that are in Dolores/Mercedes/Maldonado, Ciudad de la Costa ×2 filed as
+Maldonado/Montevideo, `Buenos Aires` ×6 that are in the province) — their `region` was right; fixed 2026-09-27 (follow-up below).
 
 **Deployed and verified live (`chat` v20, 2026-09-26).** Deployed only after the column was confirmed in production;
 `verify_jwt=false` by API and the deployed `index.ts`, `regions.ts` and `prompts.ts` identical to `HEAD` (hash without CR). Six
@@ -2289,7 +2288,22 @@ approved places: 6/6 pass, and `agent_log` shows the plan taken (`fallback` / `r
 capital-first ordering with today's data (all 46 are in the capital); "Maldonado" (1 place in the city, 15 elsewhere in the
 department) does. The rows the run wrote (6 `agent_log`, the `chat_usage` counters) were reverted with a guarded transaction
 back to the baseline; record: `db/checks/2026-09-26-chat-region-live-run.md`. The prompt is unchanged, so the soft-launch count
-is not restarted. Next, separately: the 11 approved rows with the wrong `city`.
+is not restarted.
+
+**Follow-up (2026-09-27) — `city` corrected on 13 rows** (`db/fixes/2026-09-27-city-from-address.sql`, guarded by
+`tests/test_city_from_address_fix.py`). The region backfill made visible the approved rows whose `city` contradicts their own
+address: 6 `Buenos Aires` of the province → their real locality (Vicente López, San Fernando, Villa Bosch, San Isidro, Loma
+Hermosa, Mar del Plata), 3 `Fray Bentos` → Dolores / Maldonado / Mercedes, 2 filed as Maldonado / Montevideo → Ciudad de la
+Costa; the same sweep over `needs_review` added 2 (Rodríguez, Paysandú), in a separate block. Only `city` and
+`validation_notes` change (snapshot hash of every other column, `updated_at` trigger off and asserted back on, exact counts),
+under a `CORRECCIÓN MANUAL 2026-09-27: ciudad corregida según la dirección (era X)` header that is a DATA correction and
+protects nothing (`manual_override_marker` returns None before and after on the real notes; the test pins the wording).
+La Union Bakery → San Isidro is inferred from the CPA B1642, the name and the coordinates (0.2 km from San Isidro's centre),
+not written in its address. **Left as they are:** the 19 flagged `discarded` rows (debt) and every label that differs from
+Google's locality while the region agrees (`Punta del Este` for Maldonado / La Barra, `Ing. Maschwitz`, `Paraná` for Oro
+Verde, `Berisso`, `San Miguel` for Muñiz, `Vicente López` for Olivos, `Carrasco`, `Barra del Chuy`). Verified read-only after
+the commit: 13 rows carry the header; approved `Buenos Aires` is the 63 of CABA only and `Fray Bentos` is all Río Negro; 0
+`updated_at` touched; trigger on.
 
 **Future improvement (scale).** A region search that has to rank by the requested city fetches the whole region
 (`REGION_FETCH_LIMIT` = 500 rows, ~120 approved in the largest region today) and orders it in code. If a region ever passes
