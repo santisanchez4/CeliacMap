@@ -14,6 +14,8 @@ from typing import Any
 
 from supabase import Client, create_client
 
+from agents.clients.google_places import GooglePlacesClient
+
 logger = logging.getLogger("celiacmap.agent")
 
 # Approximate bounding box for Uruguay + Argentina at full national extent,
@@ -79,6 +81,15 @@ class SupabaseClient:
             )
             return None
         payload = {**candidate, "status": "pending"}
+        # The department / province, from the address every discovery agent already passes here
+        # (Search, Social, Web, Suggestion, review_queue): one derivation instead of one per agent.
+        # A region the caller set is kept; an address that names none leaves the column NULL.
+        if not payload.get("region"):
+            region = GooglePlacesClient.region_from_address(
+                candidate.get("address"), candidate.get("country")
+            )
+            if region:
+                payload["region"] = region
         res = (
             self._db.table("places")
             .upsert(payload, on_conflict="source,external_id", ignore_duplicates=True)

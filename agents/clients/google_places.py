@@ -145,20 +145,31 @@ def names_match(searched: str | None, found: str | None) -> bool:
     return hits / len(shorter) >= NAME_MATCH_THRESHOLD
 
 
-AR_PROVINCES = {
-    "buenos aires", "catamarca", "chaco", "chubut", "cordoba", "corrientes",
-    "entre rios", "formosa", "jujuy", "la pampa", "la rioja", "mendoza",
-    "misiones", "neuquen", "rio negro", "salta", "san juan", "san luis",
-    "santa cruz", "santa fe", "santiago del estero", "tierra del fuego",
-    "tucuman",
+# Normalized name -> the accented name stored in `places.region` and used by the chatbot. The same
+# spelling in both countries for "Río Negro"; the row's `country` tells the two apart.
+AR_REGION_NAMES = {
+    "buenos aires": "Buenos Aires", "catamarca": "Catamarca", "chaco": "Chaco", "chubut": "Chubut",
+    "cordoba": "Córdoba", "corrientes": "Corrientes", "entre rios": "Entre Ríos", "formosa": "Formosa",
+    "jujuy": "Jujuy", "la pampa": "La Pampa", "la rioja": "La Rioja", "mendoza": "Mendoza",
+    "misiones": "Misiones", "neuquen": "Neuquén", "rio negro": "Río Negro", "salta": "Salta",
+    "san juan": "San Juan", "san luis": "San Luis", "santa cruz": "Santa Cruz", "santa fe": "Santa Fe",
+    "santiago del estero": "Santiago del Estero", "tierra del fuego": "Tierra del Fuego",
+    "tucuman": "Tucumán",
 }
 
-UY_DEPARTMENTS = {
-    "artigas", "canelones", "cerro largo", "colonia", "durazno", "flores",
-    "florida", "lavalleja", "maldonado", "montevideo", "paysandu",
-    "rio negro", "rivera", "rocha", "salto", "san jose", "soriano",
-    "tacuarembo", "treinta y tres",
+UY_REGION_NAMES = {
+    "artigas": "Artigas", "canelones": "Canelones", "cerro largo": "Cerro Largo", "colonia": "Colonia",
+    "durazno": "Durazno", "flores": "Flores", "florida": "Florida", "lavalleja": "Lavalleja",
+    "maldonado": "Maldonado", "montevideo": "Montevideo", "paysandu": "Paysandú", "rio negro": "Río Negro",
+    "rivera": "Rivera", "rocha": "Rocha", "salto": "Salto", "san jose": "San José", "soriano": "Soriano",
+    "tacuarembo": "Tacuarembó", "treinta y tres": "Treinta y Tres",
 }
+
+# C.A.B.A. is not a province: it is its own region, never the province of the same name.
+CABA_REGION = "Ciudad Autónoma de Buenos Aires"
+
+AR_PROVINCES = set(AR_REGION_NAMES)
+UY_DEPARTMENTS = set(UY_REGION_NAMES)
 
 # Argentine postal codes are either plain digits (old format, e.g. "E2820")
 # or the full CPA format letter+4digits+3letters (e.g. "C1427EKC"); Uruguayan
@@ -475,6 +486,84 @@ class GooglePlacesClient:
         return city, country
 
     @staticmethod
+    def _region_from_line(line: str, country: str | None, short_name: str | None = None) -> str | None:
+        """The canonical region a single address line / component names, or None.
+
+        ``country`` (already canonical, or None when unknown) picks the list; a region of the OTHER
+        country is not a region. A bare "Buenos Aires" (no "Provincia de") is CABA's city line in some
+        Google results and the province in others, so it is never guessed.
+        """
+        stripped = _POSTAL_PREFIX_RE.sub("", line).strip()
+        normalized = _normalize_text(stripped)
+        if country in (None, "Argentina") and (
+            normalized in _CABA_NAMES
+            or "autonoma de buenos aires" in normalized
+            or (short_name or "").strip().upper() == "CABA"
+        ):
+            return CABA_REGION
+        key = _normalize_text(_REGION_WRAP_RE.sub(r"\1", stripped).strip())
+        if key == "buenos aires" and key == normalized:
+            return None
+        names = {
+            "Argentina": AR_REGION_NAMES,
+            "Uruguay": UY_REGION_NAMES,
+        }.get(country or "", {**UY_REGION_NAMES, **AR_REGION_NAMES})
+        return names.get(key)
+
+    @staticmethod
+    def region_from_address(formatted_address: str | None, country: str | None = None) -> str | None:
+        """The department / province a Google ``formatted_address`` names, in canonical form.
+
+        Reads only the region line ("…, Departamento de Cerro Largo, Uruguay", "…, Entre Ríos,
+        Argentina"), so a street named like another region ("Rio Negro 1185", "Av. Córdoba") never
+        wins. Without a province line, a city named like its province ("X5022 Córdoba, Argentina")
+        still reads as that province. ``country`` is a hint for addresses with no country line; if the address's own country line contradicts it, there is no region.
+        Returns None for anything else (out-of-scope countries, a bare "Buenos Aires", a city that is
+        not a region): a wrong region is worse than none, and the chat then falls back to the city.
+        """
+        if not formatted_address:
+            return None
+        parts = [p.strip() for p in formatted_address.split(",") if p.strip()]
+        if len(parts) < 2:
+            return None
+        line_country = SUPPORTED_COUNTRIES.get(_normalize_text(parts[-1]))
+        body = parts[:-1] if line_country else parts
+        if country is not None:
+            country = SUPPORTED_COUNTRIES.get(_normalize_text(country))
+            if country is None or (line_country and line_country != country):
+                return None
+        return GooglePlacesClient._region_from_line(body[-1], line_country or country)
+
+    @staticmethod
+    def region_from_components(
+        address_components: list[dict[str, Any]] | None, country: str | None = None
+    ) -> str | None:
+        """The region a Place Details ``address_components`` list names (``administrative_area_level_1``).
+
+        Google returns "Departamento de X" for every Uruguayan department (checked live, es and en).
+        Used only when the address itself names no region.
+        """
+        if not address_components:
+            return None
+        area = None
+        component_country = None
+        for component in address_components:
+            types = component.get("types") or []
+            if "administrative_area_level_1" in types:
+                area = component
+            elif "country" in types:
+                component_country = SUPPORTED_COUNTRIES.get(_normalize_text(component.get("long_name") or ""))
+        if area is None:
+            return None
+        if country is not None:
+            country = SUPPORTED_COUNTRIES.get(_normalize_text(country))
+            if country is None:
+                return None
+        return GooglePlacesClient._region_from_line(
+            area.get("long_name") or "", country or component_country, area.get("short_name")
+        )
+
+    @staticmethod
     def city_country_from_components(
         address_components: list[dict[str, Any]] | None,
     ) -> tuple[str | None, str | None]:
@@ -528,7 +617,7 @@ class GooglePlacesClient:
         if parsed_country is None:
             return None
         loc = (result.get("geometry") or {}).get("location") or {}
-        return {
+        candidate = {
             "name": result.get("name"),
             "lat": loc.get("lat"),
             "lng": loc.get("lng"),
@@ -538,6 +627,10 @@ class GooglePlacesClient:
             "country": parsed_country,
             "city": parsed_city or city,
         }
+        region = GooglePlacesClient.region_from_address(result.get("formatted_address"), parsed_country)
+        if region:
+            candidate["region"] = region
+        return candidate
 
     @staticmethod
     def extract_rich_fields(result: dict[str, Any]) -> dict:
@@ -577,6 +670,14 @@ class GooglePlacesClient:
             rich["city"] = city
         if country:
             rich["country"] = country
+
+        # Address first (measured: 422/422 approved places), components only when the address names
+        # no region. Left out when neither does, so a patch never overwrites a stored region with None.
+        region = GooglePlacesClient.region_from_address(
+            result.get("formatted_address"), country
+        ) or GooglePlacesClient.region_from_components(result.get("address_components"), country)
+        if region:
+            rich["region"] = region
 
         return rich
 

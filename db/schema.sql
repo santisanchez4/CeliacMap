@@ -705,6 +705,18 @@ create index if not exists place_reports_negative_recent_idx
   on public.place_reports (place_id, created_at) where report_type = 'negative';
 -- COMMUNITY-WARNING-END
 
+-- PLACES-REGION-BEGIN
+-- The department (Uruguay) or province (Argentina) of a place, so the chatbot can answer
+-- "lugares en Cerro Largo" when every place there is filed under a smaller city (Melo).
+-- Derived from Google's own address by GooglePlacesClient.region_from_address (agents fill it at
+-- insert; the Updater keeps it in step with the address); never from the search target. The value is
+-- the accented canonical name ("Entre Ríos"); C.A.B.A. is "Ciudad Autónoma de Buenos Aires", never
+-- the province "Buenos Aires". "Río Negro" exists in both countries: the row's `country` tells them
+-- apart. NULL = the address names no region (out of scope, or unresolved). Public like `city`
+-- (places is readable by anon, approved rows only); no CHECK and no index (1.3k rows).
+alter table public.places add column if not exists region text;
+-- PLACES-REGION-END
+
 -- PLACE-EVIDENCE-BEGIN
 -- ---------------------------------------------------------------------
 -- Table: place_evidence  (audit plan 2026-09-24, step 1)

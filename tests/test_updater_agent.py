@@ -137,6 +137,43 @@ def test_patch_skips_unchanged_rich_fields():
 # --- No-op when nothing changed -------------------------------------------
 
 
+# --- places.region follows the address in the same patch -------------------------
+
+MELO_ADDRESS = "Dr. Luis Alberto de Herrera 859, 37000 Melo, Departamento de Cerro Largo, Uruguay"
+
+
+def test_patch_recomputes_the_region_when_the_address_moves_to_another_department():
+    agent, _, _ = make_agent()
+    place = {"name": "Same", "address": "Av. Italia 1, Montevideo, Departamento de Montevideo, Uruguay",
+             "region": "Montevideo", "category": "restaurant"}
+    result = {"name": "Same", "formatted_address": "Av. Giannattasio 1, 15800 Ciudad de la Costa, Departamento de Canelones, Uruguay",
+              "types": ["restaurant"]}
+    patch = agent._build_patch(place, result)
+    assert patch["address"] == result["formatted_address"]
+    assert patch["region"] == "Canelones"
+
+
+def test_patch_fills_a_missing_region_even_when_nothing_else_changed():
+    agent, _, _ = make_agent()
+    place = {"name": "Same", "address": MELO_ADDRESS, "region": None, "category": "restaurant"}
+    result = {"name": "Same", "formatted_address": MELO_ADDRESS, "types": ["restaurant"]}
+    assert agent._build_patch(place, result) == {"region": "Cerro Largo"}
+
+
+def test_patch_keeps_the_stored_region_when_the_new_address_names_none():
+    agent, _, _ = make_agent()
+    place = {"name": "Same", "address": MELO_ADDRESS, "region": "Cerro Largo", "category": "restaurant"}
+    result = {"name": "Same", "formatted_address": "Addr 2", "types": ["restaurant"]}
+    assert agent._build_patch(place, result) == {"address": "Addr 2"}
+
+
+def test_patch_is_quiet_when_the_region_is_already_right():
+    agent, _, _ = make_agent()
+    place = {"name": "Same", "address": MELO_ADDRESS, "region": "Cerro Largo", "category": "restaurant"}
+    result = {"name": "Same", "formatted_address": MELO_ADDRESS, "types": ["restaurant"]}
+    assert agent._build_patch(place, result) == {}
+
+
 def test_patch_is_empty_when_nothing_changed():
     agent, _, _ = make_agent()
     place = {"name": "Same", "address": "Addr 1", "category": "restaurant"}

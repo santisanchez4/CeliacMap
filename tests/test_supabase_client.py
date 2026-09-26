@@ -96,6 +96,49 @@ def test_insert_place_candidate_inserts_in_scope_candidate():
     client._db.table.assert_called_once_with("places")
 
 
+# --- places.region is derived at the same chokepoint ---------------------------
+
+
+def _upserted_payload(client: SupabaseClient) -> dict:
+    return client._db.table.return_value.upsert.call_args.args[0]
+
+
+def _insert(client: SupabaseClient, **overrides) -> None:
+    candidate = {
+        "name": "EMPATIA GLUTEN FREE",
+        "lat": -32.37,
+        "lng": -54.17,
+        "source": "social",
+        "external_id": "ext-melo",
+        "country": "Uruguay",
+        "address": "Dr. Luis Alberto de Herrera 859, 37000 Melo, Departamento de Cerro Largo, Uruguay",
+        **overrides,
+    }
+    client._db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "row-1"}])
+    client.insert_place_candidate(candidate)
+
+
+def test_insert_place_candidate_derives_the_region_from_the_address():
+    client = _client_with_mock_db()
+    _insert(client)
+    assert _upserted_payload(client)["region"] == "Cerro Largo"
+
+
+def test_insert_place_candidate_keeps_a_region_the_caller_already_set():
+    client = _client_with_mock_db()
+    _insert(client, region="Rocha")
+    assert _upserted_payload(client)["region"] == "Rocha"
+
+
+def test_insert_place_candidate_leaves_the_region_out_when_the_address_names_none():
+    client = _client_with_mock_db()
+    _insert(client, address="Rivera 1967, Fray Bentos, Uruguay")
+    assert "region" not in _upserted_payload(client)
+    client = _client_with_mock_db()
+    _insert(client, address=None)
+    assert "region" not in _upserted_payload(client)
+
+
 # --- delete_expired_google_reviews (Google Places ToS: 30-day expiration) -----
 
 
