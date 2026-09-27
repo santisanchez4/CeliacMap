@@ -2439,6 +2439,10 @@ pipeline run). Wall-clock time for the 271 was not measured (the pilot's page do
   (`docs/runbooks/evidence-finder.md`).
 - 10 places are a small sample and the model varies between runs: read the report of the full run, do not trust the proportions of the pilot.
   Recall is the price of the stricter attribution.
+- **Data for the admin to check (noted 2026-09-27, not touched): "Tu rincón de dulces gluten free 🍪 by Flo Scalone"**
+  (`67b1218b-dadb-4798-bb22-a751b2f2c7d5`, Google place `ChIJ66iDLwqBn5URRpXTO1AgHM4`). Its address in the database is `1200, 11200 Montevideo, …` (no street;
+  coordinates -34.911528, -56.1849587), while a reel of its Instagram (`@soyfloscalone`) says "📍 Santiago de Chile 1015". Two different numbers (1200 vs 1015) and the
+  street only in the Instagram: the address is not corrected until the admin finds out which is right (on the map or with the business).
 - `has_exclusive_signal` misses phrases such as "exclusivamente para celíacos"; the report flags them as "posible 100". Changing the Validator's
   regex is a separate, measured decision.
 

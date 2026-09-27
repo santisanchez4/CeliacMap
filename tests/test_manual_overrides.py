@@ -58,6 +58,8 @@ DATA_HEADERS = [
     "Uruguay/Argentina). Se mantiene en needs_review por exclusión editorial, no por la calidad del negocio.",
     "CORRECCIÓN MANUAL: este lugar está en Brasil, fuera del alcance geográfico del proyecto (solo Uruguay/Argentina). "
     "Movido a needs_review para exclusión editorial, no por problema de calidad del negocio en sí.",
+    # 2026-09-27: an address fixed from the business's own Instagram (Delirio Sin Gluten). It says where the place is, not how safe it is.
+    'CORRECCIÓN MANUAL 2026-09-27: dirección corregida a "Luis Franzini 970" según el Instagram del local (antes "Luis Franzini", sin número).',
 ]
 
 
@@ -68,6 +70,7 @@ def test_the_data_correction_phrases_are_an_explicit_reviewed_list():
         "lugar de ejemplo del seed",
         "no es un comercio",
         "fuera del alcance geográfico",
+        "dirección corregida",
     )
 
 
@@ -139,3 +142,18 @@ def test_a_place_without_notes_or_markers_is_not_protected():
     assert manual_override_marker(None) is None
     assert manual_override_marker("") is None
     assert manual_override_marker(VALIDATOR_TEXT) is None
+
+
+def test_an_address_correction_is_a_data_correction_written_with_or_without_accents_and_in_any_case():
+    assert manual_override_marker("correccion manual 2026-09-27: DIRECCION CORREGIDA a Luis Franzini 970.") is None
+    assert manual_override_marker("CORRECCIÓN MANUAL 2026-09-27: Dirección Corregida (antes sin número).") is None
+
+
+def test_an_address_correction_header_on_top_of_an_approval_still_protects_the_place():
+    approval = "APROBACIÓN MANUAL (2026-09-27, review_queue): Revisado por el admin. El Validator había dejado: approved @ 0.95."
+    assert manual_override_marker(f"{DATA_HEADERS[-1]}\n\n{approval}") == "aprobacion manual"
+
+
+def test_the_address_phrase_alone_without_the_correction_header_protects_nothing_and_a_look_alike_header_does():
+    assert manual_override_marker("Nota: dirección corregida en el mapa.") is None  # not a CORRECCIÓN MANUAL header at all
+    assert manual_override_marker("CORRECCIÓN MANUAL 2026-09-27: dirección arreglada a Luis Franzini 970.") == "correccion manual"

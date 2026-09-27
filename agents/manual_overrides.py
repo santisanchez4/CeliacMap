@@ -32,6 +32,7 @@ DATA_CORRECTION_PHRASES = (
     "lugar de ejemplo del seed",
     "no es un comercio",
     "fuera del alcance geográfico",
+    "dirección corregida",
 )
 
 

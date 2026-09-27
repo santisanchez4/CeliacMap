@@ -334,8 +334,8 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   header (`OVERRIDE MANUAL` / `APROBACIÓN MANUAL` / `CORRECCIÓN MANUAL`): who, what direct knowledge, what the Validator
   had said. Never inflate or deflate `validation_confidence`; leave `verified` alone unless a human vouches for it.
 - **`DATA_CORRECTION_PHRASES`** (`agents/manual_overrides.py`): a `CORRECCIÓN MANUAL` header that only corrects data
-  ("país/ciudad corregidos", "ciudad corregida", "lugar de ejemplo del seed", "no es un comercio", "fuera del alcance
-  geográfico") does not protect a place; each header line is judged on its own; `OVERRIDE` / `APROBACIÓN MANUAL` always
+  ("país/ciudad corregidos", "ciudad corregida", "dirección corregida", "lugar de ejemplo del seed", "no es un comercio",
+  "fuera del alcance geográfico") does not protect a place; each header line is judged on its own; `OVERRIDE` / `APROBACIÓN MANUAL` always
   protect. In fix scripts, a data-only note uses one of those phrases and a safety decision goes on its own line.
 - **100% label** [Manual Validator overrides; Kitchen information]: `gluten_free_100` means only celiac-safe products are
   cooked and sold. Cooking everything but offering a celiac menu, separate prep or a separate kitchen is
