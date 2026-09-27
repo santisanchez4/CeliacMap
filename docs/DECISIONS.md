@@ -2483,6 +2483,29 @@ candidate with no `external_id` (a manual place with no Google listing) never lo
 Python 728 → 736. **Not retroactive:** the existing pairs are cleaned by a separate, reviewed batch (the admin decides which row stays, moves the votes,
 reports and opinions, and discards the other with a `CORRECCIÓN MANUAL: duplicado de <id>` header).
 
+**Follow-ups.** `DryRunSupabase.insert_place_candidate` did not mirror the lookup at first delivery — a `--dry-run` still logged "would insert" for a
+`place_id` that production would skip — fixed the same day (5 tests, `tests/test_run_agents_dryrun.py`). The 21-pair cleanup batch: read-only side-by-side
+review of all 24 pairs first (13 both `approved`, 8 needing a discard, 3 already one-sided), one transaction (`db/fixes/2026-09-27-duplicate-place-ids.sql`)
+with a snapshot-hash guard and per-step assertions, `"duplicado de"` added to `DATA_CORRECTION_PHRASES` (a data correction, protects nothing). Two owner
+corrections during review: CeliHaus's kept row (google_places, `celiac_friendly`) had no admin's-100%-queue flag while its discarded row (social,
+`gluten_free_100`) did — the flag is now handed to the kept row before the discard, so the business stays in `review_queue --pending-100` instead of
+silently leaving it; and the NULL-field fill (`phone`/`website`/`social_url`) was rehearsed once with a plain `coalesce`, which would have copied a single
+Instagram *post* or *reel* URL (Il Porto, Minimarket La Isla, Sin Gluten Olivos) as if it were the business's profile — `social_url` is now filled only when
+the discarded row's link does **not** match `/(p|reel|reels|tv)/`, so only Harvest Punta del Este and Niter (real profile links) get filled; the excluded
+three keep their own link in the discarded row's notes. Net effect after the fix: 21 rows discarded, exactly 3 kept rows change (CeliHaus's flag, Harvest's
+and Niter's `social_url`). Rehearsed twice (`begin; … <report>; rollback;`, a fingerprint of `places`/`place_votes` unchanged before/after both times) before
+the admin's "dale". Tests 757 → 767 (`tests/test_duplicate_places_fix.py`, a pglast-AST guard).
+
+**New branches, same day.** Two places anchored to their own Google listing, reviewed on their Instagram: **Rikuras Sin Gluten El Pinar** (Ciudad de la
+Costa, Canelones) and **Piu Helados Prado** (Montevideo), both inserted `manual` / `approved` / `gluten_free_100` in one transaction with the same
+guard-and-assert shape (`db/fixes/2026-09-27-new-branches.sql`, `tests/test_manual_row_fixes.py`). The same transaction updates the existing, `discarded`
+**Piu Helados Cordón** row (`d1420754-…`) with its name, `category='cafe'`, phone and Instagram — data only, it stays `discarded` — because reactivating a
+place is a safety decision and belongs to `review_queue --approve`, run right after the SQL commits, not inside it: `--approve d1420754-dca8-47e2-8d60-97ac779de1c2
+--level 100 --note "Revisado por el admin: su Instagram (piuheladosmontevideo) se presenta como heladería artesanal Gluten Free"`. Applied to production
+2026-09-27: rehearsed (`begin; … rollback;`, fingerprint unchanged), then committed — `places` 1312 → 1314, both new rows confirmed `approved` /
+`gluten_free_100` and publicly readable with the anon key, Cordón's four columns changed and still `discarded`. `review_queue --approve` (dry run) confirmed
+next: `discarded → approved · Espacio 100% sin gluten`; the `--apply` waits for a second go-ahead, since it is a distinct write.
+
 **Dry run (added after the first delivery, which missed it).** `DryRunSupabase.insert_place_candidate` now mirrors the same lookup, after the scope check: a
 candidate whose `place_id` already belongs to a row logs `[dry-run] would SKIP ...` instead of `would insert`, so a rehearsal no longer promises an insert that
 production would not do (5 tests in `tests/test_run_agents_dryrun.py`). Known limit: a dry run writes nothing, so its client returns `None` for both outcomes and
