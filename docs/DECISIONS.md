@@ -942,9 +942,11 @@ as Ta Bacana / Caneladesayunos: inserted directly as `approved`, `safety_level='
 ("Dispensario Espresso Bar"), confirmed to be the same business by three matches against its
 Instagram bio (address, phone, Tuesday–Sunday 16:00–20:00), so it is anchored to it —
 `external_id` = the Google `place_id`, `geocode_method='find_place'`, ROOFTOP coordinates, plus the
-phone, hours and rating Google returned. That anchor is what stops the monthly Search agent from
-inserting the same place again as a pending "Dispensario Espresso Bar" (`place_exists_by_external_id`),
-and lets the Updater keep it fresh. **Practical rule:** before geocoding a manual place from the
+phone, hours and rating Google returned. That anchor lets the Updater keep it fresh. **(Correction
+2026-09-27: it did NOT stop the monthly Search agent from inserting the same place again as a pending
+"Dispensario Espresso Bar". The original text said `place_exists_by_external_id` did that, but only Social,
+Web and Suggestion call it; Search relied on the `(source, external_id)` unique index, which a `manual` row
+does not trigger. Fixed in `insert_place_candidate`: see "One Google place, one row".)** **Practical rule:** before geocoding a manual place from the
 cadastre, run Find Place on its name + city — a listing may already exist and is better than an
 address-only row. See `db/fixes/2026-09-24-fray-bentos-dispensario.sql`.
 
@@ -2462,6 +2464,24 @@ the model varies between runs, not because of this change. Aggregate numbers: `d
 **Tests.** Python 535 → 712 (`test_evidence_finder*.py`, `test_evidence_guides.py`, `test_evidence_acceptance.py`, `test_evidence_attribution.py`, `test_evidence_freeze.py`,
 `test_find_evidence.py`, `test_review_queue_proposals.py`, `test_llm_usage.py`, additions to `test_website_scraper.py`). Mutation checks: breaking
 the source check, the verification, the vetoes, the noise filter, the name masking, the identity words or the region rule each fails tests.
+
+### One Google place, one row — dedup across sources (2026-09-27)
+
+**The finding.** Checking whether a manual place anchored to a Google `place_id` (Rikuras Sin Gluten El Pinar) was safe from the monthly Search
+agent, the code showed that **Search never looked the `place_id` up**: `place_exists_by_external_id` (any source, any status) is called by Social, Web
+and Suggestion, while Search inserts through `insert_place_candidate`, whose only protection is the unique index on `(source, external_id)`. A candidate
+of another source (Search's `google_places` against a `manual` or `social` row) never conflicts. The database already had the proof: **24 `place_id`
+had two rows** (`google_places` + `social`), **13 of them with both rows `approved`** (Zero Gluten, Minimarket La Isla, Celiak2, JANA, Placeres sin gluten,
+Donato, CeliHaus, Nature gluten free, Alfin Pizzas, Nana, Alárabi, Yoda, Apto Libre de Gluten: the same business twice on the map) and 11 with the other
+status combinations. The Dispensario entry above claimed the anchor prevented exactly this; it was wrong and is corrected there.
+
+**The fix (option A, owner-approved).** `SupabaseClient.insert_place_candidate` (the chokepoint every discovery agent inserts through) skips a candidate
+whose `external_id` already belongs to ANY row, any source and any status (a discarded row still holds the id), logs the skip at INFO with the name, the
+source and the id, and returns `None`; Search counts it as `skipped`. A failed lookup does not block the insert (like the other dedup checks) and a
+candidate with no `external_id` (a manual place with no Google listing) never looks anything up. Cost: one `SELECT` per candidate that has an id. Tests first
+(`tests/test_supabase_client.py`, and one end to end in `tests/test_search_agent.py`: a Search candidate with the `place_id` of a manual row is not inserted).
+Python 728 → 736. **Not retroactive:** the existing pairs are cleaned by a separate, reviewed batch (the admin decides which row stays, moves the votes,
+reports and opinions, and discards the other with a `CORRECCIÓN MANUAL: duplicado de <id>` header).
 
 ### Build status (phases)
 

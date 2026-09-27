@@ -106,6 +106,33 @@ def test_duplicate_external_id_dedup_across_queries():
     assert summary["unique_candidates"] == 2
 
 
+def test_a_search_candidate_with_the_place_id_of_a_manual_row_is_not_inserted():
+    """The chokepoint dedups by external_id across sources: Search's google_places candidate must not duplicate a manual row."""
+    from agents.clients.supabase_client import SupabaseClient
+
+    rows = [{"id": "manual-1", "source": "manual", "status": "approved", "external_id": "MANUAL-PLACE"}]
+    fake_db = MagicMock()
+
+    def eq(column, value):
+        found = MagicMock()
+        found.limit.return_value.execute.return_value = MagicMock(data=[r for r in rows if r.get(column) == value])
+        return found
+
+    fake_db.table.return_value.select.return_value.eq.side_effect = eq
+    fake_db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "new-row"}])
+    client = SupabaseClient.__new__(SupabaseClient)
+    client._db = fake_db
+    client.delete_expired_google_reviews = MagicMock(return_value=[])
+    agent = SearchAgent(client, MagicMock(), TARGETS, max_review_enrichments=0, max_detail_lookups=0, max_review_refresh=0)
+    agent.places.text_search.return_value = {"results": [make_result("MANUAL-PLACE"), make_result("BRAND-NEW")]}
+
+    summary = agent.run()
+
+    upserts = fake_db.table.return_value.upsert.call_args_list
+    assert [call.args[0]["external_id"] for call in upserts] == ["BRAND-NEW"]
+    assert summary["inserted"] == 1 and summary["skipped"] == 1
+
+
 def test_result_without_place_id_is_skipped():
     agent, db, places = make_agent()
     no_id = make_result("X")

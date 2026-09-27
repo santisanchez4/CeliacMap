@@ -266,6 +266,9 @@ class SearchAgent(BaseAgent):
                         if out["snippets"]:
                             reviews_enriched += 1
                             review_snippets += out["snippets"]
+                else:
+                    # Nothing written: the place_id already belongs to a row (any source or status), like the other dedups.
+                    skipped += 1
 
         summary = {
             "queries": queries,

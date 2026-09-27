@@ -80,6 +80,22 @@ class SupabaseClient:
                 lng,
             )
             return None
+        # One Google place_id, one row: any source, any status. The unique index is on (source, external_id), so a candidate of
+        # another source (Search's 'google_places' against a 'manual' or 'social' row) never conflicted and became a duplicate
+        # (24 place_ids had two rows on 2026-09-27). Social / Web / Suggestion look the id up before resolving; this covers the rest.
+        external_id = candidate.get("external_id")
+        if external_id:
+            try:
+                if self.place_exists_by_external_id(external_id):
+                    logger.info(
+                        "skipping place candidate %r (source=%s): a place with external_id %s already exists (any source or status)",
+                        candidate.get("name"),
+                        candidate.get("source"),
+                        external_id,
+                    )
+                    return None
+            except Exception:  # noqa: BLE001 - a failed lookup must not block the insert (same as the other dedup checks)
+                logger.exception("dedup check failed for %s", external_id)
         payload = {**candidate, "status": "pending"}
         # The department / province, from the address every discovery agent already passes here
         # (Search, Social, Web, Suggestion, review_queue): one derivation instead of one per agent.

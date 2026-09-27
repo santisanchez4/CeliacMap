@@ -22,6 +22,8 @@ def _client_with_mock_db() -> SupabaseClient:
     # mock for the underlying connection.
     client = SupabaseClient.__new__(SupabaseClient)
     client._db = MagicMock()
+    # By default no row has the candidate's external_id (the normal case); the dedup tests say otherwise.
+    client._db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
     return client
 
 
@@ -94,6 +96,79 @@ def test_insert_place_candidate_inserts_in_scope_candidate():
 
     assert row == {"id": "row-1"}
     client._db.table.assert_called_once_with("places")
+
+
+# --- one place_id, one row: any source, any status ---------------------------------------------------------------
+# Found 2026-09-27: 24 place_ids had two rows (google_places + social), 13 of them both approved. The unique index is on
+# (source, external_id), so a candidate of another source never conflicted; only Social / Web / Suggestion looked the id up.
+
+EXTERNAL_ID = "ChIJH05jRj-Ln5URB3xgh46-Mck"
+
+
+def _candidate(**overrides) -> dict:
+    return {"name": "Rikuras Sin Gluten El Pinar", "lat": -34.8043848, "lng": -55.9063936, "source": "google_places",
+            "external_id": EXTERNAL_ID, "country": "Uruguay", **overrides}
+
+
+def _lookup(client: SupabaseClient):
+    return client._db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute
+
+
+def test_insert_place_candidate_skips_a_candidate_whose_place_id_belongs_to_a_manual_row():
+    client = _client_with_mock_db()
+    _lookup(client).return_value = MagicMock(data=[{"id": "manual-row"}])  # a source='manual' row already holds this place_id
+
+    assert client.insert_place_candidate(_candidate()) is None
+
+    client._db.table.return_value.upsert.assert_not_called()
+
+
+def test_the_lookup_is_by_external_id_alone_so_any_source_and_any_status_counts():
+    client = _client_with_mock_db()
+    client.insert_place_candidate(_candidate())
+    select = client._db.table.return_value.select
+    select.assert_called_once_with("id")
+    select.return_value.eq.assert_called_once_with("external_id", EXTERNAL_ID)
+    # no other filter: not by source (the unique index already covers that) and not by status (a discarded row still holds the id)
+    assert select.return_value.eq.return_value.method_calls[0][0] == "limit"
+    for name in ("eq", "neq", "in_", "is_", "filter"):
+        assert not getattr(select.return_value.eq.return_value, name).called
+
+
+def test_insert_place_candidate_still_inserts_when_no_row_has_that_place_id():
+    client = _client_with_mock_db()
+    client._db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "new-row"}])
+    assert client.insert_place_candidate(_candidate()) == {"id": "new-row"}
+    client._db.table.return_value.upsert.assert_called_once()
+
+
+def test_a_candidate_with_no_external_id_never_looks_anything_up():
+    client = _client_with_mock_db()
+    client._db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "row-1"}])
+    client.insert_place_candidate(_candidate(external_id=None, source="manual"))
+    client._db.table.return_value.select.assert_not_called()
+
+
+def test_the_skip_is_logged_with_the_name_the_place_id_and_the_source(caplog):
+    client = _client_with_mock_db()
+    _lookup(client).return_value = MagicMock(data=[{"id": "manual-row"}])
+    with caplog.at_level("INFO", logger="celiacmap.agent"):
+        client.insert_place_candidate(_candidate())
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "Rikuras Sin Gluten El Pinar" in text and EXTERNAL_ID in text and "google_places" in text
+
+
+def test_a_failed_lookup_does_not_block_the_insert_like_the_other_dedup_checks():
+    client = _client_with_mock_db()
+    _lookup(client).side_effect = RuntimeError("PostgREST down")
+    client._db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "row-1"}])
+    assert client.insert_place_candidate(_candidate()) == {"id": "row-1"}
+
+
+def test_the_out_of_scope_guard_still_runs_first_and_touches_nothing():
+    client = _client_with_mock_db()
+    assert client.insert_place_candidate(_candidate(lat=-25.4, lng=-49.3)) is None  # Curitiba
+    client._db.table.assert_not_called()
 
 
 # --- places.region is derived at the same chokepoint ---------------------------

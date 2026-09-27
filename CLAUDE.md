@@ -346,6 +346,8 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Evidence, not action** [Community reports; ranking; outreach]: reports, votes, outreach replies and the chatbot never
   change `places.status` on their own; only the Validator, the admin (with a transparent note) or the documented report
   rules do.
+- **One Google place, one row** [One Google place, one row]: `insert_place_candidate` skips a candidate whose `external_id` already belongs to ANY row
+  (any source, any status), so a manual place anchored to a Google `place_id` cannot be duplicated by the Search agent. Not retroactive.
 - **Evidence proposals are proposals** [Evidence finder]: `scripts/find_evidence` never writes and never changes a place; a `100` needs a quote
   verified on its page (else "100 · verificar en la fuente": accepted only alone, with `--verified-source`); a source is about the business by the
   code's rule (own URL, name + city, or title words with an identity word + city/region), never by the name alone; on a page matched only by its text the quote must sit
@@ -405,6 +407,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **One Google place, one row (2026-09-27)** — Search never looked the `place_id` up: 24 place_ids had two rows (13 both approved); `insert_place_candidate` now dedups across sources; the Dispensario claim was false. [→](docs/DECISIONS.md#one-google-place-one-row--dedup-across-sources-2026-09-27)
 - **Evidence finder for the admin-pending 100% queue (2026-09-27)** — read-only tool that proposes 100 / options / insuficiente with literal, page-verified quotes for the 271 flagged places; the admin accepts with `review_queue`; three pilot rounds, one wrong 100 caught and fixed; the full run waits for 2026-10-01. [→](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27)
 - **`category_zero` telemetry (2026-09-27)** — the chat log now says when a category emptied a search that has places (1 in 29, all development traffic); the answer is unchanged, and the router rule and prompt options wait for real traffic. [→](docs/DECISIONS.md#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)
 - **Department / province search (2026-09-26)** — `places.region` from the address; the chat searches by region (ambiguous names guarded), the redactor via `datos_cercanos` with no prompt change; the 2c-vs-examples contradiction is noted for the next prompt edit. [→](docs/DECISIONS.md#department--province-search--placesregion-2026-09-26)
