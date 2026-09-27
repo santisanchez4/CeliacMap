@@ -2442,7 +2442,20 @@ pipeline run). Wall-clock time for the 271 was not measured (the pilot's page do
 - `has_exclusive_signal` misses phrases such as "exclusivamente para celíacos"; the report flags them as "posible 100". Changing the Validator's
   regex is a separate, measured decision.
 
-**Tests.** Python 535 → 695 (`test_evidence_finder*.py`, `test_evidence_acceptance.py`, `test_evidence_attribution.py`, `test_evidence_freeze.py`,
+**Follow-up (2026-09-27): the run over the 13 Montevideo places of the queue** (26 searches, US$0.02 of Haiku, no writes): 3 / 0 / 3 / 7 for 100 /
+100 · verificar en la fuente / options / insuficiente (the 7: website 2, red social 1, nada 4). One of the three 100s was wrong in a way the pilot had not
+covered: **Un Lugar Sin Gluten** was proposed from a sentence ("toda su cocina es 100% libre de gluten") that, on the guide it came from (a Superprof
+list of restaurants), belongs to the previous entry of the list (Chocará). Its own sentence, "dedicado 100% a comidas sin gluten", had been collected too,
+but the Validator's regex does not recognise it. Attribution by page cannot tell whose sentence it is on a page that lists several businesses. Fixed, tests
+first and evaluated for free on the frozen sources: (1) a page matched to the business only by its text (its title does not name it) supports a quote only
+in the same sentence as the name or up to 400 characters after it; (2) a page that lists several businesses (a listing word in its title or address, a blog,
+or a numbered list of 3+ entries) never supports a plain 100: at most "100 · verificar en la fuente", never accepted in bulk, and its quote is never
+cited in the public note; (3) the "posible 100" alert recognises "dedicado 100% a comidas sin gluten" and similar phrases (`has_exclusive_signal` untouched).
+Replay on the 13: only Un Lugar Sin Gluten changed (100 → options · posible 100, with its right quote); RecoBeco and Milena, whose evidence is on their
+own sites, did not. Replay of the earlier pilot on its own frozen sources: Matilde and Apto did not change; two places flipped (Pagana, @TACCTOMDP) because
+the model varies between runs, not because of this change. Aggregate numbers: `db/checks/2026-09-27-evidence-finder-montevideo.md`.
+
+**Tests.** Python 535 → 712 (`test_evidence_finder*.py`, `test_evidence_guides.py`, `test_evidence_acceptance.py`, `test_evidence_attribution.py`, `test_evidence_freeze.py`,
 `test_find_evidence.py`, `test_review_queue_proposals.py`, `test_llm_usage.py`, additions to `test_website_scraper.py`). Mutation checks: breaking
 the source check, the verification, the vetoes, the noise filter, the name masking, the identity words or the region rule each fails tests.
 

@@ -146,8 +146,11 @@ def test_proposal_labels():
 # --- verification against the page --------------------------------------------------------------------------------------------
 
 def test_a_quote_found_verbatim_on_its_page_is_verified():
-    fetch = lambda url: ("Bienvenidos. " + SNIPPET + " Abrimos de lunes a sábado.") if url == "https://blog.example/guia" else ""  # noqa: E731
-    result = finder(llm=FakeLLM(scope()), fetch_text=fetch).find(place())
+    # A neutral address: "blog" and "guia" in a URL make it a guide, which never supports a plain 100 (tests/test_evidence_guides.py).
+    url = "https://celimap.example/lugar/tiempo-libre"
+    tavily = FakeTavily({None: [hit(url, SNIPPET)]})
+    fetch = lambda u: ("Bienvenidos. " + SNIPPET + " Abrimos de lunes a sábado.") if u == url else ""  # noqa: E731
+    result = finder(tavily=tavily, llm=FakeLLM(scope()), fetch_text=fetch).find(place())
     assert result["citations"][0]["verificacion"] == "verificada"
     assert result["proposal"] == "100" and result["verify_in_source"] is False
 

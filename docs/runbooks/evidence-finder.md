@@ -21,6 +21,9 @@ For each one the finder looks for **public** evidence about **that** business an
   the whole name and the city appear together; or its title / URL holds every distinctive word of the name AND the city or `places.region` appears.
   A name made only of generic or place words ("Concepción sin TACC" in Concepción del Uruguay) identifies no business: it matches only by its full
   name plus the city, or by its own URL. The model can only veto a quote ("this sentence is about another place"), never accept one the code rejected.
+- On a page matched to the business only by its text (its title does not name it), a quote counts only in the same sentence as the name or up to 400
+  characters after it. A page that lists several businesses (a listing word in its title or address, a blog, a numbered list of 3+ entries) never supports
+  a plain 100: at most "100 · verificar en la fuente" (the citation is labelled "guía de varios negocios" and never quoted in the public note).
 - Nothing from the model's own knowledge: it sees numbered quotes and returns only enum values (scope, contradiction, "about this business").
 - Nothing about the health of a person (an owner who is celiac...): those sentences are dropped, and the public note is refused if it matches.
 - Google Places reviews are **not** used (ToS: they are purged after 30 days; `place_evidence` is permanent).
@@ -86,3 +89,5 @@ your own spend: every report records `searches_used`; add them up and check the 
 - A quote is literal in the snippet Tavily returned, which is not always literal on the page; verify with the URL. Instagram / Facebook pages
   cannot be downloaded, so those quotes cannot be checked against the page at all.
 - Chains and branches: a quote about the brand may not apply to that branch. The report shows the text; the admin decides.
+- Guides and listicles: the code cannot tell whose sentence it is on a page of several businesses; it keeps only what sits next to the name and never lets such a
+  page support a plain 100 (found on 2026-09-27 with a Superprof guide: the sentence of the previous restaurant of the list).

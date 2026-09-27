@@ -348,7 +348,8 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   rules do.
 - **Evidence proposals are proposals** [Evidence finder]: `scripts/find_evidence` never writes and never changes a place; a `100` needs a quote
   verified on its page (else "100 · verificar en la fuente": accepted only alone, with `--verified-source`); a source is about the business by the
-  code's rule (own URL, name + city, or title words with an identity word + city/region), never by the name alone; the public note quotes only
+  code's rule (own URL, name + city, or title words with an identity word + city/region), never by the name alone; on a page matched only by its text the quote must sit
+  next to the name, and a guide of several businesses never supports a plain 100; the public note quotes only
   verified text (≤ 160 characters, no health data); no Google reviews. Runbook: `docs/runbooks/evidence-finder.md`.
 - **Evidence the Validator must weigh goes in `place_evidence`**, not `validation_notes` (invisible to it, overwritten).
   To bring back a `discarded` / `needs_review` place with real evidence, approve it with a manual override; do not send it

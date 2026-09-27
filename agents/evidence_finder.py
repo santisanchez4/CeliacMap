@@ -46,12 +46,19 @@ VERIFICATION_LABELS = {
     "no_verificable": "red social: no verificable",
 }
 UNVERIFIED_ROW_PREFIX = "(sin verificar en la página) "
+GUIDE_ROW_PREFIX = "(guía con varios negocios: sin atribución confirmada) "
+# Words of a page title or address that say the page lists several businesses (a guide, a blog, a listicle).
+MULTI_BUSINESS_WORDS = frozenset(
+    "guia guias mejores top ranking listado directorio recomendados lugares restaurantes cafeterias panaderias locales "
+    "dieteticas tiendas".split()
+)
 
 RESULTS_PER_QUERY = 5
 QUOTE_MAX = 300  # characters of one stored quote
 NOTE_QUOTE_MAX = 160  # characters of the quote in the public validation_notes
 REASON_MAX = 240  # characters of the model's reason kept per quote
 CONTEXT_MAX = 200  # characters of each neighbouring sentence the model gets as context
+NEAR_NAME_MAX = 400  # a quote on a page matched only by its text must be this close after the business name
 MAX_CANDIDATE_QUOTES = 8  # quotes one place sends to the model
 MAX_STORED_EVIDENCE = 5  # place_evidence rows one acceptance writes (the Validator reads five)
 MAX_DISCARDED_SOURCES = 10
@@ -240,6 +247,37 @@ def why_not_about_place(place: dict, source: dict) -> str:
     return "no menciona el nombre" if has_city else "no menciona la ciudad"
 
 
+# --- pages that list several businesses; distance to the name ---------------------------------------------------------------
+
+_NUMBERED_HEADING_RE = re.compile(r"(?m)^\s*(\d{1,2})[.)]?\s+\S[^\n]{0,70}$")
+
+
+def looks_like_multi_business(title: str | None, url: str | None, text: str | None, name: str | None = None) -> bool:
+    """A guide, blog or listicle: its title or address has a listing word ("guía", "mejores", "restaurantes"...), the address has a
+    blog, or the page has a numbered list of at least three entries. The business's own name is masked out of the title first."""
+    title_norm = normalize(mask_name(title, name) if name else title)
+    url_words = set(normalize(url).split())
+    if set(title_norm.split()) & MULTI_BUSINESS_WORDS or url_words & MULTI_BUSINESS_WORDS or "blog" in url_words:
+        return True
+    if "donde comer" in title_norm:
+        return True
+    return len({m for m in _NUMBERED_HEADING_RE.findall(text or "")}) >= 3
+
+
+def _near_name(source_text: str, quote: str, name: str | None, span: int = NEAR_NAME_MAX) -> bool:
+    """The quote is in the same sentence as the business name, or at most ``span`` characters after an occurrence of it."""
+    haystack, needle, business = normalize(source_text), normalize(quote), normalize(name)
+    if not business or not needle:
+        return False
+    start = haystack.find(needle)
+    if start < 0:
+        return False
+    for m in re.finditer(r"(?<![a-z0-9])" + re.escape(business) + r"(?![a-z0-9])", haystack):
+        if m.start() < start + len(needle) and start - m.end() <= span:
+            return True
+    return False
+
+
 # --- quotes ---------------------------------------------------------------------------------------------------------------
 
 _SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+|\s*(?:\.\.\.|…)\s*")
@@ -332,8 +370,11 @@ _EXTENDED_SIGNAL_RE = re.compile(
     r"exclusiv\w*\s+(?:para|de)\s+(?:los\s+|las\s+)?celiac"
     r"|(?:solo|solamente|unicamente)\s+para\s+(?:los\s+|las\s+)?celiac"
     r"|todo\s+(?:el\s+local\s+)?(?:es\s+)?apto\s+para\s+celiac"
+    r"|dedicad\w*\s+(?:100\s+)?(?:exclusivamente\s+)?(?:a\s+|al\s+)?(?:la\s+)?(?:(?:elaboracion|preparacion)\s+de\s+)?"
+    r"(?:comidas?|productos?|platos?|alimentos|recetas|panificados|elaboraciones)\s+(?:sin\s+gluten|libres?\s+de\s+gluten"
+    r"|aptos?\s+para\s+celiac|sin\s+tacc)"
 )
-_NEGATION_BEFORE_RE = re.compile(r"\bno\s+(?:es\s+|son\s+|tiene\s+)?$")
+_NEGATION_BEFORE_RE = re.compile(r"\bno\s+(?:es\s+|son\s+|tiene\s+|esta\s+|estan\s+)?$")
 
 
 def has_extended_signal(text: str | None) -> bool:
@@ -421,7 +462,9 @@ def assess(quotes: list[dict]) -> dict:
     Validator's regex missed, and the vetoes the model applied."""
     proposal, reasons = decide(quotes)
     establishment = [q for q in quotes if q["has_signal"] and q["alcance"] == "establecimiento" and not q["contradice"]]
-    verify = proposal == "100" and not any(q.get("verificacion") == "verificada" for q in establishment)
+    verify = proposal == "100" and not any(_supports_a_plain_100(q) for q in establishment)
+    if verify and any(q.get("multi_negocio") for q in establishment):
+        reasons = [*reasons, "la cita sale de una guía con varios negocios: verificar en la fuente"]
     possible = None
     if proposal == "options":
         possible = next((q for q in quotes if not q["has_signal"] and q["alcance"] == "establecimiento" and not q["contradice"]
@@ -431,12 +474,18 @@ def assess(quotes: list[dict]) -> dict:
             "vetoes": _vetoes(quotes)}
 
 
+def _supports_a_plain_100(citation: dict) -> bool:
+    """Verified on its page AND not from a page that lists several businesses (which cannot say whose sentence it is)."""
+    return citation.get("verificacion") == "verificada" and not citation.get("multi_negocio")
+
+
 def needs_source_check(entry) -> bool:
-    """A "100" is block-acceptable only if a quote verified on its page states the exclusivity of the whole establishment."""
+    """A "100" is block-acceptable only if a quote verified on a page about the business alone states the exclusivity of the
+    whole establishment. A guide with several businesses never does it by itself."""
     if not isinstance(entry, dict) or entry.get("proposal") != "100":
         return False
     return not any(
-        isinstance(c, dict) and c.get("verificacion") == "verificada" and c.get("has_signal")
+        isinstance(c, dict) and _supports_a_plain_100(c) and c.get("has_signal")
         and c.get("alcance") == "establecimiento" and not c.get("contradice")
         for c in entry.get("citations") or []
     )
@@ -453,7 +502,8 @@ def proposal_label(result: dict) -> str:
 
 
 def verification_label(citation: dict) -> str:
-    return VERIFICATION_LABELS.get(citation.get("verificacion"), "sin verificar")
+    label = VERIFICATION_LABELS.get(citation.get("verificacion"), "sin verificar")
+    return label + " · guía de varios negocios" if citation.get("multi_negocio") else label
 
 
 # --- search ---------------------------------------------------------------------------------------------------------------
@@ -489,7 +539,7 @@ class EvidenceFinder:
     # -- one place ------------------------------------------------------------------------------------------------------
     def find(self, place: dict) -> dict:
         stats = {"searches": 0, "search_errors": 0, "sources_seen": 0, "sources_about_place": 0,
-                 "quotes_candidate": 0, "quotes_dropped_by_llm": 0, "llm_error": False,
+                 "quotes_candidate": 0, "quotes_dropped_by_llm": 0, "quotes_dropped_far_from_name": 0, "llm_error": False,
                  "llm_tokens": {"input": 0, "output": 0}}
         sources: dict[str, dict] = {}
         for query, domains in build_queries(place)[: self.queries]:
@@ -522,11 +572,18 @@ class EvidenceFinder:
                 continue
             stats["sources_about_place"] += 1
             kind = source_kind(source["url"], place)
-            found = 0
+            # A page matched to the business only by its text (its title does not name it) may be about several: a quote counts only
+            # if it is in the same sentence as the name or shortly after it.
+            text_only = reason == "name_and_city" and not _title_url_has_every_token(place, source)
+            found = dropped_far = 0
             for item in extract_quotes_with_context(source["text"], place.get("name")):
                 text = item["text"]
                 key = normalize(text)
                 if key in seen or not quote_is_literal(text, source["text"]):
+                    continue
+                if text_only and not _near_name(source["text"], text, place.get("name")):
+                    dropped_far += 1
+                    stats["quotes_dropped_far_from_name"] += 1
                     continue
                 seen.add(key)
                 found += 1
@@ -536,8 +593,9 @@ class EvidenceFinder:
                                    "has_extended": has_extended_signal(masked), "origin": source["origin"],
                                    "title": source["title"], "before": item["before"], "after": item["after"]})
             if not found:
-                discarded.append({"url": source["url"], "title": source["title"],
-                                  "why": "sobre el negocio, pero sin frases sobre gluten o celíacos"})
+                why = ("sobre el negocio por su texto, pero las frases sobre gluten están lejos del nombre (guía con varios negocios)"
+                       if dropped_far else "sobre el negocio, pero sin frases sobre gluten o celíacos")
+                discarded.append({"url": source["url"], "title": source["title"], "why": why})
         candidates.sort(key=lambda c: (not c["has_signal"], _KIND_RANK.get(c["source_kind"], 3)))
         candidates = candidates[:MAX_CANDIDATE_QUOTES]
         stats["quotes_candidate"] = len(candidates)
@@ -545,6 +603,8 @@ class EvidenceFinder:
         pages: dict[str, str] = {}
         for candidate in candidates:
             candidate["verificacion"] = self._verify(candidate, pages)
+            candidate["multi_negocio"] = candidate["source_kind"] != "propia" and looks_like_multi_business(
+                candidate["title"], candidate["url"], pages.get(candidate["url"]), place.get("name"))
 
         scopes = self._classify(place, candidates, stats)
         kept: list[dict] = []
@@ -557,7 +617,8 @@ class EvidenceFinder:
                 continue
             kept.append({"text": candidate["text"], "url": candidate["url"], "source_kind": candidate["source_kind"],
                          "matched_by": candidate["matched_by"], "has_signal": candidate["has_signal"],
-                         "has_extended": candidate["has_extended"], "verificacion": candidate["verificacion"], "alcance": scope["alcance"],
+                         "has_extended": candidate["has_extended"], "verificacion": candidate["verificacion"],
+                         "multi_negocio": candidate["multi_negocio"], "alcance": scope["alcance"],
                          "contradice": scope["contradice"], "motivo": scope["motivo"]})
 
         verdict = assess(kept)
@@ -705,7 +766,9 @@ def _evidence_row(citation: dict) -> dict | None:
     text = citation["text"]
     if _OWNER_HEALTH_RE.search(text):
         return None
-    if citation.get("verificacion") != "verificada":
+    if citation.get("multi_negocio"):
+        text = GUIDE_ROW_PREFIX + text
+    elif citation.get("verificacion") != "verificada":
         text = UNVERIFIED_ROW_PREFIX + text
     return {"source": "web", "text": text[:1000], "url": citation["url"]}
 
@@ -730,14 +793,14 @@ def build_acceptance_note(entry) -> tuple[str, list[dict]] | None:
         return None
 
     def rank(c: dict) -> tuple[int, int]:
-        return (0 if c.get("verificacion") == "verificada" else 1, _KIND_RANK.get(c.get("source_kind"), 3))
+        return (0 if _supports_a_plain_100(c) else 1, _KIND_RANK.get(c.get("source_kind"), 3))
 
     main = sorted(pool, key=rank)
     rest = sorted((c for c in cites if c not in main), key=rank)
     top = main[0]
     if _OWNER_HEALTH_RE.search(top["text"]):
         return None
-    if top.get("verificacion") == "verificada":
+    if _supports_a_plain_100(top):
         note = f"evidencia pública para {label}: «{_clip(top['text'])}» ({top['url']})"
     else:
         where = "en redes del local" if is_social_url(top["url"]) else "en la web"
