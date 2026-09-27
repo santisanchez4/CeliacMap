@@ -15,15 +15,16 @@
 -- The row that stays is the one with more information (in all 21 pairs the google_places row has the same or more panel fields, is anchored to the Google
 -- listing and is the one the Updater refreshes) or, where a status differs, the approved one. None of the 42 rows carries an OVERRIDE or an APROBACIÓN MANUAL;
 -- four discarded rows (Celihaus, Donato, Yoda, Sin Gluten Olivos) carry a data-only "ciudad corregida" header, which stays in their notes below the new header.
--- 11 of the 21 discarded rows are in the admin's 100% queue: the pending flag is removed with them (nothing of the queue is lost, the business keeps its own row).
+-- 11 of the 21 discarded rows are in the admin's 100% queue. In 10 of those pairs the kept row is in it too; in CeliHaus it is not, so the flag is HANDED OVER to the
+-- kept row (step 4b) before the discard removes it: no business leaves the queue.
 -- What hangs from the discarded row moves to the kept one: votes (INSERT ... ON CONFLICT DO NOTHING, then DELETE, so the vote_count trigger, which only fires on
 -- INSERT and DELETE, stays right), reports and published opinions, evidence, outreach messages and promoted suggestions. Today none of the 21 discarded rows has any
 -- (the 15 votes of the 24 pairs, all of JANA, are already on the kept row), so the moves are safety nets; the assertions demand that nothing stays attached.
 -- The kept row only gets its NULL panel fields (phone, website, social_url) filled from the discarded one: one case today (Minimarket La Isla, its Instagram).
 -- The discarded row becomes status 'discarded' with the header "CORRECCIÓN MANUAL: duplicado de <id>" on top of its previous notes, and leaves the 100% queue
--- (its flag is removed, like review_queue --discard does). The header is a DATA correction (agents/manual_overrides.py, "duplicado de"): it protects nothing.
+-- (its flag is removed, like review_queue --discard does, after handing it to the kept row where that one lacked it). The header is a DATA correction (agents/manual_overrides.py, "duplicado de"): it protects nothing.
 -- No row of `places` is deleted. Special case to review: CeliHaus, whose kept row is celiac_friendly ("Tiene opciones sin TACC") while the discarded one was
--- gluten_free_100 (in the admin's 100% queue): the business now shows the lower level until the admin confirms 100% with evidence.
+-- gluten_free_100 (in the admin's 100% queue): the business shows the lower level, and stays in the queue, until the admin confirms 100% with evidence.
 --
 -- Run (one transaction, all-or-nothing; any drift RAISES and nothing is written):
 --   node_modules/.bin/supabase db query --linked --file db/fixes/2026-09-27-duplicate-place-ids.sql
@@ -63,8 +64,10 @@ insert into _pairs (keep_id, drop_id, external_id, keep_status, drop_status) val
 create temp table _snap on commit drop as
 select p.id, md5(to_jsonb(p)::text) as h,
        md5((to_jsonb(p) - 'status' - 'flags' - 'validation_notes' - 'updated_at')::text) as h_drop,
-       md5((to_jsonb(p) - 'phone' - 'website' - 'social_url' - 'vote_count' - 'updated_at')::text) as h_keep,
-       p.validation_notes as notes
+       md5((to_jsonb(p) - 'phone' - 'website' - 'social_url' - 'flags' - 'vote_count' - 'updated_at')::text) as h_keep,
+       p.validation_notes as notes,
+       (coalesce(p.flags, '[]'::jsonb) @> jsonb_build_array('100% pendiente de confirmación del administrador')) as q,
+       coalesce(p.flags, '[]'::jsonb) - '100% pendiente de confirmación del administrador' as flags_wo_q
   from public.places p;
 
 -- 2. Guard: all 21 pairs exist, share the external_id and are in the expected statuses.
@@ -97,6 +100,15 @@ update public.places k
   from _pairs pr join public.places d on d.id = pr.drop_id
  where k.id = pr.keep_id
    and ((k.phone is null and d.phone is not null) or (k.website is null and d.website is not null) or (k.social_url is null and d.social_url is not null));
+
+-- 4b. A business that was in the admin's 100% queue through the row that is discarded stays in it through the kept row (only CeliHaus today: its kept
+-- row is celiac_friendly and had no flag). The flag is the only thing that moves; the kept row's other flags are asserted unchanged below.
+update public.places k
+   set flags = coalesce(k.flags, '[]'::jsonb) || jsonb_build_array('100% pendiente de confirmación del administrador')
+  from _pairs pr join public.places d on d.id = pr.drop_id
+ where k.id = pr.keep_id
+   and coalesce(d.flags, '[]'::jsonb) @> jsonb_build_array('100% pendiente de confirmación del administrador')
+   and not coalesce(k.flags, '[]'::jsonb) @> jsonb_build_array('100% pendiente de confirmación del administrador');
 
 -- 5. Discard the duplicate, announce it, and take it out of the 100% queue.
 do $$
@@ -132,10 +144,16 @@ begin
      and not (p.flags @> jsonb_build_array('100% pendiente de confirmación del administrador'));
   if bad <> 21 then raise exception 'the discarded rows are not as intended: % of 21', bad; end if;
 
-  -- the 21 kept rows: same status and same everything, except the NULL panel fields that were filled and the vote_count
+  -- the 21 kept rows: same status and same everything, except the NULL panel fields that were filled, the vote_count and the flags (checked next)
   select count(*) into bad from public.places p join _snap s using (id) join _pairs pr on p.id = pr.keep_id
-   where md5((to_jsonb(p) - 'phone' - 'website' - 'social_url' - 'vote_count' - 'updated_at')::text) = s.h_keep and p.status = pr.keep_status;
+   where md5((to_jsonb(p) - 'phone' - 'website' - 'social_url' - 'flags' - 'vote_count' - 'updated_at')::text) = s.h_keep and p.status = pr.keep_status;
   if bad <> 21 then raise exception 'the kept rows changed something other than empty panel fields: % of 21 are intact', bad; end if;
+
+  -- flags of a kept row: every flag but the queue one is unchanged, and it is in the queue iff either row of its pair was
+  select count(*) into bad from public.places p join _snap s using (id) join _pairs pr on p.id = pr.keep_id join _snap sd on sd.id = pr.drop_id
+   where coalesce(p.flags, '[]'::jsonb) - '100% pendiente de confirmación del administrador' = s.flags_wo_q
+     and (coalesce(p.flags, '[]'::jsonb) @> jsonb_build_array('100% pendiente de confirmación del administrador')) = (s.q or sd.q);
+  if bad <> 21 then raise exception 'a kept row lost or gained a flag it should not have: % of 21 are as intended', bad; end if;
 
   -- one live row per place_id in each pair
   select count(*) into bad from (

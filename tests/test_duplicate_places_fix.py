@@ -91,7 +91,7 @@ def test_the_header_is_a_data_correction_and_protects_nothing_but_an_approval_un
 
 
 def test_the_kept_row_only_fills_its_null_panel_fields():
-    block = [b for b in update_blocks("places") if "coalesce(" in b][0]
+    block = [b for b in update_blocks("places") if "coalesce(k.phone" in b][0]
     assert set_columns(block) == ["phone", "website", "social_url"]
     for column in ("phone", "website", "social_url"):
         assert f"coalesce(k.{column}, d.{column})" in block
@@ -118,5 +118,27 @@ def test_nothing_else_changes_the_assertions_compare_a_hash_of_every_other_colum
     body = code()
     assert "md5(to_jsonb(p)::text)" in body
     assert "md5((to_jsonb(p) - 'status' - 'flags' - 'validation_notes' - 'updated_at')::text)" in body  # discarded rows
-    assert "md5((to_jsonb(p) - 'phone' - 'website' - 'social_url' - 'vote_count' - 'updated_at')::text)" in body  # kept rows
+    assert "md5((to_jsonb(p) - 'phone' - 'website' - 'social_url' - 'flags' - 'vote_count' - 'updated_at')::text)" in body  # kept rows
     assert "(select count(*) from public.places) <> (select count(*) from _snap)" in body
+
+
+QUEUE_FLAG = "100% pendiente de confirmación del administrador"
+
+
+def test_a_place_that_was_in_the_100_queue_keeps_its_place_in_it_through_the_kept_row():
+    body = code()
+    blocks = [b for b in update_blocks("places") if re.search(r"set flags = coalesce\(k\.flags", b)]
+    assert len(blocks) == 1, "one UPDATE hands the pending flag to the kept row"
+    block = blocks[0]
+    assert set_columns(block) == ["flags"]
+    assert block.count(QUEUE_FLAG) == 3  # appended, required on the discarded row, and absent from the kept one
+    assert "coalesce(d.flags, '[]'::jsonb) @>" in block and "not coalesce(k.flags, '[]'::jsonb) @>" in block
+    assert body.index("set flags = coalesce(k.flags") < body.index("set status = 'discarded'"), "before the discard removes it"
+
+
+def test_only_the_queue_flag_moves_the_other_flags_of_a_kept_row_are_asserted_unchanged():
+    body = code()
+    assert "coalesce(p.flags, '[]'::jsonb) - '" + QUEUE_FLAG + "' as flags_wo_q" in body  # snapshot without the queue flag
+    assert "(coalesce(p.flags, '[]'::jsonb) @> jsonb_build_array('" + QUEUE_FLAG + "')) as q" in body  # and whether it was in the queue
+    assert "= s.flags_wo_q" in body and "(s.q or sd.q)" in body
+    assert re.search(r"if bad <> 21 then raise exception 'a kept row lost or gained a flag", body)
