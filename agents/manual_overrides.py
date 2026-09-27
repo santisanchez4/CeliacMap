@@ -33,6 +33,7 @@ DATA_CORRECTION_PHRASES = (
     "no es un comercio",
     "fuera del alcance geográfico",
     "dirección corregida",
+    "duplicado de",
 )
 
 

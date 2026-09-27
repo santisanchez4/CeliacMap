@@ -60,6 +60,8 @@ DATA_HEADERS = [
     "Movido a needs_review para exclusión editorial, no por problema de calidad del negocio en sí.",
     # 2026-09-27: an address fixed from the business's own Instagram (Delirio Sin Gluten). It says where the place is, not how safe it is.
     'CORRECCIÓN MANUAL 2026-09-27: dirección corregida a "Luis Franzini 970" según el Instagram del local (antes "Luis Franzini", sin número).',
+    # 2026-09-27: the same Google place twice; the row that is discarded says which one stays. It says nothing about how safe the place is.
+    "CORRECCIÓN MANUAL: duplicado de 6797f10b-dbe4-4c67-a5d2-1b8f0e3a7c11",
 ]
 
 
@@ -71,6 +73,7 @@ def test_the_data_correction_phrases_are_an_explicit_reviewed_list():
         "no es un comercio",
         "fuera del alcance geográfico",
         "dirección corregida",
+        "duplicado de",
     )
 
 
@@ -157,3 +160,18 @@ def test_an_address_correction_header_on_top_of_an_approval_still_protects_the_p
 def test_the_address_phrase_alone_without_the_correction_header_protects_nothing_and_a_look_alike_header_does():
     assert manual_override_marker("Nota: dirección corregida en el mapa.") is None  # not a CORRECCIÓN MANUAL header at all
     assert manual_override_marker("CORRECCIÓN MANUAL 2026-09-27: dirección arreglada a Luis Franzini 970.") == "correccion manual"
+
+
+def test_a_duplicate_header_is_a_data_correction_whatever_the_case_or_accents():
+    assert manual_override_marker("correccion manual: DUPLICADO DE 6797f10b-dbe4-4c67-a5d2-1b8f0e3a7c11") is None
+    assert manual_override_marker("CORRECCIÓN MANUAL 2026-09-27: Duplicado de 6797f10b-dbe4-4c67-a5d2-1b8f0e3a7c11.") is None
+
+
+def test_the_kept_row_keeps_its_own_decisions_and_a_duplicate_header_on_top_of_an_approval_still_protects():
+    approval = "APROBACIÓN MANUAL (2026-09-27, review_queue): conozco el local. El Validator había dejado: approved @ 0.9."
+    assert manual_override_marker(f"{DATA_HEADERS[-1]}\n\n{approval}") == "aprobacion manual"
+    assert manual_override_marker(f"{approval}\n\n{DATA_HEADERS[-1]}") == "aprobacion manual"
+
+
+def test_a_look_alike_of_the_duplicate_header_still_protects():
+    assert manual_override_marker("CORRECCIÓN MANUAL: repetido de 6797f10b-dbe4-4c67-a5d2-1b8f0e3a7c11") == "correccion manual"
