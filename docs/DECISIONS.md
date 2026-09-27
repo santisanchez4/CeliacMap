@@ -2504,7 +2504,17 @@ place is a safety decision and belongs to `review_queue --approve`, run right af
 --level 100 --note "Revisado por el admin: su Instagram (piuheladosmontevideo) se presenta como heladería artesanal Gluten Free"`. Applied to production
 2026-09-27: rehearsed (`begin; … rollback;`, fingerprint unchanged), then committed — `places` 1312 → 1314, both new rows confirmed `approved` /
 `gluten_free_100` and publicly readable with the anon key, Cordón's four columns changed and still `discarded`. `review_queue --approve` (dry run) confirmed
-next: `discarded → approved · Espacio 100% sin gluten`; the `--apply` waits for a second go-ahead, since it is a distinct write.
+next: `discarded → approved · Espacio 100% sin gluten`.
+
+**Both steps applied to production 2026-09-27, on the owner's "dale".** `review_queue --approve d1420754-… --apply` reactivated Piu Helados Cordón:
+`discarded` → `approved` / `gluten_free_100`, `verified` stayed `false`, `validation_confidence` stayed `0.75` (the Validator's own score, untouched — the
+rule is never to inflate or deflate it), confirmed public with the anon key. Then `db/fixes/2026-09-27-duplicate-place-ids.sql` ran clean (no exception).
+Read-only verification against the 21 `place_id`: 21 live rows (one per id, 42 rows total counting the discarded twin), all 21 discarded rows carry the
+`"CORRECCIÓN MANUAL: duplicado de <id>"` header, 0 votes/reports/evidence/outreach left on any of them, and `vote_count` matches `place_votes` on every row
+of `places` (0 mismatches). The admin's 100%-queue count is **254** and **CeliHaus is in it** (kept row `celiac_friendly` / `approved`, flag handed over as
+designed). `places` is **1314** (1312 + the 2 new branches). Harvest Punta del Este and Niter kept their filled `social_url` (`instagram.com/harvestpde`,
+`facebook.com/harinapanuy`); Il Porto, Minimarket La Isla and Sin Gluten Olivos are unchanged (`social_url` still `null` on the kept row, their own post/reel
+link stays only in the discarded row's notes).
 
 **Dry run (added after the first delivery, which missed it).** `DryRunSupabase.insert_place_candidate` now mirrors the same lookup, after the scope check: a
 candidate whose `place_id` already belongs to a row logs `[dry-run] would SKIP ...` instead of `would insert`, so a rehearsal no longer promises an insert that
