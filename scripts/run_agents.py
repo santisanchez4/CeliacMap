@@ -153,6 +153,20 @@ class DryRunSupabase:
                 candidate.get("lng"),
             )
             return None
+        # And its dedup: one Google place_id, one row (any source, any status).
+        external_id = candidate.get("external_id")
+        if external_id:
+            try:
+                if self._inner.place_exists_by_external_id(external_id):
+                    logger.info(
+                        "[dry-run] would SKIP candidate %r (source=%s): a place with external_id %s already exists",
+                        candidate.get("name"),
+                        candidate.get("source"),
+                        external_id,
+                    )
+                    return None
+            except Exception:  # noqa: BLE001 - same as the real client: a failed lookup does not block the insert
+                logger.exception("[dry-run] dedup check failed for %s", external_id)
         logger.info("[dry-run] would insert candidate %r", candidate.get("name"))
         return None
 

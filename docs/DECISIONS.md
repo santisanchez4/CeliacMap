@@ -2483,6 +2483,12 @@ candidate with no `external_id` (a manual place with no Google listing) never lo
 Python 728 → 736. **Not retroactive:** the existing pairs are cleaned by a separate, reviewed batch (the admin decides which row stays, moves the votes,
 reports and opinions, and discards the other with a `CORRECCIÓN MANUAL: duplicado de <id>` header).
 
+**Dry run (added after the first delivery, which missed it).** `DryRunSupabase.insert_place_candidate` now mirrors the same lookup, after the scope check: a
+candidate whose `place_id` already belongs to a row logs `[dry-run] would SKIP ...` instead of `would insert`, so a rehearsal no longer promises an insert that
+production would not do (5 tests in `tests/test_run_agents_dryrun.py`). Known limit: a dry run writes nothing, so its client returns `None` for both outcomes and
+Search's `skipped` counter (which now counts a candidate the client did not insert) also includes what a dry run "would insert"; the log lines, not the counter,
+tell the two apart.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

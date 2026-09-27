@@ -43,3 +43,64 @@ def test_dry_run_wrapper_reads_unpublished_opinions_but_never_publishes():
 
     assert wrapper.set_opinions_published(["r1"], True) == []
     inner.set_opinions_published.assert_not_called()
+
+
+# --- the dedup of insert_place_candidate (One Google place, one row) --------------------------------------------------
+# A dry run must report what production would (not) insert: the real client skips a candidate whose place_id belongs to any row.
+
+CANDIDATE = {"name": "Rikuras", "source": "google_places", "external_id": "ChIJexisting", "lat": -34.9, "lng": -56.16}
+
+
+def test_dry_run_reports_a_candidate_whose_place_id_already_exists_as_skipped_not_as_an_insert(caplog):
+    inner = MagicMock()
+    inner.place_exists_by_external_id.return_value = True
+
+    with caplog.at_level("INFO"):
+        out = DryRunSupabase(inner).insert_place_candidate(dict(CANDIDATE))
+
+    assert out is None
+    inner.place_exists_by_external_id.assert_called_once_with("ChIJexisting")
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "would SKIP" in messages and "Rikuras" in messages and "ChIJexisting" in messages
+    assert "would insert" not in messages
+    inner.insert_place_candidate.assert_not_called()
+
+
+def test_dry_run_still_reports_a_new_place_id_as_would_insert_and_writes_nothing(caplog):
+    inner = MagicMock()
+    inner.place_exists_by_external_id.return_value = False
+
+    with caplog.at_level("INFO"):
+        out = DryRunSupabase(inner).insert_place_candidate(dict(CANDIDATE))
+
+    assert out is None
+    assert "would insert candidate 'Rikuras'" in " ".join(r.getMessage() for r in caplog.records)
+    inner.insert_place_candidate.assert_not_called()
+
+
+def test_dry_run_never_looks_up_a_candidate_without_an_external_id(caplog):
+    inner = MagicMock()
+
+    with caplog.at_level("INFO"):
+        DryRunSupabase(inner).insert_place_candidate({**CANDIDATE, "external_id": None})
+
+    inner.place_exists_by_external_id.assert_not_called()
+    assert "would insert" in " ".join(r.getMessage() for r in caplog.records)
+
+
+def test_dry_run_treats_a_failed_lookup_like_the_real_client_and_reports_would_insert(caplog):
+    inner = MagicMock()
+    inner.place_exists_by_external_id.side_effect = RuntimeError("network")
+
+    with caplog.at_level("INFO"):
+        DryRunSupabase(inner).insert_place_candidate(dict(CANDIDATE))
+
+    assert "would insert" in " ".join(r.getMessage() for r in caplog.records)
+
+
+def test_dry_run_checks_the_scope_before_the_lookup_like_the_real_client():
+    inner = MagicMock()
+
+    DryRunSupabase(inner).insert_place_candidate({**CANDIDATE, "lat": 48.85, "lng": 2.35})
+
+    inner.place_exists_by_external_id.assert_not_called()
