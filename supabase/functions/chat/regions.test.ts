@@ -466,7 +466,7 @@ Deno.test("fetchSearchPlaces still ranks by the requested city when called with 
 });
 
 // ---------------------------------------------------------------------------
-// Telemetry: a category that found nothing (docs/DECISIONS.md, "Telemetría de category_zero"). The log only ever
+// Telemetry: a category that found nothing (docs/DECISIONS.md, "`category_zero` telemetry"). The log only ever
 // showed what the router filtered by, never whether the filter hid anything. Nothing that is returned or shown to the
 // redactor may change: only queryLog gains fields, and only when a category was set, gave 0 rows and it was no name lookup.
 // ---------------------------------------------------------------------------

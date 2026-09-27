@@ -399,6 +399,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **`category_zero` telemetry (2026-09-27)** — the chat log now says when a category emptied a search that has places (1 in 29, all development traffic); the answer is unchanged, and the router rule and prompt options wait for real traffic. [→](docs/DECISIONS.md#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)
 - **Department / province search (2026-09-26)** — `places.region` from the address; the chat searches by region (ambiguous names guarded), the redactor via `datos_cercanos` with no prompt change; the 2c-vs-examples contradiction is noted for the next prompt edit. [→](docs/DECISIONS.md#department--province-search--placesregion-2026-09-26)
 - **Chatbot — named place retrieval (2026-09-23)** — search by business name, accent/typo tolerant (chat v14). [→](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23)
 - **Base landing decisions (s/f)** — ES/EN toggle, fonts, CSS-only mockup, SVG icons, favicons; unheaded, at the end of the entry above. [→](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23)

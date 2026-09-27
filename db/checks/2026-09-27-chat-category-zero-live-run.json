@@ -1,0 +1,20 @@
+{
+  "message": "hay cafés sin tacc en Cerro Largo?",
+  "session": "celiac-test-catzero-20260927",
+  "reply": "Por ahora no tengo lugares confirmados en Cerro Largo. Si conocés algún café sin TACC en esa zona, contame y lo sumamos para que el equipo lo revise.",
+  "places": [],
+  "truth_by_category": {
+    "shop": 2
+  },
+  "checks": {
+    "no cafes exist in the region (premise of the case)": true,
+    "places is empty, as before the change": true,
+    "no action, no pending submission": true,
+    "the reply lists no place of the region": true
+  },
+  "passed": true,
+  "window": [
+    "2026-09-27T00:59:11.515470+00:00",
+    "2026-09-27T00:59:17.988851+00:00"
+  ]
+}

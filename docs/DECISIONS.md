@@ -2315,6 +2315,63 @@ named-lookup path in `fetchSearchPlaces` already works in those two steps). Not 
 the real query strings). Mutation check: removing the ambiguity rule, the city-first ranking or the Buenos Aires exception
 each fails 3–4 tests.
 
+### `category_zero` telemetry — a category that finds nothing (2026-09-27)
+
+**The question.** The router puts a `category` on searches that did not name a type: in the real turn of 2026-09-25 ("que
+locales puedo visitar para conseguir productos libre de gluten cerca de Fraile Muerto Cerro Largo?") it wrote `shop`. If the
+region also had a café or a restaurant, the category would hide it, and nothing in the log said so. Noted as open in the
+department-search entry above.
+
+**Measured before deciding (read-only, `agent_log` 2026-09-17 → 09-25).** 29 `buscar` turns, **all development traffic** (bursts
+seconds apart, test names such as "Los leños y Ramona y dalbert"; 0 marked, no organic traffic yet). 13 had a `category`
+(restaurant 7, cafe 4, shop 2); 5 of those found nothing; replaying each of the 5 without the category over today's approved
+places: **1** would have found something (Maldonado / restaurant → 2 shops, and today "Maldonado" is a department search that
+returns its 4 restaurants anyway, so v20 already covers it); the two Cerro Largo / shop searches are 0 either way (the department
+has 2 shops and no café or restaurant, so the category hid nothing: the very turn that raised the question cannot show the
+bug); the other two (a barrio typed as `ciudad`, a name lookup with commas) are 0 either way. **1 in 29.** Two limits: the log
+keeps `raw_user_message` only for marked turns (ADR-006 §10), so "a search with no explicit type" cannot be told from one that
+named it, and `query` did not store `nivel`, so the replay could not apply it. The real frequency is unknown until there is
+real traffic.
+
+**Options considered, none for the answer itself.**
+- **A. Fall back to the unfiltered rows in `<datos>` and put a fixed sentence before the redactor's reply** (in code, like
+  `cortesia` and the celiaquia guard): **rejected by the owner (2026-09-27)** because a canned opening can contradict the
+  redactor's own text ("estos restaurantes" right after "no encontré restaurantes"), and there is no evidence yet that this
+  happens with real people.
+- **B. `<datos>` empty and a summary in `<datos_cercanos>`** (like the department fallback): no prompt change, but RESPONDER_PROMPT
+  2c offers `datos_cercanos` only when `<datos>` is empty, so the turn lists nothing, and a follow-up "mostrame" could carry
+  `category=shop` over and return 0 again. Not measured.
+- **C. A line in `RESPONDER_PROMPT`** telling the redactor the requested type had no matches: the cleanest wording, but a
+  prompt change (jailbreak battery, soft-launch restart). Waits for the pending prompt change.
+
+**What was built: telemetry only.** In `searchPlacesForChat` (`supabase/functions/chat/index.ts`), when a `category` is set, the
+search returns 0 rows and it is not a name lookup (`requestedNames`, the same rule `fetchSearchPlaces` uses), one more request
+counts the same search without the category (`Prefer: count=exact`, `limit=1`, same city or region, barrio and level). The
+log gains `query.category_zero: true` and `query.count_without_category: N` (`null` if that request fails, which never fails the
+turn), and `query.nivel` is now always logged. **Nothing returned or shown to the redactor changes**: rows, `<datos>`,
+`<datos_cercanos>`, `places` and the reply are as before. Cost: one REST request, in series before the redactor, only on those turns.
+Tests first (Deno 239 → 248, in `regions.test.ts` against the fake PostgREST that reads the real query strings, plus one in
+`index.test.ts`): the count runs only in that case; it keeps the region, barrio and level; the barrio nearby count and its
+`datos_cercanos` are unchanged; a failed count changes nothing. Python (535) and the frontend tests (66) pass unchanged.
+
+**Deployed and verified live (`chat` v21, 2026-09-27).** `verify_jwt=false` by API after the deploy, and the deployed
+`index.ts`, `regions.ts` and `prompts.ts` identical to `HEAD` 739d850 (hash without CR), pushed so `origin/main` matches. No
+prompt and no redactor input changed, so no offline measurement or jailbreak battery was needed and the soft-launch count is
+not restarted. One live turn ("hay cafés sin tacc en Cerro Largo?"): `places` empty, no action, and `agent_log` shows
+`category: cafe`, `region_plan: region`, `category_zero: true`, `count_without_category: 2`, `nivel: null`. The rows it wrote
+(1 `agent_log`, 3 `chat_usage`) were reverted with a guarded transaction and verified against the baseline; record:
+`db/checks/2026-09-27-chat-category-zero-live-run.md`. The reply ("Por ahora no tengo lugares confirmados en Cerro Largo") is
+the 2c-vs-examples phrasing already noted above, unchanged.
+
+**Plan: read it when there is real traffic.** Development traffic is everything up to 2026-09-27 (the log carries no session, so
+the cut is by date). Over the `buscar` turns after the soft-launch starts:
+`count(*) filter (where result->'query'->>'category_zero' = 'true' and (result->'query'->>'count_without_category')::int > 0)`
+is how often a category hid places, against `count(*) filter (where result->'query'->>'category' is not null)`. If it shows up:
+option C and a router rule for "locales / lugares / sitios" go into the pending prompt change, together with the 2c-vs-examples
+contradiction, "Cerca hay…" (a proximity the system does not verify), the medical queries (Fase E follow-ups) and the pure
+cancels (Fase D). Caution for that rule: "dónde comprar" or "conseguir productos" do imply `shop`, so it cannot be "never set a
+category on a generic noun". If it does not show up, nothing changes.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
