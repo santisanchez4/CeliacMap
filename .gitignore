@@ -36,3 +36,6 @@ venv/
 
 # Generated / scratch outputs
 outputs/
+
+# Evidence-finder proposal reports: third-party text and place ids, stale quickly (docs/runbooks/evidence-finder.md)
+db/checks/evidence-proposals/

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agents.clients.website_scraper import WebsiteScraperClient, is_social_url
+from agents.clients.website_scraper import WebsiteScraperClient, fetch_page_text, is_social_url
 
 
 def _mock_response(text, status_ok=True):
@@ -196,3 +196,39 @@ def test_find_email_returns_none_on_connection_error(mock_get):
 def test_find_email_returns_none_on_http_error_status(mock_get):
     mock_get.return_value = _mock_response("<html></html>", status_ok=False)
     assert WebsiteScraperClient().find_email("https://cafex.com") is None
+
+
+# --- fetch_page_text: the visible text of a business's own site, for the evidence finder -------
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_fetch_page_text_returns_visible_text_without_scripts_styles_or_tags(mock_get):
+    mock_get.return_value = _mock_response(
+        "<html><head><style>p{color:red}</style><script>var x='sin gluten';</script></head>"
+        "<body><h1>Panader&iacute;a Tiempo Libre</h1><p>Todo es <b>sin gluten</b>.</p><noscript>habilit&aacute; JS</noscript></body></html>"
+    )
+    text = fetch_page_text("https://tiempolibre.com.ar")
+    assert "Panadería Tiempo Libre" in text and "Todo es sin gluten." in text
+    assert "color:red" not in text and "var x" not in text and "<" not in text and "JS" not in text
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_fetch_page_text_never_downloads_a_social_profile(mock_get):
+    for url in ("https://www.instagram.com/tl", "https://facebook.com/tl", "https://linktr.ee/tl", "", None):
+        assert fetch_page_text(url) == ""
+    mock_get.assert_not_called()
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_fetch_page_text_never_raises(mock_get):
+    mock_get.side_effect = TimeoutError("timed out")
+    assert fetch_page_text("https://cafex.com") == ""
+    mock_get.side_effect = None
+    mock_get.return_value = _mock_response("<html></html>", status_ok=False)
+    assert fetch_page_text("https://cafex.com") == ""
+
+
+@patch("agents.clients.website_scraper.requests.get")
+def test_fetch_page_text_is_bounded(mock_get):
+    mock_get.return_value = _mock_response("<p>" + "sin gluten " * 100_000 + "</p>")
+    assert len(fetch_page_text("https://cafex.com")) <= 100_000

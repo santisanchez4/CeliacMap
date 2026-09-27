@@ -222,16 +222,17 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 ├── js/         main.js (i18n, nav) · config.js (public keys) · map.js · suggest.js + kitchen.js (Form A) · report.js
 │               (Form B) · ranking.js · opinions.js · chat.js (widget -> the `chat` function)
 ├── agents/     base.py · {search,social,web,validator,updater,suggestion,outreach}_agent.py · outreach_reply_handler.py ·
-│               review_handler.py · manual_overrides.py · admin_notify.py · clients/ (supabase, google_places, tavily,
+│               review_handler.py · manual_overrides.py · admin_notify.py · evidence_finder.py · evidence_freeze.py ·
+│               clients/ (supabase, google_places, tavily,
 │               llm, resend, website_scraper)
 ├── mcp_server/ server.py (6 tools over Supabase + the RUBRIC) · skills/validator-rubric/SKILL.md (academic deliverable)
 ├── supabase/functions/  outreach-reply/ · place-report-created/ · chat/ (index.ts, prompts.ts, regions.ts, index.test.ts, regions.test.ts) — Deno/TS
 ├── config/     settings.py (env-driven) · targets.yaml (countries, cities, search terms, `web: true` opt-in)
 ├── scripts/    run_agents.py (CI: search -> social -> web -> suggestion -> validator -> updater -> outreach -> review_sweep)
-│               plus admin tools (review_queue, moderate_opinions, cap_unsupported_100, revalidate_low_confidence,
+│               plus admin tools (review_queue, find_evidence, moderate_opinions, cap_unsupported_100, revalidate_low_confidence,
 │               admin_digest), purge_chat_logs, sync_chat_prompts, check_setup, gen_favicons, gen_cursors
 ├── db/         schema.sql · seed.sql (ranking votes only) · migrations/ · fixes/ (one-off production SQL) · checks/
-├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…008, C4-diagrams.md) · plans/ · superpowers/
+├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…008, C4-diagrams.md) · plans/ · superpowers/ · runbooks/
 ├── tests/      offline Python tests + frontend_*.test.js; guards: test_rubric_docs_sync, test_chat_prompts_sync, test_claude_md_size
 ├── .github/workflows/  monthly pipeline, mid-month Validator, weekly suggestions, admin digest, Pages deploy, dispatch handlers
 └── requirements.txt · .env.example · README.md · CLAUDE.md · prompts.md · .gitignore
@@ -345,6 +346,10 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Evidence, not action** [Community reports; ranking; outreach]: reports, votes, outreach replies and the chatbot never
   change `places.status` on their own; only the Validator, the admin (with a transparent note) or the documented report
   rules do.
+- **Evidence proposals are proposals** [Evidence finder]: `scripts/find_evidence` never writes and never changes a place; a `100` needs a quote
+  verified on its page (else "100 · verificar en la fuente": accepted only alone, with `--verified-source`); a source is about the business by the
+  code's rule (own URL, name + city, or title words with an identity word + city/region), never by the name alone; the public note quotes only
+  verified text (≤ 160 characters, no health data); no Google reviews. Runbook: `docs/runbooks/evidence-finder.md`.
 - **Evidence the Validator must weigh goes in `place_evidence`**, not `validation_notes` (invisible to it, overwritten).
   To bring back a `discarded` / `needs_review` place with real evidence, approve it with a manual override; do not send it
   through `pending`.
@@ -399,6 +404,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **Evidence finder for the admin-pending 100% queue (2026-09-27)** — read-only tool that proposes 100 / options / insuficiente with literal, page-verified quotes for the 271 flagged places; the admin accepts with `review_queue`; three pilot rounds, one wrong 100 caught and fixed; the full run waits for 2026-10-01. [→](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27)
 - **`category_zero` telemetry (2026-09-27)** — the chat log now says when a category emptied a search that has places (1 in 29, all development traffic); the answer is unchanged, and the router rule and prompt options wait for real traffic. [→](docs/DECISIONS.md#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)
 - **Department / province search (2026-09-26)** — `places.region` from the address; the chat searches by region (ambiguous names guarded), the redactor via `datos_cercanos` with no prompt change; the 2c-vs-examples contradiction is noted for the next prompt edit. [→](docs/DECISIONS.md#department--province-search--placesregion-2026-09-26)
 - **Chatbot — named place retrieval (2026-09-23)** — search by business name, accent/typo tolerant (chat v14). [→](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23)

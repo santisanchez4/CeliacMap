@@ -2372,6 +2372,80 @@ contradiction, "Cerca hay…" (a proximity the system does not verify), the medi
 cancels (Fase D). Caution for that rule: "dónde comprar" or "conseguir productos" do imply `shop`, so it cannot be "never set a
 category on a generic noun". If it does not show up, nothing changes.
 
+### Evidence finder for the admin-pending 100% queue (2026-09-27)
+
+**The problem.** `cap_unsupported_100 --flag-only` left **271 places** in `scripts/review_queue --pending-100`: all `approved` and all still
+published as "Espacio 100% sin gluten" (the flag does not change the map), none with stored `place_evidence`. 196 have no `website`, 39 only a
+social profile or link-in-bio, 36 a site of their own; 58 cities (Buenos Aires 57, Córdoba 30, Mar del Plata 25, Mendoza 22); 141 cafés, 78
+shops, 52 restaurants. The admin could only confirm each one by researching it by hand.
+
+**What was built (owner-approved design).** A read-only tool that proposes, with evidence, and a command that lets the admin accept in bulk.
+The decision stays the admin's: nothing here changes `safety_level`, `status`, `flags` or `verified` by itself.
+
+- `agents/evidence_finder.py` + `scripts/find_evidence.py`: per place, Tavily searches (open web + Instagram/Facebook, optionally ACELU / ACELA /
+  ACA), the place's own site, and Haiku only to classify already-retrieved quotes. `EvidenceFinder` receives **no database**: it cannot write.
+  Output is a local report (JSON + markdown) in `db/checks/evidence-proposals/` (git-ignored: third-party text, place ids) plus a `.frozen.json`
+  of what was retrieved; `--replay` repeats a run on the frozen sources with no Tavily searches and no downloads (`agents/evidence_freeze.py`).
+- **Why Tavily and not Anthropic web search (the one `web_agent` uses):** the code retrieves the text and the URL, so "only literal quotes with
+  their URL" and "nothing from the model's knowledge" are enforced by code, not by a prompt; the cost is predictable; and `web_agent` is off
+  because an agentic run timed out CI. Cost of the choice: a snippet is short (recall) and not always literal on the page.
+- **Proposals:** `100` (an explicit exclusivity phrase by `has_exclusive_signal`, computed with the business name masked, scoped by the model to
+  the whole establishment, nothing contradicting it), `options` (evidence of a gluten-free offer without that), `insuficiente` (nothing usable;
+  it never proposes a discard). The model can only take a place out of 100. Each citation is labelled **verificada en la página** (literal in the
+  page the code downloaded, or the place's own site), **solo snippet** or **red social: no verificable**; a 100 that no verified quote supports
+  is **"100 · verificar en la fuente"**. An extended-signal alert ("posible 100", phrases like "exclusivamente para celíacos" that the Validator's
+  regex misses) exists in the report but never proposes 100 by itself. `has_exclusive_signal` itself was not changed (it is the Validator's gate).
+- **A source is about the business only if the code says so** (`match_reason`): its URL is the place's own website / social profile; or the whole
+  name and the city appear in the text; or its title / URL holds every distinctive word of the name, at least one being an identity word (not a word
+  of the place's city, region or address), AND the city or region appears. Never the name alone. The model gets the context (neighbouring
+  sentences, title, source type) and can only veto; a quote of a source the code rejected never reaches it (prompts.md §34).
+- **Rules kept:** Google Places reviews are not used (purged after 30 days, `place_evidence` is permanent); sentences that tie a person to celiac
+  disease are dropped before anything sees them; `place_evidence.source` is `web` (what it is; `admin` would read as the admin's own statement).
+- **The admin's command (`review_queue`, dry run unless `--apply`):** `--proposals REPORT` reads a report; `--accept-proposals ID… --report REPORT`
+  saves the cited quotes as `place_evidence` and applies the same APROBACIÓN MANUAL as `--approve` with an automatic note. It refuses an id not in
+  the report, `insuficiente`, a place that changed after the report (`updated_at`), left the queue or `approved`, has a manual decision, or whose note
+  would carry health data. A "100 · verificar en la fuente" is refused in bulk and accepted only alone with `--verified-source` (the admin opened
+  the link). The public note quotes (at most 160 characters) only a verified quote; otherwise it says "evidencia en redes del local (URL)" /
+  "evidencia en la web (URL)" without the snippet. Accepting `options` lowers the public label and the dry run says so.
+
+**The pilot (same 10 places in 10 cities every time; aggregate numbers in `db/checks/2026-09-27-evidence-finder-pilot.md`).** Three live runs
+(60 Tavily searches) and two replays on the frozen sources of the third. What each round taught:
+
+1. *First run* (2 / 5 / 3 for 100 / options / insuficiente): "literal" was only literal in the Tavily snippet. Of the 15 quotes, 10 were from
+   Instagram / Facebook (cannot be downloaded); of the 5 downloadable, 3 were literal on the page and 2 were not (a stitched snippet containing a
+   `None`, and text that is not in the visible body). → verification labels and the "verificar en la fuente" rule.
+2. *Second run* (same totals, different results: Tavily and the model vary between runs, so a before/after on live runs is not exact). The changes
+   worked (labels, vetoes with the model's reason, discarded sources, Haiku tokens) but exposed two flaws of mine: quotes that are only the
+   business name pass the regex because names contain "sin TACC" (11 of 31 model-dropped candidates), and the model judged "is this about THIS
+   business" on the sentence alone. → freeze / replay first, so the next changes could be compared on the same sources for free.
+3. *Replay with name masking, code-level attribution and the looser source filter*: 3 proposals of 100, and **one was wrong**: "Concepción sin
+   TACC" was proposed from an Instagram reel of *Quinta Gluten Free*, another business of the same city. The only distinctive word of that name is the
+   city itself, so "every distinctive word in the title + the city" was vacuous. → identity words (a name of only place words matches by full name
+   plus city or its own URL) and a veto when the neighbouring sentences name another business.
+4. *Final replay*: 2 / 4 / 4. **Both proposals of the 100 family are right** (checked against the place's own data): Matilde Gluten Free
+   (100, two quotes verified on a directory page of the same address, Belgrano 930) and Apto Libre de Gluten (100 · verificar en la fuente:
+   "Somos Apto Cocina, 100% libre de gluten, León Guruciaga 161", the address in the database). The four insuficientes have social profile 2, nothing 2
+   (no own site); two of them are the price of the stricter attribution (Concepción, @TACCTOMDP). This was the owner's cut criterion: no wrong 100.
+
+**Cost and time.** Haiku ≈ US$0.0035 per place (12.9 k tokens in, 4.3 k out for 10 places, US$1 / US$5 per Mtok) → about US$0.93 for the 271. Tavily:
+2 searches per place = 542 for the whole queue (3 with `--queries 3`), against a free plan of 1000 a month shared with the Social agent (≤ 25–30 per
+pipeline run). Wall-clock time for the 271 was not measured (the pilot's page downloads are the slow part). **The Tavily usage endpoint did not move
+(25 / 1000) after the first 40 searches** (read before the first run and after the second): do not size a run from it; the runbook says to add up `searches_used` and read the dashboard by hand.
+
+**Not decided / open.**
+- **The rule for the `insuficiente` ones is the owner's, after the full run** (the pilot only says which links they have: website 0, red social 2,
+  nada 2 of 4). Nothing is proposed automatically for them.
+- The full run of the 271 waits until after the pipeline of 2026-10-01, with `--max-searches`, so the Social agent keeps its quota
+  (`docs/runbooks/evidence-finder.md`).
+- 10 places are a small sample and the model varies between runs: read the report of the full run, do not trust the proportions of the pilot.
+  Recall is the price of the stricter attribution.
+- `has_exclusive_signal` misses phrases such as "exclusivamente para celíacos"; the report flags them as "posible 100". Changing the Validator's
+  regex is a separate, measured decision.
+
+**Tests.** Python 535 → 695 (`test_evidence_finder*.py`, `test_evidence_acceptance.py`, `test_evidence_attribution.py`, `test_evidence_freeze.py`,
+`test_find_evidence.py`, `test_review_queue_proposals.py`, `test_llm_usage.py`, additions to `test_website_scraper.py`). Mutation checks: breaking
+the source check, the verification, the vetoes, the noise filter, the name masking, the identity words or the region rule each fails tests.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

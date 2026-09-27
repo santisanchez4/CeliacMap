@@ -12,6 +12,7 @@ expired cert must degrade to "no email found" rather than abort anything.
 
 from __future__ import annotations
 
+import html
 import logging
 import re
 from urllib.parse import urlparse
@@ -120,3 +121,36 @@ class WebsiteScraperClient:
             if _is_valid_email(match.group(0)):
                 return match.group(0)
         return None
+
+
+# --- Visible text of a business's own site (evidence finder) -------------------------------------
+
+PAGE_TIMEOUT = 8  # seconds
+PAGE_TEXT_MAX = 100_000  # characters kept from one page
+
+_HIDDEN_RE = re.compile(r"<(script|style|noscript)\b.*?</\1\s*>", re.IGNORECASE | re.DOTALL)
+_BLOCK_TAG_RE = re.compile(
+    r"</?(?:p|div|br|li|ul|ol|h[1-6]|section|article|header|footer|tr|td|th|table)\b[^>]*>", re.IGNORECASE
+)
+_ANY_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def fetch_page_text(url: str | None) -> str:
+    """Best-effort visible text of a business's own page; "" on a social URL or any failure. Never raises.
+
+    Block-level tags become line breaks so the evidence finder can split sentences; inline tags vanish.
+    """
+    if not url or is_social_url(url):
+        return ""
+    try:
+        response = requests.get(url, timeout=PAGE_TIMEOUT, headers={"User-Agent": USER_AGENT})
+        response.raise_for_status()
+    except Exception:  # noqa: BLE001 - any transport/HTTP error means "no text"
+        logger.info("page text fetch failed for %r", url)
+        return ""
+    body = _HIDDEN_RE.sub(" ", response.text)
+    body = _BLOCK_TAG_RE.sub("\n", body)
+    body = html.unescape(_ANY_TAG_RE.sub("", body))
+    body = re.sub(r"[ \t\r\f\v]+", " ", body)
+    body = re.sub(r"\s*\n\s*", "\n", body)
+    return body.strip()[:PAGE_TEXT_MAX]

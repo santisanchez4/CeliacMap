@@ -16,6 +16,16 @@ dry run unless ``--apply`` is given. Same shape as ``scripts/moderate_opinions.p
     python -m scripts.review_queue --clear-warning ID --apply
     python -m scripts.review_queue --locate SUGGESTION_ID --lat -33.12 --lng -58.30 --apply
 
+    python -m scripts.review_queue --proposals REPORT.json [--only 100|options|insuficiente]   # read a scripts/find_evidence report
+    python -m scripts.review_queue --accept-proposals ID1 ID2 --report REPORT.json [--apply]
+
+``--accept-proposals`` confirms the report's proposals in bulk: it saves the cited quotes as ``place_evidence`` (source ``web``) and
+applies the same APROBACIÓN MANUAL as ``--approve``, with an automatic note that cites the source and no health data (the note is public).
+The note quotes (at most 160 characters) only a quote verified on its page; otherwise it says "evidencia en redes del local (URL)" or
+"evidencia en la web (URL)" without the snippet. It refuses a place that changed since the report, is no longer in the queue or approved,
+already carries a manual decision, or whose proposal is ``insuficiente``. A "100 · verificar en la fuente" (no quote verified on its
+page) is refused in bulk: open the link and accept it alone with ``--verified-source``. Accepting "options" lowers the public label.
+
 Rules it applies (CLAUDE.md "Manual Validator overrides — allowed, but never silent"): an approval
 prepends an ``APROBACIÓN MANUAL`` header to ``validation_notes`` (the Validator's text is kept below),
 never changes ``validation_confidence`` and never sets ``verified``. The note you pass goes to a public
@@ -24,10 +34,20 @@ column: do not write anyone's health data in it (e.g. that the owner is celiac).
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from datetime import date, datetime, timedelta, timezone
 
+from agents.evidence_finder import (
+    PROPOSALS,
+    build_acceptance_note,
+    needs_source_check,
+    proposal_label,
+    summarize,
+    verification_label,
+)
+from agents.manual_overrides import manual_override_marker
 from agents.validator_agent import _OWNER_HEALTH_RE, PENDING_ADMIN_FLAG
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
@@ -190,6 +210,143 @@ def discard(db, place_id: str, note: str, apply: bool, out) -> int:
     return 0
 
 
+def _load_report(path: str):
+    """(report, None) or (None, why not). A report is what scripts/find_evidence writes."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError) as exc:
+        return None, f"No se pudo leer el reporte {path}: {exc}"
+    rows = data.get("places") if isinstance(data, dict) else None
+    if not isinstance(rows, list) or not all(isinstance(r, dict) and r.get("place_id") and r.get("proposal") in PROPOSALS for r in rows):
+        return None, f"El reporte {path} no tiene el formato de scripts/find_evidence (places con place_id y proposal)."
+    return data, None
+
+
+def _print_proposal(r: dict, out) -> None:
+    out("")
+    out(f"  id:        {r['place_id']}")
+    out(f"  lugar:     {r.get('name')} · {r.get('city')}, {r.get('country')} · {r.get('category')} · links: {r.get('link_kind')}")
+    out(f"  propuesta: {proposal_label(r)}")
+    out(f"  motivo:    {'; '.join(r.get('reasons') or []) or '-'}")
+    for c in r.get("citations") or []:
+        out(f"  cita:      «{c.get('text')}»")
+        out(f"             {c.get('url')} · {c.get('source_kind')} · {verification_label(c)} · señal de exclusividad: "
+            f"{'sí' if c.get('has_signal') else 'no'} · alcance: {c.get('alcance')}")
+    for v in r.get("vetoes") or []:
+        out(f"  veto del modelo: cita {v.get('cita')} ({v.get('tipo')}) — {v.get('motivo_modelo') or 'sin motivo'}")
+    if r.get("possible_100"):
+        q = r.get("possible_100_quote") or {}
+        out(f"  posible 100: «{q.get('text')}» {q.get('url')} (frase que has_exclusive_signal no reconoce; no es una propuesta de 100)")
+
+
+def list_proposals(path: str, only: str | None, out) -> int:
+    data, err = _load_report(path)
+    if err:
+        out(err)
+        return 2
+    rows = data["places"]
+    s = summarize(rows)
+    out(f"== Propuestas de evidencia ({(data.get('meta') or {}).get('created_at', 'sin fecha')}) — nada de esto está en el mapa ==")
+    out("  " + " · ".join(f"{k}: {s['por_propuesta'][k]}" for k in PROPOSALS)
+        + f" · 100 · verificar en la fuente: {s['cien_verificar_en_la_fuente']} · posible 100: {s['posible_100']}")
+    out("  insuficientes por lo que tiene el lugar: " + " · ".join(f"{k} {v}" for k, v in s["insuficientes_por_link"].items()))
+    for proposal in ([only] if only else PROPOSALS):
+        group = [r for r in rows if r["proposal"] == proposal]
+        out(f"== {proposal}: {len(group)} ==")
+        for r in group:
+            _print_proposal(r, out)
+        if not group or proposal == "insuficiente":
+            continue
+        block = [r for r in group if not needs_source_check(r)]
+        single = [r for r in group if needs_source_check(r)]
+        out("")
+        if block:
+            out(f"IDs {proposal}: " + " ".join(r["place_id"] for r in block))
+        if single:
+            out(f"IDs {proposal} · verificar en la fuente (de a uno, con --verified-source): " + " ".join(r["place_id"] for r in single))
+    return 0
+
+
+def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_source: bool = False) -> int:
+    """Confirm evidence proposals: the cited quotes become place_evidence (source 'web') and the place gets the same
+    APROBACIÓN MANUAL as --approve. Only this admin command writes; a place that changed, was decided or has nothing to cite is refused.
+
+    A "100 · verificar en la fuente" (no quote verified on its page) is never accepted in bulk: only alone, with --verified-source."""
+    data, err = _load_report(path)
+    if err:
+        out(err)
+        return 2
+    by_id = {r["place_id"]: r for r in data["places"]}
+    accepted: list[str] = []
+    refused: list[str] = []
+
+    def refuse(pid: str, name, why: str) -> None:
+        refused.append(pid)
+        out(f"  RECHAZADO {pid} ({name or '?'}): {why}")
+
+    for pid in ids:
+        entry = by_id.get(pid)
+        if entry is None:
+            refuse(pid, None, "no está en el reporte")
+            continue
+        name = entry.get("name")
+        if entry["proposal"] == "insuficiente":
+            refuse(pid, name, "propuesta insuficiente: no hay evidencia que aceptar (decidilo a mano con --approve o --discard)")
+            continue
+        source_check = needs_source_check(entry)
+        if source_check and not verified_source:
+            refuse(pid, name, "100 · verificar en la fuente: ninguna cita está verificada en la página; abrí el link y aceptalo "
+                              "solo, con --verified-source")
+            continue
+        place = db.fetch_place_by_id(pid)
+        if not place:
+            refuse(pid, name, "No existe el lugar")
+        elif place.get("status") != "approved":
+            refuse(pid, name, f"ya no está aprobado ({place.get('status')})")
+        elif PENDING_ADMIN_FLAG not in (place.get("flags") or []):
+            refuse(pid, name, "ya no está en la cola de 100% pendientes")
+        elif manual_override_marker(place.get("validation_notes")):
+            refuse(pid, name, "ya tiene una decisión manual: no la pisa una propuesta automática")
+        elif place.get("updated_at") != entry.get("updated_at"):
+            refuse(pid, name, "cambió después del reporte: volvé a buscar la evidencia")
+        else:
+            built = build_acceptance_note(entry)
+            if built is None:
+                health = any(_OWNER_HEALTH_RE.search(c.get("text") or "") for c in entry.get("citations") or [])
+                refuse(pid, name, "la nota llevaría datos de salud de una persona" if health else "no tiene una cita utilizable")
+                continue
+            note, store = built
+            level = "100" if entry["proposal"] == "100" else "options"
+            current = place.get("safety_level")
+            after = "gluten_free_100" if level == "100" else (current if current in ("celiac_friendly", "options_available") else "options_available")
+            label_from, label_to = LEVEL_LABELS.get(current, current), LEVEL_LABELS.get(after, after)
+            out(f"  {name}: {label_from} → {label_to}{' (sin cambio)' if label_from == label_to else ''}")
+            out(f"    nota: {note}")
+            if source_check:
+                out("    100 · verificar en la fuente: confirmaste que abriste el link (--verified-source); la nota cita solo la URL")
+            out(f"    evidencia a guardar: {len(store)} fila(s) (source web)")
+            if not apply:
+                accepted.append(pid)
+                continue
+            try:
+                for row in store:
+                    db.add_place_evidence(pid, row["source"], row["text"], row["url"])
+            except Exception:  # noqa: BLE001 - without its evidence a place is not approved
+                refuse(pid, name, "no se pudo guardar la evidencia; el lugar no se aprobó")
+                continue
+            approve(db, pid, level, note, True, out)
+            accepted.append(pid)
+
+    if not apply:
+        out(f"DRY RUN — {len(accepted)} se aceptarían, {len(refused)} rechazados. Agregá --apply para escribir.")
+    else:
+        if accepted:
+            db.insert_agent_log("validator", "accept_evidence_proposals", {"accepted": accepted, "refused": refused}, status="success")
+        out(f"Listo: {len(accepted)} aceptados, {len(refused)} rechazados.")
+    return 1 if refused else 0
+
+
 def clear_warning(db, place_id: str, apply: bool, out) -> int:
     out(f"Se quitaría el aviso 'reportado por la comunidad' de {place_id}.")
     if not apply:
@@ -245,6 +402,20 @@ def locate(db, suggestion_id: str, lat: float, lng: float, address: str | None, 
 
 
 def run(db, args, out=print) -> int:
+    if args.accept_proposals:
+        bad = next((i for i in args.accept_proposals if not _UUID.match(i)), None)
+        if bad:
+            out(f"Id inválido (se espera un uuid): {bad}")
+            return 2
+        if not args.report:
+            out("Falta --report ARCHIVO (el reporte de scripts/find_evidence del que salen las propuestas).")
+            return 2
+        if args.verified_source and len(args.accept_proposals) != 1:
+            out("--verified-source es para un solo lugar: abrí el link de la fuente y aceptalo de a uno.")
+            return 2
+        return accept_proposals(db, args.accept_proposals, args.report, args.apply, out, verified_source=args.verified_source)
+    if args.proposals:
+        return list_proposals(args.proposals, args.only, out)
     target = args.approve or args.discard or args.clear_warning
     if target and not _UUID.match(target):
         out(f"Id inválido (se espera un uuid): {target}")
@@ -289,6 +460,13 @@ def build_parser() -> argparse.ArgumentParser:
     actions.add_argument("--discard", metavar="PLACE_ID")
     actions.add_argument("--clear-warning", metavar="PLACE_ID")
     actions.add_argument("--locate", metavar="SUGGESTION_ID")
+    actions.add_argument("--accept-proposals", nargs="+", metavar="PLACE_ID",
+                         help="confirm evidence proposals from a find_evidence report (needs --report)")
+    parser.add_argument("--proposals", metavar="REPORT", help="read a find_evidence report: counts, citations and the ids to accept")
+    parser.add_argument("--only", choices=list(PROPOSALS), help="with --proposals: one kind of proposal")
+    parser.add_argument("--report", metavar="REPORT", help="the find_evidence report --accept-proposals reads")
+    parser.add_argument("--verified-source", action="store_true",
+                        help="with --accept-proposals and ONE id: you opened the link of a '100 · verificar en la fuente' and confirm it")
     parser.add_argument("--level", choices=["100", "options"])
     parser.add_argument("--note", help="why (goes to the public validation_notes; no health data)")
     parser.add_argument("--lat", type=float)

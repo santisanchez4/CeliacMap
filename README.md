@@ -58,7 +58,9 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   "Reportado por la comunidad" pin on the map and the third (or one credible contamination
   report) takes the place off it; unplaceable suggestions wait for the admin instead of being
   rejected; the chatbot can search "only 100%"; and the admin gets urgent emails plus a daily
-  digest. Admin tool: `python -m scripts.review_queue`.
+  digest. Admin tool: `python -m scripts.review_queue`. For the 100% queue there is also an evidence finder
+  (`python -m scripts.find_evidence`, read-only: it proposes 100 / options / insuficiente with literal, verified quotes;
+  the admin confirms with `review_queue --proposals` / `--accept-proposals`; runbook in `docs/runbooks/evidence-finder.md`).
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.
@@ -264,6 +266,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── suggestion_agent.py     # promotes public form suggestions → pending
 │   ├── validator_agent.py      # Claude: approved / needs_review / rejected
 │   ├── updater_agent.py        # re-checks approved places
+│   ├── evidence_finder.py      # admin tool: public evidence for the 100% queue (read-only) · evidence_freeze.py = replay sources
 │   └── clients/                # supabase / google_places / tavily_client / llm
 ├── mcp_server/                 # AI toolkit — MCP server (FastMCP, 6 tools)
 │   ├── server.py
@@ -278,14 +281,15 @@ serif display headings over a clean sans body, and generous spacing.
 ├── scripts/
 │   ├── check_setup.py          # connectivity / config preflight
 │   ├── moderate_opinions.py    # list / approve / hide community opinions (dry-run unless --apply)
-│   ├── review_queue.py         # admin queue: 100% pending, needs_review, unplaceable suggestions, warnings
+│   ├── review_queue.py         # admin queue: 100% pending, needs_review, unplaceable suggestions, warnings, evidence proposals
+│   ├── find_evidence.py        # evidence finder CLI: reads the 100% queue, writes a local report (never writes to the database)
 │   ├── admin_digest.py         # daily email to the admin (admin-digest.yml)
 │   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers
 │   ├── seed.sql                # community-ranking votes on 15 real places (fictional sample places removed 2026-09-25)
 │   └── checks/                 # verification evidence: BEGIN;…ROLLBACK; scripts, jailbreak battery, live runs, prompt A/B tool
-├── docs/                       # DECISIONS.md (decisions log + design detail), architecture/ (ADRs, C4), plans/
+├── docs/                       # DECISIONS.md (decisions log + design detail), architecture/ (ADRs, C4), plans/, runbooks/
 ├── tests/                      # offline unit tests (all external calls mocked)
 ├── .github/workflows/          # agents-monthly cron + Pages deploy
 ├── requirements.txt

@@ -2345,3 +2345,29 @@ the chat.
 "sin TACC" never sets `nivel`); redactor regression vs `main`: figures unchanged, 0/40 false positives, labels 96/96.
 Still pending after deploy: the 37-turn jailbreak battery and a live "solo 100%" turn.
 Changing a prompt restarts the soft-launch count (CLAUDE.md).
+
+## 34. Evidence finder — quote scope classifier (2026-09-27)
+
+**Source of truth:** `SCOPE_RUBRIC` in `agents/evidence_finder.py` (Haiku, `haiku_model`). Not a health gate on its own: it never
+decides a level. It reads numbered quotes that the code already retrieved about ONE place and returns, per quote, three enum values plus a
+one-line reason (`motivo`, at most 240 characters, scrubbed of health data, shown in the report next to any veto): `alcance`
+(`establecimiento` | `producto_o_linea` | `opciones` | `irrelevante`), `contradice_exclusividad` and `habla_de_este_negocio`.
+
+- **Why it exists:** `has_exclusive_signal` finds an exclusivity phrase but cannot tell "the whole place is gluten free" from "our cakes
+  are 100% gluten free" (a product line in a place that also sells gluten). The model reads that distinction; the code decides.
+- **It can only lower a place.** "100" needs an explicit exclusivity phrase (regex, computed with the business name masked) AND scope
+  `establecimiento` from the model AND no contradicting quote. Anything else the model returns (an out-of-enum value, a non-boolean, a
+  missing entry, an API error, a quote number it was never sent) is read as the safest value, so an injected instruction in a quote cannot
+  raise anything (`tests/test_evidence_finder.py`, `tests/test_evidence_attribution.py`).
+- **Attribution belongs to the code (third version, same day).** The first version made the model judge "is this sentence about THIS
+  business?" from the sentence alone; in the pilot that dropped legitimate page-level statements ("Clasificado 100% Sin TACC." on the
+  business's own directory page) and let a neighbour's sentence through. Now the code decides at source level (the page's URL is the place's
+  own, or its title/URL holds every distinctive word of the name plus an identity word that is not a place word, and the city or region
+  appears). The prompt says the pages were ALREADY verified, gives each quote its neighbouring sentences (`antes` / `despues`), the page
+  title and the source type (never a URL), and lets the model only VETO: `habla_de_este_negocio: false` if the sentence itself talks about
+  ANOTHER place, or the neighbouring sentences show the quote belongs to another business with a different name.
+- **Rules in the prompt:** only the text it receives; no knowledge of the business; the name proves nothing; conservative default for
+  `alcance` and `contradice_exclusividad` ("producto_o_linea" / "opciones" over "establecimiento", `contradice_exclusividad` true), but
+  `habla_de_este_negocio` defaults to true; a one-line `motivo`; no health data of any person in the answer.
+- **Measured:** three live runs of the same 10-place pilot and two replays of the third on frozen sources (`docs/DECISIONS.md`, "Evidence
+  finder for the admin-pending 100% queue"; aggregate numbers in `db/checks/2026-09-27-evidence-finder-pilot.md`); no A/B on a larger set yet.

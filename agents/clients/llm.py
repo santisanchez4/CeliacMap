@@ -68,6 +68,8 @@ class LLMClient:
         resp = self._create(system, user, model, max_tokens)
         if getattr(resp, "usage", None):
             logger.debug("tokens in=%s out=%s", resp.usage.input_tokens, resp.usage.output_tokens)
+            # Kept for callers that report spend (the evidence finder); the last call only.
+            self.last_usage = {"input": resp.usage.input_tokens, "output": resp.usage.output_tokens}
         return self._text(resp)
 
     def complete_json(

@@ -504,8 +504,8 @@ class SupabaseClient:
     # --- admin review queue (scripts/review_queue.py, audit plan step 6) ---------
     ADMIN_PLACE_COLUMNS = (
         "id, name, city, country, address, category, safety_level, status, source, lat, lng, "
-        "geocode_method, social_url, website, validation_confidence, validation_notes, flags, "
-        "recommendation, community_warning_at, created_at"
+        "geocode_method, region, social_url, website, validation_confidence, validation_notes, flags, "
+        "recommendation, community_warning_at, created_at, updated_at"
     )
 
     def fetch_places_for_admin(
