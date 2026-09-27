@@ -313,9 +313,15 @@ Deno.test("real turn 1: Fraile Muerto finds nothing, so the redactor gets the de
     assertEquals(found.nearbyCount, 2);
     assertEquals(found.queryLog.region, "Cerro Largo");
     assertEquals(found.queryLog.region_plan, "fallback");
-    // The city was searched first, and the old same-city nearby count did not run.
+    // The city was searched first. The only select=id request is the category_zero count (no category, limit 1); the old
+    // same-city nearby count (no country, no order) did not run.
     assertEquals(calls[0].searchParams.get("city"), "ilike.*Fraile Muerto*");
-    assertEquals(calls.filter((u) => u.searchParams.get("select") === "id").length, 0);
+    const idCalls = calls.filter((u) => u.searchParams.get("select") === "id");
+    assertEquals(idCalls.length, 1);
+    assertEquals(idCalls[0].searchParams.get("category"), null);
+    assertEquals(idCalls[0].searchParams.get("country"), "eq.Uruguay");
+    assertEquals(found.queryLog.category_zero, true);
+    assertEquals(found.queryLog.count_without_category, 0);
   });
 });
 
@@ -457,4 +463,164 @@ Deno.test("fetchSearchPlaces still ranks by the requested city when called with 
     const rows = await fetchSearchPlaces("https://x.supabase.co", "anon", { region: "Córdoba", pais: "Argentina", regionPrefer: "cordoba" });
     assertEquals(NAMES(rows), ["Dentro", "Fuera"]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Telemetry: a category that found nothing (docs/DECISIONS.md, "Telemetría de category_zero"). The log only ever
+// showed what the router filtered by, never whether the filter hid anything. Nothing that is returned or shown to the
+// redactor may change: only queryLog gains fields, and only when a category was set, gave 0 rows and it was no name lookup.
+// ---------------------------------------------------------------------------
+
+const CENTRO = [
+  place("c1", "Café Uno", "Montevideo", "Montevideo", "Uruguay", "cafe"),
+  place("c2", "Café Dos", "Montevideo", "Montevideo", "Uruguay", "cafe"),
+  place("c3", "Resto Tres", "Montevideo", "Montevideo", "Uruguay", "restaurant"),
+];
+const isCountCall = (u: URL) => u.searchParams.get("select") === "id" && u.searchParams.get("limit") === "1";
+
+Deno.test("category_zero: a category with 0 rows counts the same search without it, and returns exactly what it did before", async () => {
+  await withFakePostgrest(CERRO_LARGO, async (calls) => {
+    // Melo is a city, not a department: the search is by city.
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon", router({ ciudad: "Melo", pais: "Uruguay", category: "restaurant" }), "restaurantes en Melo",
+    );
+    // What the person and the redactor get is untouched: no rows, no nearby figure.
+    assertEquals(found.rows, []);
+    assertEquals(found.datosCercanos, null);
+    assertEquals(found.nearbyCount, null);
+    // The log says the filter emptied a city that has places (a number only comes back when Prefer: count=exact was sent).
+    assertEquals(found.queryLog.region_plan, "city");
+    assertEquals(found.queryLog.category, "restaurant");
+    assertEquals(found.queryLog.category_zero, true);
+    assertEquals(found.queryLog.count_without_category, 3);
+    // The extra request: same city and country, no category, one row asked for.
+    const count = calls.filter(isCountCall);
+    assertEquals(count.length, 1);
+    assertEquals(count[0].searchParams.get("city"), "ilike.*Melo*");
+    assertEquals(count[0].searchParams.get("country"), "eq.Uruguay");
+    assertEquals(count[0].searchParams.get("category"), null);
+    assertEquals(count[0].searchParams.get("status"), "eq.approved");
+  });
+});
+
+Deno.test("category_zero: 0 without the category too is logged as 0 (nothing there, not hidden)", async () => {
+  await withFakePostgrest(CENTRO, async () => {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon", router({ ciudad: "Chuy", pais: "Uruguay", category: "cafe" }), "cafes en Chuy",
+    );
+    assertEquals(found.rows, []);
+    assertEquals(found.queryLog.category_zero, true);
+    assertEquals(found.queryLog.count_without_category, 0);
+  });
+});
+
+Deno.test("category_zero: a department search counts by region, not by a city called like it", async () => {
+  await withFakePostgrest(CERRO_LARGO, async (calls) => {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon", router({ ciudad: "Cerro Largo", pais: "Uruguay", category: "restaurant" }), "restaurantes en Cerro Largo",
+    );
+    assertEquals(found.rows, []);
+    assertEquals(found.queryLog.region_plan, "region");
+    assertEquals(found.queryLog.category_zero, true);
+    assertEquals(found.queryLog.count_without_category, 3);
+    const count = calls.filter(isCountCall)[0];
+    assertEquals(count.searchParams.get("region"), "eq.Cerro Largo");
+    assertEquals(count.searchParams.get("country"), "eq.Uruguay");
+    assertEquals(count.searchParams.get("city"), null);
+    assertEquals(count.searchParams.get("category"), null);
+  });
+});
+
+Deno.test("category_zero: the count keeps the barrio and the 100% level, and nivel is now in the log", async () => {
+  const data = [
+    place("k1", "Pocitos 100", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "Benito Blanco 1, Pocitos", safety_level: "gluten_free_100" }),
+    place("k2", "Pocitos opciones", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "Benito Blanco 2, Pocitos", safety_level: "options_available" }),
+    place("k3", "Centro 100", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "18 de Julio 1, Centro", safety_level: "gluten_free_100" }),
+  ];
+  await withFakePostgrest(data, async (calls) => {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon",
+      router({ ciudad: "Montevideo", pais: "Uruguay", zona: "Pocitos", category: "shop", nivel: "100" }), "solo 100% en Pocitos",
+    );
+    assertEquals(found.queryLog.nivel, "100");
+    assertEquals(found.queryLog.count_without_category, 1);
+    const count = calls.filter(isCountCall)[0];
+    assertEquals(count.searchParams.get("safety_level"), "eq.gluten_free_100");
+    assertEquals(count.searchParams.get("address"), "ilike.*Pocitos*");
+  });
+});
+
+Deno.test("nivel is always in the log: null when the search did not ask for 100%", async () => {
+  await withFakePostgrest(CENTRO, async () => {
+    const found = await searchPlacesForChat("https://x.supabase.co", "anon", router({ ciudad: "Montevideo", pais: "Uruguay" }), "algo");
+    assertEquals(found.queryLog.nivel, null);
+    assertEquals(found.rows.length, 3);
+  });
+});
+
+Deno.test("category_zero: the count runs only when a category was set, gave 0 rows and it was not a name lookup", async () => {
+  // No category: 0 rows is not a category problem.
+  await withFakePostgrest(CENTRO, async (calls) => {
+    const found = await searchPlacesForChat("https://x.supabase.co", "anon", router({ ciudad: "Chuy", pais: "Uruguay" }), "algo en Chuy");
+    assertEquals(calls.length, 1);
+    assertEquals("category_zero" in found.queryLog, false);
+    assertEquals("count_without_category" in found.queryLog, false);
+  });
+  // A category that found rows.
+  await withFakePostgrest(CENTRO, async (calls) => {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon", router({ ciudad: "Montevideo", pais: "Uruguay", category: "cafe" }), "cafes en Montevideo",
+    );
+    assertEquals(found.rows.length, 2);
+    assertEquals(calls.length, 1);
+    assertEquals("category_zero" in found.queryLog, false);
+    assertEquals("count_without_category" in found.queryLog, false);
+  });
+  // A name lookup already ignores the category, so an empty result is not the category's doing.
+  for (const names of [{ lugar_nombre: "Inexistente" }, { texto_libre: "Inexistente" }]) {
+    await withFakePostgrest(CENTRO, async (calls) => {
+      const found = await searchPlacesForChat(
+        "https://x.supabase.co", "anon", router({ ciudad: "Montevideo", pais: "Uruguay", category: "shop", ...names }), "Inexistente",
+      );
+      assertEquals(found.rows, []);
+      assertEquals(calls.filter(isCountCall).length, 0);
+      assertEquals("category_zero" in found.queryLog, false);
+    });
+  }
+});
+
+Deno.test("category_zero: the barrio nearby count and its datos_cercanos are unchanged, and the category count runs beside them", async () => {
+  const data = [place("g1", "Palermo GF", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina", "cafe"),
+    place("g2", "Caballito GF", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina", "restaurant")];
+  await withFakePostgrest(data, async () => {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon",
+      router({ ciudad: "Buenos Aires", zona: "Mataderos", pais: "Argentina", category: "cafe" }), "cafes en Mataderos",
+    );
+    assertEquals(found.rows, []);
+    assertEquals(found.datosCercanos, { city: "Buenos Aires", count: 2 });
+    assertEquals(found.nearbyCount, 2);
+    assertEquals(found.queryLog.category_zero, true);
+    // Mataderos matches no address, with or without the category.
+    assertEquals(found.queryLog.count_without_category, 0);
+  });
+});
+
+Deno.test("category_zero: a failed count never fails the turn nor changes what it returns", async () => {
+  const original = globalThis.fetch;
+  let n = 0;
+  globalThis.fetch = (() => (++n === 1
+    ? Promise.resolve(new Response("[]"))
+    : Promise.resolve(new Response("unavailable", { status: 503 })))) as typeof fetch;
+  try {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon", router({ ciudad: "Montevideo", pais: "Uruguay", category: "shop" }), "locales en Montevideo",
+    );
+    assertEquals(found.rows, []);
+    assertEquals(found.datosCercanos, null);
+    assertEquals(found.queryLog.category_zero, true);
+    assertEquals(found.queryLog.count_without_category, null);
+  } finally {
+    globalThis.fetch = original;
+  }
 });

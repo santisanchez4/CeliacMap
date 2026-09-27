@@ -1772,6 +1772,20 @@ Deno.test("buildChatLogResult - an ordinary unmarked turn keeps its metadata-onl
   });
 });
 
+Deno.test("buildChatLogResult - the category_zero telemetry reaches agent_log inside query, next to result_count, with no raw text", () => {
+  const result = buildChatLogResult({
+    action: "chat_turn",
+    modulo: "buscar",
+    marked: false,
+    markedReason: null,
+    query: { ciudad: "Maldonado", category: "restaurant", nivel: null, category_zero: true, count_without_category: 5 },
+    resultCount: 0,
+  });
+  assertEquals(result.query, { ciudad: "Maldonado", category: "restaurant", nivel: null, category_zero: true, count_without_category: 5 });
+  assertEquals(result.result_count, 0);
+  assertEquals("raw_user_message" in result, false);
+});
+
 Deno.test("buildChatLogResult - a marked turn keeps the raw texts, and a guard trip adds the DISCARDED model text separately from what the user saw", () => {
   const marked = buildChatLogResult({
     action: "chat_turn",

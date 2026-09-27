@@ -415,6 +415,12 @@ export function rankNamedPlaces(
   }).slice(0, PLACES_SEARCH_LIMIT).map(({ row }) => row);
 }
 
+/** The business names a search asks for ("A; B"), if any: such a search ignores the category filter. */
+function requestedNames(params: PlacesQueryParams): string[] {
+  return (params.lugar_nombre || params.texto_libre || "")
+    .split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
+}
+
 export async function fetchSearchPlaces(
   supabaseUrl: string, anonKey: string, params: PlacesQueryParams,
 ): Promise<Record<string, unknown>[]> {
@@ -424,8 +430,7 @@ export async function fetchSearchPlaces(
     if (!res.ok) throw new Error(`places search failed: ${res.status}`);
     return await res.json();
   };
-  const names = (params.lugar_nombre || params.texto_libre || "")
-    .split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
+  const names = requestedNames(params);
   if (!names.length) {
     if (params.region && params.regionPrefer) {
       const rows = await read(buildPlacesSearchUrl(supabaseUrl, { ...params, limit: REGION_FETCH_LIMIT }));
@@ -502,6 +507,21 @@ export async function fetchRegionSummary(
   return rows.length ? widenedLabel(target.region, rows) : null;
 }
 
+/**
+ * Telemetry only: how many approved places the same search (city or region, barrio, level) finds with no category.
+ * A category that found nothing where this is above 0 is a category hiding places. Nothing returned or shown to the
+ * redactor depends on it. Throws on a failed request: the caller treats it as best-effort.
+ */
+async function countWithoutCategory(
+  supabaseUrl: string, anonKey: string, params: PlacesQueryParams,
+): Promise<number | null> {
+  const url = new URL(buildPlacesSearchUrl(supabaseUrl, { ...params, category: null, limit: 1 }));
+  url.searchParams.set("select", "id");
+  const res = await fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Prefer: "count=exact" } });
+  if (!res.ok) throw new Error(`count without category failed: ${res.status}`);
+  return parseContentRange(res.headers.get("content-range"));
+}
+
 export interface ChatSearchResult {
   rows: Record<string, unknown>[];
   datosCercanos: { city: string; count: number } | null;
@@ -524,7 +544,7 @@ export async function searchPlacesForChat(
 ): Promise<ChatSearchResult> {
   const plan = planRegionSearch({ ciudad: router.ciudad, zona: router.zona, pais: router.pais, message });
   const queryLog: Record<string, unknown> = {
-    ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category,
+    ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category, nivel: router.nivel,
     texto_libre: router.texto_libre, lugar_nombre: router.lugar_nombre, region_plan: plan.kind,
   };
   if (plan.kind !== "city") queryLog.region = plan.target.region;
@@ -536,6 +556,16 @@ export async function searchPlacesForChat(
     }
     : router;
   const rows = await fetchSearchPlaces(supabaseUrl, anonKey, params);
+
+  if (params.category && rows.length === 0 && requestedNames(params).length === 0) {
+    queryLog.category_zero = true;
+    queryLog.count_without_category = null; // stays null if the count fails
+    try {
+      queryLog.count_without_category = await countWithoutCategory(supabaseUrl, anonKey, params);
+    } catch {
+      // Best-effort — telemetry must not fail the turn.
+    }
+  }
 
   let datosCercanos: { city: string; count: number } | null = null;
   let nearbyCount: number | null = null;
