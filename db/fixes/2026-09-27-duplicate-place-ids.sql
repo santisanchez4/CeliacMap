@@ -20,7 +20,10 @@
 -- What hangs from the discarded row moves to the kept one: votes (INSERT ... ON CONFLICT DO NOTHING, then DELETE, so the vote_count trigger, which only fires on
 -- INSERT and DELETE, stays right), reports and published opinions, evidence, outreach messages and promoted suggestions. Today none of the 21 discarded rows has any
 -- (the 15 votes of the 24 pairs, all of JANA, are already on the kept row), so the moves are safety nets; the assertions demand that nothing stays attached.
--- The kept row only gets its NULL panel fields (phone, website, social_url) filled from the discarded one: one case today (Minimarket La Isla, its Instagram).
+-- The kept row only gets its NULL panel fields (phone, website, social_url) filled from the discarded one, and social_url only from a PROFILE link
+-- (never a single post/reel/tv URL, which names one publication and not the business): two cases today, Harvest Punta del Este and Niter, both an
+-- Instagram/Facebook profile. Il Porto, Minimarket La Isla and Sin Gluten Olivos also had a social_url to offer, but it was a single post or reel, so it
+-- is excluded and stays in the discarded row's own notes.
 -- The discarded row becomes status 'discarded' with the header "CORRECCIÓN MANUAL: duplicado de <id>" on top of its previous notes, and leaves the 100% queue
 -- (its flag is removed, like review_queue --discard does, after handing it to the kept row where that one lacked it). The header is a DATA correction (agents/manual_overrides.py, "duplicado de"): it protects nothing.
 -- No row of `places` is deleted. Special case to review: CeliHaus, whose kept row is celiac_friendly ("Tiene opciones sin TACC") while the discarded one was
@@ -93,13 +96,16 @@ update public.outreach_messages o set place_id = pr.keep_id from _pairs pr where
 update public.suggestions s set promoted_place_id = pr.keep_id from _pairs pr where s.promoted_place_id = pr.drop_id;
 
 -- 4. The kept row only fills its NULL panel fields from the discarded one.
+-- social_url is only filled from a PROFILE link: a single post/reel/tv URL (Instagram /p/, /reel/, /reels/; any /tv/) names one
+-- publication, not the business, so it is never copied — the discarded row's own link is not lost, it stays in its notes below.
 update public.places k
    set phone = coalesce(k.phone, d.phone),
        website = coalesce(k.website, d.website),
-       social_url = coalesce(k.social_url, d.social_url)
+       social_url = case when k.social_url is null and d.social_url !~ '/(p|reel|reels|tv)/' then d.social_url else k.social_url end
   from _pairs pr join public.places d on d.id = pr.drop_id
  where k.id = pr.keep_id
-   and ((k.phone is null and d.phone is not null) or (k.website is null and d.website is not null) or (k.social_url is null and d.social_url is not null));
+   and ((k.phone is null and d.phone is not null) or (k.website is null and d.website is not null)
+        or (k.social_url is null and d.social_url is not null and d.social_url !~ '/(p|reel|reels|tv)/'));
 
 -- 4b. A business that was in the admin's 100% queue through the row that is discarded stays in it through the kept row (only CeliHaus today: its kept
 -- row is celiac_friendly and had no flag). The flag is the only thing that moves; the kept row's other flags are asserted unchanged below.
@@ -154,6 +160,11 @@ begin
    where coalesce(p.flags, '[]'::jsonb) - '100% pendiente de confirmación del administrador' = s.flags_wo_q
      and (coalesce(p.flags, '[]'::jsonb) @> jsonb_build_array('100% pendiente de confirmación del administrador')) = (s.q or sd.q);
   if bad <> 21 then raise exception 'a kept row lost or gained a flag it should not have: % of 21 are as intended', bad; end if;
+
+  -- exactly 3 kept rows change anything at all: Harvest and Niter (social_url, a profile link) and CeliHaus (the queue flag).
+  -- Il Porto, Minimarket La Isla and Sin Gluten Olivos are NOT among them: their discarded row's social_url is a single post/reel, excluded above.
+  select count(*) into bad from public.places p join _snap s using (id) join _pairs pr on p.id = pr.keep_id where md5(to_jsonb(p)::text) <> s.h;
+  if bad <> 3 then raise exception 'expected exactly 3 kept rows changed (Harvest, Niter, CeliHaus), found %', bad; end if;
 
   -- one live row per place_id in each pair
   select count(*) into bad from (

@@ -93,8 +93,9 @@ def test_the_header_is_a_data_correction_and_protects_nothing_but_an_approval_un
 def test_the_kept_row_only_fills_its_null_panel_fields():
     block = [b for b in update_blocks("places") if "coalesce(k.phone" in b][0]
     assert set_columns(block) == ["phone", "website", "social_url"]
-    for column in ("phone", "website", "social_url"):
+    for column in ("phone", "website"):
         assert f"coalesce(k.{column}, d.{column})" in block
+    # social_url is not a plain coalesce: see test_the_social_url_fill_excludes_a_single_post_reel_or_tv_link
 
 
 def test_what_hangs_from_a_discarded_row_moves_to_the_kept_one():
@@ -142,3 +143,29 @@ def test_only_the_queue_flag_moves_the_other_flags_of_a_kept_row_are_asserted_un
     assert "(coalesce(p.flags, '[]'::jsonb) @> jsonb_build_array('" + QUEUE_FLAG + "')) as q" in body  # and whether it was in the queue
     assert "= s.flags_wo_q" in body and "(s.q or sd.q)" in body
     assert re.search(r"if bad <> 21 then raise exception 'a kept row lost or gained a flag", body)
+
+
+# --- social_url is filled only from a profile link, never a single post/reel/tv (2026-09-27) ------------------------
+# The rehearsal showed 5 rows would gain a social_url; 3 of them were a single post/reel, not the business profile.
+
+def test_the_social_url_fill_excludes_a_single_post_reel_or_tv_link():
+    block = [b for b in update_blocks("places") if "coalesce(k.phone" in b][0]
+    assert "coalesce(k.social_url, d.social_url)" not in block  # a bare coalesce would also copy a post/reel link
+    assert re.search(r"d\.social_url\s+!~\s+'/\(p\|reel\|reels\|tv\)/'", block), "the exclusion is a regex on d.social_url"
+
+
+def test_exactly_three_kept_rows_change_harvest_niter_and_celihaus():
+    body = code()
+    assert "if bad <> 3 then raise exception 'expected exactly 3 kept rows changed" in body
+
+
+def test_il_porto_la_isla_and_olivos_do_not_change_their_kept_row_their_post_or_reel_link_is_not_copied():
+    body = code()
+    names = {"feac01c7-a1b6-4453-baba-e9a249201282": "Il Porto",
+             "22b104b1-f950-48fb-8deb-577985b51593": "La Isla",
+             "a14e5e65-4071-4f9f-a241-92fe5e1bf25b": "Sin Gluten Olivos"}
+    for keep_id, label in names.items():
+        assert keep_id in body, f"{label}'s keep_id is still one of the 21 pairs"
+    # the excluded discarded rows' social_url is a single post/reel, confirmed against the pairs' comments
+    for reel in ("/reel/DE_FHN2pCZp", "/reel/DY5kjfKsQO4", "/p/DX7-er7joqc"):
+        assert reel not in body  # the script never names or copies these; it only excludes the pattern
