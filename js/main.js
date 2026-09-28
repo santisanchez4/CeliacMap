@@ -252,6 +252,13 @@
     "cta.text": "Explore the map and join the community that makes eating gluten-free simple.",
     "cta.primary": "Explore the map",
 
+    "nav.partners": "Partners",
+    "partners.eyebrow": "Partners",
+    "partners.title": "Who supports CeliacMap",
+    "partners.label": "Partner",
+    "partners.disclaimer": "Partners support the project. They have no influence on which places appear on the map or on their label.",
+    "partners.bienestar.text": "Handmade gluten-free, vegan, lactose-free and sugar-free products, in Fray Bentos (Uruguay).",
+
     "footer.tagline": "Safe gluten-free places, mapped by the community.",
     "footer.contact": "Let's stay in touch",
     "footer.credit": "Made by Santiago Sanchez"

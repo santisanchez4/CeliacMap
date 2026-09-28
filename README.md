@@ -51,6 +51,12 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   underlying table stays closed. Moderate with `python -m scripts.moderate_opinions`
   (list pending) and `--approve ID --apply` / `--hide ID --apply`
   ([`ADR-008`](docs/architecture/ADR-008-published-community-opinions.md)).
+- ✅ **Partners** — a separate "Aliados" section before the footer shows the project's first
+  partner, Bienestar Gluten Free (Fray Bentos), labeled "Aliado" / "Partner" with the fixed
+  sentence that partners have no influence on which places appear on the map or on their label.
+  Frontend only: sponsored links (`rel="sponsored"`), no third-party scripts, and nothing in the
+  map, the Validator, the ranking or the chatbot changes
+  ([`ADR-009`](docs/architecture/ADR-009-sponsorships-separate-from-safety.md)).
 - 🚧 **Audit 2026-09-24** ([plan](docs/plans/PLAN-auditoria-2026-09-24.md), built, not deployed yet) —
   the Validator now reads the evidence the agents and people gave (post text, blog sentence,
   form note) and a place is "Espacio 100% sin gluten" only with an explicit exclusivity phrase
@@ -232,8 +238,8 @@ serif display headings over a clean sans body, and generous spacing.
 
 ## Features
 
-- 12 sections: Hero, Problem, Solution, Features, Interactive Map, Community Ranking,
-  Suggest a Place, Reviews, AI & Agents, About, Call to Action, Footer.
+- 13 sections: Hero, Problem, Solution, Features, Interactive Map, Community Ranking,
+  Suggest a Place, Reviews, AI & Agents, About, Call to Action, Partners, Footer.
 - Bilingual interface: Spanish (default, "sin TACC") with a client-side ES/EN
   toggle (remembered via `localStorage`).
 - Floating assistant chat (bottom-right; a bottom sheet on mobile) for finding places,

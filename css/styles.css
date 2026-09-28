@@ -1373,6 +1373,56 @@ h1, h2, h3 {
 .cta .btn-accent { background: var(--color-bg); color: var(--green-deepest); }
 .cta .btn-accent:hover { background: var(--green-pale); color: var(--green-deepest); }
 
+/* ------------------------------ Aliados ---------------------------- */
+#aliados .section-head { margin-bottom: clamp(28px, 4vw, 44px); }
+.partner-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.partner-logo {
+  flex: none;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+.partner-body { min-width: 0; }
+.partner-label {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.partner-disclaimer { margin-top: 8px; font-size: 0.8125rem; line-height: 1.5; color: var(--color-text-muted); }
+.partner-name { margin-top: 16px; font-size: 1.3125rem; font-weight: 600; line-height: 1.3; }
+.partner-text { margin-top: 6px; color: var(--color-text-muted); line-height: 1.6; }
+.partner-links { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 10px; }
+.partner-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.partner-links a:hover { text-decoration: underline; }
+@media (min-width: 600px) {
+  .partner-card { flex-direction: row; gap: 28px; padding: 32px; }
+}
+
 /* ------------------------------- Footer ---------------------------- */
 .site-footer { background: var(--green-deepest); color: #b9c4ba; padding: 72px 0 32px; }
 .footer-inner {

@@ -232,8 +232,9 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 │               plus admin tools (review_queue, find_evidence, moderate_opinions, cap_unsupported_100, revalidate_low_confidence,
 │               admin_digest), purge_chat_logs, sync_chat_prompts, check_setup, gen_favicons, gen_cursors
 ├── db/         schema.sql · seed.sql (ranking votes only) · migrations/ · fixes/ (one-off production SQL) · checks/
-├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…008, C4-diagrams.md) · plans/ · superpowers/ · runbooks/
-├── tests/      offline Python tests + frontend_*.test.js; guards: test_rubric_docs_sync, test_chat_prompts_sync, test_claude_md_size
+├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…009, C4-diagrams.md) · plans/ · superpowers/ · runbooks/
+├── tests/      offline Python tests + frontend_*.test.js; guards: test_rubric_docs_sync, test_chat_prompts_sync, test_claude_md_size,
+│               frontend_partners
 ├── .github/workflows/  monthly pipeline, mid-month Validator, weekly suggestions, admin digest, Pages deploy, dispatch handlers
 └── requirements.txt · .env.example · README.md · CLAUDE.md · prompts.md · .gitignore
 ```
@@ -279,7 +280,7 @@ Avoid a cluttered or confusing design. The page must feel like a real product pr
 ## Suggested Sections
 
 Landing order: Hero · Problem · Solution · Features · Interactive Map (+ community ranking) · Suggest a Place · Reviews /
-community voice · AI & Agents · About · Call to Action · Footer. (Roadmap removed 2026-09-01.) Original list:
+community voice · AI & Agents · About · Call to Action · Partners (`#aliados`, ADR-009) · Footer. (Roadmap removed 2026-09-01.) Original list:
 [Suggested Sections (texto anterior)](docs/DECISIONS.md#suggested-sections-texto-anterior).
 
 ## Documentation Rules
@@ -401,12 +402,16 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Two public safety labels only** ("Espacio 100% sin gluten" / "Tiene opciones sin TACC"); `safetyGroup()` in
   `js/map.js` is the single rule and an unknown level falls to "options", never to 100%. The CARTO/OSM attribution on the
   map is a free-tier condition and is never removed.
+- **Partners are frontend only** [Sponsorships]: the `#aliados` card with the fixed "Aliado" + independence sentence (ES/EN),
+  `rel="sponsored noopener"`, no third-party scripts; a partner never changes `places`, the Validator, the ranking, the chatbot or
+  the map, and is never added to the map for being one. `tests/frontend_partners.test.js` guards it.
 
 ## Decisions Log (índice)
 
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **Sponsorships, visible and separate from safety (2026-09-28)** — first partner (Bienestar Gluten Free): a labeled `#aliados` card, frontend only, `rel="sponsored"`, logo as the second binary-image exception (ADR-009); Bienestar's 2026-09-01 manual approval, label and confidence are unchanged; the chat prompt's pre-existing Bienestar example is noted as debt. [→](docs/DECISIONS.md#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)
 - **One Google place, one row (2026-09-27)** — Search never looked the `place_id` up: 24 place_ids had two rows (13 both approved); `insert_place_candidate` now dedups across sources (the dry run mirrors it too); the 21-pair cleanup keeps CeliHaus in the 100% queue and fills `social_url` only from a profile link; two new branches (Rikuras El Pinar, Piu Prado) and Piu Cordón reactivated. [→](docs/DECISIONS.md#one-google-place-one-row--dedup-across-sources-2026-09-27)
 - **Evidence finder for the admin-pending 100% queue (2026-09-27)** — read-only tool that proposes 100 / options / insuficiente with literal, page-verified quotes for the 271 flagged places; the admin accepts with `review_queue`; three pilot rounds, one wrong 100 caught and fixed; the full run waits for 2026-10-01. [→](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27)
 - **`category_zero` telemetry (2026-09-27)** — the chat log now says when a category emptied a search that has places (1 in 29, all development traffic); the answer is unchanged, and the router rule and prompt options wait for real traffic. [→](docs/DECISIONS.md#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)
@@ -482,5 +487,5 @@ Detail of every phase, with its verification notes: [Build status (phases)](docs
 - **Open:** chatbot soft-launch with organic traffic (Fase F: ADR-006 closure, C4, README); F4 Option 1 prompt
   reformulation (non-blocking); live confirmation of a real outreach reply and opt-out.
 
-**ADRs:** `docs/architecture/ADR-001…008` (the file names give the topic) and `C4-diagrams.md` (Mermaid `flowchart`, not C4
+**ADRs:** `docs/architecture/ADR-001…009` (the file names give the topic) and `C4-diagrams.md` (Mermaid `flowchart`, not C4
 syntax, which overlaps text on GitHub). Pointer bullets for the first six are at the end of the "GitHub Pages deploy" entry.

@@ -82,6 +82,9 @@ Key decisions made during development (keep this updated as the project evolves)
   composites transparency to black. Favicon `<link>`s use **relative** paths like
   every other asset (the site deploys under the `/CeliacMap/` project subpath — an
   earlier absolute `/assets/...` href was broken there).
+  **Second exception (2026-09-28):** the partner logo in `assets/images/` (under 40 KB,
+  guarded by `tests/frontend_partners.test.js`); see **Sponsorships — visible and
+  separate from the safety evaluation**.
 
 ### Editorial redesign (visual + content)
 
@@ -2521,6 +2524,49 @@ candidate whose `place_id` already belongs to a row logs `[dry-run] would SKIP .
 production would not do (5 tests in `tests/test_run_agents_dryrun.py`). Known limit: a dry run writes nothing, so its client returns `None` for both outcomes and
 Search's `skipped` counter (which now counts a candidate the client did not insert) also includes what a dry run "would insert"; the log lines, not the counter,
 tell the two apart.
+
+### Sponsorships — visible and separate from the safety evaluation (2026-09-28)
+
+**Context.** CeliacMap has its first partner ("aliado"): **Bienestar Gluten Free** (Fray Bentos, UY; handmade gluten-free,
+vegan, lactose-free and sugar-free products). The business approved the use of its logo. In a health tool, the risk is that
+payment leaks into what the map says is safe. Full rationale: `docs/architecture/ADR-009-sponsorships-separate-from-safety.md`.
+
+**Decision.**
+- **Frontend only.** A separate `<section id="aliados">`, the last section of `<main>` (after the CTA, before the footer):
+  one card with the logo, one line taken from the business's bio, and Instagram / WhatsApp links with
+  `rel="sponsored noopener"` and `target="_blank"`. The footer gets an "Aliados" link. The header nav does not: it already
+  has five links, all of them about the product. No third-party scripts, pixels or tracking.
+- **Fixed labeling.** The card reads "Aliado" / "Partner", and right under it the fixed sentence "Los aliados apoyan el
+  proyecto. No influyen en qué lugares aparecen en el mapa ni en su etiqueta." / "Partners support the project. They have
+  no influence on which places appear on the map or on their label." The Spanish lives in the `index.html` markup, as every
+  other string does (`main.js` takes the ES snapshot from the `data-i18n` nodes), and the English lives in `js/main.js`.
+- **Untouched:** `places` (`status`, `safety_level`, `validation_confidence`, `verified`), the Validator / `RUBRIC`, the
+  ranking, the chatbot (prompts and search), and the map's marker and place card. There is no `sponsored` column, no boost
+  and no pin. Future partners get the same card and the same sentence. A partner is never added to the map for being a
+  partner, and ending a partnership only removes the card.
+- **Logo:** `assets/images/bienestar-gluten-free.webp`, optimized to under 40 KB. It is the **second exception** to "no binary
+  image assets", after the favicon PNGs (see the Base landing decisions).
+
+**Bienestar was already on the map before the partnership.** It was approved manually on 2026-09-01 (`APROBACIÓN MANUAL`,
+the first precedent under **Manual Validator overrides**: Validator `needs_review` @ 0.52, admin's direct knowledge). The
+partnership comes later and changes neither its label (`options_available`, shown as "Tiene opciones sin TACC") nor its
+confidence (`validation_confidence` stays `0.52`, `verified` stays `false`, `vote_count` is untouched). For transparency, a
+partnership line is appended to its `validation_notes`. The admin approves it and applies it separately. The line avoids the
+override markers of `agents/manual_overrides.py` on purpose. The row stays protected by its existing `APROBACIÓN MANUAL`
+header, not by the new line.
+
+**Pre-existing finding, not changed here.** `supabase/functions/chat/prompts.ts` (lines 467–474) uses "Bienestar Gluten Free,
+Rivera 1967, Fray Bentos … 100% sin gluten" as the few-shot example of the reportar → suggestion flow. It was written before
+the partnership. It retrieves nothing, but it puts the partner's name, with a 100% claim that its real label does not have,
+inside the chatbot prompt. Changing a chatbot prompt needs the jailbreak battery and restarts the soft-launch count, so it is
+left alone and noted as debt: **the next deliberate edit of `prompts.ts` replaces the example with a name that is not a
+partner** (and re-syncs `prompts.md` §27 / ADR-006).
+
+**Guard.** `tests/frontend_partners.test.js` (deno + linkedom) checks that `#aliados` is the last section of `<main>` and the
+footer links to it; that the label and the sentence are right in ES and in EN (it runs `js/main.js` and toggles the
+language); that both links carry `rel="sponsored noopener"`; that the logo is local, lazy, sized, described and under 40 KB,
+with no script or iframe in the section; and that `js/map.js`, `js/chat.js` and the chat function's `index.ts` /
+`regions.ts` never mention the partner. `prompts.ts` is excluded for the reason above, and the test says so.
 
 ### Build status (phases)
 

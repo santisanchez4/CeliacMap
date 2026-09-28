@@ -2371,3 +2371,18 @@ one-line reason (`motivo`, at most 240 characters, scrubbed of health data, show
   `habla_de_este_negocio` defaults to true; a one-line `motivo`; no health data of any person in the answer.
 - **Measured:** three live runs of the same 10-place pilot and two replays of the third on frozen sources (`docs/DECISIONS.md`, "Evidence
   finder for the admin-pending 100% queue"; aggregate numbers in `db/checks/2026-09-27-evidence-finder-pilot.md`); no A/B on a larger set yet.
+
+## 35. Partners section — first sponsor, kept apart from the safety evaluation (2026-09-28)
+
+**Prompt (summary, development):** "Add a sponsorship section for our first partner, Bienestar Gluten Free (Fray Bentos),
+with its Instagram and WhatsApp. It is a health tool: the sponsorship does not touch `places`, `safety_level`, `status`,
+the Validator/RUBRIC, the ranking, the chatbot or the map's marker/card; frontend only, in a separate section. Clear
+labeling: "Aliado" / "Partner" and under it the fixed sentence "Los aliados apoyan el proyecto. No influyen en qué lugares
+aparecen en el mapa ni en su etiqueta." (ES + EN). Logo optimized under 40 KB (second exception to "no binary images"),
+`rel="sponsored noopener"`, no third-party scripts, a test, ADR-009, a Decisions Log entry noting that Bienestar was
+already on the map by a manual approval of 2026-09-01, and the `validation_notes` text for the admin to approve."
+
+**Result:** `<section id="aliados">` + footer link, `tests/frontend_partners.test.js`,
+`docs/architecture/ADR-009-sponsorships-separate-from-safety.md`, and the Decisions Log entry "Sponsorships — visible and
+separate from the safety evaluation". No LLM prompt changed. The chatbot prompt's pre-existing Bienestar few-shot example
+(§27) is noted there as debt for the next deliberate prompt edit.
