@@ -57,6 +57,11 @@ conocimiento personal directo; el Validator había dicho `needs_review` @ 0.52).
   iframes;
 - ni `js/map.js`, ni `js/chat.js`, ni el código de la función `chat` (`index.ts`, `regions.ts`) mencionan al aliado.
 
+**En producción (2026-09-28):** la sección está publicada en celiacmap.org (commit `8aa1f9c`, deploy de Pages en verde),
+verificada en Chrome a 390 px y en desktop, en ES y EN, con 0 errores de consola y los dos enlaces abiertos. La nota de alianza
+se aplicó después al `validation_notes` de Bienestar. `status`, `safety_level`, `validation_confidence`, `verified` y
+`vote_count` no cambiaron (verificación de solo lectura).
+
 **Hallazgo previo — el prompt del chatbot.** `supabase/functions/chat/prompts.ts` usa "Bienestar Gluten Free, Rivera
 1967, Fray Bentos … 100% sin gluten" como ejemplo few-shot del flujo reportar/sugerir. El ejemplo se escribió antes de
 la alianza. No se cambia acá, porque cambiar un prompt del chatbot exige la batería de jailbreak y reinicia el conteo

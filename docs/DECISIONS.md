@@ -2551,7 +2551,10 @@ payment leaks into what the map says is safe. Full rationale: `docs/architecture
 the first precedent under **Manual Validator overrides**: Validator `needs_review` @ 0.52, admin's direct knowledge). The
 partnership comes later and changes neither its label (`options_available`, shown as "Tiene opciones sin TACC") nor its
 confidence (`validation_confidence` stays `0.52`, `verified` stays `false`, `vote_count` is untouched). For transparency, a
-partnership line is appended to its `validation_notes`. The admin approves it and applies it separately. The line avoids the
+partnership line (`NOTA DE ALIANZA (2026-09-28): …`) is appended to its `validation_notes`, approved by the admin and applied
+on 2026-09-28 once the section was live (commit `8aa1f9c`, Pages deploy green). A read-only check afterwards showed `status`
+`approved`, `safety_level` `options_available`, `validation_confidence` `0.52`, `verified` `false` and `vote_count` `1`, all unchanged,
+with the `APROBACIÓN MANUAL` header still first. The line avoids the
 override markers of `agents/manual_overrides.py` on purpose. The row stays protected by its existing `APROBACIÓN MANUAL`
 header, not by the new line.
 
