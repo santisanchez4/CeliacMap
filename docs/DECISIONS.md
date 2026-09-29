@@ -2596,6 +2596,14 @@ with no script or iframe in the section; and that `js/map.js`, `js/chat.js` and 
   invitation sits outside the card, with its texts and mailto subject right in ES and EN and back). The sponsored-rel case is
   now scoped to the card's links.
 
+**Second follow-up (2026-09-28): the independence sentence once, as the section lead.** With the invitation's small note
+the page said the same thing twice. The fixed sentence ("Los aliados apoyan el proyecto. No influyen en qué lugares
+aparecen en el mapa ni en su etiqueta." / EN) moves out of the card to the section's lead, under the title, outside every
+card, so it covers every present and future partner once; the card keeps only its "Aliado" / "Partner" label. The
+invitation's note ("Ser aliado no cambia cómo se evalúa tu local en el mapa.") is removed. The title gets its accent:
+"Quiénes apoyan CeliacMap". The test now checks that the sentence sits in the section head, outside any card or the
+invitation, and appears exactly once in the section's text, in ES and in EN.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

@@ -29,22 +29,32 @@ Deno.test("the #aliados section sits inside main, after every other section, bef
   assert.ok(document.querySelector('.footer-nav a[href="#aliados"]'), "footer links to #aliados");
 });
 
-Deno.test("label and independence sentence are shown in Spanish and in English", async () => {
+const count = (hay, needle) => hay.split(needle).length - 1;
+
+Deno.test("the independence sentence is the section lead, exactly once, outside any card, in ES and EN", async () => {
   const { window, document } = await page();
-  const label = document.querySelector("#aliados .partner-label");
-  const disclaimer = document.querySelector("#aliados .partner-disclaimer");
-  assert.equal(text(label), LABEL_ES);
-  assert.equal(text(disclaimer), DISCLAIMER_ES);
+  const section = document.getElementById("aliados");
+  const label = section.querySelector(".partner-card .partner-label");
+  const disclaimer = section.querySelector(".partner-disclaimer");
+  assert.ok(disclaimer.closest(".section-head"), "the sentence sits in the section head");
+  assert.equal(disclaimer.closest(".partner-card, .partner-invite"), null);
+  assert.equal(text(document.getElementById("aliados-title")), "Quiénes apoyan CeliacMap");
+
+  const check = (labelText, sentence) => {
+    assert.equal(text(label), labelText);
+    assert.equal(text(disclaimer), sentence);
+    assert.equal(count(text(section), sentence), 1, "the sentence appears once in the section");
+  };
+  check(LABEL_ES, DISCLAIMER_ES);
 
   document.getElementById("lang-toggle").dispatchEvent(new window.Event("click"));
   assert.equal(document.documentElement.getAttribute("lang"), "en");
-  assert.equal(text(label), LABEL_EN);
-  assert.equal(text(disclaimer), DISCLAIMER_EN);
+  check(LABEL_EN, DISCLAIMER_EN);
+  assert.equal(text(document.getElementById("aliados-title")), "Who supports CeliacMap");
   assert.equal(text(document.querySelector('.footer-nav a[href="#aliados"]')), "Partners");
 
   document.getElementById("lang-toggle").dispatchEvent(new window.Event("click"));
-  assert.equal(text(label), LABEL_ES);
-  assert.equal(text(disclaimer), DISCLAIMER_ES);
+  check(LABEL_ES, DISCLAIMER_ES);
 });
 
 Deno.test("every partner link is rel=sponsored noopener in a new tab", async () => {
@@ -88,25 +98,22 @@ Deno.test("the header nav ends with Aliados / Partners pointing at #aliados", as
 
 const INVITE_ES = "¿Tenés un negocio sin gluten o sin TACC y querés sumarte como aliado? Escribinos a hola@celiacmap.org.";
 const INVITE_EN = "Run a gluten-free business and want to become a partner? Write to hola@celiacmap.org.";
-const NOTE_ES = "Ser aliado no cambia cómo se evalúa tu local en el mapa.";
-const NOTE_EN = "Being a partner doesn't change how your venue is evaluated on the map.";
 const subject = (a) => new URL(a.getAttribute("href")).searchParams.get("subject");
 
-Deno.test("the invitation sits outside the partner card, with its mailto subject and texts in ES and EN", async () => {
+Deno.test("the invitation sits outside the partner card, with its mailto subject and text in ES and EN", async () => {
   const { window, document } = await page();
   const invite = document.querySelector("#aliados .partner-invite");
   assert.ok(invite && !invite.closest(".partner-card"), "invitation is not inside a partner card");
   const mail = invite.querySelector('a[href^="mailto:"]');
   assert.equal(new URL(mail.getAttribute("href")).pathname, "hola@celiacmap.org");
   assert.equal(mail.getAttribute("rel"), null, "the invitation is not a sponsored link");
+  assert.equal(invite.querySelectorAll("p").length, 1, "the invitation has no extra note");
 
   assert.equal(text(invite.querySelector(".partner-invite-text")), INVITE_ES);
-  assert.equal(text(invite.querySelector(".partner-invite-note")), NOTE_ES);
   assert.equal(subject(mail), "Quiero ser aliado de CeliacMap");
 
   document.getElementById("lang-toggle").dispatchEvent(new window.Event("click"));
   assert.equal(text(invite.querySelector(".partner-invite-text")), INVITE_EN);
-  assert.equal(text(invite.querySelector(".partner-invite-note")), NOTE_EN);
   assert.equal(subject(mail), "Partnership with CeliacMap");
 
   document.getElementById("lang-toggle").dispatchEvent(new window.Event("click"));

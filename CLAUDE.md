@@ -402,7 +402,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Two public safety labels only** ("Espacio 100% sin gluten" / "Tiene opciones sin TACC"); `safetyGroup()` in
   `js/map.js` is the single rule and an unknown level falls to "options", never to 100%. The CARTO/OSM attribution on the
   map is a free-tier condition and is never removed.
-- **Partners are frontend only** [Sponsorships]: the `#aliados` card with the fixed "Aliado" + independence sentence (ES/EN),
+- **Partners are frontend only** [Sponsorships]: a card labeled "Aliado" under the section's one fixed independence sentence (ES/EN),
   `rel="sponsored noopener"`, no third-party scripts; a partner never changes `places`, the Validator, the ranking, the chatbot or
   the map, and is never added to the map for being one. `tests/frontend_partners.test.js` guards it.
 

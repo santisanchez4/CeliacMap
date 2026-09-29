@@ -260,7 +260,6 @@
     "partners.bienestar.text": "Handmade gluten-free, vegan, lactose-free and sugar-free products, in Fray Bentos (Uruguay).",
     "partners.invite.text": "Run a gluten-free business and want to become a partner? Write to",
     "partners.invite.href": "mailto:hola@celiacmap.org?subject=Partnership%20with%20CeliacMap",
-    "partners.invite.note": "Being a partner doesn't change how your venue is evaluated on the map.",
 
     "footer.tagline": "Safe gluten-free places, mapped by the community.",
     "footer.contact": "Let's stay in touch",

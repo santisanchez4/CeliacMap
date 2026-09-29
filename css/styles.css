@@ -1407,8 +1407,7 @@ h1, h2, h3 {
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
-.partner-disclaimer { margin-top: 8px; font-size: 0.8125rem; line-height: 1.5; color: var(--color-text-muted); }
-.partner-name { margin-top: 16px; font-size: 1.3125rem; font-weight: 600; line-height: 1.3; }
+.partner-name { margin-top: 12px; font-size: 1.3125rem; font-weight: 600; line-height: 1.3; }
 .partner-text { margin-top: 6px; color: var(--color-text-muted); line-height: 1.6; }
 .partner-links { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 10px; }
 .partner-links a {
@@ -1439,7 +1438,6 @@ h1, h2, h3 {
   text-underline-offset: 3px;
   overflow-wrap: anywhere;
 }
-.partner-invite-note { margin-top: 8px; font-size: 0.8125rem; color: var(--color-text-muted); }
 
 /* ------------------------------- Footer ---------------------------- */
 .site-footer { background: var(--green-deepest); color: #b9c4ba; padding: 72px 0 32px; }
