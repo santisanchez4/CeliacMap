@@ -109,6 +109,8 @@ See [`CLAUDE.md`](CLAUDE.md) → **Architecture** for the summary and [`docs/DEC
 - [Leaflet.js](https://leafletjs.com/) — interactive map
 - Google Fonts — [Playfair Display](https://fonts.google.com/specimen/Playfair+Display)
   + [DM Sans](https://fonts.google.com/specimen/DM+Sans)
+- [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) — cookie-free page-view counts
+  (one deferred beacon; no custom events, never the text of the chat or the forms)
 
 **Backend / Database**
 - [Supabase](https://supabase.com/) — PostgreSQL + REST API + Row Level Security

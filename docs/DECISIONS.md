@@ -2604,6 +2604,33 @@ invitation's note ("Ser aliado no cambia cómo se evalúa tu local en el mapa.")
 "Quiénes apoyan CeliacMap". The test now checks that the sentence sits in the section head, outside any card or the
 invitation, and appears exactly once in the section's text, in ES and in EN.
 
+### Cloudflare Web Analytics — the first third-party measurement script (2026-09-28)
+
+**Decision.** `index.html` loads the official Cloudflare Web Analytics beacon, once, at the end of `<body>`, with `defer`
+(`https://static.cloudflareinsights.com/beacon.min.js`, `data-cf-beacon` with the site token), plus a `preconnect` to
+`static.cloudflareinsights.com`. The site has no CSP, so nothing else needed opening. The snippet the Cloudflare dashboard
+handed out used `type="module"`; it was written with `defer`, as in Cloudflare's documented snippet (both run after
+parsing).
+
+**Why this one.** It sets no cookies and uses no local storage for tracking, so it needs no cookie banner; it is free; and it
+does not build a profile of the visitor or collect personal data. The domain is DNS-only in Cloudflare (no proxy), so there
+is no automatic injection and no double count; the manual snippet is the only source.
+
+**What it measures and what it does not.** Only what the beacon measures on its own for a page view: the page URL, the
+referrer, browser / device / country aggregates and load-performance timings. **No custom events**: nothing in `js/` calls
+the beacon, so it never sees what someone types in the chat, the suggestion form or the report form (those texts go to
+Supabase and the `chat` function, never into the URL). The anchor navigation (`#map`, `#aliados`, …) is not reported as
+extra page views.
+
+**An exception to "no third-party scripts".** It is the first third-party *measurement* script, and the second third-party
+script of the page after Leaflet (loaded from unpkg with SRI). Unlike Leaflet it carries no `integrity` hash: Cloudflare
+serves `beacon.min.js` unversioned and updates it in place, so a pinned hash would break it. The partners' rule
+(ADR-009) is unaffected: the `#aliados` section still has no script of its own, and no partner is measured apart.
+
+**Guard.** `tests/frontend_analytics.test.js`: the beacon appears exactly once, deferred, as the last script of `<body>`,
+with the site token; `static.cloudflareinsights.com` is preconnected; and no file in `js/` mentions the beacon (no custom
+events, no chat or form tracking).
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
