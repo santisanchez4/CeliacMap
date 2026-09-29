@@ -2534,8 +2534,8 @@ payment leaks into what the map says is safe. Full rationale: `docs/architecture
 **Decision.**
 - **Frontend only.** A separate `<section id="aliados">`, the last section of `<main>` (after the CTA, before the footer):
   one card with the logo, one line taken from the business's bio, and Instagram / WhatsApp links with
-  `rel="sponsored noopener"` and `target="_blank"`. The footer gets an "Aliados" link. The header nav does not: it already
-  has five links, all of them about the product. No third-party scripts, pixels or tracking.
+  `rel="sponsored noopener"` and `target="_blank"`. The footer gets an "Aliados" link. No third-party scripts, pixels or
+  tracking. (The header nav first left it out; see the 2026-09-28 follow-up below.)
 - **Fixed labeling.** The card reads "Aliado" / "Partner", and right under it the fixed sentence "Los aliados apoyan el
   proyecto. No influyen en qué lugares aparecen en el mapa ni en su etiqueta." / "Partners support the project. They have
   no influence on which places appear on the map or on their label." The Spanish lives in the `index.html` markup, as every
@@ -2565,11 +2565,36 @@ inside the chatbot prompt. Changing a chatbot prompt needs the jailbreak battery
 left alone and noted as debt: **the next deliberate edit of `prompts.ts` replaces the example with a name that is not a
 partner** (and re-syncs `prompts.md` §27 / ADR-006).
 
+The same next deliberate edit of the chatbot prompts also takes, as a separate measured change:
+- **Redactor glossary — Argentina's official term is now "sin gluten".** Joint Resolution 32/2023 moved the term to "sin
+  gluten" (under 10 mg/kg); the new symbol coexists with "Sin TACC" during the transition. Oats can be suitable when they are
+  certified gluten-free. **Verify every point against the official text before writing it into the prompt**: these are the
+  owner's notes, not yet checked against the resolution, and the redactor never gives gluten figures to users (Fase E), so the
+  10 mg/kg figure is context for the glossary, not a sentence for the answer.
+- **The map's labels do not change for now** ("Espacio 100% sin gluten" / "Tiene opciones sin TACC"). Review them after
+  December 2026.
+
 **Guard.** `tests/frontend_partners.test.js` (deno + linkedom) checks that `#aliados` is the last section of `<main>` and the
 footer links to it; that the label and the sentence are right in ES and in EN (it runs `js/main.js` and toggles the
 language); that both links carry `rel="sponsored noopener"`; that the logo is local, lazy, sized, described and under 40 KB,
 with no script or iframe in the section; and that `js/map.js`, `js/chat.js` and the chat function's `index.ts` /
 `regions.ts` never mention the partner. `prompts.ts` is excluded for the reason above, and the test says so.
+
+**Follow-up (2026-09-28, same day): header link + invitation.**
+- **"Aliados" / "Partners" in the header nav**, last, after "Acerca", also in the mobile menu. This was the owner's decision
+  and **reverses the first criterion of leaving it only in the footer**. It is picked up as active by the existing nav
+  observer like every other link. `white-space: nowrap` on nav links keeps six links on one line; measured in Chrome at
+  1000 px and at 900 px (the narrowest desktop nav), in ES and EN: one line each, no overflow, 35 px of free space on each
+  side at worst (900 px, ES).
+- **Invitation under the card**, outside it (a rule above, centered, no card of its own, so it never reads as another
+  partner): "¿Tenés un negocio sin gluten o sin TACC y querés sumarte como aliado? Escribinos a hola@celiacmap.org." and,
+  smaller, "Ser aliado no cambia cómo se evalúa tu local en el mapa." (EN in `js/main.js`). The address is a `mailto:` with a
+  prefilled subject, "Quiero ser aliado de CeliacMap" / "Partnership with CeliacMap"; the subject follows the language through
+  a new `data-i18n-href` attribute in `main.js` (same snapshot pattern as `data-i18n-placeholder`). It is not a sponsored
+  link, so it carries no `rel`. The `hola@celiacmap.org` alias was tested by the owner.
+- **Tests:** two more cases in `tests/frontend_partners.test.js` (the nav ends with Aliados → Partners on `#aliados`; the
+  invitation sits outside the card, with its texts and mailto subject right in ES and EN and back). The sponsored-rel case is
+  now scoped to the card's links.
 
 ### Build status (phases)
 

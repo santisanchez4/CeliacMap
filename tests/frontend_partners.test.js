@@ -49,7 +49,7 @@ Deno.test("label and independence sentence are shown in Spanish and in English",
 
 Deno.test("every partner link is rel=sponsored noopener in a new tab", async () => {
   const { document } = await page();
-  const links = [...document.querySelectorAll("#aliados a")];
+  const links = [...document.querySelectorAll("#aliados .partner-card a")];
   assert.deepEqual(links.map((a) => a.getAttribute("href")), [
     "https://www.instagram.com/bienestar.glutenfree/",
     "https://wa.me/c/59899506403",
@@ -72,6 +72,45 @@ Deno.test("the logo is local, lazy, sized, described and under 40 KB; no third-p
   const { size } = await Deno.stat(src);
   assert.ok(size < 40 * 1024, `${src} is ${size} bytes`);
   assert.equal(document.querySelectorAll("#aliados script, #aliados iframe").length, 0);
+});
+
+Deno.test("the header nav ends with Aliados / Partners pointing at #aliados", async () => {
+  const { window, document } = await page();
+  const items = [...document.querySelectorAll("#main-nav .nav-list > li > a")];
+  const last = items.at(-1);
+  assert.equal(items.length, 6);
+  assert.equal(items.at(-2).getAttribute("href"), "#about");
+  assert.equal(last.getAttribute("href"), "#aliados");
+  assert.equal(text(last), "Aliados");
+  document.getElementById("lang-toggle").dispatchEvent(new window.Event("click"));
+  assert.equal(text(last), "Partners");
+});
+
+const INVITE_ES = "¿Tenés un negocio sin gluten o sin TACC y querés sumarte como aliado? Escribinos a hola@celiacmap.org.";
+const INVITE_EN = "Run a gluten-free business and want to become a partner? Write to hola@celiacmap.org.";
+const NOTE_ES = "Ser aliado no cambia cómo se evalúa tu local en el mapa.";
+const NOTE_EN = "Being a partner doesn't change how your venue is evaluated on the map.";
+const subject = (a) => new URL(a.getAttribute("href")).searchParams.get("subject");
+
+Deno.test("the invitation sits outside the partner card, with its mailto subject and texts in ES and EN", async () => {
+  const { window, document } = await page();
+  const invite = document.querySelector("#aliados .partner-invite");
+  assert.ok(invite && !invite.closest(".partner-card"), "invitation is not inside a partner card");
+  const mail = invite.querySelector('a[href^="mailto:"]');
+  assert.equal(new URL(mail.getAttribute("href")).pathname, "hola@celiacmap.org");
+  assert.equal(mail.getAttribute("rel"), null, "the invitation is not a sponsored link");
+
+  assert.equal(text(invite.querySelector(".partner-invite-text")), INVITE_ES);
+  assert.equal(text(invite.querySelector(".partner-invite-note")), NOTE_ES);
+  assert.equal(subject(mail), "Quiero ser aliado de CeliacMap");
+
+  document.getElementById("lang-toggle").dispatchEvent(new window.Event("click"));
+  assert.equal(text(invite.querySelector(".partner-invite-text")), INVITE_EN);
+  assert.equal(text(invite.querySelector(".partner-invite-note")), NOTE_EN);
+  assert.equal(subject(mail), "Partnership with CeliacMap");
+
+  document.getElementById("lang-toggle").dispatchEvent(new window.Event("click"));
+  assert.equal(subject(mail), "Quiero ser aliado de CeliacMap");
 });
 
 // supabase/functions/chat/prompts.ts is left out on purpose: it has used Bienestar as a few-shot

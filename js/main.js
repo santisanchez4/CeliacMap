@@ -258,6 +258,9 @@
     "partners.label": "Partner",
     "partners.disclaimer": "Partners support the project. They have no influence on which places appear on the map or on their label.",
     "partners.bienestar.text": "Handmade gluten-free, vegan, lactose-free and sugar-free products, in Fray Bentos (Uruguay).",
+    "partners.invite.text": "Run a gluten-free business and want to become a partner? Write to",
+    "partners.invite.href": "mailto:hola@celiacmap.org?subject=Partnership%20with%20CeliacMap",
+    "partners.invite.note": "Being a partner doesn't change how your venue is evaluated on the map.",
 
     "footer.tagline": "Safe gluten-free places, mapped by the community.",
     "footer.contact": "Let's stay in touch",
@@ -283,6 +286,15 @@
     ESph[node.getAttribute("data-i18n-placeholder")] = node.getAttribute("placeholder") || "";
   });
 
+  // And for links whose href changes with the language (the partners mailto subject).
+  var i18nHrefNodes = Array.prototype.slice.call(
+    document.querySelectorAll("[data-i18n-href]")
+  );
+  var ESHref = {};
+  i18nHrefNodes.forEach(function (node) {
+    ESHref[node.getAttribute("data-i18n-href")] = node.getAttribute("href") || "";
+  });
+
   function applyLang(lang) {
     var dict = lang === "en" ? EN : ES;
     i18nNodes.forEach(function (node) {
@@ -293,6 +305,11 @@
       var key = node.getAttribute("data-i18n-placeholder");
       var val = lang === "en" ? EN[key] : ESph[key];
       if (val != null) node.setAttribute("placeholder", val);
+    });
+    i18nHrefNodes.forEach(function (node) {
+      var key = node.getAttribute("data-i18n-href");
+      var val = lang === "en" ? EN[key] : ESHref[key];
+      if (val) node.setAttribute("href", val);
     });
     document.documentElement.setAttribute("lang", lang);
     try { localStorage.setItem("celiacmap-lang", lang); } catch (e) {}

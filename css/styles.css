@@ -266,6 +266,7 @@ h1, h2, h3 {
 .main-nav .nav-list { display: flex; gap: 6px; }
 .main-nav a {
   display: block;
+  white-space: nowrap;
   padding: 9px 15px;
   border-radius: 999px;
   font-size: 0.9375rem;
@@ -1422,6 +1423,23 @@ h1, h2, h3 {
 @media (min-width: 600px) {
   .partner-card { flex-direction: row; gap: 28px; padding: 32px; }
 }
+/* Invitation: no card, a rule above, centered — so it never reads as another partner. */
+.partner-invite {
+  max-width: 560px;
+  margin: 40px auto 0;
+  padding-top: 28px;
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+.partner-invite-text { color: var(--color-text); line-height: 1.6; text-wrap: balance; }
+.partner-invite-text a {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.partner-invite-note { margin-top: 8px; font-size: 0.8125rem; color: var(--color-text-muted); }
 
 /* ------------------------------- Footer ---------------------------- */
 .site-footer { background: var(--green-deepest); color: #b9c4ba; padding: 72px 0 32px; }

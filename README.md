@@ -54,6 +54,8 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - ✅ **Partners** — a separate "Aliados" section before the footer shows the project's first
   partner, Bienestar Gluten Free (Fray Bentos), labeled "Aliado" / "Partner" with the fixed
   sentence that partners have no influence on which places appear on the map or on their label.
+  Linked from the header and the footer; under the card, an invitation to become a partner by email
+  (hola@celiacmap.org).
   Frontend only: sponsored links (`rel="sponsored"`), no third-party scripts, and nothing in the
   map, the Validator, the ranking or the chatbot changes
   ([`ADR-009`](docs/architecture/ADR-009-sponsorships-separate-from-safety.md)).

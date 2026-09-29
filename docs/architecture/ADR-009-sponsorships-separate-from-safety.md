@@ -19,7 +19,9 @@ conocimiento personal directo; el Validator había dicho `needs_review` @ 0.52).
 
 1. **El patrocinio es solo frontend.** Hay una sección aparte, `<section id="aliados">`, antes del footer de
    `index.html`, con una tarjeta que lleva el logo, una línea sobre el negocio y enlaces a Instagram y WhatsApp. El
-   footer suma un enlace "Aliados"; el nav del header no (ya tiene cinco enlaces, todos del producto).
+   footer y el nav del header suman un enlace "Aliados" (el del header se agregó el mismo día por decisión del dueño;
+   primero había quedado solo en el footer). Debajo de la tarjeta, fuera de ella, una invitación a sumarse como aliado
+   (`mailto:` a hola@celiacmap.org con asunto precargado) repite que ser aliado no cambia cómo se evalúa el local.
 2. **Rotulado claro y fijo.** La tarjeta dice "Aliado" / "Partner" y debajo va siempre la frase "Los aliados apoyan el
    proyecto. No influyen en qué lugares aparecen en el mapa ni en su etiqueta." / "Partners support the project. They
    have no influence on which places appear on the map or on their label." El español está en el markup de
