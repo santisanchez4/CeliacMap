@@ -195,7 +195,9 @@ evidencia, no una orden: nunca cambia por sí solo el estado de un lugar, salvo 
 - **Retiro del mapa.** Con **tres** reportes distintos en 30 días, o con **un solo** reporte que el evaluador considere
   creíble sobre contaminación con gluten o síntomas después de comer en el lugar, el lugar sale del mapa hasta que el
   administrador lo revise.
-- Un reporte **nunca sube** la etiqueta de un lugar, y nunca anula una decisión que tomó el administrador.
+- Un reporte **nunca sube** la etiqueta de un lugar. Si el administrador aprobó un lugar manualmente, un reporte no
+  cambia la etiqueta que definió ni borra el registro de su decisión, aunque sí puede retirar el lugar del mapa hasta que
+  lo revise.
 - **Los reportes negativos nunca se publican.** Publicar una acusación sin verificar sobre un comercio sería un riesgo
   para el comercio y para la comunidad. Las **recomendaciones positivas** pueden publicarse en el sitio, pero solo
   después de que el administrador las aprueba, con el nombre que la persona haya elegido o como "Anónimo". Una
@@ -237,9 +239,10 @@ lugar, ayudar a confirmar un lugar en revisión e información general sobre la 
 **Mejoras en curso:**
 
 - **Actualización de criterios por la Resolución Conjunta 32/2023.** Hoy el evaluador baja la confianza cuando un lugar
-  dice "sin gluten" y no "sin TACC", porque "sin gluten" podía ser un término de marketing. Con la Resolución Conjunta
-  32/2023, "sin gluten" pasa a ser el término oficial en Argentina, y la avena puede ser apta cuando está certificada.
-  Estamos actualizando los criterios para reflejarlo: la idea es dejar de penalizar "sin gluten" en Argentina y seguir
+  dice "sin gluten" y no "sin TACC", porque "sin gluten" podía ser un término de marketing. Según la Resolución Conjunta
+  32/2023, un alimento es libre de gluten con menos de 10 mg/kg, y "sin gluten" pasa a ser el término de uso en
+  Argentina. Entendemos además que admite avena libre de gluten certificada; nos gustaría validarlo con ustedes antes de
+  actualizar los criterios. Estamos actualizando los criterios para reflejarlo: la idea es dejar de penalizar "sin gluten" en Argentina y seguir
   distinguiendo un uso publicitario de la expresión de un sello o una práctica real. El cambio se va a probar antes de
   aplicarse. Por ahora, las etiquetas del mapa se mantienen como están.
 - **Revisión de la lista de espera del 100%** con la herramienta de propuestas citadas descrita en la sección 8.
@@ -250,7 +253,7 @@ lugar, ayudar a confirmar un lugar en revisión e información general sobre la 
 Para consultas, correcciones, pedidos de baja de un comercio o cualquier comentario sobre esta metodología:
 
 - **Correo:** hola@celiacmap.org
-- **Sitio:** https://santisanchez4.github.io/CeliacMap/
-- **Responsable:** Santiago Sanchez, creador y administrador de CeliacMap.
+- **Sitio:** https://celiacmap.org
+- **Responsable:** Santiago Sánchez, creador y administrador de CeliacMap.
 
 Nos interesa especialmente la mirada de las asociaciones de pacientes sobre estos criterios.
