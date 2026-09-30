@@ -17,6 +17,7 @@ other Edge Functions — these are only ever needed inside this function):
 | `CHAT_MODEL` | Model id, default `claude-haiku-4-5` (escape hatch to Sonnet — ADR-006 decision 12). |
 | `CHAT_MAX_MESSAGES_PER_SESSION` | Per-session-token cap (default 15). |
 | `CHAT_MAX_MESSAGES_PER_IP_DAY` | Per-IP-hash daily cap (default 40). |
+| `CHAT_IP_HASH_SECRET` | Key of the HMAC-SHA256 that turns the client IP into its `chat_usage` bucket (privacy phase 1, 2026-09-29). 32 random bytes, hex. If missing, no IP bucket is stored and the per-IP cap is off (session and global caps still apply). Rotating it only resets the per-IP daily counters. |
 | `CHAT_DAILY_CALL_CAP` | Global cap per day (default **500**), enforced against `chat_usage`'s TURN counter, not raw model calls — see the comment above `isRateLimited`'s call site in `index.ts` for why this diverges from the `1000` figure in ADR-006's original budget table (that number assumed a calls-based counter; applying it to the turns-based counter `bump_chat_usage` actually maintains would silently double the approved ~US$2-3/day spend ceiling to ~US$4-6/day). |
 | `CHAT_MAX_HISTORY_TURNS` | History turns forwarded to the model (default 8). |
 
