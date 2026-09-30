@@ -2777,7 +2777,8 @@ Deployed as `chat` **v24** (2026-09-30 02:4x UTC): `verify_jwt=false`, downloade
 test "recomendar un lugar nuevo" up to the draft, never sent: the draft turn ("¿Lo envío así?") carried no kitchen or owner
 question and no `kitchen_asked`; no suggestion or report was written. Finding: while Módulo 4 asked for more detail, the
 redactor improvised kitchen-style examples (no owner) — a prompt-level behavior, added to item 3 of the next prompt batch.
-Test rows: `db/checks/2026-09-30-chat-v24-test-cleanup.sql` (guarded), pending the owner's "dale".
+Test rows removed with `db/checks/2026-09-30-chat-v24-test-cleanup.sql` (guarded) after the owner's "dale"; verified against
+the baseline: 0 chat_usage rows for 2026-09-30, 58 in total, 100 chatbot logs, 2 suggestions, 2 reports.
 
 ### Build status (phases)
 
