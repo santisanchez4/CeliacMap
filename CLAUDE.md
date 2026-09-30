@@ -375,6 +375,9 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Show the literal SQL/command and wait for an explicit "dale" before writing to production or any external service**; verify
   read-only afterwards. Live tests: fixed session token, cleanup SQL shown first, guard `DELETE`s that must match 0 rows,
   revert against the baseline counts.
+- **`places` is granted to the public by column** [places public read by column grant]: a new column stays closed to
+  anon / authenticated until it is added to the `PLACES-PUBLIC-COLUMNS` grant in `db/schema.sql` and in a migration, with
+  `tests/test_places_public_columns.py` passing. Never a table-wide `grant select` on `places`, never `select=*` with the anon key.
 - **`revoke all` before the minimal `grant`** on every new public object (Supabase grants everything by default). A view
   runs with its owner's rights: its `WHERE` is the only barrier.
 - **Smoke-test a new PostgREST filter live (read-only) before relying on it** (a jsonb `cs.` filter needs
@@ -411,6 +414,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **`places` public read by column grant (2026-09-29)** — the anon key could read `contact_email`, outreach and review columns; now `revoke all` + a 20-column `grant select`, rehearsed, applied and verified live (privacy phase 1). [→](docs/DECISIONS.md#places-public-read-by-column-grant--privacy-phase-1-2026-09-29)
 - **Cloudflare Web Analytics (2026-09-28)** — first third-party measurement script: one deferred beacon, page views only, no cookies, no custom events, never chat or form text; a third-party-script exception next to Leaflet. [→](docs/DECISIONS.md#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28)
 - **Sponsorships, visible and separate from safety (2026-09-28)** — first partner (Bienestar Gluten Free): a labeled `#aliados` card (+ header link and a mailto invitation), frontend only, `rel="sponsored"`, logo as the second binary-image exception (ADR-009); Bienestar's 2026-09-01 manual approval, label and confidence are unchanged; the next prompt edit replaces the chat's Bienestar example and adds the "sin gluten" glossary. [→](docs/DECISIONS.md#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)
 - **One Google place, one row (2026-09-27)** — Search never looked the `place_id` up: 24 place_ids had two rows (13 both approved); `insert_place_candidate` now dedups across sources (the dry run mirrors it too); the 21-pair cleanup keeps CeliHaus in the 100% queue and fills `social_url` only from a profile link; two new branches (Rikuras El Pinar, Piu Prado) and Piu Cordón reactivated. [→](docs/DECISIONS.md#one-google-place-one-row--dedup-across-sources-2026-09-27)

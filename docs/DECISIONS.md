@@ -2631,6 +2631,43 @@ serves `beacon.min.js` unversioned and updates it in place, so a pinned hash wou
 with the site token; `static.cloudflareinsights.com` is preconnected; and no file in `js/` mentions the beacon (no custom
 events, no chat or form tracking).
 
+### `places` public read by column grant — privacy phase 1 (2026-09-29)
+
+**Problem.** `places` had a table-wide `grant select ... to anon, authenticated`; RLS only filtered ROWS
+(`status = 'approved'`). So the public anon key (in `js/config.js`) could read every column of an approved place, including
+`contact_email` (scraped for outreach), `outreach_opt_out` / `outreach_status` / `outreach_channel`, `validation_notes`,
+`flags` and `recommendation`, and could use `select=*`. The read-only baseline of 2026-09-29
+(`db/checks/places_public_columns_smoke.py`) confirmed all of them answered 200. At that moment no approved place had a
+`contact_email` (10 rows, none approved), but an outreach-confirmed place turned approved would have exposed it. Found by
+the personal-data inventory (`docs/legal/inventario-datos.md`, P3).
+
+**Decision.** The public read is a **column allowlist**: `revoke all on public.places from anon, authenticated;` then
+`grant select (<20 columns>)`. The 20 are exactly what the public readers select, filter or order by: `js/map.js`,
+`js/ranking.js`, `js/report.js` (autocomplete) and the `chat` Edge Function (which reads with the anon key; its
+`needs_review` lookup uses the service role). `id` and `status` are also read by the `place_votes` WITH CHECK subquery,
+which runs as anon. Closed: `contact_email`, `contact_email_checked_at`, `outreach_status`, `outreach_channel`,
+`outreach_opt_out`, `validation_notes`, `validation_confidence`, `flags`, `recommendation`, `external_id`, `verified`,
+`geocode_method`, `created_at`, `updated_at` (none used by a public reader). The `revoke all` also drops the INSERT / UPDATE
+/ DELETE / TRUNCATE table grants Supabase gives by default (RLS already refused them). `community_opinions` runs with its
+owner's (`postgres`) rights and is unaffected; the only functions anon can execute that read `places`
+(`sync_place_vote_count`) are `SECURITY DEFINER`.
+
+**How it was applied.** Survey of every public reader; `tests/test_places_public_columns.py` first (the grant block vs the
+readers' columns, no sensitive column, no `select=*`, `revoke all` before the grant, migration = schema block); a
+begin/rollback rehearsal as `set local role anon` (`db/checks/2026-09-29-places-public-columns-rehearsal.sql`: 412 map
+rows, 20 columns granted, the 14 closed, a test vote accepted and rolled back, no write privilege); then
+`db/migrations/2026-09-29-places-public-columns.sql` (+ `notify pgrst, 'reload schema'`). Verified afterwards: the smoke test
+with `--chat` ALL PASSED (every public query 200, `contact_email` / `validation_notes` / `outreach_opt_out` / `flags` /
+`select=*` / a filter on `contact_email` → 401 `42501`, a real chat search listed places), and celiacmap.org in a real
+browser (412 markers, a place panel opened by a real marker click with phone, website and hours, Top 3, ranking, report-form
+autocomplete, "La voz de la comunidad", 0 console errors). The emergency revert
+(`db/migrations/2026-09-29-places-public-columns-revert.sql`) was not needed.
+
+**Standing rule.** A new `places` column is **closed to the public** until it is added to the grant in `db/schema.sql`
+(`PLACES-PUBLIC-COLUMNS` block) and in a migration, with `tests/test_places_public_columns.py` passing. A public reader that
+starts using a column outside the grant fails that test (and would 401 in production); a wildcard `select=*` with the anon
+key is refused by the database.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
