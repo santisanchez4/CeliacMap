@@ -58,6 +58,47 @@ Deno.test("form B: the name field sits inside #rp-details, capped at 40, never a
   assert.equal(f.document.getElementById("rp-author-notice-positive").hasAttribute("hidden"), false);
 });
 
+// Privacy phase 1 (2026-09-29): the notice under the name says what the privacy policy and the terms say — optional,
+// consent to publish it with the comment after review, name + initial or a nickname, blank = "Anónimo", removal on
+// request by mail. The address is a mailto link OUTSIDE the translated span (main.js swaps textContent).
+const NOTICE_ES = "Opcional. Si lo escribís, autorizás que se publique junto a tu comentario, después de revisarlo. " +
+  "Sugerimos nombre e inicial (como «Santiago S.») o un apodo. Si lo dejás vacío, aparece como «Anónimo». " +
+  "Podés pedir que lo saquemos:";
+const NOTICE_EN = "Optional. If you enter it, you agree to it being published with your comment after review. " +
+  'We suggest a first name and initial (like "Santiago S.") or a nickname. If left blank, it shows as "Anonymous". ' +
+  "You can ask us to remove it:";
+
+Deno.test("form B: the name notice states consent, the suggestion, 'Anónimo' and a mailto, in ES and EN", async () => {
+  const f = await page(["js/kitchen.js", "js/report.js"]);
+  const notice = f.document.getElementById("rp-author-notice-positive");
+  const span = notice.querySelector('[data-i18n="report.author.noticePositive"]');
+  assert.equal(Boolean(span), true, "the translated text lives in its own span");
+  assert.equal(span.textContent.replace(/\s+/g, " ").trim(), NOTICE_ES);
+  const link = notice.querySelector('a[href="mailto:hola@celiacmap.org"]');
+  assert.equal(Boolean(link), true, "mailto link missing");
+  assert.equal(link.textContent.trim(), "hola@celiacmap.org");
+  assert.equal(span.contains(link), false, "the link must survive the language switch (outside the translated span)");
+  assert.equal(notice.textContent.replace(/\s+/g, " ").trim(), NOTICE_ES + " hola@celiacmap.org.");
+  const main = await Deno.readTextFile("js/main.js");
+  assert.equal(main.includes(`"report.author.noticePositive": ${JSON.stringify(NOTICE_EN)}`), true, "EN text");
+  // The notice sits inside the name field, so it hides with it in 'Reportar' mode.
+  assert.equal(f.document.getElementById("rp-author-field").contains(notice), true);
+  setType(f, "negative");
+  assert.equal(f.document.getElementById("rp-author-field").hidden, true);
+  setType(f, "positive");
+  assert.equal(f.document.getElementById("rp-author-field").hidden, false);
+});
+
+Deno.test("form B: the notice's mailto is distinguishable from the text (primary color + underline)", async () => {
+  // `a { color: inherit; text-decoration: none }` is the global reset: without its own rule the address is
+  // indistinguishable from the muted notice text (found in a real browser).
+  const css = await Deno.readTextFile("css/styles.css");
+  const rule = /\.rp-author-notice a\s*\{([^}]*)\}/.exec(css);
+  assert.equal(Boolean(rule), true, ".rp-author-notice a rule missing");
+  assert.match(rule[1], /color:\s*var\(--color-primary\)/);
+  assert.match(rule[1], /text-decoration:\s*underline/);
+});
+
 Deno.test("form B: a positive recommendation sends the trimmed name", async () => {
   const { sent } = await submitReport({ author: "  Ana  " });
   assert.equal(sent[0].author_name, "Ana");

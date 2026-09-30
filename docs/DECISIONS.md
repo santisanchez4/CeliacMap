@@ -2731,6 +2731,13 @@ the script and the runbook (CLAUDE.md, "Reglas vigentes").
   logged hour around it submitted anything (the nearest are a `celiaquia` turn at 17:04 and searches from 18:12; the one
   `confirmar` turn, 18:14, is about another place and sent nothing), and it was recorded on 2026-09-24 as the first positive
   report waiting for moderation. It stays published.
+- Form B name notice (2026-09-30), aligned with the terms and the privacy policy: optional; entering it is consent to publish
+  it with the comment after review; name + initial or a nickname suggested; blank = "Anónimo"; removal on request with a
+  `mailto:hola@celiacmap.org` link. The address sits outside the translated span (main.js swaps `textContent`) and has its
+  own rule (`.rp-author-notice a`: primary color + underline), since the global reset made it look like plain text. The
+  notice lives inside `#rp-author-field`, so it hides with the field in "Reportar". Verified in Chrome, desktop and 390 px
+  (iframe; the window would not resize), ES and EN, with real clicks for the place selection and the type switch; 0 console
+  errors. Guarded by `tests/frontend_opinions.test.js`.
 
 ### Build status (phases)
 

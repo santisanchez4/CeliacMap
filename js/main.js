@@ -223,7 +223,7 @@
     "report.form.descriptionPh": "Describe your experience: what you found, when, and any relevant detail.",
     "report.author.label": "Your name (optional)",
     "report.author.ph": "How you want your name to appear",
-    "report.author.noticePositive": "If it's a recommendation, it may be shown on the site after we review it. Without a name, it appears as Anonymous.",
+    "report.author.noticePositive": "Optional. If you enter it, you agree to it being published with your comment after review. We suggest a first name and initial (like \"Santiago S.\") or a nickname. If left blank, it shows as \"Anonymous\". You can ask us to remove it:",
     "report.author.noticeNegative": "Reports are not published: we review them internally.",
     "report.form.submit": "Send",
     "report.form.disclaimer": "Your contribution is added as evidence and reviewed together with the place's existing information; it doesn't change its status automatically.",

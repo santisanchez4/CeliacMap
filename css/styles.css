@@ -540,6 +540,8 @@ h1, h2, h3 {
 }
 .kitchen-intro { color: var(--color-text-muted); font-size: 0.88rem; margin: 0 0 14px; }
 .rp-author-notice { color: var(--color-text-muted); font-size: 0.88rem; margin: 6px 0 0; }
+.rp-author-notice a { color: var(--color-primary); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.rp-author-notice a:hover { color: var(--color-primary-dark); }
 #rp-author-field { margin-top: 20px; }
 #rp-author-notice-negative { margin-top: 16px; }
 .kitchen-q { margin: 0 0 16px; }
