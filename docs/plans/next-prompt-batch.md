@@ -30,6 +30,11 @@
    question, rule 5's invitation, the owner constraint, the Pan Justo examples) and the router's `cocina_respuesta` (rule
    10); if yes, bring them back without the owner question (item 1) and turn the code flags on again, with the kitchen
    A/B (`db/checks/chat_kitchen_live.py`). The kitchen question is then only in form A (“Agregalo”).
+   Live finding (chat v24, 2026-09-30): with the flags off, the draft turn no longer asks, but when Módulo 4
+   (`confirmar`) asks for more detail (`necesita_mas_detalle`), the redactor improvised kitchen-style examples ("¿es 100%
+   sin gluten o tiene opciones sin TACC? ¿Cómo preparan lo apto para celíacos?"); the owner was not asked. Also, "quiero
+   recomendar un lugar nuevo que no está en el mapa" was routed to `confirmar` (a place still being verified) and the
+   address given there was lost once the draft started in `reportar`. Cover both in this batch.
 
 ## Earlier items (from `docs/DECISIONS.md`)
 

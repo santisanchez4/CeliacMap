@@ -2773,6 +2773,11 @@ recites them. The kitchen question now lives only in form A. Whether the chat as
 item 3 of `docs/plans/next-prompt-batch.md`. Texts: policy 3.1 / 3.4 say the chat does not ask; terms 3 say the
 "register now" flow is for a place CeliacMap is still verifying (Módulo 4 looks up `needs_review` places), terms 5 name the
 «Aliado» label.
+Deployed as `chat` **v24** (2026-09-30 02:4x UTC): `verify_jwt=false`, downloaded source identical to `HEAD` b163949. Live
+test "recomendar un lugar nuevo" up to the draft, never sent: the draft turn ("¿Lo envío así?") carried no kitchen or owner
+question and no `kitchen_asked`; no suggestion or report was written. Finding: while Módulo 4 asked for more detail, the
+redactor improvised kitchen-style examples (no owner) — a prompt-level behavior, added to item 3 of the next prompt batch.
+Test rows: `db/checks/2026-09-30-chat-v24-test-cleanup.sql` (guarded), pending the owner's "dale".
 
 ### Build status (phases)
 
