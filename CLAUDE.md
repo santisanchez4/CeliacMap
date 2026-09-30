@@ -230,9 +230,9 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 ├── config/     settings.py (env-driven) · targets.yaml (countries, cities, search terms, `web: true` opt-in)
 ├── scripts/    run_agents.py (CI: search -> social -> web -> suggestion -> validator -> updater -> outreach -> review_sweep)
 │               plus admin tools (review_queue, find_evidence, moderate_opinions, cap_unsupported_100, revalidate_low_confidence,
-│               admin_digest), purge_chat_logs, sync_chat_prompts, check_setup, gen_favicons, gen_cursors
+│               admin_digest, delete_personal_data), purge_chat_logs (weekly retention), sync_chat_prompts, check_setup, gen_favicons, gen_cursors
 ├── db/         schema.sql · seed.sql (ranking votes only) · migrations/ · fixes/ (one-off production SQL) · checks/
-├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…009, C4-diagrams.md) · plans/ · superpowers/ · runbooks/
+├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…009, C4-diagrams.md) · plans/ · superpowers/ · runbooks/ · legal/ (privacy)
 ├── tests/      offline Python tests + frontend_*.test.js; guards: test_rubric_docs_sync, test_chat_prompts_sync, test_claude_md_size,
 │               frontend_partners
 ├── .github/workflows/  monthly pipeline, mid-month Validator, weekly suggestions, admin digest, Pages deploy, dispatch handlers
@@ -340,10 +340,12 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   protect. In fix scripts, a data-only note uses one of those phrases and a safety decision goes on its own line.
 - **100% label** [Manual Validator overrides; Kitchen information]: `gluten_free_100` means only celiac-safe products are
   cooked and sold. Cooking everything but offering a celiac menu, separate prep or a separate kitchen is
-  `options_available`; one shared kitchen is not 100% by default. An **owner-is-celiac** claim raises confidence but is
-  evidence for human review, never automatic: only the admin upgrades to 100%. Kitchen declarations are unverified, live
-  only on `suggestions` / `place_reports` (never `places`), and `owner_celiac` never reaches the model.
-- **No third-party health data in public columns** (`places.*`, `validation_notes`, flags, opinions): `places` is public.
+  `options_available`; one shared kitchen is not 100% by default. Only the admin upgrades to 100%. Kitchen declarations
+  are unverified and live only on `suggestions` / `place_reports` (never `places`).
+- **No third-party health data is collected** [Privacy phase 1]: whether an owner is celiac is no longer asked, stored,
+  shown to the admin or sent to the model (`owner_celiac` columns dropped from 2026-10-06; the chat stops asking in the
+  next prompt batch). Never add a question about a person's health. A free-text claim about one is evidence for human
+  review, never automatic, and never goes to a public column (`places.*`, `validation_notes`, flags, opinions).
 - **Evidence, not action** [Community reports; ranking; outreach]: reports, votes, outreach replies and the chatbot never
   change `places.status` on their own; only the Validator, the admin (with a transparent note) or the documented report
   rules do.
@@ -372,6 +374,10 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Secrets boundary:** only the anon key reaches the browser. Server-only tables (`agent_log`, `reviews`, `place_evidence`,
   `chat_usage`, `outreach_messages`) get no anon grant. Google Places reviews are purged after 30 days. The legacy Places API **and** the Geocoding API must both be enabled in
   GCP and allowed in the `GOOGLE_MAPS_API_KEY` restrictions.
+- **Retention and deletion requests** [Privacy phase 1]: the weekly purge (`chat-log-purge.yml`) deletes chatbot logs at 30
+  days, `chat_usage` at 7 and Google reviews at 30 (Search re-fetches them monthly); the chat's IP bucket is an HMAC with
+  `CHAT_IP_HASH_SECRET`, never a plain hash. A deletion request goes through `scripts/delete_personal_data.py` and
+  `docs/legal/runbook-pedidos-de-datos.md`, never an ad-hoc `DELETE`; a chat recommendation is never published.
 - **Show the literal SQL/command and wait for an explicit "dale" before writing to production or any external service**; verify
   read-only afterwards. Live tests: fixed session token, cleanup SQL shown first, guard `DELETE`s that must match 0 rows,
   revert against the baseline counts.
@@ -414,6 +420,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **Privacy phase 1 (2026-09-29)** — owner_celiac no longer collected (column drop prepared for 2026-10-06), weekly purge of `chat_usage` (7 d) and Google reviews (30 d), IP bucket as HMAC, chat recommendations never published, deletion-request script + runbook. [→](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29)
 - **`places` public read by column grant (2026-09-29)** — the anon key could read `contact_email`, outreach and review columns; now `revoke all` + a 20-column `grant select`, rehearsed, applied and verified live (privacy phase 1). [→](docs/DECISIONS.md#places-public-read-by-column-grant--privacy-phase-1-2026-09-29)
 - **Cloudflare Web Analytics (2026-09-28)** — first third-party measurement script: one deferred beacon, page views only, no cookies, no custom events, never chat or form text; a third-party-script exception next to Leaflet. [→](docs/DECISIONS.md#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28)
 - **Sponsorships, visible and separate from safety (2026-09-28)** — first partner (Bienestar Gluten Free): a labeled `#aliados` card (+ header link and a mailto invitation), frontend only, `rel="sponsored"`, logo as the second binary-image exception (ADR-009); Bienestar's 2026-09-01 manual approval, label and confidence are unchanged; the next prompt edit replaces the chat's Bienestar example and adds the "sin gluten" glossary. [→](docs/DECISIONS.md#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)

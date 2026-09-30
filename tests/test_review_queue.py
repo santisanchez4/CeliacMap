@@ -64,12 +64,14 @@ def go(db, *argv):
 
 
 def test_default_lists_every_queue_with_the_evidence_and_the_admin_only_kitchen_data():
+    # Privacy phase 1: the kitchen answers stay, the owner's health is never shown (old rows included).
     code, text = go(FakeDB())
     assert code == 0
     for heading in ("100% pendientes", "needs_review", "Sugerencias sin ubicar", "reportados por la comunidad"):
         assert heading in text
     assert "[social] 100% sin TACC https://instagram.com/x" in text
-    assert "dueño/a celíaco/a sí (solo para vos)" in text
+    assert "cocina:    exclusiva sí" in text
+    assert "dueño" not in text
     assert "me contaminé" in text  # the report text: admin only
     assert "https://www.google.com/maps?q=-33.12,-58.3" in text
 

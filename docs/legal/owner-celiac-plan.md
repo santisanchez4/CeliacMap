@@ -92,7 +92,7 @@ solo muestra el dato cuando existe, tampoco salió en ningún mail.
 
 ## Plan propuesto
 
-### Etapa 1 — dejar de juntarlo sin tocar los prompts (se puede hacer ya)
+### Etapa 1 — dejar de juntarlo sin tocar los prompts ✅ hecha (fase 1 de privacidad, 2026-09-29)
 
 1. **Formulario:** sacar la pregunta 3 y su nota de `index.html`, las claves i18n de `js/main.js` y la rama `owner` de
    `js/kitchen.js`. Test: `frontend_kitchen.test.js` pasa a afirmar que `owner_celiac` **nunca** está en el cuerpo
@@ -108,7 +108,7 @@ solo muestra el dato cuando existe, tampoco salió en ningún mail.
 Límite de la etapa 1: el redactor **sigue preguntando** por el dueño (lo dice su prompt), aunque la respuesta ya no se
 guarde. La respuesta sí queda en la conversación que ve Anthropic, y en `agent_log` durante 30 días si el turno se marca.
 
-### Etapa 2 — sacar la pregunta de los prompts (en la próxima tanda de prompts)
+### Etapa 2 — sacar la pregunta de los prompts (en la próxima tanda: `docs/plans/next-prompt-batch.md`, punto 1)
 
 Cambios en `ROUTER_PROMPT` (regla 9, regla 10, el campo `dueno_celiaco` y el ejemplo) y en `RESPONDER_PROMPT` (reglas 3
 y 5, la constraint de `:357-360` y el ejemplo de Pan Justo). Después, borrar `dueno_celiaco` del tipo y del parser del
@@ -125,7 +125,7 @@ Qué medir en esa tanda: que el redactor ya no pregunte por el dueño (0 de N en
 `db/checks/chat_kitchen_live.py`), que la extracción de `cocina_exclusiva` y `preparacion_celiaca` no empeore
 (`chat_kitchen_router_check.py`) y que la batería siga en 0 quiebres.
 
-### Etapa 3 — base de datos (después de las etapas 1 y 2, con “dale”)
+### Etapa 3 — base de datos (con “dale”; SQL preparado en `db/migrations/2026-10-06-drop-owner-celiac.PENDING.sql`)
 
 El orden importa: si la columna desaparece mientras alguien tiene la página vieja en caché, PostgREST rechaza el
 `INSERT` que la trae y **se pierde la sugerencia entera**. Por eso la columna se borra al menos una semana después de la

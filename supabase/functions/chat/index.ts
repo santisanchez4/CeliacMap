@@ -85,7 +85,6 @@ export type PendingReportSubmission = {
   // had. Positive reports only (place_reports has a CHECK that forbids them on a negative one).
   kitchen_exclusive?: boolean | null;
   celiac_prep?: CeliacPrep | null;
-  owner_celiac?: boolean | null;
   // Internal: the kitchen question was already put to the person for this draft. Round-tripped
   // through the client echo only; never written to the database (like place_name).
   kitchen_asked?: boolean;
@@ -109,7 +108,6 @@ export type PendingSuggestionSubmission = {
   // Kitchen declarations — same sparse rules as PendingReportSubmission.
   kitchen_exclusive?: boolean | null;
   celiac_prep?: CeliacPrep | null;
-  owner_celiac?: boolean | null;
   kitchen_asked?: boolean;
 };
 
@@ -882,7 +880,6 @@ export type ConfirmarResult =
       description: string;
       kitchen_exclusive?: boolean;
       celiac_prep?: CeliacPrep;
-      owner_celiac?: boolean;
     };
   };
 
@@ -1045,39 +1042,39 @@ export function buildSuggestionInsertPayload(p: PendingSuggestionSubmission) {
 export type CeliacPrep = "separate_kitchen" | "separate_prep" | "shared_kitchen";
 const CELIAC_PREPS: readonly CeliacPrep[] = ["separate_kitchen", "separate_prep", "shared_kitchen"];
 
+// Whether the owner is celiac is a third party's health data (privacy phase 1, 2026-09-29): it is not a
+// kitchen fact. The router may still return dueno_celiaco until the next prompt batch removes the
+// question; kitchenFactsFromRouter discards it, so it never reaches a draft, a row or the redactor.
 export interface KitchenFacts {
   kitchen_exclusive: boolean | null;
   celiac_prep: CeliacPrep | null;
-  owner_celiac: boolean | null;
 }
-export const NO_KITCHEN_FACTS: KitchenFacts = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
+export const NO_KITCHEN_FACTS: KitchenFacts = { kitchen_exclusive: null, celiac_prep: null };
 
-type SparseKitchen = { kitchen_exclusive?: boolean; celiac_prep?: CeliacPrep; owner_celiac?: boolean; kitchen_asked?: true };
+type SparseKitchen = { kitchen_exclusive?: boolean; celiac_prep?: CeliacPrep; kitchen_asked?: true };
 
 /** Only the keys that carry a value (plus the internal asked marker). */
 function sparseKitchen(facts: KitchenFacts, asked: boolean): SparseKitchen {
   const out: SparseKitchen = {};
   if (facts.kitchen_exclusive !== null) out.kitchen_exclusive = facts.kitchen_exclusive;
   if (facts.celiac_prep !== null) out.celiac_prep = facts.celiac_prep;
-  if (facts.owner_celiac !== null) out.owner_celiac = facts.owner_celiac;
   if (asked) out.kitchen_asked = true;
   return out;
 }
 
 export function normalizeKitchenFacts(
-  input: { kitchen_exclusive?: unknown; celiac_prep?: unknown; owner_celiac?: unknown },
+  input: { kitchen_exclusive?: unknown; celiac_prep?: unknown },
 ): KitchenFacts {
   const exclusive = typeof input.kitchen_exclusive === "boolean" ? input.kitchen_exclusive : null;
   // The preparation method only exists when the kitchen is NOT exclusive (a CHECK in the database).
   const prep = exclusive === false && (CELIAC_PREPS as readonly unknown[]).includes(input.celiac_prep)
     ? (input.celiac_prep as CeliacPrep)
     : null;
-  const owner = typeof input.owner_celiac === "boolean" ? input.owner_celiac : null;
-  return { kitchen_exclusive: exclusive, celiac_prep: prep, owner_celiac: owner };
+  return { kitchen_exclusive: exclusive, celiac_prep: prep };
 }
 
 export function hasKitchenFacts(f: KitchenFacts): boolean {
-  return f.kitchen_exclusive !== null || f.celiac_prep !== null || f.owner_celiac !== null;
+  return f.kitchen_exclusive !== null || f.celiac_prep !== null;
 }
 
 /** The router's Spanish words -> the database vocabulary. Never infers beyond one rule:
@@ -1094,14 +1091,14 @@ export function kitchenFactsFromRouter(
   const prep = r.preparacion_celiaca ? prepWords[r.preparacion_celiaca] : null;
   let exclusive = yesNo(r.cocina_exclusiva);
   if (prep !== null && exclusive === null) exclusive = false;
-  return normalizeKitchenFacts({ kitchen_exclusive: exclusive, celiac_prep: prep, owner_celiac: yesNo(r.dueno_celiaco) });
+  return normalizeKitchenFacts({ kitchen_exclusive: exclusive, celiac_prep: prep });
 }
 
 /** `p` with `facts` merged over its own (a new non-null value wins). A report (a review of a place
  * that is already on the map, positive or negative) never carries kitchen facts: only a suggestion
  * does. Keys exist only when meaningful, so no facts => the same shape as before. */
 export function mergeKitchenFacts<T extends PendingSubmission>(p: T, facts: KitchenFacts): T {
-  const next = { ...p } as T & { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: boolean | null };
+  const next = { ...p } as T & { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: unknown };
   delete next.kitchen_exclusive;
   delete next.celiac_prep;
   delete next.owner_celiac;
@@ -1110,11 +1107,9 @@ export function mergeKitchenFacts<T extends PendingSubmission>(p: T, facts: Kitc
   const merged = normalizeKitchenFacts({
     kitchen_exclusive: facts.kitchen_exclusive ?? current.kitchen_exclusive,
     celiac_prep: facts.celiac_prep ?? current.celiac_prep,
-    owner_celiac: facts.owner_celiac ?? current.owner_celiac,
   });
   if (merged.kitchen_exclusive !== null) next.kitchen_exclusive = merged.kitchen_exclusive;
   if (merged.celiac_prep !== null) next.celiac_prep = merged.celiac_prep;
-  if (merged.owner_celiac !== null) next.owner_celiac = merged.owner_celiac;
   return next;
 }
 
@@ -1148,7 +1143,7 @@ export function decideKitchenAnswer(
   return pending.address && pending.country && pending.city ? pending : null;
 }
 
-/** In a confirmation turn, facts said in that same message ("dale, la dueña es celíaca") are
+/** In a confirmation turn, facts said in that same message ("dale, es todo sin gluten") are
  * merged into the payload before it is written. */
 export function withConfirmFacts(confirm: ConfirmTurnResult, facts: KitchenFacts): ConfirmTurnResult {
   if (confirm.kind === "insert_report") return { kind: "insert_report", payload: mergeKitchenFacts(confirm.payload, facts) };
@@ -1157,7 +1152,7 @@ export function withConfirmFacts(confirm: ConfirmTurnResult, facts: KitchenFacts
 }
 
 export function cocinaContext(
-  p: { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: boolean | null },
+  p: { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null },
 ): EnvioContext["cocina"] {
   const f = normalizeKitchenFacts(p);
   if (!hasKitchenFacts(f)) return null;
@@ -1165,7 +1160,6 @@ export function cocinaContext(
   return {
     exclusiva: f.kitchen_exclusive === null ? null : f.kitchen_exclusive ? "si" : "no",
     preparacion: f.celiac_prep === null ? null : prepWords[f.celiac_prep],
-    dueno_celiaco: f.owner_celiac === null ? null : f.owner_celiac ? "si" : "no",
   };
 }
 
@@ -1177,7 +1171,7 @@ export function kitchenEnvioExtras(p: PendingSubmission, preguntarCocina: boolea
 
 /** Módulo 4 never asks (it stays single-turn): recite what was volunteered, else invite. */
 export function moduloCuatroEnvioExtras(
-  payload: { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null; owner_celiac?: boolean | null },
+  payload: { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null },
 ): Partial<EnvioContext> {
   const cocina = cocinaContext(payload);
   return cocina ? { cocina } : { invitar_cocina: true };
@@ -1369,7 +1363,6 @@ export interface EnvioContext {
   cocina?: {
     exclusiva: "si" | "no" | null;
     preparacion: "cocina_separada" | "preparacion_aparte" | "misma_cocina" | null;
-    dueno_celiaco: "si" | "no" | null;
   } | null;
 }
 
@@ -1410,13 +1403,30 @@ export function buildResponderUserMessage(args: {
 // table should be corrected to 500 to match (tracked, not yet done).
 // ---------------------------------------------------------------------------
 
-export function computeBucketKeys(sessionToken: string, ipHash: string): [string, string, string] {
-  return [`session:${sessionToken}`, `ip:${ipHash}`, "global"];
+/** Bucket keys for one turn. With no IP hash (CHAT_IP_HASH_SECRET missing) there is no IP bucket at
+ * all: nothing derived from the IP is stored, and the session + global caps still apply. */
+export function computeBucketKeys(sessionToken: string, ipHash: string | null): string[] {
+  return ipHash ? [`session:${sessionToken}`, `ip:${ipHash}`, "global"] : [`session:${sessionToken}`, "global"];
 }
 
 export async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function hmacSha256Hex(secret: string, input: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(input));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Privacy phase 1 (2026-09-29): the per-IP daily counter is keyed by an HMAC of the IP with the
+// CHAT_IP_HASH_SECRET function secret. An unkeyed SHA-256 of an IPv4 address can be reversed by
+// trying every address; without the secret the HMAC cannot. No secret => null => no IP bucket.
+export async function ipBucketHash(ip: string, secret: string | undefined): Promise<string | null> {
+  if (!secret || !secret.trim()) return null;
+  return await hmacSha256Hex(secret, ip);
 }
 
 export function getClientIp(req: Request): string {
@@ -1809,8 +1819,12 @@ export async function handleRequest(req: Request): Promise<Response> {
   const history = trimHistory(messages, maxHistoryTurns);
   const lastUserMessage = history[history.length - 1].content;
 
-  const ipHash = await sha256Hex(getClientIp(req));
-  const [sessionKey, ipKey, globalKey] = computeBucketKeys(sessionToken, ipHash);
+  const ipHash = await ipBucketHash(getClientIp(req), Deno.env.get("CHAT_IP_HASH_SECRET"));
+  if (ipHash === null) console.error("[chat] CHAT_IP_HASH_SECRET is not set: the per-IP limit is off for this turn");
+  const bucketKeys = computeBucketKeys(sessionToken, ipHash);
+  const sessionKey = bucketKeys[0];
+  const ipKey = ipHash ? bucketKeys[1] : null;
+  const globalKey = bucketKeys[bucketKeys.length - 1];
   const day = todayUtc();
 
   const counts: RateLimitCounts = { session: 0, ip: 0, global: 0 };
@@ -1818,12 +1832,12 @@ export async function handleRequest(req: Request): Promise<Response> {
     const { data, error } = await supabase
       .from("chat_usage")
       .select("bucket_key, count")
-      .in("bucket_key", [sessionKey, ipKey, globalKey])
+      .in("bucket_key", bucketKeys)
       .eq("day", day);
     if (error) throw error;
     for (const row of data ?? []) {
       if (row.bucket_key === sessionKey) counts.session = row.count;
-      else if (row.bucket_key === ipKey) counts.ip = row.count;
+      else if (ipKey !== null && row.bucket_key === ipKey) counts.ip = row.count;
       else if (row.bucket_key === globalKey) counts.global = row.count;
     }
   } catch (err) {
@@ -1865,7 +1879,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
   try {
-    const { error } = await supabase.rpc("bump_chat_usage", { p_keys: [sessionKey, ipKey, globalKey], p_day: day });
+    const { error } = await supabase.rpc("bump_chat_usage", { p_keys: bucketKeys, p_day: day });
     if (error) throw error;
   } catch (err) {
     await logServerError(supabase, "usage_bump_failed", err);

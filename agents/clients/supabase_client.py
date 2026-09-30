@@ -333,7 +333,8 @@ class SupabaseClient:
         the admin reads everything before publishing."""
         res = (
             self._db.table("place_reports")
-            .select("id, description, author_name, created_at, place_id, places!inner(name, city, country, status, safety_level)")
+            .select("id, description, author_name, reporter_token, created_at, place_id, "
+                    "places!inner(name, city, country, status, safety_level)")
             .eq("report_type", "positive")
             .is_("published_at", "null")
             .eq("places.status", "approved")
@@ -684,3 +685,40 @@ class SupabaseClient:
             .execute()
         )
         return len(res.data or [])
+
+    def delete_old_chat_usage(self, cutoff_days: int = 7) -> int:
+        """Delete chat rate-limit counters (session token / IP hash buckets) older than cutoff_days.
+
+        The counters only matter for the current day; keeping them longer would keep a pseudonymous
+        trail of who chatted when. Run weekly by scripts/purge_chat_logs.py.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=cutoff_days)).date().isoformat()
+        res = self._db.table("chat_usage").delete().lt("day", cutoff).execute()
+        return len(res.data or [])
+
+    def fetch_purged_review_place_ids(self) -> list[str]:
+        """Places whose Google review snippets the weekly purge deleted since the last Search run.
+
+        scripts/purge_chat_logs.py logs them as agent='search', action='google_reviews_purged';
+        SearchAgent re-fetches them in its monthly run, so the purge never stops the refresh.
+        """
+        last = (
+            self._db.table("agent_log")
+            .select("created_at")
+            .eq("agent", "search")
+            .eq("action", "search_run_complete")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        query = (
+            self._db.table("agent_log")
+            .select("result")
+            .eq("agent", "search")
+            .eq("action", "google_reviews_purged")
+        )
+        if last.data:
+            query = query.gt("created_at", last.data[0]["created_at"])
+        rows = query.execute().data or []
+        ids = {pid for r in rows for pid in ((r.get("result") or {}).get("place_ids") or []) if pid}
+        return sorted(ids)

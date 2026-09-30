@@ -1,9 +1,9 @@
-# Chatbot log purge - weekly.
-# Deletes agent_log rows with agent='chatbot' older than 30 days. Marked
-# chatbot turns can carry raw user/bot text (ADR-006 decision 10), so this
-# cannot depend on someone remembering to run a manual delete - see CLAUDE.md
-# "Logging y privacidad" in ADR-006 and scripts/purge_chat_logs.py.
-name: Chatbot log purge
+# Weekly retention purge (scripts/purge_chat_logs.py).
+# Deletes agent_log rows with agent='chatbot' older than 30 days (marked chatbot turns can carry raw
+# user/bot text, ADR-006 decision 10), chat_usage counters older than 7 days and Google review
+# snippets older than 30 days (privacy phase 1, 2026-09-29). The monthly Search run re-fetches the
+# reviews of the places this job logs. None of it may depend on someone remembering a manual delete.
+name: Weekly retention purge
 
 on:
   schedule:
@@ -34,5 +34,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Purge expired chatbot logs
+      - name: Purge expired chat logs, chat counters and Google reviews
         run: python scripts/purge_chat_logs.py

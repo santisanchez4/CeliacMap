@@ -50,6 +50,8 @@ import {
   sanitizeIlikeTerm,
   SCOPE_DECLINE_REPLIES,
   sha256Hex,
+  hmacSha256Hex,
+  ipBucketHash,
   trimHistory,
   toChatPlaceReferences,
   toRedactorPlace,
@@ -502,11 +504,41 @@ Deno.test("computeBucketKeys builds the three documented bucket keys", () => {
   assertEquals(computeBucketKeys("abc-123", "deadbeef"), ["session:abc-123", "ip:deadbeef", "global"]);
 });
 
-Deno.test("sha256Hex hashes the IP instead of ever storing it raw", async () => {
-  const hash = await sha256Hex("203.0.113.42");
-  assertEquals(hash.length, 64);
-  assertMatch(hash, /^[0-9a-f]{64}$/);
-  assertEquals(hash === "203.0.113.42", false);
+Deno.test("computeBucketKeys without an IP hash (secret missing) keeps only session + global", () => {
+  assertEquals(computeBucketKeys("abc-123", null), ["session:abc-123", "global"]);
+});
+
+// Privacy phase 1 (2026-09-29): an unkeyed SHA-256 of an IPv4 address can be reversed by trying all
+// ~4.3 billion of them, so the IP bucket is an HMAC-SHA256 keyed with CHAT_IP_HASH_SECRET.
+Deno.test("hmacSha256Hex matches RFC 4231 test case 2", async () => {
+  assertEquals(
+    await hmacSha256Hex("Jefe", "what do ya want for nothing?"),
+    "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
+  );
+});
+
+Deno.test("ipBucketHash is keyed: never the raw IP, never the unkeyed SHA-256, changes with the secret", async () => {
+  const ip = "203.0.113.42";
+  const a = await ipBucketHash(ip, "secret-a");
+  const b = await ipBucketHash(ip, "secret-b");
+  assertMatch(a!, /^[0-9a-f]{64}$/);
+  assertEquals(a === ip, false);
+  assertEquals(a === await sha256Hex(ip), false);
+  assertEquals(a === b, false);
+  assertEquals(await ipBucketHash(ip, "secret-a"), a); // stable within a secret: the daily counter works
+});
+
+Deno.test("ipBucketHash without a secret returns null (no IP-derived key is stored at all)", async () => {
+  assertEquals(await ipBucketHash("203.0.113.42", undefined), null);
+  assertEquals(await ipBucketHash("203.0.113.42", ""), null);
+  assertEquals(await ipBucketHash("203.0.113.42", "   "), null);
+});
+
+Deno.test("handleRequest hashes the IP with ipBucketHash, never with sha256Hex", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const handler = src.slice(src.indexOf("export async function handleRequest"));
+  assertEquals(handler.includes("sha256Hex("), false);
+  assertEquals(handler.includes('ipBucketHash(getClientIp(req), Deno.env.get("CHAT_IP_HASH_SECRET"))'), true);
 });
 
 Deno.test("getClientIp reads the first address from x-forwarded-for", () => {

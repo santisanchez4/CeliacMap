@@ -24,7 +24,7 @@ import {
 import { RESPONDER_PROMPT, ROUTER_PROMPT } from "./prompts.ts";
 import { MAX_MESSAGE_LENGTH, ROUTER_MAX_TOKENS } from "./index.ts";
 
-const NO_FACTS = { kitchen_exclusive: null, celiac_prep: null, owner_celiac: null };
+const NO_FACTS = { kitchen_exclusive: null, celiac_prep: null };
 const NO_ROUTER_FACTS = { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: null } as const;
 
 function suggestion(over: Partial<PendingSuggestionSubmission> = {}): PendingSuggestionSubmission {
@@ -50,9 +50,20 @@ Deno.test("normalizeKitchenFacts - celiac_prep only survives when the kitchen is
 });
 
 Deno.test("normalizeKitchenFacts - non-boolean input becomes null, never truthy-coerced", () => {
-  assertEquals(normalizeKitchenFacts({ kitchen_exclusive: "true", owner_celiac: 1 }), NO_FACTS);
+  assertEquals(normalizeKitchenFacts({ kitchen_exclusive: "true" }), NO_FACTS);
   assertEquals(hasKitchenFacts(NO_FACTS), false);
-  assertEquals(hasKitchenFacts({ ...NO_FACTS, owner_celiac: false }), true);
+});
+
+// Privacy phase 1 (2026-09-29): whether the owner is celiac is a third party's health data. The router may
+// still return dueno_celiaco (its prompt is unchanged until the next prompt batch), but the code discards it:
+// it never reaches a draft, a database row or the redactor's <envio>.
+Deno.test("owner_celiac is discarded everywhere: normalize, router facts, drafts", () => {
+  assertEquals(normalizeKitchenFacts({ owner_celiac: true } as never), NO_FACTS);
+  assertEquals(hasKitchenFacts(normalizeKitchenFacts({ owner_celiac: false } as never)), false);
+  assertEquals(kitchenFactsFromRouter({ cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: "si" }), NO_FACTS);
+  const legacyEcho = { ...suggestion(), owner_celiac: true } as PendingSuggestionSubmission;
+  assertEquals("owner_celiac" in (validatePendingSubmission(legacyEcho) as object), false);
+  assertEquals("owner_celiac" in mergeKitchenFacts(legacyEcho, NO_FACTS), false);
 });
 
 // ---- kitchenFactsFromRouter ----------------------------------------------------
@@ -60,20 +71,20 @@ Deno.test("normalizeKitchenFacts - non-boolean input becomes null, never truthy-
 Deno.test("kitchenFactsFromRouter - maps the router words; a preparation method implies 'not exclusive'", () => {
   assertEquals(
     kitchenFactsFromRouter({ cocina_exclusiva: "si", preparacion_celiaca: null, dueno_celiaco: "si" }),
-    { kitchen_exclusive: true, celiac_prep: null, owner_celiac: true },
+    { kitchen_exclusive: true, celiac_prep: null },
   );
   assertEquals(
     kitchenFactsFromRouter({ cocina_exclusiva: null, preparacion_celiaca: "cocina_separada", dueno_celiaco: null }),
-    { kitchen_exclusive: false, celiac_prep: "separate_kitchen", owner_celiac: null },
+    { kitchen_exclusive: false, celiac_prep: "separate_kitchen" },
   );
   assertEquals(
     kitchenFactsFromRouter({ cocina_exclusiva: null, preparacion_celiaca: "preparacion_aparte", dueno_celiaco: "no" }),
-    { kitchen_exclusive: false, celiac_prep: "separate_prep", owner_celiac: false },
+    { kitchen_exclusive: false, celiac_prep: "separate_prep" },
   );
   // Contradiction from the model: exclusive AND a preparation method -> exclusive wins, the method is dropped.
   assertEquals(
     kitchenFactsFromRouter({ cocina_exclusiva: "si", preparacion_celiaca: "misma_cocina", dueno_celiaco: null }),
-    { kitchen_exclusive: true, celiac_prep: null, owner_celiac: null },
+    { kitchen_exclusive: true, celiac_prep: null },
   );
   assertEquals(kitchenFactsFromRouter(NO_ROUTER_FACTS), NO_FACTS);
 });
@@ -86,20 +97,18 @@ Deno.test("mergeKitchenFacts - no facts keeps the draft's exact shape", () => {
 });
 
 Deno.test("mergeKitchenFacts - new non-null values win and the merge is coherent", () => {
-  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "shared_kitchen", owner_celiac: false });
-  const merged = mergeKitchenFacts(p, { kitchen_exclusive: true, celiac_prep: null, owner_celiac: null });
+  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "shared_kitchen" });
+  const merged = mergeKitchenFacts(p, { kitchen_exclusive: true, celiac_prep: null });
   assertEquals(merged.kitchen_exclusive, true);
   assertEquals("celiac_prep" in merged, false); // exclusive kitchen -> preparation method dropped
-  assertEquals(merged.owner_celiac, false); // untouched
 });
 
 Deno.test("mergeKitchenFacts - a report, positive or negative, never carries kitchen facts (only a suggestion does)", () => {
   // Owner decision 2026-09-24: how a place cooks is asked only when a business is ADDED; a review of a
   // place that is already on the map collects the experience, nothing else.
   for (const report_type of ["positive", "negative"] as const) {
-    const merged = mergeKitchenFacts(report({ report_type }), { kitchen_exclusive: true, celiac_prep: null, owner_celiac: true });
+    const merged = mergeKitchenFacts(report({ report_type }), { kitchen_exclusive: true, celiac_prep: null });
     assertEquals("kitchen_exclusive" in merged, false, report_type);
-    assertEquals("owner_celiac" in merged, false, report_type);
   }
 });
 
@@ -123,7 +132,14 @@ Deno.test("applyKitchenStep - does not ask when the person already volunteered f
   const step = applyKitchenStep(suggestion(), { cocina_exclusiva: "si", preparacion_celiaca: null, dueno_celiaco: "si" }, { complete: true });
   assertEquals(step.preguntarCocina, false);
   assertEquals(step.pending.kitchen_exclusive, true);
-  assertEquals(step.pending.owner_celiac, true);
+  assertEquals("owner_celiac" in step.pending, false);
+});
+
+Deno.test("applyKitchenStep - an answer that only says the owner is celiac keeps nothing", () => {
+  const asked = suggestion({ kitchen_asked: true });
+  const step = applyKitchenStep(asked, { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: "si" }, { complete: true });
+  assertEquals(step.pending, asked);
+  assertEquals(step.preguntarCocina, false); // already asked once: never twice
 });
 
 Deno.test("applyKitchenStep - never asks about a report, and ignores facts volunteered about it", () => {
@@ -134,7 +150,6 @@ Deno.test("applyKitchenStep - never asks about a report, and ignores facts volun
     const chatty = applyKitchenStep(report({ report_type }), { cocina_exclusiva: "si", preparacion_celiaca: null, dueno_celiaco: "si" }, { complete: true });
     assertEquals(chatty.preguntarCocina, false, report_type);
     assertEquals("kitchen_exclusive" in chatty.pending, false, report_type);
-    assertEquals("owner_celiac" in chatty.pending, false, report_type);
   }
 });
 
@@ -148,7 +163,7 @@ Deno.test("validatePendingSubmission - a draft without kitchen data keeps its ex
 });
 
 Deno.test("validatePendingSubmission - keeps valid kitchen data and the asked marker", () => {
-  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", owner_celiac: true, kitchen_asked: true });
+  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", kitchen_asked: true });
   assertEquals(validatePendingSubmission(p), p);
 });
 
@@ -178,7 +193,7 @@ Deno.test("producer -> JSON -> validator round-trips every draft shape unchanged
     applyKitchenStep(suggestion(), NO_ROUTER_FACTS, { complete: true }).pending,
     applyKitchenStep(report(), { cocina_exclusiva: "no", preparacion_celiaca: "cocina_separada", dueno_celiaco: "si" }, { complete: true }).pending,
     applyKitchenStep(suggestion({ address: null }), { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: "no" }, { complete: false }).pending,
-    mergeKitchenFacts(suggestion({ kitchen_asked: true }), { kitchen_exclusive: true, celiac_prep: null, owner_celiac: null }),
+    mergeKitchenFacts(suggestion({ kitchen_asked: true }), { kitchen_exclusive: true, celiac_prep: null }),
   ];
   for (const d of drafts) {
     assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(d))), d);
@@ -227,18 +242,18 @@ Deno.test("buildSuggestionInsertPayload - no kitchen data => exactly today's row
   );
 });
 
-Deno.test("buildSuggestionInsertPayload - carries only the answered keys and never kitchen_asked", () => {
-  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", owner_celiac: true, kitchen_asked: true });
-  const payload = buildSuggestionInsertPayload(p);
+Deno.test("buildSuggestionInsertPayload - carries only the answered keys, never kitchen_asked, never owner_celiac", () => {
+  const p = { ...suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", kitchen_asked: true }), owner_celiac: true };
+  const payload = buildSuggestionInsertPayload(p as PendingSuggestionSubmission);
   assertEquals(payload.kitchen_exclusive, false);
   assertEquals(payload.celiac_prep, "separate_prep");
-  assertEquals(payload.owner_celiac, true);
+  assertEquals("owner_celiac" in payload, false);
   assertEquals("kitchen_asked" in payload, false);
 });
 
 Deno.test("buildPlaceReportInsertPayload - a review row never carries kitchen keys, even from a hand-made draft", () => {
   for (const report_type of ["positive", "negative"] as const) {
-    const row = buildPlaceReportInsertPayload(report({ report_type, kitchen_exclusive: true, owner_celiac: false, kitchen_asked: true }));
+    const row = buildPlaceReportInsertPayload({ ...report({ report_type, kitchen_exclusive: true, kitchen_asked: true }), owner_celiac: false } as PendingReportSubmission);
     assertEquals("kitchen_exclusive" in row, false, report_type);
     assertEquals("owner_celiac" in row, false, report_type);
     assertEquals("celiac_prep" in row, false, report_type);
@@ -255,12 +270,12 @@ Deno.test("decideConfirmarSubmission (Módulo 4) - facts volunteered in the mess
     match: { id: "3f2b6c1e-8d3a-4e21-9a55-0c7d6f1b2a10", name: "Café Sol" } as never,
     lugarNombre: "Café Sol",
     reporteTexto: "todo sin gluten, la dueña es celíaca",
-    facts: { kitchen_exclusive: true, celiac_prep: null, owner_celiac: true },
+    facts: { kitchen_exclusive: true, celiac_prep: null, owner_celiac: true } as never,
   });
   assertEquals(withFacts.kind, "insert_now");
   if (withFacts.kind === "insert_now") {
     assertEquals(withFacts.payload.kitchen_exclusive, true);
-    assertEquals(withFacts.payload.owner_celiac, true);
+    assertEquals("owner_celiac" in withFacts.payload, false);
     assertEquals("celiac_prep" in withFacts.payload, false);
   }
   const plain = decideConfirmarSubmission({ match: null, lugarNombre: "Café Sol", reporteTexto: "lo conozco, es sin tacc" });
@@ -295,22 +310,21 @@ Deno.test("decideKitchenAnswer - never when: not asked, not an answer, a confirm
 
 Deno.test("withConfirmFacts - facts said in the confirming message are merged before the insert", () => {
   const confirm: ConfirmTurnResult = { kind: "insert_suggestion", payload: suggestion({ kitchen_asked: true }) };
-  const merged = withConfirmFacts(confirm, { kitchen_exclusive: false, celiac_prep: "separate_kitchen", owner_celiac: null });
+  const merged = withConfirmFacts(confirm, { kitchen_exclusive: false, celiac_prep: "separate_kitchen" });
   assertEquals(merged.kind, "insert_suggestion");
   if (merged.kind === "insert_suggestion") {
     assertEquals(merged.payload.kitchen_exclusive, false);
     assertEquals(merged.payload.celiac_prep, "separate_kitchen");
   }
-  assertEquals(withConfirmFacts({ kind: "nothing_pending" }, { kitchen_exclusive: true, celiac_prep: null, owner_celiac: null }), { kind: "nothing_pending" });
+  assertEquals(withConfirmFacts({ kind: "nothing_pending" }, { kitchen_exclusive: true, celiac_prep: null }), { kind: "nothing_pending" });
 });
 
 Deno.test("withConfirmFacts - facts said while confirming a review of a mapped place are NOT written", () => {
   const confirm: ConfirmTurnResult = { kind: "insert_report", payload: report() };
-  const out = withConfirmFacts(confirm, { kitchen_exclusive: true, celiac_prep: null, owner_celiac: true });
+  const out = withConfirmFacts(confirm, { kitchen_exclusive: true, celiac_prep: null });
   assertEquals(out.kind, "insert_report");
   if (out.kind === "insert_report") {
     assertEquals("kitchen_exclusive" in out.payload, false);
-    assertEquals("owner_celiac" in out.payload, false);
   }
 });
 
@@ -318,16 +332,18 @@ Deno.test("kitchenEnvioExtras - the question flag and the recap use the router's
   assertEquals(kitchenEnvioExtras(suggestion(), true), { preguntar_cocina: true });
   assertEquals(kitchenEnvioExtras(suggestion(), false), {});
   assertEquals(
-    kitchenEnvioExtras(suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", owner_celiac: true }), false),
-    { cocina: { exclusiva: "no", preparacion: "preparacion_aparte", dueno_celiaco: "si" } },
+    kitchenEnvioExtras({ ...suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep" }), owner_celiac: true } as PendingSuggestionSubmission, false),
+    { cocina: { exclusiva: "no", preparacion: "preparacion_aparte" } },
   );
+  // An owner answer alone is no recap at all: the redactor never receives it.
+  assertEquals(kitchenEnvioExtras({ ...suggestion(), owner_celiac: true } as PendingSuggestionSubmission, false), {});
 });
 
 Deno.test("moduloCuatroEnvioExtras - facts present => recap; none => invite to add them", () => {
   assertEquals(moduloCuatroEnvioExtras({}), { invitar_cocina: true });
   assertEquals(
     moduloCuatroEnvioExtras({ kitchen_exclusive: true }),
-    { cocina: { exclusiva: "si", preparacion: null, dueno_celiaco: null } },
+    { cocina: { exclusiva: "si", preparacion: null } },
   );
 });
 

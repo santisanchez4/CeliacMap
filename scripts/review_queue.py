@@ -91,8 +91,7 @@ def _print_place(db, p: dict, out, *, reports: bool = False) -> None:
     if suggestion:
         out(f"  sugerido:  {suggestion.get('created_at')} · nota: {suggestion.get('notes') or '-'}")
         out(f"  cocina:    exclusiva {_TRI.get(suggestion.get('kitchen_exclusive'), 'sin dato')}"
-            f" · preparación {suggestion.get('celiac_prep') or 'sin dato'}"
-            f" · dueño/a celíaco/a {_TRI.get(suggestion.get('owner_celiac'), 'sin dato')} (solo para vos)")
+            f" · preparación {suggestion.get('celiac_prep') or 'sin dato'}")
     if reports:
         for r in _safe(lambda: db.fetch_recent_negative_reports(p["id"], days=WARNING_DAYS)):
             out(f"  reporte:   {r.get('created_at')} · {r.get('description')}")
@@ -113,8 +112,7 @@ def _print_suggestions(rows: list[dict], out) -> None:
         out(f"  enviado:   {s.get('created_at')} · categoría {s.get('category') or '-'} · link {s.get('evidence_url') or '-'}")
         out(f"  nota:      {s.get('notes') or '-'}")
         out(f"  cocina:    exclusiva {_TRI.get(s.get('kitchen_exclusive'), 'sin dato')}"
-            f" · preparación {s.get('celiac_prep') or 'sin dato'}"
-            f" · dueño/a celíaco/a {_TRI.get(s.get('owner_celiac'), 'sin dato')} (solo para vos)")
+            f" · preparación {s.get('celiac_prep') or 'sin dato'}")
         out("  → corregí la ubicación con: --locate ID --lat <lat> --lng <lng> [--address '...'] --apply")
 
 

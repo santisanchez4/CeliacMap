@@ -11,7 +11,7 @@ places — Curitiba cluster".
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from agents.clients.supabase_client import SupabaseClient, coordinates_in_scope
@@ -270,6 +270,50 @@ def test_delete_chatbot_logs_returns_zero_when_nothing_expired():
     chain.return_value.execute.return_value = MagicMock(data=[])
 
     assert client.delete_chatbot_logs() == 0
+
+
+# --- weekly retention purge (privacy phase 1, 2026-09-29) ------------------------
+
+
+def test_delete_old_chat_usage_deletes_counters_older_than_the_cutoff_day():
+    client = _client_with_mock_db()
+    chain = client._db.table.return_value.delete.return_value.lt
+    chain.return_value.execute.return_value = MagicMock(data=[{"bucket_key": "a"}, {"bucket_key": "b"}])
+
+    assert client.delete_old_chat_usage(cutoff_days=7) == 2
+    client._db.table.assert_called_once_with("chat_usage")
+    column, value = chain.call_args.args
+    assert column == "day"
+    cutoff = datetime.fromisoformat(value).date()
+    assert (datetime.now(timezone.utc).date() - cutoff).days == 7  # the counters' day is a UTC date
+
+
+def _agent_log_tables(last_run, purge_rows):
+    """table('agent_log') is called twice: the last search run, then the purge entries."""
+    client = _client_with_mock_db()
+    last_q, purge_q = MagicMock(), MagicMock()
+    (last_q.select.return_value.eq.return_value.eq.return_value.order.return_value.limit.return_value
+     .execute.return_value) = MagicMock(data=last_run)
+    purge_base = purge_q.select.return_value.eq.return_value.eq.return_value
+    purge_base.execute.return_value = MagicMock(data=purge_rows)
+    purge_base.gt.return_value.execute.return_value = MagicMock(data=purge_rows)
+    client._db.table.side_effect = [last_q, purge_q]
+    return client, purge_base
+
+
+def test_fetch_purged_review_place_ids_since_the_last_search_run_flattens_and_dedups():
+    client, purge_base = _agent_log_tables(
+        [{"created_at": "2026-09-01T14:07:40+00:00"}],
+        [{"result": {"place_ids": ["p2", "p1"]}}, {"result": {"place_ids": ["p1"]}}, {"result": None}],
+    )
+    assert client.fetch_purged_review_place_ids() == ["p1", "p2"]
+    purge_base.gt.assert_called_once_with("created_at", "2026-09-01T14:07:40+00:00")
+
+
+def test_fetch_purged_review_place_ids_without_a_previous_search_run_reads_every_entry():
+    client, purge_base = _agent_log_tables([], [{"result": {"place_ids": ["p9"]}}])
+    assert client.fetch_purged_review_place_ids() == ["p9"]
+    purge_base.gt.assert_not_called()
 
 
 # --- community kitchen claims (server-only intake tables) ----------------------

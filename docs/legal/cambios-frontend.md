@@ -49,9 +49,9 @@ Notas:
 
 ## 4. Otros cambios que dependen de los pendientes
 
-- Sacar la pregunta “¿El dueño o la dueña es celíaco/a?” (`owner-celiac-plan.md`, etapa 1).
-- Si se decide así en el pendiente P8 del inventario: el aviso de publicación de las recomendaciones que llegan por el
-  chat (va en la tanda de prompts, no en el frontend).
+- ~~Sacar la pregunta “¿El dueño o la dueña es celíaco/a?”~~ Hecho en la fase 1 (2026-09-29).
+- El aviso de publicación de las recomendaciones que llegan por el chat va en la tanda de prompts, no en el frontend
+  (`docs/plans/next-prompt-batch.md`, punto 2).
 - Actualizar `README.md` y `docs/DECISIONS.md` (entrada nueva + línea en el índice de `CLAUDE.md`) cuando se publique.
 
 ## 5. Verificación antes de dar por hecho

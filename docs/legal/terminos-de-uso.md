@@ -1,6 +1,6 @@
 # Términos de uso de CeliacMap
 
-> **BORRADOR, no publicado (2026-09-29).** Falta la revisión legal. Lo que dice sobre cómo funciona el sistema coincide
+> **BORRADOR, no publicado (actualizado 2026-09-29, fase 1 de privacidad).** Falta la revisión legal. Lo que dice sobre cómo funciona el sistema coincide
 > con `docs/legal/inventario-datos.md` y con el código a esta fecha.
 
 **Última actualización:** [fecha de publicación]
@@ -63,8 +63,8 @@ acuerdo, no uses los formularios, los votos ni el chat.
 
 ### Cómo moderamos
 
-- Ningún comentario se publica solo. Una **recomendación** se publica solo si la aprobamos, con el nombre que
-  elegiste o como “Anónimo”. Un **reporte de problema** nunca se publica: lo usamos para volver a revisar el lugar.
+- Ningún comentario se publica solo. Una **recomendación** enviada con el formulario se publica solo si la aprobamos,
+  con el nombre que elegiste o como “Anónimo”. Las recomendaciones que llegan por el chat no se publican. Un **reporte de problema** nunca se publica: lo usamos para volver a revisar el lugar.
 - Podemos no publicar, o sacar después, cualquier recomendación que no cumpla estas reglas o que deje de corresponder
   (por ejemplo, si el lugar sale del mapa, su recomendación deja de verse).
 - Un comentario, un voto o un reporte **no cambia por sí solo** la etiqueta de un lugar ni si aparece en el mapa. Son

@@ -46,15 +46,14 @@
 
 ## Implementación antes de publicar (código, con plan y “dale” para producción)
 
-- [ ] P6 — eliminar `owner_celiac` (`owner-celiac-plan.md`, etapas 1 a 4).
-- [ ] P1 — procedimiento y script para atender pedidos de acceso, rectificación y supresión en todas las tablas y en
-      el buzón, con registro de cada pedido.
-- [ ] P2 — borrado automático de `chat_usage` y hash de IP con clave secreta.
-- [ ] P3 — cerrar la lectura pública de `places.contact_email` y de las columnas de outreach.
-- [ ] P4 — borrado semanal de las reseñas de Google (hoy 270 de 281 tienen más de 30 días; la próxima corrida mensual
-      las borra el 2026-10-01).
+- [ ] P6 — eliminar `owner_celiac`: etapa 1 hecha (fase 1, 2026-09-29); etapa 2 en la próxima tanda de prompts;
+      etapa 3, el SQL `db/migrations/2026-10-06-drop-owner-celiac.PENDING.sql`, el 2026-10-06 o después.
+- [x] P1 — `scripts/delete_personal_data.py` + `runbook-pedidos-de-datos.md` (fase 1).
+- [x] P2 — purga de `chat_usage` a los 7 días + HMAC de la IP (fase 1).
+- [x] P3 — `places` con grant por columna (fase 1, aplicado y verificado).
+- [x] P4 — reseñas de Google en la purga semanal (fase 1).
 - [ ] P5 — plazos de retención para sugerencias, reportes, votos, outreach, `agent_log` y el buzón.
-- [ ] P8 — decidir qué pasa con las recomendaciones que llegan por el chat.
+- [x] P8 — las recomendaciones del chat no se publican (fase 1); el aviso en el chat va en la próxima tanda de prompts.
 - [ ] Cambios de frontend (`cambios-frontend.md`).
 - [ ] Registrar las decisiones en `docs/DECISIONS.md` y en el índice de `CLAUDE.md`.
 

@@ -36,11 +36,10 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   GF business that only exists on Instagram still lands on the map), dedups, and
   promotes it into `places` as `pending` (`source='user'`) for the Validator to
   judge. Honeypot + timing + cooldown guard against spam. The "add a place" form (and
-  the chatbot, when someone adds a business) also asks three optional questions about **how the place cooks** —
-  is the kitchen exclusively gluten free, how is celiac food prepared if not, is
-  the owner celiac. The answers are stored server-side as **unverified evidence**
-  (never publicly readable; the owner's condition never even reaches the
-  Validator): a community claim does not put a place at "Espacio 100% sin gluten"
+  the chatbot, when someone adds a business) also asks two optional questions about **how the place cooks** —
+  is the kitchen exclusively gluten free, and how is celiac food prepared if not (whether the owner is celiac is
+  no longer collected: third-party health data, privacy phase 1). The answers are stored server-side as **unverified
+  evidence** (never publicly readable): a community claim does not put a place at "Espacio 100% sin gluten"
   on its own — community-suggested places are capped in code, and the rubric
   (measured against the real model) keeps every other source from doing it too;
   the admin decides ([`ADR-007`](docs/architecture/ADR-007-kitchen-info-as-evidence.md)).
@@ -294,6 +293,8 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── review_queue.py         # admin queue: 100% pending, needs_review, unplaceable suggestions, warnings, evidence proposals
 │   ├── find_evidence.py        # evidence finder CLI: reads the 100% queue, writes a local report (never writes to the database)
 │   ├── admin_digest.py         # daily email to the admin (admin-digest.yml)
+│   ├── delete_personal_data.py # answer a deletion request: find by text/date, dry-run unless --apply (docs/legal/runbook-pedidos-de-datos.md)
+│   ├── purge_chat_logs.py      # weekly retention purge: chat logs 30 d, chat_usage 7 d, Google reviews 30 d
 │   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers

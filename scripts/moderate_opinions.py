@@ -11,6 +11,12 @@ hides a published one. Dry-run by default; nothing is written without ``--apply`
 
 Only positive reports of currently approved places can be approved (the database also forbids
 publishing a negative one). See docs/superpowers/specs/2026-09-24-community-opinions-design.md.
+
+Only recommendations sent with form B are offered (privacy phase 1, 2026-09-29). The chat does not
+tell the person that a comment may be published as "Anónimo" (that notice waits for the next prompt
+batch), so a row without ``reporter_token`` -- the chat never sends one, form B always does -- is
+listed apart and refused. A form row older than the token (before 2026-09-24) looks the same and is
+refused too: when in doubt, it is not published.
 """
 from __future__ import annotations
 
@@ -22,10 +28,20 @@ from agents.clients.supabase_client import SupabaseClient
 from agents.validator_agent import ValidatorAgent
 from config.settings import get_settings
 
+def from_the_form(r: dict) -> bool:
+    """A recommendation sent with form B (the only kind offered for publishing)."""
+    return bool(r.get("reporter_token"))
+
+
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
 
-def _print_pending(pending: list[dict], out) -> None:
+def _print_pending(rows: list[dict], out) -> None:
+    pending = [r for r in rows if from_the_form(r)]
+    from_chat = len(rows) - len(pending)
+    if from_chat:
+        out(f"({from_chat} más llegó por el chat o no tiene origen claro: no se ofrece para publicar,"
+            " porque el chat no avisa que puede publicarse.)")
     if not pending:
         out("No hay recomendaciones pendientes de aprobar.")
         return
@@ -66,11 +82,17 @@ def run(db, approve: list[str], hide: list[str], apply: bool, out=print) -> int:
         out(f"Retirados: {len(changed)} de {len(hide)}.")
         return 0
 
-    pending_ids = {r["id"] for r in db.fetch_unpublished_opinions()}
+    rows = db.fetch_unpublished_opinions()
+    pending_ids = {r["id"] for r in rows if from_the_form(r)}
+    chat_ids = {r["id"] for r in rows if not from_the_form(r)}
     allowed = [i for i in approve if i in pending_ids]
     skipped = [i for i in approve if i not in pending_ids]
-    if skipped:
-        out(f"Omitidos (no son una recomendación positiva pendiente de un lugar aprobado): {', '.join(skipped)}")
+    from_chat = [i for i in skipped if i in chat_ids]
+    other = [i for i in skipped if i not in chat_ids]
+    if from_chat:
+        out(f"Omitidos (llegaron por el chat o sin origen claro; no se publican): {', '.join(from_chat)}")
+    if other:
+        out(f"Omitidos (no son una recomendación positiva pendiente de un lugar aprobado): {', '.join(other)}")
     if not allowed:
         return 1
     if not apply:

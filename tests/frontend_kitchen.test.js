@@ -35,14 +35,14 @@ const plain = (x) => JSON.parse(JSON.stringify(x));
 const PREFIXES = [["sg", "suggest-form"]];
 
 for (const [pfx, formId] of PREFIXES) {
-  Deno.test(`#${pfx}-kitchen markup: a fieldset in #${formId}, three groups, "No sé" checked, question 2 hidden`, async () => {
+  Deno.test(`#${pfx}-kitchen markup: a fieldset in #${formId}, two groups, "No sé" checked, question 2 hidden`, async () => {
     const f = await page();
     const root = f.document.getElementById(`${pfx}-kitchen`);
     assert.ok(root, "fieldset missing");
     assert.equal(root.tagName, "FIELDSET");
     assert.ok(f.document.getElementById(formId).contains(root));
     assert.ok(root.querySelector("legend"));
-    for (const q of ["exclusive", "prep", "owner"]) {
+    for (const q of ["exclusive", "prep"]) {
       const radios = [...root.querySelectorAll(`input[data-kitchen-q="${q}"]`)];
       assert.ok(radios.length >= 3, `${q}: options`);
       assert.equal(radios.find((r) => r.value === "unknown").hasAttribute("checked"), true, `${q}: default is "No sé"`);
@@ -65,8 +65,7 @@ Deno.test("read(): not exclusive shows question 2 and reports every answered key
   choose(f, "sg-kitchen-exclusive", "no");
   assert.equal(root.querySelector("[data-kitchen-prep]").hidden, false);
   choose(f, "sg-kitchen-prep", "separate_prep");
-  choose(f, "sg-kitchen-owner", "yes");
-  assert.deepEqual(plain(kitchen.read()), { kitchen_exclusive: false, celiac_prep: "separate_prep", owner_celiac: true });
+  assert.deepEqual(plain(kitchen.read()), { kitchen_exclusive: false, celiac_prep: "separate_prep" });
 });
 
 Deno.test("read(): exclusive kitchen never sends celiac_prep, even if it was chosen before", async () => {
@@ -80,18 +79,28 @@ Deno.test("read(): exclusive kitchen never sends celiac_prep, even if it was cho
   assert.deepEqual(plain(kitchen.read()), { kitchen_exclusive: true });
 });
 
-Deno.test("read(): 'No' for the owner is a real answer (false), not 'unknown'", async () => {
+// Privacy phase 1 (2026-09-29): whether the owner is celiac is a third party's health data. The form no
+// longer asks it and nothing can send it.
+Deno.test("the owner question is gone: no radios, no copy, no i18n keys, and read() never reports it", async () => {
   const f = await page();
-  const kitchen = f.browser.CeliacKitchen.attach(f.document.getElementById("sg-kitchen"));
-  choose(f, "sg-kitchen-owner", "no");
-  assert.deepEqual(plain(kitchen.read()), { owner_celiac: false });
+  const root = f.document.getElementById("sg-kitchen");
+  assert.equal(root.querySelectorAll('input[data-kitchen-q="owner"]').length, 0);
+  assert.equal(Boolean(f.document.getElementById("sg-kq3")), false);
+  assert.equal(/dueño o la dueña/i.test(root.textContent), false);
+  const main = await Deno.readTextFile("js/main.js");
+  assert.equal(main.includes('"kitchen.q3"'), false);
+  assert.equal(main.includes('"kitchen.ownerNote"'), false);
+  assert.equal((await Deno.readTextFile("js/kitchen.js")).includes("owner_celiac"), false);
+  const kitchen = f.browser.CeliacKitchen.attach(root);
+  choose(f, "sg-kitchen-exclusive", "yes");
+  assert.equal("owner_celiac" in plain(kitchen.read()), false);
 });
 
 Deno.test("setVisible(false) hides the block, clears the answers and read() returns {}", async () => {
   const f = await page();
   const root = f.document.getElementById("sg-kitchen");
   const kitchen = f.browser.CeliacKitchen.attach(root);
-  choose(f, "sg-kitchen-owner", "yes");
+  choose(f, "sg-kitchen-exclusive", "yes");
   kitchen.setVisible(false);
   assert.equal(root.hidden, true);
   kitchen.setVisible(true);
@@ -102,7 +111,7 @@ Deno.test("EN dictionary carries every kitchen key (copy test covers the rest)",
   const main = await Deno.readTextFile("js/main.js");
   for (const key of ["kitchen.legend", "kitchen.intro", "kitchen.q1", "kitchen.q1.yes", "kitchen.q1.no",
     "kitchen.unknown", "kitchen.q2", "kitchen.q2.separateKitchen", "kitchen.q2.separatePrep",
-    "kitchen.q2.sharedKitchen", "kitchen.q3", "kitchen.yes", "kitchen.no", "kitchen.ownerNote"]) {
+    "kitchen.q2.sharedKitchen"]) {
     assert.ok(main.includes(`"${key}":`), key);
   }
 });
@@ -130,11 +139,11 @@ Deno.test("suggest.js: everything on 'No sé' sends exactly today's payload (no 
 
 Deno.test("suggest.js: answered kitchen questions travel with the suggestion", async () => {
   const [sent] = await submitSuggest([
-    ["sg-kitchen-exclusive", "no"], ["sg-kitchen-prep", "separate_kitchen"], ["sg-kitchen-owner", "yes"],
+    ["sg-kitchen-exclusive", "no"], ["sg-kitchen-prep", "separate_kitchen"],
   ]);
   assert.equal(sent.body.kitchen_exclusive, false);
   assert.equal(sent.body.celiac_prep, "separate_kitchen");
-  assert.equal(sent.body.owner_celiac, true);
+  assert.equal("owner_celiac" in sent.body, false);
 });
 
 async function submitReport(type, choices = []) {

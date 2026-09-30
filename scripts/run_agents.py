@@ -67,6 +67,9 @@ class DryRunSupabase:
     def fetch_reviews_for_place(self, place_id: str, limit: int = 5) -> list[dict]:
         return self._inner.fetch_reviews_for_place(place_id, limit=limit)
 
+    def fetch_purged_review_place_ids(self) -> list[str]:
+        return self._inner.fetch_purged_review_place_ids()
+
     def fetch_community_claims(self, place_id: str, limit: int = 5) -> list[dict]:
         return self._inner.fetch_community_claims(place_id, limit=limit)
 

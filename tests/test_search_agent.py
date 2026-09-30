@@ -62,6 +62,7 @@ def make_agent(
     db.insert_place_candidate.return_value = {"id": "row-1"}
     # No expired reviews by default -- refresh tests override this explicitly.
     db.delete_expired_google_reviews.return_value = []
+    db.fetch_purged_review_place_ids.return_value = []
     places = MagicMock()
     agent = SearchAgent(
         db,
@@ -520,6 +521,24 @@ def test_refresh_deletes_expired_reviews_and_refetches_under_budget():
     assert summary["reviews_expired"] == 2
     assert summary["reviews_refresh_calls"] == 2
     assert summary["reviews_refreshed"] == 2
+
+
+def test_refresh_also_refetches_places_whose_reviews_the_weekly_purge_deleted():
+    # Privacy phase 1: the weekly purge deletes expired snippets first and logs the place ids; the
+    # monthly refresh must still re-fetch them (deduped with what it deletes itself).
+    agent, db, places = make_agent(max_review_refresh=5)
+    db.delete_expired_google_reviews.return_value = ["place-1"]
+    db.fetch_purged_review_place_ids.return_value = ["place-2", "place-1"]
+    db.fetch_place_by_id.side_effect = lambda pid: {"external_id": f"ext-{pid}"}
+    places.text_search.return_value = {"results": []}
+    places.place_details_with_reviews.return_value = {"result": {"reviews": [{"text": "sin TACC", "rating": 5}]}}
+
+    summary = agent.run()
+
+    assert places.place_details_with_reviews.call_count == 2
+    assert summary["reviews_expired"] == 1
+    assert summary["reviews_purged_weekly"] == 2
+    assert summary["reviews_refresh_calls"] == 2
 
 
 def test_refresh_respects_max_review_refresh_budget():

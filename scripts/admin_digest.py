@@ -8,8 +8,8 @@ away by ``agents/admin_notify.AdminNotifier``; they appear here again as part of
     python -m scripts.admin_digest                # send it (needs RESEND_API_KEY + ADMIN_EMAIL)
 
 Privacy: chatbot turns are only COUNTED (their text is purged after 30 days and must not live on
-in an inbox). Suggestion kitchen answers, owner-celiac included, and report texts are for the
-admin's review and are included.
+in an inbox). Suggestion kitchen answers and report texts are for the admin's review and are
+included. Whether an owner is celiac (a third party's health data) is never emailed.
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 
 from agents.admin_notify import DEFAULT_SENDER, SUBJECT_PREFIX
 from agents.validator_agent import PENDING_ADMIN_FLAG
+from scripts.moderate_opinions import from_the_form
 
 WINDOW_HOURS = 24
 _TRI = {True: "sí", False: "no", None: "sin dato"}
@@ -53,10 +54,9 @@ def build_digest(db, since: str | None = None) -> tuple[str, str] | None:
                 lines.append(f"    nota: {s['notes']}")
             if s.get("evidence_url"):
                 lines.append(f"    link: {s['evidence_url']}")
-            if any(s.get(k) is not None for k in ("kitchen_exclusive", "celiac_prep", "owner_celiac")):
+            if any(s.get(k) is not None for k in ("kitchen_exclusive", "celiac_prep")):
                 lines.append(f"    cocina: exclusiva {_TRI.get(s.get('kitchen_exclusive'))}"
-                             f" · preparación {s.get('celiac_prep') or 'sin dato'}"
-                             f" · dueño/a celíaco/a {_TRI.get(s.get('owner_celiac'))}")
+                             f" · preparación {s.get('celiac_prep') or 'sin dato'}")
         lines.append("  (se procesan el lunes; las que no se ubiquen aparecen en review_queue --suggestions)")
         sections.append(lines)
 
@@ -79,13 +79,16 @@ def build_digest(db, since: str | None = None) -> tuple[str, str] | None:
         lines.append("  python -m scripts.review_queue --warnings")
         sections.append(lines)
 
-    pending_opinions = db.fetch_unpublished_opinions()
+    unpublished = db.fetch_unpublished_opinions()
+    pending_opinions = [r for r in unpublished if from_the_form(r)]
     if positive or pending_opinions:
         counts["opiniones por aprobar"] = len(pending_opinions)
         lines = [f"RECOMENDACIONES: {len(positive)} nuevas hoy · {len(pending_opinions)} esperando tu aprobación"]
         for r in pending_opinions:
             lines.append(f"- {_place_label(r)} · {r.get('author_name') or 'Anónimo'}: {r.get('description')}")
             lines.append(f"    python -m scripts.moderate_opinions --approve {r.get('id')} --apply")
+        if len(unpublished) > len(pending_opinions):
+            lines.append(f"  ({len(unpublished) - len(pending_opinions)} del chat: no se publican)")
         sections.append(lines)
 
     warned = db.fetch_places_for_admin(None, warned_since=_since(24 * 30), limit=50)

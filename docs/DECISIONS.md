@@ -2668,6 +2668,50 @@ autocomplete, "La voz de la comunidad", 0 console errors). The emergency revert
 starts using a column outside the grant fails that test (and would 401 in production); a wildcard `select=*` with the anon
 key is refused by the database.
 
+### Privacy phase 1 — owner_celiac out, retention, IP HMAC, deletion requests (2026-09-29)
+
+Closes the `[PENDIENTE DE IMPLEMENTAR]` marks of `docs/legal/` that code can close (the inventory's P1–P4, P6 stage 1 and
+P8). Everything was test-first; no prompt changed (`prompts.ts` untouched), so no A/B or jailbreak battery was needed.
+
+**owner_celiac, stage 1** (`docs/legal/owner-celiac-plan.md`). Whether a business owner is celiac is a third party's health
+data, collected without that person's consent (Ley 18.331 art. 18, Ley 25.326 art. 7), and it no longer changed anything: the
+Validator never read it. It is gone from form A (`index.html`, `js/kitchen.js`, the `kitchen.q3` / `kitchen.ownerNote` keys
+and the `.kitchen-note` rule), from `review_queue` and the daily email, and the chat discards it: `KitchenFacts` no longer
+has the field, `kitchenFactsFromRouter` ignores the router's `dueno_celiaco`, a legacy client echo is stripped, and neither
+a row nor the redactor's `<envio>` carries it. The router still extracts it and the redactor still asks until the next
+prompt batch (`docs/plans/next-prompt-batch.md`, item 1). Production had 0 rows with the datum. The column drop is prepared,
+not run: `db/migrations/2026-10-06-drop-owner-celiac.PENDING.sql`, no earlier than 2026-10-06 so a cached page cannot lose a
+suggestion to an unknown-column error.
+
+**Retention in the weekly purge** (`scripts/purge_chat_logs.py`, `.github/workflows/chat-log-purge.yml`, now "Weekly
+retention purge"). Besides the 30-day chatbot logs: `chat_usage` counters older than 7 days
+(`SupabaseClient.delete_old_chat_usage`; before, only a manual snippet in the schema) and Google review snippets older than
+30 days (before, only inside the monthly Search stage, so 30 to ~61 days in practice; 270 of 281 were past 30 days on
+2026-09-29). The purge logs the place ids it emptied (`agent='search'`, `action='google_reviews_purged'`) and
+`SearchAgent._refresh_expired_reviews` re-fetches those since its last run (`fetch_purged_review_place_ids`), so the monthly
+refresh keeps working when the weekly job deletes first.
+
+**IP bucket: HMAC-SHA256 with `CHAT_IP_HASH_SECRET`** (`ipBucketHash` in `supabase/functions/chat/index.ts`). The unkeyed
+SHA-256 of an IPv4 could be reversed by trying all ~4.3 billion addresses. With no secret the function stores no IP-derived
+key at all (session and global caps still apply) and logs the missing secret, instead of falling back to the plain hash. The
+old SHA-256 buckets disappear with the 7-day purge.
+
+**Chat recommendations are never published** (`scripts/moderate_opinions.py`, `from_the_form`). The chat never says a comment
+may be published as "Anónimo", so only rows with a `reporter_token` (form B always sends one; the chat never does) are
+offered or approvable; the daily email counts the rest apart. No schema change. A form row older than the token
+(2026-09-24) looks the same and is refused too. The one opinion already published (created 2026-09-23, no token) was left
+as it is: its origin cannot be told. The chat notice is item 2 of the next prompt batch.
+
+**Deletion requests** (`scripts/delete_personal_data.py`, `docs/legal/runbook-pedidos-de-datos.md`). Search by text and an
+optional date range in `suggestions`, `place_reports`, `place_evidence` and the marked-turn text of the chatbot's
+`agent_log` rows; dry run by default, `--apply` (optionally `--ids`) deletes, and one `agent_log` record
+(`agent='privacy'`, needs the `agent-log-privacy` migration) keeps the request reference, counts and ids, never the content
+or the searched text; it is written before deleting, so a failed record deletes nothing. The jsonb filters were smoke-tested live read-only (36 matches, equal to the SQL count). Internal
+target: answer in 5 business days.
+
+**Standing rules.** No third-party health data is collected; retention runs in the weekly purge; deletion requests go through
+the script and the runbook (CLAUDE.md, "Reglas vigentes").
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

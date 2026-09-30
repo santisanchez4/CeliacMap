@@ -562,7 +562,6 @@ h1, h2, h3 {
 .kitchen-opt input { margin-top: 2px; accent-color: var(--color-primary); flex: none; }
 .kitchen-opt:has(input:checked) { border-color: var(--color-primary); background: var(--color-surface); }
 .kitchen-opt:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.kitchen-note { color: var(--color-text-muted); font-size: 0.8rem; margin: 6px 0 0; }
 .suggest-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

@@ -8,9 +8,12 @@ ID_B = "9a1c5d7e-2b44-4f60-8c31-5e0d7a9b1c22"
 ID_C = "c0ffee00-1234-4abc-8def-0123456789ab"
 
 
-def row(rid, name=None, text="Muy rico todo"):
+def row(rid, name=None, text="Muy rico todo", reporter_token="tok-form-12345"):
+    # Form B always sends a reporter_token; the chat never does (privacy phase 1: that is how a chat
+    # recommendation is told apart without a schema change).
     return {
         "id": rid, "description": text, "author_name": name, "created_at": "2026-09-23T10:00:00+00:00",
+        "reporter_token": reporter_token,
         "place_id": "p1", "places": {"name": "San Felipa", "city": "Gualeguaychú", "country": "Argentina", "status": "approved"},
     }
 
@@ -107,3 +110,36 @@ def test_warns_when_the_text_claims_100_but_the_map_says_options():
     run(FakeDB([r, ok]), [], [], False, out=out)
     text = "\n".join(lines)
     assert text.count("⚠ AVISO") == 1
+
+
+# --- privacy phase 1 (2026-09-29): chat recommendations are never offered for publishing -----------
+# The chat never tells the person their comment may be published as "Anónimo" (that notice waits for the
+# next prompt batch), so a row without reporter_token (the chat, or a form row older than the token) is
+# listed apart and cannot be approved.
+
+
+def test_listing_does_not_offer_chat_recommendations():
+    db = FakeDB([row(ID_A), row(ID_B, reporter_token=None, text="me lo contaron en el chat")])
+    lines, out = capture()
+    assert run(db, approve=[], hide=[], apply=False, out=out) == 0
+    text = "\n".join(lines)
+    assert ID_A in text
+    assert ID_B not in text and "me lo contaron en el chat" not in text
+    assert "1 recomendación(es) pendiente(s)" in text
+    assert "1 más llegó por el chat" in text
+
+
+def test_approving_a_chat_recommendation_is_refused_even_with_apply():
+    db = FakeDB([row(ID_A), row(ID_B, reporter_token=None)])
+    lines, out = capture()
+    code = run(db, approve=[ID_A, ID_B], hide=[], apply=True, out=out)
+    assert code == 1
+    assert db.writes == [([ID_A], True)]
+    assert "chat" in "\n".join(lines)
+
+
+def test_from_the_form_is_the_single_rule():
+    from scripts.moderate_opinions import from_the_form
+    assert from_the_form({"reporter_token": "tok-form-12345"}) is True
+    assert from_the_form({"reporter_token": None}) is False
+    assert from_the_form({}) is False

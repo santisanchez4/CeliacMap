@@ -1,8 +1,8 @@
 /* =====================================================================
    CeliacMap — js/kitchen.js
    Shared "Sobre la cocina" block used by the suggest and report forms.
-   Three optional radio questions (is the kitchen exclusively gluten free?,
-   how is celiac food prepared?, is the owner celiac?). read() returns ONLY
+   Two optional radio questions (is the kitchen exclusively gluten free?,
+   how is celiac food prepared?). read() returns ONLY
    the answered keys, so leaving everything on "No sé" produces a payload
    identical to the one sent before this block existed.
    See docs/superpowers/specs/2026-09-24-kitchen-info-design.md.
@@ -42,7 +42,6 @@
     function reset() {
       setChecked(root, "exclusive", "unknown");
       setChecked(root, "prep", "unknown");
-      setChecked(root, "owner", "unknown");
       sync();
     }
 
@@ -57,9 +56,6 @@
         var prep = checkedValue(root, "prep");
         if (PREP_VALUES.indexOf(prep) !== -1) out.celiac_prep = prep;
       }
-      var owner = checkedValue(root, "owner");
-      if (owner === "yes") out.owner_celiac = true;
-      else if (owner === "no") out.owner_celiac = false;
       return out;
     }
 

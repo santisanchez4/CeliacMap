@@ -135,9 +135,13 @@ class SearchAgent(BaseAgent):
         without cached reviews until a later run.
         """
         expired_place_ids = self.db.delete_expired_google_reviews()
+        # The weekly retention purge (scripts/purge_chat_logs.py) usually deletes them first and logs
+        # the place ids: re-fetch those too, or the purge would silently end the refresh.
+        purged_weekly = list(self.db.fetch_purged_review_place_ids() or [])
+        to_refresh = list(dict.fromkeys(expired_place_ids + purged_weekly))
         refresh_calls = 0
         refreshed = 0
-        for place_id in expired_place_ids[: self.max_review_refresh]:
+        for place_id in to_refresh[: self.max_review_refresh]:
             place = self.db.fetch_place_by_id(place_id)
             external_id = place.get("external_id") if place else None
             if not external_id:
@@ -148,6 +152,7 @@ class SearchAgent(BaseAgent):
                 refreshed += 1
         return {
             "expired": len(expired_place_ids),
+            "purged_weekly": len(purged_weekly),
             "refresh_calls": refresh_calls,
             "refreshed": refreshed,
         }
@@ -283,6 +288,7 @@ class SearchAgent(BaseAgent):
             "reviews_enriched": reviews_enriched,
             "review_snippets": review_snippets,
             "reviews_expired": review_refresh["expired"],
+            "reviews_purged_weekly": review_refresh["purged_weekly"],
             "reviews_refresh_calls": review_refresh["refresh_calls"],
             "reviews_refreshed": review_refresh["refreshed"],
         }

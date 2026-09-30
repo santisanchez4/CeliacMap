@@ -94,7 +94,10 @@ def test_digest_groups_everything_and_never_includes_chat_text():
         suggestions=[{"name": "Pastas Lo de Flor", "address": "JC 23", "city": "Fray Bentos", "country": "Uruguay",
                       "status": "new", "notes": "pastas caseras", "kitchen_exclusive": True, "owner_celiac": True}],
         reports=[{"report_type": "negative", "description": "cerraron", "places": {"name": "Cafe X", "city": "Salto", "country": "Uruguay"}}],
-        opinions=[{"id": "o1", "description": "riquísimo", "author_name": None, "places": {"name": "San Felipa", "city": "Gualeguaychú", "country": "Argentina"}}],
+        opinions=[{"id": "o1", "description": "riquísimo", "author_name": None, "reporter_token": "tok-form-12345",
+                   "places": {"name": "San Felipa", "city": "Gualeguaychú", "country": "Argentina"}},
+                  {"id": "o2", "description": "del chat", "author_name": None, "reporter_token": None,
+                   "places": {"name": "Cafe Y", "city": "Salto", "country": "Uruguay"}}],
         log=[
             {"agent": "validator", "action": "validate", "status": "success", "result": {"status": "needs_review"}},
             {"agent": "chatbot", "action": "turn", "status": "success", "result": {"marked": True, "raw_user_text": "SECRETO"}},
@@ -103,8 +106,11 @@ def test_digest_groups_everything_and_never_includes_chat_text():
     )
     subject, text = build_digest(db)
     assert subject.startswith("[CeliacMap] Resumen del día")
-    assert "Pastas Lo de Flor" in text and "dueño/a celíaco/a sí" in text
+    assert "Pastas Lo de Flor" in text and "cocina: exclusiva sí" in text
+    # Privacy phase 1: the owner's health is never emailed, even if an old row still carries it.
+    assert "dueño" not in text and "celíaco/a" not in text
     assert "cerraron" in text and "riquísimo" in text and "moderate_opinions --approve o1" in text
+    assert "--approve o2" not in text  # a chat recommendation is never offered for publishing
     assert "a revisión humana 1" in text
     assert "social/social_query_failed: 1" in text
     assert "1 turnos · 1 marcados" in text

@@ -206,10 +206,6 @@
     "kitchen.q2.separateKitchen": "Separate kitchen",
     "kitchen.q2.separatePrep": "Same kitchen, with separate preparation (utensils, surfaces, schedules)",
     "kitchen.q2.sharedKitchen": "Same kitchen, no separation",
-    "kitchen.q3": "Is the owner celiac?",
-    "kitchen.yes": "Yes",
-    "kitchen.no": "No",
-    "kitchen.ownerNote": "We only use this for internal review; it is not shown on the map.",
 
     "report.form.title": "Been to a place on the map? Tell us how it went",
     "report.form.intro": "Recommend it if it went well, or report a problem. We add it as evidence for review; it never changes the map on its own.",

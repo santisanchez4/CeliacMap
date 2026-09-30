@@ -282,8 +282,10 @@ begin
     add constraint agent_log_agent_check
     check (agent in
       ('search', 'validator', 'updater', 'social', 'web', 'pipeline', 'suggestion',
-       'outreach', 'outreach_reply', 'review_handler', 'chatbot', 'admin_notify'));
+       'outreach', 'outreach_reply', 'review_handler', 'chatbot', 'admin_notify', 'privacy'));
 end $$;
+-- 'privacy' (2026-09-29): scripts/delete_personal_data.py records each deletion request it answers
+-- (request reference, counts, deleted ids; never the content nor the searched text).
 
 -- ---------------------------------------------------------------------
 -- Table: suggestions  (public "Suggest a Place" form intake)
@@ -555,21 +557,19 @@ create index if not exists place_votes_place_id_idx on public.place_votes (place
 -- reads/increments this with the service_role key to enforce
 -- CHAT_MAX_MESSAGES_PER_SESSION / CHAT_MAX_MESSAGES_PER_IP_DAY /
 -- CHAT_DAILY_CALL_CAP before calling the model -- never exposed to anon (see
--- RLS + the function privilege revoke below). No PII: bucket_key is either
--- 'session:<localStorage token>', 'ip:<sha256 hash>' (never the raw IP), or
--- the literal 'global'.
+-- RLS + the function privilege revoke below). bucket_key is either
+-- 'session:<localStorage token>', 'ip:<HMAC-SHA256 of the IP keyed with the
+-- CHAT_IP_HASH_SECRET function secret>' (never the raw IP; since 2026-09-29 --
+-- before, an unkeyed SHA-256, reversible by trying every IPv4), or the literal
+-- 'global'. Pseudonymous data, not anonymous: purged after 7 days by the weekly
+-- retention job (.github/workflows/chat-log-purge.yml, scripts/purge_chat_logs.py).
 create table if not exists public.chat_usage (
-  bucket_key  text not null,   -- 'session:<token>' | 'ip:<sha256-hex>' | 'global'
+  bucket_key  text not null,   -- 'session:<token>' | 'ip:<hmac-sha256-hex>' | 'global'
   day         date not null,
   count       integer not null default 0,
   updated_at  timestamptz not null default now(),
   primary key (bucket_key, day)
 );
-
--- Manual retention (NOT PII -- just counters; unlike agent_log's chatbot rows
--- below, no automated purge is required, but this keeps the table from
--- growing forever if anyone bothers to run it):
---   delete from public.chat_usage where day < current_date - 7;
 
 -- ---------------------------------------------------------------------
 -- Trigger: keep places.updated_at fresh on UPDATE
@@ -827,7 +827,7 @@ drop policy if exists "public read reviews of approved places" on public.reviews
 -- agent_log rows with agent='chatbot' can carry raw user/bot text on marked
 -- turns (ADR-006 decision 10 -- refusals, rate-limit hits, out-of-scope
 -- attempts). That is health-adjacent PII, so it is NOT left to a manual
--- delete snippet like chat_usage above: it is purged automatically at 30
+-- delete snippet: it is purged automatically at 30
 -- days by .github/workflows/chat-log-purge.yml (weekly schedule +
 -- workflow_dispatch), which runs `python scripts/purge_chat_logs.py`. The
 -- DELETE is hardcoded to agent='chatbot' -- it must never touch any other
