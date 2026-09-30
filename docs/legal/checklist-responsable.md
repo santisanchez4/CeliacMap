@@ -1,20 +1,21 @@
 # Checklist del responsable (Santiago)
 
-> 2026-09-29. Tareas que no puede hacer el código. Las referencias legales son orientativas: confirmalas en la revisión
-> legal.
+> 2026-09-29, actualizado 2026-09-30 (fase 2). Tareas que no puede hacer el código. Las referencias legales son
+> orientativas: confirmalas en la revisión legal.
 
 ## Uruguay — URCDP (Ley 18.331)
 
 - [ ] **Registrar la base de datos** en el Registro de Bases de Datos Personales de la URCDP (art. 28). Datos para el
       formulario: responsable (persona física, Uruguay), finalidad (mapa comunitario de lugares sin gluten, moderación y
       seguridad del chat), categorías de datos (sección 2 del inventario), datos sensibles (ver abajo), encargados y
-      transferencias internacionales (sección 6), medidas de seguridad (RLS, claves solo en el servidor).
+      transferencias internacionales (sección 6), medidas de seguridad (RLS, grant por columna, claves solo en el
+      servidor) y plazos de conservación (política, sección 6).
 - [ ] Preguntar si alcanza con **una sola base** o si hay que registrar varias (comunidad, outreach a negocios, logs del
       chat).
-- [ ] Declarar o resolver los **datos sensibles**: `owner_celiac` (se elimina, 0 filas), los turnos del chat con
-      síntomas (30 días) y los textos libres.
+- [ ] Declarar o resolver los **datos sensibles**: `owner_celiac` (ya no se junta; columnas a borrar desde el 2026-10-07),
+      los turnos del chat con síntomas (30 días) y los textos libres.
 - [ ] Confirmar si **Brasil** (base en `sa-east-1`) y **Estados Unidos** (Anthropic, Resend, Google, Cloudflare,
-      GitHub) necesitan autorización o una garantía para la transferencia internacional (arts. 23 y siguientes).
+      GitHub, Zoho) necesitan autorización o una garantía para la transferencia internacional (arts. 23 y siguientes).
 
 ## Argentina — AAIP (Ley 25.326)
 
@@ -22,40 +23,59 @@
       Argentina por un sitio web, tiene que inscribirse en el Registro Nacional de Bases de Datos (art. 21).
 - [ ] Preguntar si la transferencia a Brasil y a Estados Unidos necesita cláusulas contractuales o si alcanza con el
       consentimiento (art. 12).
-- [ ] Revisar si en Argentina hace falta un **aviso de derechos** con un texto obligatorio (el que remite a la AAIP
-      como órgano de control) y agregarlo a la política.
 
 ## Revisión legal (abogado/a con práctica en datos personales, UY y AR)
 
-- [ ] Revisar `politica-de-privacidad.md` y `terminos-de-uso.md`, en especial cada marca **[A CONFIRMAR EN LA REVISIÓN
-      LEGAL]**: consentimiento para datos de salud en el chat, edad mínima, base de la transferencia internacional,
-      plazos de respuesta, alcance de la limitación de responsabilidad frente a las leyes de consumo, jurisdicción y
-      qué idioma prevalece.
-- [ ] Revisar el outreach a negocios: scraping del email de contacto en el sitio del negocio, emails no solicitados y
-      opt-out.
-- [ ] Revisar la publicación de recomendaciones con nombre y la moderación.
+Los textos publicados no llevan marcas: en cada duda se eligió la **lectura más prudente**. Estas son las decisiones que
+tiene que confirmar la revisión (política = `politica-de-privacidad.md`, términos = `terminos-de-uso.md`):
+
+- [ ] **Datos de salud en textos libres y en el chat** (política 3.4 y 4). Lectura prudente: no se piden, se pide no
+      escribirlos, no se publican, plazos cortos (30 días en el chat) y borrado a pedido. No se pide un consentimiento
+      expreso por escrito antes de chatear. ¿Alcanza, o hace falta una casilla de consentimiento para el chat?
+- [ ] **Edad mínima** (política 9, términos 1). Lectura prudente: 18 años para enviar contenido, o con autorización de
+      madre, padre o tutor; mirar el mapa, sin límite. ¿Es correcto para Uruguay y Argentina?
+- [ ] **Transferencia internacional** (política 7). Lectura prudente: se informa que los países pueden no tener un
+      nivel equivalente, la transferencia se apoya en el consentimiento y en los compromisos contractuales de cada
+      proveedor. ¿Hace falta algo más (autorización de la URCDP, cláusulas firmadas)?
+- [ ] **Plazo de respuesta** (política 8, runbook). Lectura prudente: 5 días hábiles para todo pedido (el más corto de
+      referencia: Uruguay arts. 14 y 15; Argentina art. 16; el acceso en Argentina es de 10 días corridos, art. 14).
+- [ ] **Leyendas de la Disposición 10/2008** (política 8). Se incluyeron las dos, con la AAIP en lugar de la Dirección
+      Nacional. Confirmar la redacción vigente y si además tienen que aparecer **en cada formulario** (la disposición
+      pide que se vean en los formularios de recolección; hoy los formularios enlazan a la política).
+- [ ] **Limitación de responsabilidad** (términos 7). Lectura prudente: “en la medida en que lo permita la ley” y sin
+      renunciar a los derechos de consumo (Ley 17.250, Ley 24.240). ¿Alcance real para un servicio gratuito?
+- [ ] **Ley aplicable y jurisdicción** (términos 9). Lectura prudente: ley uruguaya, sin imponer tribunales y dejando a
+      salvo los derechos y la jurisdicción del domicilio de quien usa el sitio.
+- [ ] **Idioma que prevalece** (política 11, términos 9): el español.
+- [ ] Revisar el **outreach a negocios**: scraping del email de contacto en el sitio del negocio, emails no solicitados
+      y opt-out (y el plazo de 2 años desde el último contacto).
+- [ ] Revisar la publicación de recomendaciones con nombre (consentimiento en el aviso del campo) y la moderación.
 - [ ] Revisar la relación con los aliados (sección Aliados, `rel="sponsored"`).
 
 ## Proveedores
 
-- [ ] Leer y archivar la política de datos y el DPA de cada proveedor: Supabase, Anthropic, Resend, Google, Cloudflare,
-      GitHub, Zoho, Tavily y CARTO. Anotar para cada uno el país, la retención y si el DPA se acepta por defecto o
-      hay que firmarlo.
-- [ ] Confirmar el centro de datos de la cuenta de **Zoho** y la región de las **Edge Functions** de Supabase.
-- [ ] Confirmar cuánto tiempo guarda Anthropic los datos de la API y que no se usen para entrenar.
+- [x] País y retención de cada proveedor, con fuentes oficiales (inventario, §6, fase 2).
+- [ ] Confirmar el **plan de Supabase** en el dashboard (define 1, 7, 28 o 90 días de logs; la política dice “hasta 90
+      días según el plan”).
+- [ ] Leer y archivar el DPA de cada proveedor (Supabase, Anthropic, Resend, Google, Cloudflare, GitHub, Zoho, Tavily,
+      CARTO) y anotar si se acepta por defecto o hay que firmarlo.
+- [ ] Configurar en Zoho el borrado de los avisos internos a los **90 días** (la política ya lo dice).
+- [ ] Sin publicar por el proveedor (se informa así en la política): cuánto guardan la IP Google Fonts, GitHub Pages,
+      unpkg y los logs de Cloudflare. Opcional: servir las tipografías y Leaflet desde el propio sitio para no enviar la
+      IP a Google Fonts ni a unpkg.
 
-## Implementación antes de publicar (código, con plan y “dale” para producción)
+## Implementación
 
-- [ ] P6 — eliminar `owner_celiac`: etapa 1 hecha (fase 1, 2026-09-29); etapa 2 en la próxima tanda de prompts;
-      etapa 3, el SQL `db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql`, el 2026-10-07 o después.
+- [ ] P6 — `owner_celiac`: etapa 1 hecha; etapa 2 en la próxima tanda de prompts; etapa 3, el SQL
+      `db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql`, el 2026-10-07 o después.
 - [x] P1 — `scripts/delete_personal_data.py` + `runbook-pedidos-de-datos.md` (fase 1).
 - [x] P2 — purga de `chat_usage` a los 7 días + HMAC de la IP (fase 1).
-- [x] P3 — `places` con grant por columna (fase 1, aplicado y verificado).
+- [x] P3 — `places` con grant por columna (fase 1).
 - [x] P4 — reseñas de Google en la purga semanal (fase 1).
-- [ ] P5 — plazos de retención para sugerencias, reportes, votos, outreach, `agent_log` y el buzón.
-- [x] P8 — las recomendaciones del chat no se publican (fase 1); el aviso en el chat va en la próxima tanda de prompts.
-- [ ] Cambios de frontend (`cambios-frontend.md`).
-- [ ] Registrar las decisiones en `docs/DECISIONS.md` y en el índice de `CLAUDE.md`.
+- [ ] P5 — plazos de 2 años / 1 año en la purga semanal: implementados (fase 2), activos después del “dale”.
+- [x] P7 — proveedores (fase 2).
+- [x] P8 — las recomendaciones del chat no se publican; el aviso en el chat va en la próxima tanda de prompts.
+- [ ] Publicar `/privacidad` y `/terminos` (ES + EN), links en el footer y avisos en los formularios y el chat.
 
 ## Después de publicar
 

@@ -1,9 +1,6 @@
 # Términos de uso de CeliacMap
 
-> **BORRADOR, no publicado (actualizado 2026-09-29, fase 1 de privacidad).** Falta la revisión legal. Lo que dice sobre cómo funciona el sistema coincide
-> con `docs/legal/inventario-datos.md` y con el código a esta fecha.
-
-**Última actualización:** [fecha de publicación]
+**Versión 1.0 · Última actualización: 30 de septiembre de 2026**
 
 ## 1. Qué es CeliacMap
 
@@ -13,6 +10,9 @@ asistente automático (el chat). Es gratis y no necesita una cuenta.
 
 Al usar el sitio aceptás estos términos y la [Política de privacidad](politica-de-privacidad.md). Si no estás de
 acuerdo, no uses los formularios, los votos ni el chat.
+
+Cualquier persona puede mirar el mapa. Para mandar sugerencias, comentarios, votos o mensajes al chat tenés que tener
+18 años o más, o hacerlo con la autorización de tu madre, padre o tutor.
 
 ## 2. Las etiquetas no son una garantía médica
 
@@ -37,12 +37,13 @@ acuerdo, no uses los formularios, los votos ni el chat.
 - **No da consejo médico:** no interpreta síntomas, no da diagnósticos, dosis ni cantidades de gluten “seguras”, y no
   dice si algo es grave o urgente. Para eso, consultá a un profesional de la salud.
 - Solo nombra lugares que están en el mapa. Puede equivocarse o no entender una pregunta.
+- El texto de tus mensajes lo procesa Anthropic, el proveedor del modelo, para responderte. Los turnos que el sistema
+  marca como fuera de lo esperado se guardan 30 días para revisar la seguridad (ver la Política de privacidad).
 - Hay límites de mensajes por conversación y por día, para que el servicio siga funcionando para todos.
-- No intentes que el chat ignore sus reglas ni lo uses para otra cosa. Los turnos fuera de lo esperado quedan
-  guardados 30 días para revisar la seguridad (ver la Política de privacidad).
+- No intentes que el chat ignore sus reglas ni lo uses para otra cosa.
 - Si le pedís al chat que sume un lugar nuevo o deje un comentario, primero te muestra un resumen y solo lo envía si
   lo confirmás. Si le contás que un lugar que ya está en el mapa es apto, lo registra en ese momento como una
-  recomendación para revisión.
+  recomendación para revisión. Las recomendaciones que llegan por el chat no se publican.
 
 ## 4. Comentarios, sugerencias y votos
 
@@ -55,7 +56,7 @@ acuerdo, no uses los formularios, los votos ni el chat.
 ### Qué no está permitido
 
 - Datos personales de otras personas (nombres de empleados, teléfonos, datos de salud de alguien) o datos de salud
-  tuyos que no quieras que leamos.
+  tuyos.
 - Insultos, discriminación, amenazas o acoso.
 - Información que sabés que es falsa, reseñas pagadas o hechas por el propio negocio o por su competencia.
 - Publicidad, spam, links engañosos o envíos automatizados.
@@ -74,7 +75,8 @@ acuerdo, no uses los formularios, los votos ni el chat.
 ### Cómo moderamos
 
 - Ningún comentario se publica solo. Una **recomendación** enviada con el formulario se publica solo si la aprobamos,
-  con el nombre que elegiste o como “Anónimo”. Las recomendaciones que llegan por el chat no se publican. Un **reporte de problema** nunca se publica: lo usamos para volver a revisar el lugar.
+  con el nombre que elegiste o como “Anónimo”. Las recomendaciones que llegan por el chat no se publican. Un **reporte
+  de problema** nunca se publica: lo usamos para volver a revisar el lugar.
 - Podemos no publicar, o sacar después, cualquier recomendación que no cumpla estas reglas o que deje de corresponder
   (por ejemplo, si el lugar sale del mapa, su recomendación deja de verse).
 - Un comentario, un voto o un reporte **no cambia por sí solo** la etiqueta de un lugar ni si aparece en el mapa. Son
@@ -104,22 +106,22 @@ chat, y un negocio no entra al mapa por ser aliado. Los links a sus sitios son p
 - En la medida en que lo permita la ley, Santiago Sánchez no responde por daños que resulten de confiar en una
   etiqueta, un comentario, una respuesta del chat o cualquier dato del sitio sin confirmarlo en el lugar, ni por lo que
   hagan o dejen de hacer los negocios que aparecen en el mapa.
-- Nada de lo anterior limita derechos que la ley no permite renunciar, incluidos los de las normas de defensa del
-  consumidor.
-
-**[A CONFIRMAR EN LA REVISIÓN LEGAL]** El alcance de esta cláusula en Uruguay (Ley 17.250) y en Argentina (Ley 24.240)
-para un servicio gratuito.
+- Nada de estos términos limita los derechos que la ley no permite renunciar, incluidos los que te dan las normas de
+  defensa del consumidor de Uruguay (Ley 17.250) y de Argentina (Ley 24.240), en lo que sean aplicables.
 
 ## 8. Cambios en el servicio y en estos términos
 
 Podemos cambiar, pausar o dejar de ofrecer cualquier parte del sitio. Si cambiamos estos términos, publicamos la
-versión nueva con su fecha; si el cambio es importante, lo avisamos en el sitio antes.
+versión nueva con su número de versión y su fecha; si el cambio es importante, lo avisamos en el sitio antes.
 
 ## 9. Ley aplicable
 
-Estos términos se rigen por las leyes de la República Oriental del Uruguay. Cualquier conflicto se resuelve ante los
-tribunales de Montevideo **[A CONFIRMAR EN LA REVISIÓN LEGAL: jurisdicción, y si hace falta respetar la del domicilio
-de quien usa el sitio desde Argentina]**, salvo que la ley aplicable a quien usa el sitio disponga otra cosa.
+Estos términos se rigen por las leyes de la República Oriental del Uruguay, sin perjuicio de los derechos que te den las
+normas del país donde vivís, incluido el de reclamar ante los tribunales o las autoridades de tu domicilio cuando esas
+normas lo permitan.
+
+Estos términos están escritos en español; la versión en inglés es una traducción. Si hay diferencias, vale la versión en
+español.
 
 ## 10. Contacto
 
