@@ -198,7 +198,8 @@ export function validatePendingSubmission(x: unknown): PendingSubmission | null 
       address: (address ?? null) as string | null,
       category: (category ?? null) as "restaurant" | "cafe" | "shop" | null,
       notes: (notes ?? null) as string | null,
-      ...sparseKitchen(facts, obj.kitchen_asked === true),
+      // kitchen_asked is never kept: the chat no longer asks about the kitchen (2026-09-30).
+      ...sparseKitchen(facts, false),
     };
   }
 
@@ -1123,9 +1124,12 @@ export function applyKitchenStep<T extends PendingSubmission>(
   opts: { complete: boolean },
 ): { pending: T; preguntarCocina: boolean } {
   if (pending.kind === "report") return { pending: mergeKitchenFacts(pending, NO_KITCHEN_FACTS), preguntarCocina: false };
+  // Owner decision 2026-09-30: the chat never asks about the kitchen (the redactor's question still names the
+  // owner until the next prompt batch). Facts the person volunteers are merged as before; nothing is asked.
+  void opts;
   const merged = mergeKitchenFacts(pending, kitchenFactsFromRouter(router));
-  const ask = opts.complete && merged.kitchen_asked !== true && !hasKitchenFacts(normalizeKitchenFacts(merged));
-  return { pending: ask ? ({ ...merged, kitchen_asked: true } as T) : merged, preguntarCocina: ask };
+  const { kitchen_asked: _stale, ...rest } = merged as T & { kitchen_asked?: boolean };
+  return { pending: rest as T, preguntarCocina: false };
 }
 
 /** A complete draft whose kitchen question was ALREADY asked owns the turn when the router says
@@ -1164,17 +1168,19 @@ export function cocinaContext(
 }
 
 /** The <envio> additions for a draft turn: the question flag and/or the recap of the facts. */
-export function kitchenEnvioExtras(p: PendingSubmission, preguntarCocina: boolean): Partial<EnvioContext> {
+export function kitchenEnvioExtras(p: PendingSubmission, _preguntarCocina: boolean): Partial<EnvioContext> {
+  // Never preguntar_cocina (2026-09-30): only the recap of what the person said on their own.
   const cocina = cocinaContext(p);
-  return { ...(preguntarCocina ? { preguntar_cocina: true } : {}), ...(cocina ? { cocina } : {}) };
+  return cocina ? { cocina } : {};
 }
 
-/** Módulo 4 never asks (it stays single-turn): recite what was volunteered, else invite. */
+/** Módulo 4 never asks (it stays single-turn): recite what was volunteered, else nothing (no invitation since
+ * 2026-09-30: the chat does not ask about the kitchen). */
 export function moduloCuatroEnvioExtras(
   payload: { kitchen_exclusive?: boolean | null; celiac_prep?: CeliacPrep | null },
 ): Partial<EnvioContext> {
   const cocina = cocinaContext(payload);
-  return cocina ? { cocina } : { invitar_cocina: true };
+  return cocina ? { cocina } : {};
 }
 
 /** Identifying fields of a draft for <envio>, without needing the router's extraction. */

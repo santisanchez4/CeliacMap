@@ -114,12 +114,15 @@ Deno.test("mergeKitchenFacts - a report, positive or negative, never carries kit
 
 // ---- applyKitchenStep --------------------------------------------------------
 
-Deno.test("applyKitchenStep - asks once, when the draft is complete and nothing was said", () => {
+// 2026-09-30 (owner decision, code only): the chat never asks about the kitchen. The question in the redactor
+// prompt still asks about the owner, and it only fires when <envio> carries preguntar_cocina / invitar_cocina,
+// so the code never sets either (nor the kitchen_asked marker). Facts the person volunteers are still kept
+// (the owner's health is still discarded). The prompt cleanup is item 3 of docs/plans/next-prompt-batch.md.
+Deno.test("applyKitchenStep - never asks, even when the draft is complete and nothing was said", () => {
   const first = applyKitchenStep(suggestion(), NO_ROUTER_FACTS, { complete: true });
-  assertEquals(first.preguntarCocina, true);
-  assertEquals(first.pending.kitchen_asked, true);
-  const again = applyKitchenStep(first.pending, NO_ROUTER_FACTS, { complete: true });
-  assertEquals(again.preguntarCocina, false); // never twice
+  assertEquals(first.preguntarCocina, false);
+  assertEquals("kitchen_asked" in first.pending, false);
+  assertEquals(first.pending, suggestion());
 });
 
 Deno.test("applyKitchenStep - does not ask while the draft is incomplete", () => {
@@ -136,10 +139,10 @@ Deno.test("applyKitchenStep - does not ask when the person already volunteered f
 });
 
 Deno.test("applyKitchenStep - an answer that only says the owner is celiac keeps nothing", () => {
-  const asked = suggestion({ kitchen_asked: true });
-  const step = applyKitchenStep(asked, { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: "si" }, { complete: true });
-  assertEquals(step.pending, asked);
-  assertEquals(step.preguntarCocina, false); // already asked once: never twice
+  const stale = suggestion({ kitchen_asked: true });
+  const step = applyKitchenStep(stale, { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: "si" }, { complete: true });
+  assertEquals(step.pending, suggestion()); // nothing kept, and the stale asked marker is dropped
+  assertEquals(step.preguntarCocina, false);
 });
 
 Deno.test("applyKitchenStep - never asks about a report, and ignores facts volunteered about it", () => {
@@ -162,9 +165,12 @@ Deno.test("validatePendingSubmission - a draft without kitchen data keeps its ex
   assertEquals(validatePendingSubmission(r), r);
 });
 
-Deno.test("validatePendingSubmission - keeps valid kitchen data and the asked marker", () => {
-  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep", kitchen_asked: true });
+Deno.test("validatePendingSubmission - keeps valid kitchen data, drops the asked marker (a stale echo)", () => {
+  const p = suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep" });
   assertEquals(validatePendingSubmission(p), p);
+  const stale = validatePendingSubmission({ ...p, kitchen_asked: true }) as PendingSuggestionSubmission;
+  assertEquals("kitchen_asked" in stale, false);
+  assertEquals(stale.kitchen_exclusive, false);
 });
 
 Deno.test("validatePendingSubmission - a hand-crafted echo is CLAMPED, never rejected (the draft survives)", () => {
@@ -193,12 +199,12 @@ Deno.test("producer -> JSON -> validator round-trips every draft shape unchanged
     applyKitchenStep(suggestion(), NO_ROUTER_FACTS, { complete: true }).pending,
     applyKitchenStep(report(), { cocina_exclusiva: "no", preparacion_celiaca: "cocina_separada", dueno_celiaco: "si" }, { complete: true }).pending,
     applyKitchenStep(suggestion({ address: null }), { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: "no" }, { complete: false }).pending,
-    mergeKitchenFacts(suggestion({ kitchen_asked: true }), { kitchen_exclusive: true, celiac_prep: null }),
+    mergeKitchenFacts(suggestion(), { kitchen_exclusive: true, celiac_prep: null }),
   ];
   for (const d of drafts) {
     assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(d))), d);
+    assertEquals(JSON.stringify(d).includes("kitchen_asked"), false);
   }
-  assertStringIncludes(JSON.stringify(drafts[0]), "kitchen_asked");
 });
 
 // ---- parseRouterOutput: the router's kitchen fields ---------------------------
@@ -328,8 +334,8 @@ Deno.test("withConfirmFacts - facts said while confirming a review of a mapped p
   }
 });
 
-Deno.test("kitchenEnvioExtras - the question flag and the recap use the router's words", () => {
-  assertEquals(kitchenEnvioExtras(suggestion(), true), { preguntar_cocina: true });
+Deno.test("kitchenEnvioExtras - never carries preguntar_cocina; the recap uses the router's words", () => {
+  assertEquals(kitchenEnvioExtras(suggestion(), true), {});
   assertEquals(kitchenEnvioExtras(suggestion(), false), {});
   assertEquals(
     kitchenEnvioExtras({ ...suggestion({ kitchen_exclusive: false, celiac_prep: "separate_prep" }), owner_celiac: true } as PendingSuggestionSubmission, false),
@@ -339,8 +345,8 @@ Deno.test("kitchenEnvioExtras - the question flag and the recap use the router's
   assertEquals(kitchenEnvioExtras({ ...suggestion(), owner_celiac: true } as PendingSuggestionSubmission, false), {});
 });
 
-Deno.test("moduloCuatroEnvioExtras - facts present => recap; none => invite to add them", () => {
-  assertEquals(moduloCuatroEnvioExtras({}), { invitar_cocina: true });
+Deno.test("moduloCuatroEnvioExtras - facts present => recap; none => nothing (never invitar_cocina)", () => {
+  assertEquals(moduloCuatroEnvioExtras({}), {});
   assertEquals(
     moduloCuatroEnvioExtras({ kitchen_exclusive: true }),
     { cocina: { exclusiva: "si", preparacion: null } },
@@ -463,4 +469,36 @@ Deno.test("ROUTER_MAX_TOKENS leaves room to copy a maximum-length message into r
   // A truncated JSON does not parse, parseRouterOutput falls back to fuera_de_alcance and the person's
   // draft is lost — so the budget must cover the longest message the endpoint accepts.
   assertEquals(ROUTER_MAX_TOKENS >= Math.ceil(MAX_MESSAGE_LENGTH / 2.5) + 250, true);
+});
+
+
+Deno.test("no suggestion draft and no confirmar turn ever carries preguntar_cocina or invitar_cocina", () => {
+  const drafts = [
+    suggestion(), suggestion({ address: null }), suggestion({ kitchen_exclusive: true }),
+    suggestion({ kitchen_exclusive: false, celiac_prep: "shared_kitchen" }),
+  ];
+  const routers = [NO_ROUTER_FACTS, { cocina_exclusiva: "si", preparacion_celiaca: null, dueno_celiaco: "si" } as const,
+    { cocina_exclusiva: null, preparacion_celiaca: null, dueno_celiaco: "no" } as const];
+  for (const d of drafts) {
+    for (const r of routers) {
+      for (const complete of [true, false]) {
+        const step = applyKitchenStep(d, r, { complete });
+        const extras = kitchenEnvioExtras(step.pending, step.preguntarCocina) as Record<string, unknown>;
+        assertEquals(step.preguntarCocina, false);
+        assertEquals("preguntar_cocina" in extras || "invitar_cocina" in extras, false);
+        assertEquals("kitchen_asked" in step.pending, false);
+      }
+    }
+  }
+  for (const payload of [{}, { kitchen_exclusive: true }, { kitchen_exclusive: false, celiac_prep: "separate_prep" as const }]) {
+    const extras = moduloCuatroEnvioExtras(payload) as Record<string, unknown>;
+    assertEquals("preguntar_cocina" in extras || "invitar_cocina" in extras, false);
+  }
+});
+
+Deno.test("handleRequest sets no kitchen question flag of its own", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const handler = src.slice(src.indexOf("export async function handleRequest"));
+  assertEquals(/preguntar_cocina:\s*true/.test(handler), false);
+  assertEquals(/invitar_cocina:\s*true/.test(handler), false);
 });

@@ -23,14 +23,22 @@
    `reporter_token` (the chat never sends one). With the notice live, decide whether chat recommendations become
    publishable (and how to tell them apart then: a `reporter_token` minted by the chat, or an `origin` column).
 
+3. **The chat no longer asks about the kitchen (code, 2026-09-30).** `preguntar_cocina` and `invitar_cocina` are never
+   set and `kitchen_asked` is never kept, so the redactor's kitchen question (which still names the owner) never fires;
+   facts a person volunteers are still kept, the owner's health still discarded. In this batch: **decide whether the chat
+   asks about the kitchen again.** If not, remove the kitchen instructions from `RESPONDER_PROMPT` (rule 3's optional
+   question, rule 5's invitation, the owner constraint, the Pan Justo examples) and the router's `cocina_respuesta` (rule
+   10); if yes, bring them back without the owner question (item 1) and turn the code flags on again, with the kitchen
+   A/B (`db/checks/chat_kitchen_live.py`). The kitchen question is then only in form A (“Agregalo”).
+
 ## Earlier items (from `docs/DECISIONS.md`)
 
-3. **Replace the Bienestar Gluten Free example** in the prompts (a partner since 2026-09-28; see "Sponsorships",
+4. **Replace the Bienestar Gluten Free example** in the prompts (a partner since 2026-09-28; see "Sponsorships",
    pre-existing finding, `prompts.ts` lines ~467–474).
-4. **Redactor glossary: Argentina's official term is now "sin gluten"** (Joint Resolution 32/2023; see "Sponsorships").
-5. **The 2c-vs-examples contradiction** ("Por ahora no tengo lugares confirmados en…"; see "Department / province
+5. **Redactor glossary: Argentina's official term is now "sin gluten"** (Joint Resolution 32/2023; see "Sponsorships").
+6. **The 2c-vs-examples contradiction** ("Por ahora no tengo lugares confirmados en…"; see "Department / province
    search" and "`category_zero` telemetry").
-6. **F4 Option 1: reformulate the `celiaquia` prompt** (in progress, non-blocking; see "Chatbot Fase E").
-7. Only if the `category_zero` telemetry shows it with real traffic: option C and a router rule for "locales / lugares /
+7. **F4 Option 1: reformulate the `celiaquia` prompt** (in progress, non-blocking; see "Chatbot Fase E").
+8. Only if the `category_zero` telemetry shows it with real traffic: option C and a router rule for "locales / lugares /
    sitios" (careful: "dónde comprar" does imply `shop`), "Cerca hay…" (a proximity the system does not verify), the
    medical queries (Fase E follow-ups) and the pure cancels (Fase D).

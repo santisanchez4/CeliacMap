@@ -24,9 +24,10 @@ Contacto para cualquier tema de privacidad: **hola@celiacmap.org**.
 
 ### 3.1 Cuando sugerís un lugar (formulario “Agregalo” o el chat)
 
-- **Qué:** nombre, dirección, ciudad, país y tipo del lugar; un link de referencia y notas, si los agregás; y, si las
-  contestás, dos respuestas sobre la cocina del lugar: si es exclusivamente sin gluten y cómo preparan lo apto para
-  celíacos.
+- **Qué:** nombre, dirección, ciudad, país y tipo del lugar; un link de referencia y notas, si los agregás; y, en el
+  formulario “Agregalo”, si las contestás, dos respuestas sobre la cocina del lugar: si es exclusivamente sin gluten y
+  cómo preparan lo apto para celíacos. **El chat no pregunta por la cocina**: eso se pregunta solo en el formulario. Si en
+  el chat lo contás por tu cuenta, se guarda junto con la sugerencia.
 - **Para qué:** ubicar el lugar en el mapa y que nuestro sistema de revisión lo evalúe. Las respuestas sobre la cocina
   son un dato **no verificado**: ayudan a la revisión, pero por sí solas nunca definen la etiqueta del lugar.
 - **Qué se publica:** si el lugar se aprueba, se publican sus datos como negocio (nombre, dirección, ubicación, tipo y
@@ -67,7 +68,8 @@ mismo lugar. Solo se publica el total de votos de cada lugar.
   ejemplo, un pedido que no es sobre lugares sin TACC ni sobre la celiaquía, un intento de cambiar las reglas del
   asistente, una consulta médica personal o un exceso de mensajes). Sirve para revisar la seguridad del servicio. El
   borrado es automático y corre una vez por semana, así que puede tardar hasta 7 días más.
-- Si por el chat sumás un lugar o dejás un comentario, ese texto se guarda como en los formularios (3.1 y 3.2).
+- Si por el chat sumás un lugar o dejás un comentario, ese texto se guarda como en los formularios (3.1 y 3.2). El chat
+  no te pregunta cómo cocina el lugar ni nada sobre las personas que trabajan ahí.
 - **Datos de salud de otras personas:** el chat no guarda como dato aparte si alguien de un negocio (por ejemplo, el
   dueño o la dueña) tiene celiaquía. Pero lo que escribas dentro de un comentario o de una sugerencia se guarda tal cual,
   y los turnos marcados se guardan 30 días. Por eso te pedimos que **no escribas datos de salud tuyos ni de otras

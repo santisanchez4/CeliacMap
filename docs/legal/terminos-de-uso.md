@@ -42,8 +42,8 @@ Cualquier persona puede mirar el mapa. Para mandar sugerencias, comentarios, vot
 - Hay límites de mensajes por conversación y por día, para que el servicio siga funcionando para todos.
 - No intentes que el chat ignore sus reglas ni lo uses para otra cosa.
 - Si le pedís al chat que sume un lugar nuevo o deje un comentario, primero te muestra un resumen y solo lo envía si
-  lo confirmás. Si le contás que un lugar que ya está en el mapa es apto, lo registra en ese momento como una
-  recomendación para revisión. Las recomendaciones que llegan por el chat no se publican.
+  lo confirmás. Si le contás que es apto un lugar que CeliacMap todavía está verificando, lo registra en ese momento
+  como una recomendación para revisión. Las recomendaciones que llegan por el chat no se publican.
 
 ## 4. Comentarios, sugerencias y votos
 
@@ -90,7 +90,8 @@ Cualquier persona puede mirar el mapa. Para mandar sugerencias, comentarios, vot
 
 Algunos negocios apoyan el proyecto y aparecen en la sección **Aliados**, identificados con la etiqueta “Aliado”. Los
 aliados **no influyen** en qué lugares aparecen en el mapa, en sus etiquetas, en el ranking ni en las respuestas del
-chat, y un negocio no entra al mapa por ser aliado. Los links a sus sitios son publicitarios y los marcamos así.
+chat, y un negocio no entra al mapa por ser aliado. Los links a sus sitios son publicitarios, identificados con la
+etiqueta «Aliado».
 
 ## 6. Datos de los lugares y contenido de terceros
 

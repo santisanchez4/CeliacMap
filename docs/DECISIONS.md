@@ -2764,6 +2764,16 @@ confirmed by the owner; the policy says "up to 90 days depending on the plan".
 10/2008 legends with the AAIP, Uruguayan law without imposing a forum, Spanish prevails) and listed in
 `checklist-responsable.md` for the lawyer. Not published yet: the owner reviews the final texts first.
 
+**The chat never asks about the kitchen** (owner decision, 2026-09-30; code only, `prompts.ts` untouched). The redactor's
+optional kitchen question still names the owner (the prompt changes wait for the next batch), so the code stopped
+triggering it: `applyKitchenStep` never asks and drops a stale `kitchen_asked`, `validatePendingSubmission` never keeps
+the marker, `kitchenEnvioExtras` never sends `preguntar_cocina` and `moduloCuatroEnvioExtras` never sends
+`invitar_cocina`. Facts a person volunteers are still kept (the owner's health still discarded), and the redactor still
+recites them. The kitchen question now lives only in form A. Whether the chat asks again, and the prompt cleanup, are
+item 3 of `docs/plans/next-prompt-batch.md`. Texts: policy 3.1 / 3.4 say the chat does not ask; terms 3 say the
+"register now" flow is for a place CeliacMap is still verifying (Módulo 4 looks up `needs_review` places), terms 5 name the
+«Aliado» label.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
