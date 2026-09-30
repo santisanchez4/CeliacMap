@@ -2722,8 +2722,9 @@ the script and the runbook (CLAUDE.md, "Reglas vigentes").
   only): `verify_jwt=false`, the downloaded `index.ts` / `regions.ts` / `prompts.ts` identical to `HEAD` 6d9eb13 (hash
   without CR). Two real search turns with a fixed test session: a new `ip:` bucket that differs from the one the same IP had
   under the unkeyed SHA-256 (so the HMAC is in use; with no secret no `ip:` bucket would exist), counting 2 (the per-IP cap
-  still counts), and no chatbot error rows. Test rows cleaned with `db/checks/2026-09-30-chat-v23-test-cleanup.sql`
-  (guarded), which also removes the forgotten rows of the column-grant smoke test turn (00:27 UTC).
+  still counts), and no chatbot error rows. The test rows are removed by `db/checks/2026-09-30-chat-v23-test-cleanup.sql`
+  (guarded; it also covers the forgotten rows of the column-grant smoke test turn, 00:27 UTC), **pending the owner's
+  "dale"**.
 - The owner_celiac column drop moves to **no earlier than 2026-10-07** (one week after `chat` v23); the file was renamed to
   `db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql`.
 - The published San Felipa opinion (`ecaa0402…`, 2026-09-23 17:34 UTC, anonymous) came from form B: no chat turn in the
