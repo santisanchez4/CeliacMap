@@ -663,7 +663,7 @@ class SupabaseClient:
             }
         ).execute()
 
-    def delete_chatbot_logs(self, cutoff_days: int = 30) -> int:
+    def delete_chatbot_logs(self, cutoff_days: int = 30, dry_run: bool = False) -> int:
         """Delete agent_log rows for agent='chatbot' older than cutoff_days.
 
         Marked chatbot turns can carry raw user/bot text (ADR-006 decision 10),
@@ -672,11 +672,20 @@ class SupabaseClient:
         agent_log", a table shared by every other agent. See
         scripts/purge_chat_logs.py and .github/workflows/chat-log-purge.yml.
 
-        Returns the number of rows deleted.
+        Returns the number of rows deleted (``dry_run``: the number that would be).
         """
         cutoff = (
             datetime.now(timezone.utc) - timedelta(days=cutoff_days)
         ).isoformat()
+        if dry_run:
+            res = (
+                self._db.table("agent_log")
+                .select("id", count="exact", head=True)
+                .eq("agent", "chatbot")
+                .lt("created_at", cutoff)
+                .execute()
+            )
+            return res.count or 0
         res = (
             self._db.table("agent_log")
             .delete()
@@ -686,15 +695,94 @@ class SupabaseClient:
         )
         return len(res.data or [])
 
-    def delete_old_chat_usage(self, cutoff_days: int = 7) -> int:
+    def delete_old_chat_usage(self, cutoff_days: int = 7, dry_run: bool = False) -> int:
         """Delete chat rate-limit counters (session token / IP hash buckets) older than cutoff_days.
 
         The counters only matter for the current day; keeping them longer would keep a pseudonymous
         trail of who chatted when. Run weekly by scripts/purge_chat_logs.py.
         """
         cutoff = (datetime.now(timezone.utc) - timedelta(days=cutoff_days)).date().isoformat()
+        if dry_run:
+            res = self._db.table("chat_usage").select("bucket_key", count="exact", head=True).lt("day", cutoff).execute()
+            return res.count or 0
         res = self._db.table("chat_usage").delete().lt("day", cutoff).execute()
         return len(res.data or [])
+
+    # Privacy phase 2 (2026-09-30): the tables purge_rows may touch and the filters it accepts. places,
+    # place_votes and reviews are deliberately absent (business data / never purged here / own method).
+    _PURGEABLE = {"agent_log", "suggestions", "place_reports", "place_evidence"}
+    _PURGE_FILTERS = {"eq", "neq", "is_"}
+
+    def purge_rows(self, table: str, older_than_days: int, filters=(), dry_run: bool = False) -> int:
+        """Delete rows of ``table`` whose created_at is older than ``older_than_days``, with extra filters
+        given as (method, column, value) -- e.g. ("is_", "published_at", "null"). ``dry_run`` only counts.
+        Returns the number of rows deleted (or that would be)."""
+        if table not in self._PURGEABLE:
+            raise ValueError(f"purge_rows: {table} is not purgeable")
+        for method, _column, _value in filters:
+            if method not in self._PURGE_FILTERS:
+                raise ValueError(f"purge_rows: filter {method} not allowed")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
+        query = (
+            self._db.table(table).select("id", count="exact", head=True)
+            if dry_run else self._db.table(table).delete()
+        ).lt("created_at", cutoff)
+        for method, column, value in filters:
+            query = getattr(query, method)(column, value)
+        res = query.execute()
+        return (res.count or 0) if dry_run else len(res.data or [])
+
+    def expire_outreach_contacts(self, older_than_days: int = 730, dry_run: bool = False) -> dict:
+        """Two years after the last contact, forget a business's contact email and its outreach thread.
+
+        The last contact of a place is its newest outreach message; a place never contacted counts from
+        the day its email was scraped (contact_email_checked_at). contact_email becomes NULL (the check
+        date stays, so the scraper does not collect it again at once) and every message of a thread whose
+        newest message is older than the window is deleted. ``dry_run`` only counts.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+
+        def parse(value):
+            return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+
+        messages = self._db.table("outreach_messages").select("place_id, created_at").execute().data or []
+        last: dict[str, datetime] = {}
+        count_by_place: dict[str, int] = {}
+        for m in messages:
+            at = parse(m.get("created_at"))
+            pid = m.get("place_id")
+            if not pid or at is None:
+                continue
+            count_by_place[pid] = count_by_place.get(pid, 0) + 1
+            if pid not in last or at > last[pid]:
+                last[pid] = at
+        stale_threads = sorted(pid for pid, at in last.items() if at < cutoff)
+
+        places = (
+            self._db.table("places").select("id, contact_email_checked_at")
+            .not_.is_("contact_email", "null").execute().data or []
+        )
+        stale_emails = []
+        for p in places:
+            refs = [d for d in (last.get(p["id"]), parse(p.get("contact_email_checked_at"))) if d is not None]
+            if refs and max(refs) < cutoff:
+                stale_emails.append(p["id"])
+        stale_emails.sort()
+
+        out = {"contact_emails": len(stale_emails), "messages": sum(count_by_place[pid] for pid in stale_threads)}
+        if dry_run:
+            return out
+        if stale_emails:
+            self._db.table("places").update({"contact_email": None}).in_("id", stale_emails).execute()
+        if stale_threads:
+            self._db.table("outreach_messages").delete().in_("place_id", stale_threads).execute()
+        return out
+
+    def find_expired_google_review_places(self, cutoff_days: int = 30) -> list[str]:
+        """Read-only twin of delete_expired_google_reviews for the purge's dry run."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=cutoff_days)).isoformat()
+        res = self._db.table("reviews").select("place_id").eq("source", "google").lt("created_at", cutoff).execute()
+        return sorted({r["place_id"] for r in (res.data or []) if r.get("place_id")})
 
     def fetch_purged_review_place_ids(self) -> list[str]:
         """Places whose Google review snippets the weekly purge deleted since the last Search run.

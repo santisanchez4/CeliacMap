@@ -288,6 +288,115 @@ def test_delete_old_chat_usage_deletes_counters_older_than_the_cutoff_day():
     assert (datetime.now(timezone.utc).date() - cutoff).days == 7  # the counters' day is a UTC date
 
 
+def test_delete_old_chat_usage_dry_run_counts_without_deleting():
+    client = _client_with_mock_db()
+    counted = client._db.table.return_value.select.return_value.lt.return_value
+    counted.execute.return_value = MagicMock(count=4, data=[])
+    assert client.delete_old_chat_usage(cutoff_days=7, dry_run=True) == 4
+    client._db.table.return_value.delete.assert_not_called()
+
+
+def test_delete_chatbot_logs_dry_run_counts_without_deleting():
+    client = _client_with_mock_db()
+    counted = client._db.table.return_value.select.return_value.eq.return_value.lt.return_value
+    counted.execute.return_value = MagicMock(count=2, data=[])
+    assert client.delete_chatbot_logs(dry_run=True) == 2
+    client._db.table.return_value.delete.assert_not_called()
+
+
+# --- privacy phase 2 (2026-09-30): generic purge + outreach contact expiry ----------------
+
+
+def test_purge_rows_deletes_older_than_the_window_with_the_filters():
+    client = _client_with_mock_db()
+    base = client._db.table.return_value.delete.return_value.lt.return_value
+    base.is_.return_value.execute.return_value = MagicMock(data=[{"id": "r1"}, {"id": "r2"}])
+
+    n = client.purge_rows("place_reports", 730, filters=[("is_", "published_at", "null")])
+
+    assert n == 2
+    client._db.table.assert_called_once_with("place_reports")
+    column, cutoff = client._db.table.return_value.delete.return_value.lt.call_args.args
+    assert column == "created_at"
+    assert (datetime.now(timezone.utc) - datetime.fromisoformat(cutoff)).days == 730
+    base.is_.assert_called_once_with("published_at", "null")
+
+
+def test_purge_rows_dry_run_counts_with_head_and_never_deletes():
+    client = _client_with_mock_db()
+    select = client._db.table.return_value.select
+    select.return_value.lt.return_value.eq.return_value.execute.return_value = MagicMock(count=3, data=[])
+
+    assert client.purge_rows("place_evidence", 730, filters=[("eq", "source", "user")], dry_run=True) == 3
+    assert select.call_args.kwargs == {"count": "exact", "head": True}
+    client._db.table.return_value.delete.assert_not_called()
+
+
+def test_purge_rows_refuses_unknown_tables_and_filters():
+    client = _client_with_mock_db()
+    import pytest
+    with pytest.raises(ValueError):
+        client.purge_rows("places", 30)
+    with pytest.raises(ValueError):
+        client.purge_rows("agent_log", 30, filters=[("delete", "x", "y")])
+
+
+def _outreach_client(places, messages):
+    client = _client_with_mock_db()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name not in tables:
+            t = MagicMock()
+            if name == "places":
+                t.select.return_value.not_.is_.return_value.execute.return_value = MagicMock(data=places)
+            if name == "outreach_messages":
+                t.select.return_value.execute.return_value = MagicMock(data=messages)
+                t.delete.return_value.in_.return_value.execute.return_value = MagicMock(data=[{}] * 3)
+            tables[name] = t
+        return tables[name]
+
+    client._db.table.side_effect = table
+    return client, tables
+
+
+OLD = "2024-01-01T00:00:00+00:00"
+RECENT = datetime.now(timezone.utc).isoformat()
+
+
+def test_expire_outreach_contacts_uses_the_last_contact_or_the_scrape_date():
+    places = [
+        {"id": "old-thread", "contact_email_checked_at": OLD},           # last message old too -> expires
+        {"id": "recent-thread", "contact_email_checked_at": OLD},        # a recent message keeps it
+        {"id": "never-contacted-old", "contact_email_checked_at": OLD},  # no message: the scrape date counts
+        {"id": "never-contacted-new", "contact_email_checked_at": RECENT},
+    ]
+    messages = [
+        {"place_id": "old-thread", "created_at": OLD},
+        {"place_id": "recent-thread", "created_at": OLD},
+        {"place_id": "recent-thread", "created_at": RECENT},
+        {"place_id": "no-email-any-more", "created_at": OLD},            # an old thread of a place without email
+    ]
+    client, tables = _outreach_client(places, messages)
+
+    out = client.expire_outreach_contacts(730, dry_run=True)
+    assert out == {"contact_emails": 2, "messages": 2}
+    tables["places"].update.assert_not_called()
+    tables["outreach_messages"].delete.assert_not_called()
+
+
+def test_expire_outreach_contacts_applies_the_expiry():
+    places = [{"id": "old-thread", "contact_email_checked_at": OLD}]
+    messages = [{"place_id": "old-thread", "created_at": OLD}, {"place_id": "old-thread", "created_at": OLD}]
+    client, tables = _outreach_client(places, messages)
+
+    out = client.expire_outreach_contacts(730)
+    tables["places"].update.assert_called_once_with({"contact_email": None})
+    tables["places"].update.return_value.in_.assert_called_once_with("id", ["old-thread"])
+    tables["outreach_messages"].delete.return_value.in_.assert_called_once_with("place_id", ["old-thread"])
+    assert out["contact_emails"] == 1
+
+
 def _agent_log_tables(last_run, purge_rows):
     """table('agent_log') is called twice: the last search run, then the purge entries."""
     client = _client_with_mock_db()
