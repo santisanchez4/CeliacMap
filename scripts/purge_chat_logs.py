@@ -6,7 +6,8 @@ Deletes, and nothing else:
 - Google review snippets (reviews.source='google') older than 30 days (Google Places ToS). The place
   ids whose snippets were deleted are logged (agent='search', action='google_reviews_purged') so the
   monthly Search run re-fetches them (SupabaseClient.fetch_purged_review_place_ids);
-- every agent_log row older than 1 year;
+- every agent_log row older than 1 year, except the deletion-request records (agent='privacy': request
+  reference, counts and ids, never the content), which prove a request was answered and are kept 5 years;
 - suggestions, place_reports that are not published (a hidden opinion included) and the suggestion notes
   copied to place_evidence (source 'user') older than 2 years;
 - a business's contact_email and its outreach_messages 2 years after the last contact.
@@ -36,6 +37,7 @@ CHATBOT_LOG_DAYS = 30
 CHAT_USAGE_DAYS = 7
 GOOGLE_REVIEW_DAYS = 30
 AGENT_LOG_DAYS = 365
+PRIVACY_RECORD_DAYS = 1825  # agent='privacy' deletion-request records: 5 years (owner decision, 2026-09-30)
 COMMUNITY_DAYS = 730  # suggestions, unpublished place_reports, suggestion notes in place_evidence
 OUTREACH_DAYS = 730   # after the last contact
 
@@ -52,7 +54,10 @@ def run(db, dry_run: bool = False) -> dict:
         if review_places:
             db.insert_agent_log("search", "google_reviews_purged", {"place_ids": review_places}, "success")
     summary["google_reviews_places"] = len(review_places)
-    summary["agent_log"] = db.purge_rows("agent_log", AGENT_LOG_DAYS, dry_run=dry_run)
+    summary["agent_log"] = db.purge_rows(
+        "agent_log", AGENT_LOG_DAYS, filters=[("neq", "agent", "privacy")], dry_run=dry_run)
+    summary["privacy_records"] = db.purge_rows(
+        "agent_log", PRIVACY_RECORD_DAYS, filters=[("eq", "agent", "privacy")], dry_run=dry_run)
     summary["suggestions"] = db.purge_rows("suggestions", COMMUNITY_DAYS, dry_run=dry_run)
     summary["place_reports_unpublished"] = db.purge_rows(
         "place_reports", COMMUNITY_DAYS, filters=[("is_", "published_at", "null")], dry_run=dry_run)

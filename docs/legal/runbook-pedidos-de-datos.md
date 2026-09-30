@@ -75,3 +75,4 @@ Llevarlo fuera del repositorio (tiene datos personales), por ejemplo en una plan
 |---|---|---|---|---|---|
 
 La referencia es lo único que se repite en `agent_log`, así se puede vincular sin guardar datos personales en la base.
+Esas constancias (`agent='privacy'`) se guardan **5 años**; el resto de `agent_log`, 1 año (purga semanal).

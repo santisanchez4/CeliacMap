@@ -2739,6 +2739,31 @@ the script and the runbook (CLAUDE.md, "Reglas vigentes").
   (iframe; the window would not resize), ES and EN, with real clicks for the place selection and the type switch; 0 console
   errors. Guarded by `tests/frontend_opinions.test.js`.
 
+### Privacy phase 2 — retention windows and providers (2026-09-30)
+
+**Retention windows** (decided by the owner), added to the weekly purge (`scripts/purge_chat_logs.py`, which gained a
+`--dry-run` that only counts): `agent_log` 1 year, except the deletion-request records (`agent='privacy'`: reference, counts,
+ids, never the content), kept **5 years** because they prove a request was answered; `suggestions`, unpublished
+`place_reports` (a hidden opinion included; the 2 years count from `created_at`) and the suggestion notes copied to
+`place_evidence` (source `user`, aligned with their original) 2 years; a business's `contact_email` and its
+`outreach_messages` 2 years after the last contact (the newest message, or the scrape date if it was never contacted;
+`contact_email` becomes NULL and `contact_email_checked_at` stays so it is not collected again at once; the whole thread is
+deleted). Votes live with their place and published opinions are never purged. The phase 1 windows stay (chat logs 30 days,
+`chat_usage` 7, Google reviews 30). The admin's alert emails in Zoho: 90 days, a mailbox rule the owner sets (documented,
+not code). `SupabaseClient.purge_rows` only accepts an allowlist of tables and filter methods. Test-first; the read-only
+dry run of 2026-09-30 counted 0 rows for every new rule (the data is recent) and the live PostgREST `head` counts,
+`neq` and `not.is.null` filters worked. Active from the run of 2026-10-05.
+
+**Providers** (inventory §6): country and retention of each one from its official documentation, with links; what a
+provider does not publish is written as not published (the IP retention of Google Fonts, GitHub Pages, unpkg and
+Cloudflare's logs). Zoho is the US data center (`mx.zoho.com`). The Supabase plan (1, 7, 28 or 90 days of logs) is still to be
+confirmed by the owner; the policy says "up to 90 days depending on the plan".
+
+**Legal drafts v1.0** (`docs/legal/`): no pending marks left; each legal doubt was written with the most prudent reading
+(18+ to send content, transfer on consent + provider contracts, 5 business days for every request, the two Disposición
+10/2008 legends with the AAIP, Uruguayan law without imposing a forum, Spanish prevails) and listed in
+`checklist-responsable.md` for the lawyer. Not published yet: the owner reviews the final texts first.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

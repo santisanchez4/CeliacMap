@@ -374,8 +374,10 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Secrets boundary:** only the anon key reaches the browser. Server-only tables (`agent_log`, `reviews`, `place_evidence`,
   `chat_usage`, `outreach_messages`) get no anon grant. Google Places reviews are purged after 30 days. The legacy Places API **and** the Geocoding API must both be enabled in
   GCP and allowed in the `GOOGLE_MAPS_API_KEY` restrictions.
-- **Retention and deletion requests** [Privacy phase 1]: the weekly purge (`chat-log-purge.yml`) deletes chatbot logs at 30
-  days, `chat_usage` at 7 and Google reviews at 30 (Search re-fetches them monthly); the chat's IP bucket is an HMAC with
+- **Retention and deletion requests** [Privacy phases 1–2]: the weekly purge (`chat-log-purge.yml`) deletes chatbot logs at 30
+  days, `chat_usage` at 7 and Google reviews at 30 (Search re-fetches them monthly), `agent_log` at 1 year (deletion-request
+  records, `agent='privacy'`, at 5), suggestions / unpublished reports / user evidence at 2 years, contact email + outreach 2 years
+  after the last contact; votes and published opinions are never purged there; the chat's IP bucket is an HMAC with
   `CHAT_IP_HASH_SECRET`, never a plain hash. A deletion request goes through `scripts/delete_personal_data.py` and
   `docs/legal/runbook-pedidos-de-datos.md`, never an ad-hoc `DELETE`; a chat recommendation is never published.
 - **Show the literal SQL/command and wait for an explicit "dale" before writing to production or any external service**; verify
@@ -420,6 +422,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **Privacy phase 2 (2026-09-30)** — retention windows in the weekly purge (agent_log 1 y, deletion records 5 y, community and outreach 2 y), providers with official sources, legal drafts v1.0 awaiting the owner's review. [→](docs/DECISIONS.md#privacy-phase-2--retention-windows-and-providers-2026-09-30)
 - **Privacy phase 1 (2026-09-29)** — owner_celiac no longer collected (column drop prepared for 2026-10-07), weekly purge of `chat_usage` (7 d) and Google reviews (30 d), IP bucket as HMAC, chat recommendations never published, deletion-request script + runbook. [→](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29)
 - **`places` public read by column grant (2026-09-29)** — the anon key could read `contact_email`, outreach and review columns; now `revoke all` + a 20-column `grant select`, rehearsed, applied and verified live (privacy phase 1). [→](docs/DECISIONS.md#places-public-read-by-column-grant--privacy-phase-1-2026-09-29)
 - **Cloudflare Web Analytics (2026-09-28)** — first third-party measurement script: one deferred beacon, page views only, no cookies, no custom events, never chat or form text; a third-party-script exception next to Leaflet. [→](docs/DECISIONS.md#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28)

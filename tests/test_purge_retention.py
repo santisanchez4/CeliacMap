@@ -36,7 +36,9 @@ class FakeDB:
 
     def purge_rows(self, table, older_than_days, filters=(), dry_run=False):
         self.calls.append((table, older_than_days, tuple(filters), dry_run))
-        return {"agent_log": 7, "suggestions": 1, "place_reports": 2, "place_evidence": 0}[table]
+        if table == "agent_log":
+            return 0 if ("eq", "agent", "privacy") in filters else 7
+        return {"suggestions": 1, "place_reports": 2, "place_evidence": 0}[table]
 
     def expire_outreach_contacts(self, older_than_days=730, dry_run=False):
         self.calls.append(("outreach", older_than_days, dry_run))
@@ -50,7 +52,8 @@ EXPECTED_WINDOWS = [
     ("chatbot_logs", 30),
     ("chat_usage", 7),
     ("google_reviews", 30),
-    ("agent_log", 365, ()),
+    ("agent_log", 365, (("neq", "agent", "privacy"),)),
+    ("agent_log", 1825, (("eq", "agent", "privacy"),)),
     ("suggestions", 730, ()),
     ("place_reports", 730, (("is_", "published_at", "null"),)),
     ("place_evidence", 730, (("eq", "source", "user"),)),
@@ -68,7 +71,8 @@ def test_run_applies_every_retention_window():
     assert _windows(db.calls) == EXPECTED_WINDOWS
     assert all(c[-1] is False for c in db.calls)
     assert summary == {
-        "chatbot_logs": 3, "chat_usage": 5, "google_reviews_places": 0, "agent_log": 7, "suggestions": 1,
+        "chatbot_logs": 3, "chat_usage": 5, "google_reviews_places": 0, "agent_log": 7, "privacy_records": 0,
+        "suggestions": 1,
         "place_reports_unpublished": 2, "place_evidence_user": 0, "contact_emails": 1, "outreach_messages": 4,
     }
 
@@ -102,3 +106,13 @@ def test_run_logs_nothing_when_no_review_expired():
     db = FakeDB()
     run(db)
     assert db.logged == []
+
+
+def test_deletion_request_records_are_kept_five_years_not_one():
+    # The owner's decision (2026-09-30): the agent='privacy' records prove a deletion request was answered
+    # (reference, counts, ids; no content), so they are excluded from the 1-year window and kept 5 years.
+    db = FakeDB()
+    run(db)
+    agent_log = [c for c in db.calls if c[0] == "agent_log"]
+    assert agent_log == [("agent_log", 365, (("neq", "agent", "privacy"),), False),
+                         ("agent_log", 1825, (("eq", "agent", "privacy"),), False)]

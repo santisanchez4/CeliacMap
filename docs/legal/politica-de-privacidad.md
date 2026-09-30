@@ -143,6 +143,7 @@ tipografías (Google Fonts), las imágenes del mapa (CARTO, con datos de OpenStr
 | Fragmentos de reseñas de Google | 30 días |
 | Email de contacto de un negocio y la conversación con él | 2 años desde el último contacto |
 | Registros internos del sistema | 1 año |
+| Constancia de un pedido de borrado (fecha, tablas y cantidad de filas, sin lo borrado) | 5 años |
 | Avisos internos por email (copias de sugerencias y reportes para revisarlos) | 90 días |
 | Datos en tu navegador | Hasta que los borres vos |
 
