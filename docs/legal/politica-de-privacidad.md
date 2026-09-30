@@ -56,6 +56,10 @@ Contacto para cualquier tema de privacidad: **hola@celiacmap.org**.
     pusiste o como “Anónimo”.
 - Tu navegador genera un identificador al azar para poder contar cuántos reportes distintos recibe un lugar. Ese
   identificador no dice quién sos.
+- **Tu nombre en una recomendación:** es opcional. Si lo escribís, autorizás que se publique junto a tu comentario en
+  “La voz de la comunidad”, una vez que lo revisemos. Te recomendamos solo tu nombre y una inicial (por ejemplo,
+  “Santiago S.”) o un apodo. Si lo dejás vacío, se publica como “Anónimo”. Podés pedir en cualquier momento que saquemos
+  tu nombre o tu comentario escribiendo a hola@celiacmap.org (sección 8).
 
 ### 3.3 Cuando votás un lugar
 

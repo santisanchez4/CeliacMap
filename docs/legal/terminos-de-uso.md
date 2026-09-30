@@ -61,6 +61,16 @@ acuerdo, no uses los formularios, los votos ni el chat.
 - Publicidad, spam, links engañosos o envíos automatizados.
 - Votar muchas veces el mismo lugar desde navegadores distintos.
 
+### Tu nombre en las recomendaciones
+
+- El nombre es **opcional**.
+- Si lo escribís, **autorizás que se publique junto a tu comentario** en “La voz de la comunidad”, una vez que lo
+  revisemos.
+- Te recomendamos poner solo tu nombre y una inicial (por ejemplo, “Santiago S.”) o un apodo.
+- Si lo dejás vacío, el comentario se publica como “Anónimo”.
+- Podés pedir en cualquier momento que saquemos tu nombre o tu comentario escribiendo a **hola@celiacmap.org** (lo
+  resolvemos como un pedido de borrado, ver la sección 8 de la Política de privacidad).
+
 ### Cómo moderamos
 
 - Ningún comentario se publica solo. Una **recomendación** enviada con el formulario se publica solo si la aprobamos,

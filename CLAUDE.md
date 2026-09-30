@@ -343,7 +343,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   `options_available`; one shared kitchen is not 100% by default. Only the admin upgrades to 100%. Kitchen declarations
   are unverified and live only on `suggestions` / `place_reports` (never `places`).
 - **No third-party health data is collected** [Privacy phase 1]: whether an owner is celiac is no longer asked, stored,
-  shown to the admin or sent to the model (`owner_celiac` columns dropped from 2026-10-06; the chat stops asking in the
+  shown to the admin or sent to the model (`owner_celiac` columns dropped from 2026-10-07; the chat stops asking in the
   next prompt batch). Never add a question about a person's health. A free-text claim about one is evidence for human
   review, never automatic, and never goes to a public column (`places.*`, `validation_notes`, flags, opinions).
 - **Evidence, not action** [Community reports; ranking; outreach]: reports, votes, outreach replies and the chatbot never
@@ -420,7 +420,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
-- **Privacy phase 1 (2026-09-29)** — owner_celiac no longer collected (column drop prepared for 2026-10-06), weekly purge of `chat_usage` (7 d) and Google reviews (30 d), IP bucket as HMAC, chat recommendations never published, deletion-request script + runbook. [→](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29)
+- **Privacy phase 1 (2026-09-29)** — owner_celiac no longer collected (column drop prepared for 2026-10-07), weekly purge of `chat_usage` (7 d) and Google reviews (30 d), IP bucket as HMAC, chat recommendations never published, deletion-request script + runbook. [→](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29)
 - **`places` public read by column grant (2026-09-29)** — the anon key could read `contact_email`, outreach and review columns; now `revoke all` + a 20-column `grant select`, rehearsed, applied and verified live (privacy phase 1). [→](docs/DECISIONS.md#places-public-read-by-column-grant--privacy-phase-1-2026-09-29)
 - **Cloudflare Web Analytics (2026-09-28)** — first third-party measurement script: one deferred beacon, page views only, no cookies, no custom events, never chat or form text; a third-party-script exception next to Leaflet. [→](docs/DECISIONS.md#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28)
 - **Sponsorships, visible and separate from safety (2026-09-28)** — first partner (Bienestar Gluten Free): a labeled `#aliados` card (+ header link and a mailto invitation), frontend only, `rel="sponsored"`, logo as the second binary-image exception (ADR-009); Bienestar's 2026-09-01 manual approval, label and confidence are unchanged; the next prompt edit replaces the chat's Bienestar example and adds the "sin gluten" glossary. [→](docs/DECISIONS.md#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)

@@ -28,7 +28,7 @@
 | Link de referencia | `suggestions.evidence_url` → `places.social_url` y `place_evidence.url` | Idem | Evidencia para el Validator | `places.social_url` es 🌐 si el lugar se aprueba | Sin borrado | Supabase; Anthropic (EE. UU.) lo ve el Validator |
 | Notas libres (“¿por qué es apto?”) | `suggestions.notes` → `place_evidence.text` (source `user`) | Idem | Evidencia para el Validator; mail diario al admin | No | Sin borrado. Copia en el buzón del admin (ver §5) | Supabase; Anthropic; Resend (EE. UU.) y Zoho (mail al admin) |
 | 🩺 Cocina del lugar: `kitchen_exclusive`, `celiac_prep` | `suggestions.*`, `place_reports.*` (solo reportes positivos) | Idem (formulario y chat) | Evidencia no verificada para el Validator (ADR-007) | No | Sin borrado | Supabase; Anthropic (el Validator la recibe) |
-| 🩺 **`owner_celiac`** (“¿el dueño o la dueña es celíaco/a?”) | `suggestions.owner_celiac`, `place_reports.owner_celiac` (columnas que se borran el 2026-10-06 o después) | **Ya no se junta**: el formulario no pregunta y el chat descarta la respuesta (desde la fase 1). El chat todavía pregunta hasta la próxima tanda de prompts | Nada: no lo ve el Validator, ni `review_queue`, ni el mail diario | No | **0 filas con el dato** (ver `owner-celiac-plan.md`) | Anthropic ve la respuesta en la conversación del chat mientras el chat siga preguntando |
+| 🩺 **`owner_celiac`** (“¿el dueño o la dueña es celíaco/a?”) | `suggestions.owner_celiac`, `place_reports.owner_celiac` (columnas que se borran el 2026-10-07 o después) | **Ya no se junta**: el formulario no pregunta y el chat descarta la respuesta (desde la fase 1). El chat todavía pregunta hasta la próxima tanda de prompts | Nada: no lo ve el Validator, ni `review_queue`, ni el mail diario | No | **0 filas con el dato** (ver `owner-celiac-plan.md`) | Anthropic ve la respuesta en la conversación del chat mientras el chat siga preguntando |
 | Comentario sobre un lugar (positivo o negativo) | `place_reports.description` (5–2000 caracteres) | Cualquier persona (formulario “Contanos” y chat) | Negativo: re-evaluación del Validator y aviso “Reportado por la comunidad”. Positivo: puede publicarse como opinión | Negativo: **nunca**. Positivo: 🌐 **solo si llegó por el formulario y el admin lo aprueba** (vista `community_opinions`). Las del chat (sin `reporter_token`) no se ofrecen para publicar (`moderate_opinions.from_the_form`) | Sin borrado. Una opinión publicada deja de verse si el admin la oculta (`moderate_opinions --hide`) o si el lugar sale del mapa | Supabase; Anthropic (reportes negativos); Resend + Zoho (texto completo en el mail urgente y en el mail diario) |
 | Nombre para mostrar (opcional, máx. 40) | `place_reports.author_name` | Quien deja una opinión positiva | Firmar la opinión publicada (vacío = “Anónimo”) | 🌐 si la opinión se publica | Sin borrado | Supabase |
 | Identificador de navegador para reportes | `place_reports.reporter_token` + localStorage `celiacmap-reporter-token` | Lo genera el navegador (aleatorio) | Contar reportes negativos **distintos** en 30 días | No | Sin borrado (0 filas hoy) | Supabase |
@@ -101,7 +101,7 @@ salvo los tres tokens marcados con →.
 ## 7. Datos de salud (resumen aparte)
 
 1. 🩺 `owner_celiac`: salud de una **tercera persona**, sin su consentimiento. 0 filas guardadas. Ya no se junta ni se
-   muestra (fase 1); las columnas se borran el 2026-10-06 o después y el chat deja de preguntar en la próxima tanda de
+   muestra (fase 1); las columnas se borran el 2026-10-07 o después y el chat deja de preguntar en la próxima tanda de
    prompts (`owner-celiac-plan.md`).
 2. 🩺 Turnos marcados del chat: si alguien cuenta sus síntomas (`limite_medico`), ese texto queda 30 días. Hoy el aviso
    del chat informa la retención, pero no pide un consentimiento expreso.
@@ -123,7 +123,7 @@ salvo los tres tokens marcados con →.
 | P3 | Cerrar la lectura pública de `contact_email` y de las columnas de outreach y de revisión | ✅ Fase 1: grant por columna aplicado y verificado |
 | P4 | Borrado semanal de las reseñas de Google | ✅ Fase 1: en la purga semanal; la recarga sigue en el pipeline mensual |
 | P5 | Retención para `suggestions`, `place_reports` no publicados, `place_votes`, `outreach_messages`, `agent_log` de los demás agentes y los mails del buzón | Abierto: decisión + job |
-| P6 | Eliminar `owner_celiac` | Etapa 1 ✅ (formulario, admin, chat descarta). Etapa 2: próxima tanda de prompts. Etapa 3: SQL preparado para el 2026-10-06 o después |
+| P6 | Eliminar `owner_celiac` | Etapa 1 ✅ (formulario, admin, chat descarta). Etapa 2: próxima tanda de prompts. Etapa 3: SQL preparado para el 2026-10-07 o después |
 | P7 | Confirmar la retención y el país de Anthropic, Resend, Cloudflare, Zoho, CARTO y las Edge Functions de Supabase | Abierto: lectura de las políticas de cada proveedor |
 | P8 | Recomendaciones que llegan por el chat | ✅ Fase 1: no se ofrecen para publicar (sin `reporter_token`). El aviso de “Anónimo” en el chat va en la próxima tanda de prompts (`docs/plans/next-prompt-batch.md`, punto 2) |
 

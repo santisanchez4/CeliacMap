@@ -1,11 +1,12 @@
 -- NOT APPLIED. Stage 3 of docs/legal/owner-celiac-plan.md: drop suggestions.owner_celiac and
--- place_reports.owner_celiac. Run no earlier than 2026-10-06 (one week after the frontend without the
--- owner question and the chat that discards it were deployed): a page cached before that could still
+-- place_reports.owner_celiac. Run no earlier than 2026-10-07: one week after the later of the two deploys
+-- (frontend without the owner question: Pages, 2026-09-29; chat v23 that discards it: 2026-09-30 01:14 UTC).
+-- A page cached before that could still
 -- send owner_celiac, and PostgREST rejects an INSERT with an unknown column (the whole suggestion is lost).
 -- Before running: show it, rehearse it (begin; ... rollback;), wait for the owner's "dale".
 -- After running: rename this file without ".PENDING", update db/schema.sql (KITCHEN-DECLARATIONS block
 -- and its comments, the place_reports_kitchen_positive_only_check CHECK) and tests/test_schema_kitchen_checks.py.
--- Apply: node_modules/.bin/supabase db query --linked --file db/migrations/2026-10-06-drop-owner-celiac.PENDING.sql
+-- Apply: node_modules/.bin/supabase db query --linked --file db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql
 
 -- 0) Read-only check first (2026-09-29: 0 and 0). Anything above 0 is looked at before going on.
 select (select count(*) from public.suggestions   where owner_celiac is not null) as suggestions_with_owner,

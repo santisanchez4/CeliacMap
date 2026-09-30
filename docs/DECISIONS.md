@@ -2680,8 +2680,9 @@ and the `.kitchen-note` rule), from `review_queue` and the daily email, and the 
 has the field, `kitchenFactsFromRouter` ignores the router's `dueno_celiaco`, a legacy client echo is stripped, and neither
 a row nor the redactor's `<envio>` carries it. The router still extracts it and the redactor still asks until the next
 prompt batch (`docs/plans/next-prompt-batch.md`, item 1). Production had 0 rows with the datum. The column drop is prepared,
-not run: `db/migrations/2026-10-06-drop-owner-celiac.PENDING.sql`, no earlier than 2026-10-06 so a cached page cannot lose a
-suggestion to an unknown-column error.
+not run: `db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql`. The date is not fixed in advance: it is **one week after
+the later deploy** — the frontend went out with Pages on 2026-09-29 and `chat` v23 on **2026-09-30 01:14 UTC**, so no earlier
+than 2026-10-07 — so a cached page cannot lose a suggestion to an unknown-column error.
 
 **Retention in the weekly purge** (`scripts/purge_chat_logs.py`, `.github/workflows/chat-log-purge.yml`, now "Weekly
 retention purge"). Besides the 30-day chatbot logs: `chat_usage` counters older than 7 days
@@ -2711,6 +2712,24 @@ target: answer in 5 business days.
 
 **Standing rules.** No third-party health data is collected; retention runs in the weekly purge; deletion requests go through
 the script and the runbook (CLAUDE.md, "Reglas vigentes").
+
+**Applied and verified (2026-09-29 / 30).**
+- `agent_log` accepts `'privacy'`: every existing agent value (12) and every value the code writes are in the new list; the
+  weekly purge writes as `search`. Begin/rollback rehearsal (the new CHECK validated the 5 346 rows, a `privacy` row
+  inserted and rolled back), then applied; a dry run of `delete_personal_data.py` with no match runs to the end (exit 0).
+- Frontend without the owner question: GitHub Pages, 2026-09-29 (live HTML and `js/kitchen.js` checked).
+- `chat` **v23 deployed 2026-09-30 01:14 UTC** after the owner created `CHAT_IP_HASH_SECRET` (present in `secrets list`, name
+  only): `verify_jwt=false`, the downloaded `index.ts` / `regions.ts` / `prompts.ts` identical to `HEAD` 6d9eb13 (hash
+  without CR). Two real search turns with a fixed test session: a new `ip:` bucket that differs from the one the same IP had
+  under the unkeyed SHA-256 (so the HMAC is in use; with no secret no `ip:` bucket would exist), counting 2 (the per-IP cap
+  still counts), and no chatbot error rows. Test rows cleaned with `db/checks/2026-09-30-chat-v23-test-cleanup.sql`
+  (guarded), which also removes the forgotten rows of the column-grant smoke test turn (00:27 UTC).
+- The owner_celiac column drop moves to **no earlier than 2026-10-07** (one week after `chat` v23); the file was renamed to
+  `db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql`.
+- The published San Felipa opinion (`ecaa0402…`, 2026-09-23 17:34 UTC, anonymous) came from form B: no chat turn in the
+  logged hour around it submitted anything (the nearest are a `celiaquia` turn at 17:04 and searches from 18:12; the one
+  `confirmar` turn, 18:14, is about another place and sent nothing), and it was recorded on 2026-09-24 as the first positive
+  report waiting for moderation. It stays published.
 
 ### Build status (phases)
 

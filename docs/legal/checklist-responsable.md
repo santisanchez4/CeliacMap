@@ -47,7 +47,7 @@
 ## Implementación antes de publicar (código, con plan y “dale” para producción)
 
 - [ ] P6 — eliminar `owner_celiac`: etapa 1 hecha (fase 1, 2026-09-29); etapa 2 en la próxima tanda de prompts;
-      etapa 3, el SQL `db/migrations/2026-10-06-drop-owner-celiac.PENDING.sql`, el 2026-10-06 o después.
+      etapa 3, el SQL `db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql`, el 2026-10-07 o después.
 - [x] P1 — `scripts/delete_personal_data.py` + `runbook-pedidos-de-datos.md` (fase 1).
 - [x] P2 — purga de `chat_usage` a los 7 días + HMAC de la IP (fase 1).
 - [x] P3 — `places` con grant por columna (fase 1, aplicado y verificado).

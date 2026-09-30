@@ -125,7 +125,7 @@ Qué medir en esa tanda: que el redactor ya no pregunte por el dueño (0 de N en
 `db/checks/chat_kitchen_live.py`), que la extracción de `cocina_exclusiva` y `preparacion_celiaca` no empeore
 (`chat_kitchen_router_check.py`) y que la batería siga en 0 quiebres.
 
-### Etapa 3 — base de datos (con “dale”; SQL preparado en `db/migrations/2026-10-06-drop-owner-celiac.PENDING.sql`)
+### Etapa 3 — base de datos (con “dale”; SQL preparado en `db/migrations/2026-10-07-drop-owner-celiac.PENDING.sql`)
 
 El orden importa: si la columna desaparece mientras alguien tiene la página vieja en caché, PostgREST rechaza el
 `INSERT` que la trae y **se pierde la sugerencia entera**. Por eso la columna se borra al menos una semana después de la
