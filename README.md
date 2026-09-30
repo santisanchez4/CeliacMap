@@ -300,7 +300,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers
 │   ├── seed.sql                # community-ranking votes on 15 real places (fictional sample places removed 2026-09-25)
 │   └── checks/                 # verification evidence: BEGIN;…ROLLBACK; scripts, jailbreak battery, live runs, prompt A/B tool
-├── docs/                       # DECISIONS.md (decisions log + design detail), architecture/ (ADRs, C4), plans/, runbooks/
+├── docs/                       # DECISIONS.md (decisions log + design detail), architecture/ (ADRs, C4), plans/, runbooks/, metodologia/ (public methodology, ES, .md + .pdf)
 ├── tests/                      # offline unit tests (all external calls mocked)
 ├── .github/workflows/          # agents-monthly cron + Pages deploy
 ├── requirements.txt

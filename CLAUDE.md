@@ -232,7 +232,8 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 │               plus admin tools (review_queue, find_evidence, moderate_opinions, cap_unsupported_100, revalidate_low_confidence,
 │               admin_digest, delete_personal_data), purge_chat_logs (weekly retention), sync_chat_prompts, check_setup, gen_favicons, gen_cursors
 ├── db/         schema.sql · seed.sql (ranking votes only) · migrations/ · fixes/ (one-off production SQL) · checks/
-├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…009, C4-diagrams.md) · plans/ · superpowers/ · runbooks/ · legal/ (privacy)
+├── docs/       DECISIONS.md (decisions log + detail) · architecture/ (ADR-001…009, C4-diagrams.md) · plans/ · superpowers/ · runbooks/ · legal/ (privacy) ·
+│               metodologia/ (public methodology for associations, .md + .pdf)
 ├── tests/      offline Python tests + frontend_*.test.js; guards: test_rubric_docs_sync, test_chat_prompts_sync, test_claude_md_size,
 │               frontend_partners
 ├── .github/workflows/  monthly pipeline, mid-month Validator, weekly suggestions, admin digest, Pages deploy, dispatch handlers
