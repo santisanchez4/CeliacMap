@@ -240,7 +240,7 @@ lugar, ayudar a confirmar un lugar en revisión e información general sobre la 
 
 - **Actualización de criterios por la Resolución Conjunta 32/2023.** Hoy el evaluador baja la confianza cuando un lugar
   dice "sin gluten" y no "sin TACC", porque "sin gluten" podía ser un término de marketing. Según la Resolución Conjunta
-  32/2023, un alimento es libre de gluten con menos de 10 mg/kg, y "sin gluten" pasa a ser el término de uso en
+  32/2023, un alimento es libre de gluten que no supera los 10 mg/kg de gluten, y "sin gluten" pasa a ser el término de uso en
   Argentina. Entendemos además que admite avena libre de gluten certificada; nos gustaría validarlo con ustedes antes de
   actualizar los criterios. Estamos actualizando los criterios para reflejarlo: la idea es dejar de penalizar "sin gluten" en Argentina y seguir
   distinguiendo un uso publicitario de la expresión de un sello o una práctica real. El cambio se va a probar antes de
