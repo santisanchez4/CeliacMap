@@ -2839,8 +2839,11 @@ places, none with a social profile in `website`, 117 with a `social_url` (105 of
 
 **MOOY's confirmation.** The admin confirmed the 100% from its Instagram with `review_queue --approve`; the note was saved
 with the command's example text («ACÁ LA FRASE QUE VISTE»). `db/fixes/2026-10-01-mooy-note-phrase.sql` replaces only that
-text (rehearsed with rollback; aborts until the real phrase is filled in). **Pending:** not applied yet, the admin has
-not passed the phrase; until then the public note still carries the example text. The City Bell branch Google lists (`ChIJXWuKgMLfopURi4Y6imU3rBY`) is **not** added
+sentence with the admin's wording: "Confirmado por el admin revisando su Instagram (@mooyrealcafe); reseñas de Google
+dicen «Todo lo que sirven es sin gluten y sin azúcar!!»" (the confirmation is the admin's review of the profile; the
+quoted phrase is from the Google reviews, not from Instagram). **Closed 2026-10-01:** rehearsed with rollback and applied;
+exactly 1 row, only `validation_notes` changed, status / level / confidence (0.91) / `verified` untouched, and the example
+text no longer appears in any row. The City Bell branch Google lists (`ChIJXWuKgMLfopURi4Y6imU3rBY`) is **not** added
 for now: nothing confirms it is also 100%.
 
 ### Build status (phases)
