@@ -35,6 +35,7 @@ SOCIAL_DOMAINS = (
     "whatsapp.com",
     "beacons.ai",
     "linktr.ee",
+    "tiktok.com",
 )
 
 MAILTO_RE = re.compile(r'mailto:([^\s"\'<>]+)', re.IGNORECASE)

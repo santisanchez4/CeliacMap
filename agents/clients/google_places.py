@@ -18,6 +18,8 @@ from typing import Any
 
 import googlemaps
 
+from agents.clients.website_scraper import is_social_url
+
 logger = logging.getLogger("celiacmap.agent")
 
 # Fields requested for a place-details lookup (keep minimal to limit cost).
@@ -647,9 +649,11 @@ class GooglePlacesClient:
         if phone:
             rich["phone"] = phone
 
+        # Google's "website" is often the business's social / link-in-bio profile: that is not a site.
+        # It goes out as `social_url`; callers write it only when the row has none.
         website = (result.get("website") or "").strip()
         if website:
-            rich["website"] = website
+            rich["social_url" if is_social_url(website) else "website"] = website
 
         weekday_text = (result.get("opening_hours") or {}).get("weekday_text")
         if weekday_text:

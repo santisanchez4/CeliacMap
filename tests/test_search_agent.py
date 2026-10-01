@@ -720,3 +720,50 @@ def test_details_lookup_capped():
     assert summary["inserted"] == 2
     assert summary["details_fetched"] == 1   # capped at 1
     assert places.place_details_with_reviews.call_count == 1
+
+
+# --- A social profile is never a website (2026-10-01) ----------------------
+# Google's "website" is often the business's Instagram / Facebook / link-in-bio page. It belongs in
+# `social_url`, and only when that column is empty.
+
+SOCIAL_PROFILES = [
+    "https://www.instagram.com/mooyrealcafe/",
+    "https://www.facebook.com/lapanaderiaderamona",
+    "https://wa.me/59899123456",
+    "https://linktr.ee/cafex",
+    "https://beacons.ai/cafex",
+    "https://www.tiktok.com/@cafex",
+]
+
+
+@pytest.mark.parametrize("url", SOCIAL_PROFILES)
+def test_extract_rich_fields_puts_a_social_profile_in_social_url_not_website(url):
+    rich = GooglePlacesClient.extract_rich_fields({"website": url})
+    assert rich == {"social_url": url}
+
+
+def test_extract_rich_fields_keeps_a_real_site_in_website():
+    rich = GooglePlacesClient.extract_rich_fields({"website": "https://chocara.com/"})
+    assert rich == {"website": "https://chocara.com/"}
+
+
+def test_place_details_store_the_social_profile_when_the_row_has_none():
+    agent, db, places = make_agent()
+    places.place_details_with_reviews.return_value = {"result": {"website": "https://www.instagram.com/mooyrealcafe/"}}
+    db.fetch_place_by_id.return_value = {"id": "row-1", "social_url": None}
+
+    agent._apply_place_details("row-1", "gid-1", store_reviews=False)
+
+    db.update_place.assert_called_once_with("row-1", {"social_url": "https://www.instagram.com/mooyrealcafe/"})
+
+
+def test_place_details_never_replace_a_social_url_the_row_already_has():
+    agent, db, places = make_agent()
+    places.place_details_with_reviews.return_value = {
+        "result": {"website": "https://www.facebook.com/croc", "rating": 4.5}
+    }
+    db.fetch_place_by_id.return_value = {"id": "row-1", "social_url": "https://www.instagram.com/croc"}
+
+    agent._apply_place_details("row-1", "gid-1", store_reviews=False)
+
+    db.update_place.assert_called_once_with("row-1", {"rating": 4.5})

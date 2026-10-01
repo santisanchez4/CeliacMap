@@ -117,7 +117,10 @@ class UpdaterAgent(BaseAgent):
 
         # Rich panel fields (phone/website/hours/rating). Only patch a field when
         # Google has a value and it differs from what we already store.
+        # `social_url` (a social profile Google lists as the website) only fills an empty column.
         for key, value in GooglePlacesClient.extract_rich_fields(result).items():
+            if key == "social_url" and place.get("social_url"):
+                continue
             if value not in (None, "", []) and value != place.get(key):
                 patch[key] = value
 

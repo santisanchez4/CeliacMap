@@ -96,6 +96,8 @@ class SearchAgent(BaseAgent):
         result = details.get("result") or {}
 
         rich = GooglePlacesClient.extract_rich_fields(result)
+        if "social_url" in rich and (self.db.fetch_place_by_id(place_id) or {}).get("social_url"):
+            del rich["social_url"]
         applied = False
         if rich:
             try:

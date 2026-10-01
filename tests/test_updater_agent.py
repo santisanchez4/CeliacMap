@@ -229,3 +229,23 @@ def test_manual_seed_places_are_skipped():
 
     assert summary["checked"] == 0
     places.place_details.assert_not_called()
+
+
+# --- A social profile is never a website (2026-10-01) ----------------------
+
+
+def test_patch_puts_a_social_profile_in_social_url_when_the_row_has_none():
+    agent, _, _ = make_agent()
+    place = {"name": "Same", "address": "Addr 1", "category": "restaurant", "website": None, "social_url": None}
+    result = {"name": "Same", "formatted_address": "Addr 1", "types": ["restaurant"],
+              "website": "https://www.instagram.com/mooyrealcafe/"}
+    assert agent._build_patch(place, result) == {"social_url": "https://www.instagram.com/mooyrealcafe/"}
+
+
+def test_patch_never_replaces_a_social_url_the_row_already_has():
+    agent, _, _ = make_agent()
+    place = {"name": "Same", "address": "Addr 1", "category": "restaurant",
+             "website": None, "social_url": "https://www.instagram.com/croc"}
+    result = {"name": "Same", "formatted_address": "Addr 1", "types": ["restaurant"],
+              "website": "https://www.facebook.com/croc"}
+    assert agent._build_patch(place, result) == {}

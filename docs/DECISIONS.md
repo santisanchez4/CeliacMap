@@ -2814,6 +2814,30 @@ del alcance geográfico` header (a data phrase: it protects nothing); only `stat
 exactly 8 rows. **This reverses the "editorial exclusion" of 2026-09-01 (Brazil) and 2026-09-25 (Chile)**, which kept them
 in `needs_review`: they can never be approved, so they were only noise in the admin's queue. After it: 0 live rows outside Uruguay / Argentina; `needs_review` 296 AR + 201 UY.
 
+### A social profile is not a website (2026-10-01)
+
+**Finding.** MOOY Real Café's `website` was its Instagram: Google's "website" field is whatever the business typed, and
+Search / the Updater stored it as it came. Measured the same day: **190 rows** carry a social or link-in-bio page in
+`website` (142 instagram.com, 36 facebook.com incl. subdomains, 6 linktr.ee, 3 wa.me, 2 whatsapp.com, 1 beacons.ai; 79 of
+them approved), 188 with an empty `social_url`. Moving one by hand would not last: the Updater writes Google's value back.
+
+**Rule (code, tests first).** `GooglePlacesClient.extract_rich_fields` hands a URL whose host is in `SOCIAL_DOMAINS`
+(`agents/clients/website_scraper.py`, now with `tiktok.com`) out as `social_url`, never `website`. Search
+(`_apply_place_details`) and the Updater (`_build_patch`) write it **only when the row has no `social_url`**; an existing
+one is never replaced. `website` is not cleared by the agents: Google listing a profile says nothing about a real site
+the row may already have.
+
+**Existing rows** (`db/fixes/2026-10-01-social-profile-out-of-website.sql`, rehearsed with rollback, applied only after the
+admin's "dale"): 188 rows move the profile to `social_url` and empty `website`; 2 rows that already had a `social_url`
+only empty `website` (La Panadería de Ramona, same Facebook page in both; CROC Galletas Artesanales, whose Facebook page
+is dropped in favour of the Instagram already stored). Only `website` / `social_url` change; none of the 190 is a single
+post or reel. This replaces the one-row MOOY script prepared earlier, which was never applied.
+
+**MOOY's confirmation.** The admin confirmed the 100% from its Instagram with `review_queue --approve`; the note was saved
+with the command's example text, corrected by `db/fixes/2026-10-01-mooy-note-phrase.sql` (replaces only that text; aborts
+until the real phrase is filled in). The City Bell branch Google lists (`ChIJXWuKgMLfopURi4Y6imU3rBY`) is **not** added
+for now: nothing confirms it is also 100%.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual

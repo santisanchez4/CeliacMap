@@ -423,6 +423,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
 
+- **A social profile is not a website (2026-10-01)** — Search and the Updater put a social / link-in-bio URL in `social_url` (only when empty), never `website`; one SQL for the 190 existing rows. [→](docs/DECISIONS.md#a-social-profile-is-not-a-website-2026-10-01)
 - **Monthly run review and admin decisions (2026-10-01)** — two manual 100% approvals with the quote from each site, one discard; the 8 Brazil / Chile rows go to `discarded` (reverses the editorial exclusion); the Updater can rewrite manual hours / website. [→](docs/DECISIONS.md#monthly-run-review-and-admin-decisions-2026-10-01)
 - **Privacy phase 2 (2026-09-30)** — retention windows in the weekly purge (agent_log 1 y, deletion records 5 y, community and outreach 2 y), providers with official sources, legal drafts v1.0 awaiting the owner's review. [→](docs/DECISIONS.md#privacy-phase-2--retention-windows-and-providers-2026-09-30)
 - **Privacy phase 1 (2026-09-29)** — owner_celiac no longer collected (column drop prepared for 2026-10-07), weekly purge of `chat_usage` (7 d) and Google reviews (30 d), IP bucket as HMAC, chat recommendations never published, deletion-request script + runbook. [→](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29)

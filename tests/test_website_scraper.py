@@ -39,6 +39,7 @@ def _mock_response(text, status_ok=True):
         "https://api.whatsapp.com/send?phone=59899123456",
         "https://beacons.ai/cafex",
         "https://linktr.ee/cafex",
+        "https://www.tiktok.com/@cafex",
     ],
 )
 def test_is_social_url_true_for_known_platforms(url):
