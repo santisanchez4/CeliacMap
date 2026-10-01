@@ -2780,6 +2780,40 @@ redactor improvised kitchen-style examples (no owner) — a prompt-level behavio
 Test rows removed with `db/checks/2026-09-30-chat-v24-test-cleanup.sql` (guarded) after the owner's "dale"; verified against
 the baseline: 0 chat_usage rows for 2026-09-30, 58 in total, 100 chatbot logs, 2 suggestions, 2 reports.
 
+### Monthly run review and admin decisions (2026-10-01)
+
+**The run** (GitHub Actions run 36890543042, `schedule`, success), reviewed read-only: 0 `external_id` with more than one
+live row; 71 new places (65 Search, 6 Social), all with `region`, none outside Uruguay / Argentina; 3 approved, 41
+`needs_review` (32 AR, 9 UY), 27 discarded. Outreach sent 3 emails in live mode to the businesses' own `contact_email`
+(Resend: `delivered`, recipient domain equal to the stored one). `place_reports`: nothing in `dispatched` / `processing`;
+the one `new` row is a positive report, terminal by design, so the skipped `review_sweep` left nothing behind.
+
+**Admin decisions**, applied by the admin with `scripts/review_queue --apply` (APROBACIÓN / DESCARTE MANUAL headers;
+`validation_confidence` 0.52 and `verified` untouched):
+- **ChocAra MVD - Sabores Que Unen** → approved, `gluten_free_100`. Source quoted in the note, read on the page:
+  chocara.com, «Nuestra cocina es 100% libre de gluten».
+- **Alimentos NutriCiencia SRL** → approved, `gluten_free_100`, `shop`. Source quoted in the note, read on the page:
+  cerogluten.uy, «Primera empresa Uruguaya de dedicación exclusiva a alimentos certificados Aptos para Celíacos» and
+  «Todo sin Gluten» (the phrase, not the domain name).
+- **Saint Germain Alianza Francesa** → discarded: no evidence of gluten-free options.
+- **MOOY Real Café** (La Plata, auto-approved `gluten_free_100` @ 0.91): left as is; the admin checks its Instagram. Its
+  only evidence is 4 Google reviews, two of which carry the exclusivity phrase that let the 100% through the code cap
+  («todo sin tacc», «Todo lo que sirven es sin gluten»); nothing from the business itself.
+
+**Contact data** (`db/fixes/2026-10-01-chocara-nutriciencia-data.sql`, rehearsed with rollback, applied, verified with the
+anon key): ChocAra gets its Instagram and Sunday hours (11:00–19:00); NutriCiencia gets the https website and weekday
+hours 10:00–17:00. Addresses were already Google's, so `address`, `lat` / `lng` and `region` did not change. No note
+header: a header is for a decision about the place (same as the Rikuras website fix), and this entry is the record.
+**Known limit, accepted:** both rows are `source = 'google_places'`, so the monthly Updater rewrites `website` and
+`opening_hours` whenever Google's value differs (`UpdaterAgent._build_patch`); the manual hours and the https link can
+revert on the next run. `social_url` is not a Google field and stays.
+
+**Brazil and Chile leave the queue** (`db/fixes/2026-10-01-out-of-scope-discard.sql`, rehearsed with rollback, applied):
+the 6 Brazilian and 2 Chilean rows go from `needs_review` to `discarded` with a `CORRECCIÓN MANUAL (2026-10-01): fuera
+del alcance geográfico` header (a data phrase: it protects nothing); only `status` and `validation_notes` changed, on
+exactly 8 rows. **This reverses the "editorial exclusion" of 2026-09-01 (Brazil) and 2026-09-25 (Chile)**, which kept them
+in `needs_review`: they can never be approved, so they were only noise in the admin's queue. After it: 0 live rows outside Uruguay / Argentina; `needs_review` 296 AR + 201 UY.
+
 ### Build status (phases)
 
 - ✅ **Phase 1–2 — Landing page + editorial redesign.** Responsive bilingual
