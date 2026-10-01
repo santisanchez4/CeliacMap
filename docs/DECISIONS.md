@@ -2827,15 +2827,20 @@ them approved), 188 with an empty `social_url`. Moving one by hand would not las
 one is never replaced. `website` is not cleared by the agents: Google listing a profile says nothing about a real site
 the row may already have.
 
-**Existing rows** (`db/fixes/2026-10-01-social-profile-out-of-website.sql`, rehearsed with rollback, applied only after the
-admin's "dale"): 188 rows move the profile to `social_url` and empty `website`; 2 rows that already had a `social_url`
+**Existing rows** (`db/fixes/2026-10-01-social-profile-out-of-website.sql`, applied 2026-10-01 after the code was on
+`main` (f5155c3) and after the admin's "dale"; rehearsed with rollback first): 188 rows move the profile to `social_url` and empty `website`; 2 rows that already had a `social_url`
 only empty `website` (La Panadería de Ramona, same Facebook page in both; CROC Galletas Artesanales, whose Facebook page
 is dropped in favour of the Instagram already stored). Only `website` / `social_url` change; none of the 190 is a single
-post or reel. This replaces the one-row MOOY script prepared earlier, which was never applied.
+post or reel. This replaces the one-row MOOY script prepared earlier, which was never applied. Losing CROC's Facebook
+link was accepted by the admin (its Instagram stays).
+**Result:** 190 rows changed, 0 rows left with a social profile in `website` (all statuses). With the anon key: 417 public
+places, none with a social profile in `website`, 117 with a `social_url` (105 of them a social profile with an empty
+`website`), 73 with a site of their own; MOOY shows its Instagram in `social_url`.
 
 **MOOY's confirmation.** The admin confirmed the 100% from its Instagram with `review_queue --approve`; the note was saved
-with the command's example text, corrected by `db/fixes/2026-10-01-mooy-note-phrase.sql` (replaces only that text; aborts
-until the real phrase is filled in). The City Bell branch Google lists (`ChIJXWuKgMLfopURi4Y6imU3rBY`) is **not** added
+with the command's example text («ACÁ LA FRASE QUE VISTE»). `db/fixes/2026-10-01-mooy-note-phrase.sql` replaces only that
+text (rehearsed with rollback; aborts until the real phrase is filled in). **Pending:** not applied yet, the admin has
+not passed the phrase; until then the public note still carries the example text. The City Bell branch Google lists (`ChIJXWuKgMLfopURi4Y6imU3rBY`) is **not** added
 for now: nothing confirms it is also 100%.
 
 ### Build status (phases)
