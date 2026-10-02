@@ -1,0 +1,30 @@
+{
+  "1e21c93a-0030-4c99-8ef1-eab8d487130f": {
+    "fields": ["phone", "website"],
+    "source": "db/fixes/2026-09-07-montevideo-manual-places.sql"
+  },
+  "339efc28-af19-4ce4-96ea-a9c1aa5176d4": {
+    "fields": ["website"],
+    "source": "db/fixes/2026-09-27-rikuras-malvin-website.sql"
+  },
+  "03ea2fae-834c-48c0-9f7e-b43b089dc4b4": {
+    "fields": ["phone"],
+    "source": "db/fixes/2026-09-07-montevideo-manual-places.sql"
+  },
+  "7363c257-9596-4aa1-a329-29d994d2eb65": {
+    "fields": ["phone"],
+    "source": "db/fixes/2026-09-07-montevideo-manual-places.sql"
+  },
+  "d1420754-dca8-47e2-8d60-97ac779de1c2": {
+    "fields": ["phone"],
+    "source": "db/fixes/2026-09-27-new-branches.sql"
+  },
+  "1becc778-212c-49ac-b2de-7e6417265385": {
+    "fields": ["opening_hours"],
+    "source": "db/fixes/2026-10-01-chocara-nutriciencia-data.sql"
+  },
+  "7f145df1-b613-470b-8748-b5ee19d383ad": {
+    "fields": ["website", "opening_hours"],
+    "source": "db/fixes/2026-10-01-chocara-nutriciencia-data.sql"
+  }
+}

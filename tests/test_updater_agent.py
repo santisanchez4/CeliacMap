@@ -102,6 +102,70 @@ def test_patch_combines_multiple_changes():
 # --- Rich detail fields ---------------------------------------------------
 
 
+@pytest.mark.parametrize("notes", [
+    "APROBACIÓN MANUAL (2026-10-01): confirmado por el administrador.",
+    "Nota reciente\n\n--- aprobacion manual: confirmada anteriormente.",
+])
+def test_manual_approval_preserves_contact_fields_but_refreshes_rating(notes):
+    agent, _, _ = make_agent()
+    place = {"validation_notes": notes, "website": None, "phone": "Manual",
+             "opening_hours": ["Horario confirmado"], "rating": 4.0}
+    patch = agent._build_patch(place, {
+        "website": "https://old.example", "formatted_phone_number": "Google",
+        "opening_hours": {"weekday_text": ["Horario Google"]}, "rating": 4.5,
+    })
+    assert patch == {"rating": 4.5}
+
+
+def test_rikuras_manual_website_survives_a_real_updater_run():
+    agent, db, places = make_agent()
+    db.fetch_places_by_status.return_value = [{
+        "id": "339efc28-af19-4ce4-96ea-a9c1aa5176d4",
+        "source": "google_places", "external_id": "ext-rikuras",
+        "website": "https://rikurassingluten.pidedirecto.uy/", "phone": "Old",
+    }]
+    places.place_details.return_value = {"status": "OK", "result": {
+        "website": "https://rikurassingluten.ambit.la/",
+        "formatted_phone_number": "New", "rating": 4.5,
+    }}
+    assert agent.run()["updated"] == 1
+    db.update_place.assert_called_once_with(
+        "339efc28-af19-4ce4-96ea-a9c1aa5176d4", {"phone": "New", "rating": 4.5})
+
+
+def test_same_business_name_does_not_protect_another_branch():
+    agent, _, _ = make_agent()
+    assert agent._build_patch(
+        {"id": "another-branch", "name": "Rikuras Sin Gluten", "website": "manual"},
+        {"website": "https://new.example"},
+    ) == {"website": "https://new.example"}
+
+
+def test_geography_correction_does_not_freeze_contact_fields():
+    agent, _, _ = make_agent()
+    assert agent._build_patch(
+        {"validation_notes": "CORRECCIÓN MANUAL: ciudad corregida."},
+        {"formatted_phone_number": "New"},
+    ) == {"phone": "New"}
+
+
+@pytest.mark.parametrize("place_id, protected", [
+    ("1e21c93a-0030-4c99-8ef1-eab8d487130f", {"phone", "website"}),
+    ("7363c257-9596-4aa1-a329-29d994d2eb65", {"phone"}),
+    ("03ea2fae-834c-48c0-9f7e-b43b089dc4b4", {"phone"}),
+    ("d1420754-dca8-47e2-8d60-97ac779de1c2", {"phone"}),
+    ("1becc778-212c-49ac-b2de-7e6417265385", {"opening_hours"}),
+    ("7f145df1-b613-470b-8748-b5ee19d383ad", {"website", "opening_hours"}),
+])
+def test_recorded_manual_corrections_survive_even_without_approval_notes(place_id, protected):
+    agent, _, _ = make_agent()
+    patch = agent._build_patch({"id": place_id}, {
+        "website": "https://google.example", "formatted_phone_number": "Google",
+        "opening_hours": {"weekday_text": ["Google"]}, "rating": 4.5,
+    })
+    assert set(patch) == {"website", "phone", "opening_hours", "rating"} - protected
+
+
 def test_patch_includes_rich_fields():
     agent, _, _ = make_agent()
     place = {"name": "Same", "address": "Addr 1", "category": "restaurant"}

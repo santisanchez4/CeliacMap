@@ -3814,6 +3814,25 @@ CARTO se trata como uso comercial por los aliados. HMAC ya fue configurado/verif
 primera ejecución prevista para el 05-10 y el drop de `owner_celiac` sigue diferido al 07-10 o después. Los cambios de
 perfiles sociales ya aplicados se conservan. Este registro no ejecuta esas tareas ni cambia datos productivos.
 
+### Updater manual contact protection and Google risk (2026-10-02)
+
+El responsable decide más adelante entre Google Maps, datos propios y Places UI Kit. La [auditoría](legal/auditoria-datos-google.md)
+queda como **riesgo abierto prioritario antes de tiendas o de una presentación institucional**. No bloquea el desarrollo del
+piloto, ni supone una excepción contractual. No se cambia proveedor ni se retiran datos en esta tarea.
+
+El Updater no debe sobrescribir `website`, `phone` u `opening_hours` en filas con `APROBACIÓN MANUAL`, ni campos con corrección
+manual registrada. Se usa un registro explícito por UUID/campo con fuente SQL para las correcciones históricas sin nota;
+no una inferencia de texto libre ni una migración. No cambian las reglas de seguridad del Validator. [Operación y límites](runbooks/manual-contact-fields.md).
+
+Tests primero: siete regresiones fallaron antes del cambio (aprobación y correcciones históricas, incluido Rikuras). La protección
+conserva el dato actual; no restaura automáticamente un valor que ya fue pisado. SQL Rikuras preparado y ensayado con rollback,
+asserts de una fila y solo website/updated_at; lectura posterior confirma ambit.la. **Aplicación pendiente del «dale» del responsable**
+y del merge de la protección. El futuro destino autorizado es `https://rikurassingluten.pidedirecto.uy/`.
+
+PR #2 mergeado (`23abe40`). Ruleset `Proteger main` (24349101) leído: activo, PR y check `CI required` de GitHub Actions,
+sin bypass, sin borrado/force-push. **Rama actualizada todavía no exigida**: la API devuelve
+`strict_required_status_checks_policy: false`; se informó al responsable, sin modificar configuración remota.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

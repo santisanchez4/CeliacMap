@@ -334,6 +334,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
 **Validator, overrides and labels**
+- **Updater y contacto manual:** preservar `website`/`phone`/`opening_hours` con `APROBACIÓN MANUAL`; registrar correcciones por campo en `config/manual_contact_fields.json` antes de aplicarlas. [Regla y ensayo Rikuras](docs/runbooks/manual-contact-fields.md).
 - **Manual overrides are never silent** [Manual Validator overrides]. Record them in `places.validation_notes` under a
   header (`OVERRIDE MANUAL` / `APROBACIÓN MANUAL` / `CORRECCIÓN MANUAL`): who, what direct knowledge, what the Validator
   had said. Never inflate or deflate `validation_confidence`; leave `verified` alone unless a human vouches for it.
@@ -454,6 +455,7 @@ One line per entry: title (date) — one sentence, linking to its anchor in `doc
 - **Map drag cursor (s/f)** — thin-line hand as a PNG (SVG cursors flicker). [→](docs/DECISIONS.md#map-drag-cursor-cm-mapleaflet-grab)
 - **Geocode-gate address fallback (2026-09-01)** — Find Place, then Geocoding API; `address_only` = weaker evidence. [→](docs/DECISIONS.md#geocode-gate--address-fallback-resolve_location)
 - **Manual Validator overrides (2026-09-01 → 09-25)** — never silent; four precedents; data-correction phrases; the 100% labeling rule. [→](docs/DECISIONS.md#manual-validator-overrides--allowed-but-never-silent)
+- **Updater contacto manual + Google pendiente (2026-10-02)** — preservar campos corregidos; riesgo Google prioritario antes de tiendas/presentación institucional. [→](docs/DECISIONS.md#updater-manual-contact-protection-and-google-risk-2026-10-02)
 - **`#suggest` card titles and copy (2026-09-24)** — titles and intros for both form cards. [→](docs/DECISIONS.md#suggest-section--card-titles-and-copy-2026-09-24)
 - **Audit — evidence for the Validator (2026-09-24)** — `place_evidence`, unsupported-100% cap, report thresholds, admin tools. [→](docs/DECISIONS.md#audit-2026-09-24--evidence-for-the-validator--100-only-with-explicit-evidence)
 - **Audit data-quality pass (2026-09-25)** — 42 rows fixed (seed, country/city, non-businesses, Chile); debt listed. [→](docs/DECISIONS.md#audit-data-quality-pass-2026-09-25--fictional-seed-places-wrong-countrycity-non-business-rows)

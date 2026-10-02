@@ -8,8 +8,21 @@ OVERRIDE MANUAL and APROBACIÓN MANUAL always protect, exactly as before.
 from __future__ import annotations
 
 import pytest
+import json
+from pathlib import Path
+from uuid import UUID
 
 from agents.manual_overrides import DATA_CORRECTION_PHRASES, manual_override_marker
+
+
+def test_contact_correction_registry_has_valid_fields_and_auditable_sources():
+    root = Path(__file__).resolve().parent.parent
+    registry = json.loads((root / "config/manual_contact_fields.json").read_text(encoding="utf-8"))
+    for place_id, entry in registry.items():
+        assert str(UUID(place_id)) == place_id
+        assert entry["fields"] and set(entry["fields"]) <= {"website", "phone", "opening_hours"}
+        source = (root / entry["source"]).read_text(encoding="utf-8")
+        assert place_id in source
 
 # Production notes (2026-09-24), verbatim: the admin's safety-label correction + the override it replaced.
 LOS_LENOS = (

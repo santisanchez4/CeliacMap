@@ -2410,3 +2410,9 @@ campos Google y políticas, dejando la decisión al responsable. Agregar suite c
 explicar protección de main. Rama nueva y PR, mostrando cada punto antes del siguiente. No implementar la app ahora.
 
 **Alcance:** documentación y CI; ningún prompt de modelos, criterio de seguridad ni dato productivo cambia.
+
+## 38. Contactos manuales y riesgo Google (2026-10-02)
+
+**Pedido:** proteger website/phone/opening_hours del Updater con tests primero; preparar restauración de Rikuras con ensayo y esperar «dale». Google queda como decisión abierta prioritaria antes de tiendas o presentación institucional, sin bloquear el piloto.
+
+**Resultado:** protección por aprobación manual o registro explícito de campos/UUID, ensayo SQL con rollback y guardas, PR independiente. No cambia ningún prompt del modelo.

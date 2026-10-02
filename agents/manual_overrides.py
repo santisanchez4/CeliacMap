@@ -12,6 +12,21 @@ see ``DATA_CORRECTION_PHRASES``.
 from __future__ import annotations
 
 import unicodedata
+import json
+from pathlib import Path
+
+
+CONTACT_FIELDS = frozenset({"website", "phone", "opening_hours"})
+_CONTACT_CORRECTIONS = json.loads(
+    (Path(__file__).resolve().parent.parent / "config/manual_contact_fields.json").read_text(encoding="utf-8")
+)
+
+
+def protected_contact_fields(place: dict) -> frozenset[str]:
+    """Preserve approved contact data and explicit corrections, independently of safety overrides."""
+    if "aprobacion manual" in _norm(place.get("validation_notes") or ""):
+        return CONTACT_FIELDS
+    return frozenset(_CONTACT_CORRECTIONS.get(place.get("id"), {}).get("fields", []))
 
 MANUAL_OVERRIDE_MARKERS = (
     "override",           # "OVERRIDE MANUAL ...", "override del Validator"
