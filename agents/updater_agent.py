@@ -24,6 +24,7 @@ from agents.base import BaseAgent
 from agents.clients.google_places import GooglePlacesClient
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.manual_overrides import protected_contact_fields
 
 logger = logging.getLogger("celiacmap.agent")
 
@@ -118,7 +119,10 @@ class UpdaterAgent(BaseAgent):
         # Rich panel fields (phone/website/hours/rating). Only patch a field when
         # Google has a value and it differs from what we already store.
         # `social_url` (a social profile Google lists as the website) only fills an empty column.
+        protected = protected_contact_fields(place)
         for key, value in GooglePlacesClient.extract_rich_fields(result).items():
+            if key in protected:
+                continue
             if key == "social_url" and place.get("social_url"):
                 continue
             if value not in (None, "", []) and value != place.get(key):

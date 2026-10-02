@@ -320,6 +320,9 @@ read-only data from Supabase using the anon key in `js/config.js`.
 
 ### Agents (Python)
 
+Manual contact corrections are protected from Updater refreshes; see the
+[manual contact fields runbook](docs/runbooks/manual-contact-fields.md) before editing those fields.
+
 ```bash
 cp .env.example .env             # fill in Supabase service_role + API keys
 pip install -r requirements.txt
