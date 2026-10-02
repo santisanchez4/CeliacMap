@@ -304,7 +304,7 @@
   function icon(place, selected) {
     var level = place && place.safety_level;
     return L.divIcon({
-      className: "",
+      className: "cm-pin",
       html: '<span class="cm-marker ' + safetyClass(level) + (hasWarning(place) ? " cm-marker--warning" : "") +
         (selected ? " is-selected" : "") + '"></span>',
       iconSize: [selected ? 28 : 18, selected ? 28 : 18],
@@ -400,6 +400,10 @@
     var P = LABELS.panel;
     var html = '<h3 class="pp-title">' + esc(p.name) + "</h3>";
     if (p.city) html += '<p class="pp-meta">' + esc(p.city) + "</p>";
+    if (p.address) html += '<p class="pp-address">' + esc(p.address) + '</p>';
+    html += '<a class="pp-directions" href="https://www.google.com/maps/dir/?api=1&amp;destination=' +
+      encodeURIComponent(p.lat + ',' + p.lng) + '" target="_blank" rel="noopener noreferrer">' +
+      tr('Cómo llegar ↗', 'Get directions ↗') + '</a>';
 
     html += '<div class="pp-badges">' +
       '<span class="pp-badge pp-badge--cat">' + esc(cat) + "</span>" +
@@ -418,7 +422,6 @@
     }
 
     html += '<div class="pp-fields">';
-    if (p.address) html += field(P.address[l], esc(p.address));
     if (p.phone) {
       var tel = String(p.phone).replace(/[^\d+]/g, "");
       html += field(
@@ -477,6 +480,7 @@
     panelBody.appendChild(expand);
     panelEl.classList.toggle("is-expanded", panelExpanded);
     panelEl.classList.add("is-open");
+    panelEl.inert = false;
     panelEl.setAttribute("aria-hidden", "false");
     // Let js/ranking.js wire the .pp-vote button and reflect the voted state.
     try {
@@ -488,10 +492,17 @@
     if (!panelAvailable) return;
     var wasOpen = panelEl.classList.contains("is-open");
     panelEl.classList.remove("is-open");
+    panelEl.inert = true;
     panelEl.setAttribute("aria-hidden", "true");
     // Counterpart of celiacmap:panel-open, so js/chat.js can bring its FAB back.
     // Only when it actually closed: closePanel also runs on every map click / Escape.
     if (wasOpen) {
+      if (selectedEntry) {
+        var previousEntry = selectedEntry;
+        selectedEntry = null;
+        paintMarker(previousEntry, false);
+      }
+      syncTop3();
       try { document.dispatchEvent(new CustomEvent("celiacmap:panel-close")); } catch (e) {}
       if (panelEl.contains(document.activeElement)) {
         (returnFocusEl && returnFocusEl.isConnected && returnFocusEl.getClientRects().length ? returnFocusEl : mapEl).focus({ preventScroll: true });
@@ -526,10 +537,10 @@
       // Selecting a marker swaps its icon (setIcon), replacing the node that was
       // clicked: its target is already detached by the time the click gets here.
       if (!e.target.isConnected) return;
-      if (panelEl.contains(e.target) || mapEl.contains(e.target)) return;
+      if (panelEl.contains(e.target) || mapEl.contains(e.target) || e.target.closest(".map-explore-tools")) return;
       // Links that open a place from elsewhere on the page (chat replies, "La voz de la comunidad" cards)
       // dispatch celiacmap:open-place; their own click must not be read as an outside click.
-      if (e.target.closest && e.target.closest(".chat-place-link, .review-place")) return;
+      if (e.target.closest && e.target.closest(".chat-place-link, .review-place, .mt3-name")) return;
       closePanel();
     });
     document.addEventListener("keydown", function (e) {
@@ -556,6 +567,79 @@
   var currentSafety = "all";
   var currentQuery = "";
   var selectedEntry = null;
+  var workspace = document.querySelector(".map-demo");
+  workspace.id = "map-workspace";
+  var expandButton = document.getElementById("map-expand");
+  var expanded = false;
+  var expandedScroll = null;
+  var isolatedNodes = [];
+  panelEl.inert = true;
+
+  function syncExpandButton() {
+    expandButton.textContent = expanded ? tr("Reducir mapa", "Exit expanded map") : tr("Expandir mapa", "Expand map");
+    expandButton.setAttribute("aria-expanded", String(expanded));
+
+  }
+
+  function setExpanded(open) {
+    if (expanded === open) return;
+    expanded = open;
+    workspace.classList.toggle("is-map-expanded", open);
+    if (open) {
+      document.dispatchEvent(new CustomEvent("celiacmap:map-expand"));
+      expandedScroll = { x: window.scrollX || 0, y: window.scrollY || 0 };
+      document.body.style.setProperty("--map-scroll-top", -expandedScroll.y + "px");
+      workspace.setAttribute("role", "dialog");
+      workspace.setAttribute("aria-modal", "true");
+      workspace.setAttribute("aria-label", tr("Explorar el mapa", "Explore the map"));
+      // Isolate siblings at every ancestor without making the map itself inert.
+      for (var node = workspace; node && node !== document.body; node = node.parentElement) {
+        Array.prototype.forEach.call(node.parentElement.children, function (sibling) {
+          if (sibling !== node && !sibling.hasAttribute("inert")) {
+            sibling.setAttribute("inert", "");
+            isolatedNodes.push(sibling);
+          }
+        });
+      }
+    } else {
+      isolatedNodes.forEach(function (node) { node.removeAttribute("inert"); });
+      isolatedNodes = [];
+      workspace.removeAttribute("role");
+      workspace.removeAttribute("aria-modal");
+      workspace.removeAttribute("aria-label");
+    }
+    document.body.classList.toggle("map-expanded-open", open);
+    if (!open && expandedScroll) {
+      var behavior = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = "auto";
+      window.scrollTo(expandedScroll.x, expandedScroll.y);
+      document.documentElement.style.scrollBehavior = behavior;
+      document.body.style.removeProperty("--map-scroll-top");
+      expandedScroll = null;
+    }
+    syncExpandButton();
+    map.invalidateSize({ pan: false });
+    if (selectedEntry && panelEl.classList.contains("is-open")) frameSelectedEntry(selectedEntry);
+    expandButton.focus({ preventScroll: true });
+  }
+  expandButton.addEventListener("click", function () { setExpanded(!expanded); });
+  workspace.addEventListener("keydown", function (event) {
+    if (!expanded) return;
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      if (panelEl.classList.contains("is-open")) closePanel();
+      else setExpanded(false);
+    }
+    if (event.key === "Tab") {
+      var nodes = Array.prototype.filter.call(workspace.querySelectorAll("button, a[href], input, select, summary, [tabindex='0']"), function (node) {
+        return !node.disabled && !node.closest("[inert]") && node.getClientRects().length;
+      });
+      var first = nodes[0], last = nodes[nodes.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  });
+  document.querySelector(".map-explore-tools").hidden = false;
 
   var searchInput = document.getElementById("place-search");
   var searchClear = document.getElementById("search-clear");
@@ -602,6 +686,7 @@
     document.querySelector(".map-safety-chips").setAttribute("aria-label", tr("Información sin TACC", "Gluten-free information"));
     panelClose.setAttribute("aria-label", tr("Volver al mapa", "Back to map"));
     panelEl.setAttribute("aria-label", tr("Detalle del lugar", "Place details"));
+    syncExpandButton();
   }
   translateExplorer();
 
@@ -645,6 +730,25 @@
     return (LABELS.safety[level] && LABELS.safety[level][lang()]) || level;
   }
 
+  function markerLabel(p) {
+    return p.name + " · " + (LABELS.category[p.category] ? LABELS.category[p.category][lang()] : "") +
+      " · " + safetyText(p.safety_level) + (hasWarning(p) ? tr(" · Reportado por la comunidad", " · Community report") : "");
+  }
+
+  function labelMarker(entry) {
+    var element = entry.marker.getElement && entry.marker.getElement();
+    if (!element) return;
+    element.setAttribute("aria-label", markerLabel(entry.place));
+    element.setAttribute("title", markerLabel(entry.place));
+    element.setAttribute("aria-pressed", String(selectedEntry === entry));
+    if (entry.marker.setZIndexOffset) entry.marker.setZIndexOffset(selectedEntry === entry ? 1000 : 0);
+  }
+
+  function paintMarker(entry, selected) {
+    entry.marker.setIcon(icon(entry.place, selected));
+    labelMarker(entry);
+  }
+
   function frameSelectedEntry(entry) {
     var right = 0;
     var bottom = 0;
@@ -676,15 +780,33 @@
     if (!panelEl.classList.contains("is-open")) previousView = { center: map.getCenter(), zoom: map.getZoom() };
     returnFocusEl = document.activeElement;
     panelExpanded = false;
-    if (selectedEntry && selectedEntry !== entry) selectedEntry.marker.setIcon(icon(selectedEntry.place));
+    var previousEntry = selectedEntry;
     selectedEntry = entry;
-    entry.marker.setIcon(icon(entry.place, true));
+    if (previousEntry && previousEntry !== entry) paintMarker(previousEntry, false);
+    paintMarker(entry, true);
     map.invalidateSize();
     showDetails(entry.place, entry.marker);
     frameSelectedEntry(entry);
     try { document.dispatchEvent(new CustomEvent("celiacmap:place-selected", { detail: entry.place })); } catch (e) {}
     if (focusPanel && panelEl) panelEl.focus({ preventScroll: true });
+    syncTop3();
   }
+
+  function syncTop3() {
+    Array.prototype.forEach.call(document.querySelectorAll(".mt3-name[data-map-place]"), function (button) {
+      button.setAttribute("aria-pressed", String(!!selectedEntry && button.getAttribute("data-map-place") === selectedEntry.place.id));
+    });
+  }
+  document.addEventListener("celiacmap:ranking-render", syncTop3);
+  ["mouseover", "mouseout", "focusin", "focusout"].forEach(function (type) {
+    document.addEventListener(type, function (event) {
+      var button = event.target.closest && event.target.closest("[data-map-place]");
+      if (!button) return;
+      entries.forEach(function (entry) {
+        if (entry.place.id === button.getAttribute("data-map-place")) highlightMarker(entry, type === "mouseover" || type === "focusin");
+      });
+    });
+  });
 
   // Re-apply category + city + search to the marker layer.
   function refresh() {
@@ -697,7 +819,6 @@
     });
     if (selectedEntry && !matches(selectedEntry)) {
       closePanel();
-      selectedEntry.marker.setIcon(icon(selectedEntry.place));
       selectedEntry = null;
     }
     updateCount(shown.length);
@@ -750,6 +871,7 @@
   document.addEventListener("celiacmap:lang", function () {
     updateCount(shownMarkers().length);
     translateExplorer();
+    entries.forEach(labelMarker);
     if (selectedEntry && panelEl && panelEl.classList.contains("is-open")) openPanel(selectedEntry.place);
   });
 
@@ -799,6 +921,16 @@
     }
   });
 
+  document.addEventListener("celiacmap:explore", function (event) {
+    workspace.scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth", block: "start" });
+    mapEl.focus({ preventScroll: true });
+    if (event.detail.action === "dedicated") {
+      resetFilters();
+      document.querySelector('[data-safety="gluten_free_100"]').click();
+      document.getElementById("explorer-filters").open = true;
+    }
+  });
+
   /* ------------------------- City selector -------------------------- */
   if (citySelect) {
     citySelect.addEventListener("change", function () {
@@ -826,6 +958,7 @@
   var activeIdx = -1;
 
   function closeSuggest() {
+    suggItems.forEach(function (item) { highlightMarker(item.entry, false); });
     if (!suggestEl) return;
     suggestEl.hidden = true;
     suggestEl.innerHTML = "";
@@ -850,6 +983,7 @@
     suggItems.forEach(function (it, i) {
       var on = i === idx;
       it.el.classList.toggle("is-active", on);
+      highlightMarker(it.entry, on);
       if (on) it.el.setAttribute("aria-selected", "true");
       else it.el.removeAttribute("aria-selected");
     });
@@ -858,6 +992,12 @@
     if (suggItems[idx].el.scrollIntoView) {
       suggItems[idx].el.scrollIntoView({ block: "nearest" });
     }
+  }
+
+  function highlightMarker(entry, active) {
+    var element = entry.marker.getElement && entry.marker.getElement();
+    if (element) element.classList.toggle("is-highlighted", active);
+    if (entry.marker.setZIndexOffset) entry.marker.setZIndexOffset(active || selectedEntry === entry ? 1000 : 0);
   }
 
   // Build the dropdown from the already-loaded markers (no extra API calls),
@@ -981,12 +1121,12 @@
       }
       rows.forEach(function (p) {
         if (typeof p.lat !== "number" || typeof p.lng !== "number") return;
-        var marker = L.marker([p.lat, p.lng], { icon: icon(p), title: p.name });
+        var marker = L.marker([p.lat, p.lng], { icon: icon(p), title: markerLabel(p), alt: markerLabel(p) });
         if (panelAvailable) {
           marker.on("click", (function (place, mk) {
             return function () {
               for (var i = 0; i < entries.length; i++) {
-                if (entries[i].place.id === place.id) { selectEntry(entries[i], false); return; }
+                if (entries[i].place.id === place.id) { selectEntry(entries[i], true); return; }
               }
               showDetails(place, mk);
             };
@@ -1000,6 +1140,15 @@
           city: p.city || "",
           place: p,
           name: normalize(p.name)        // accent-insensitive match key
+        });
+        var entry = entries[entries.length - 1];
+        marker.on("add", function () { labelMarker(entry); });
+        ["mouseover", "mouseout"].forEach(function (type) {
+          marker.on(type, function () {
+            Array.prototype.forEach.call(document.querySelectorAll("[data-map-place]"), function (button) {
+              if (button.getAttribute("data-map-place") === entry.place.id) button.classList.toggle("is-map-hover", type === "mouseover");
+            });
+          });
         });
       });
       setStatus(null);

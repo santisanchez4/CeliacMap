@@ -237,6 +237,9 @@
           <div class="map-wrap">
             <div id="cm-map" role="application" aria-label="Mapa de lugares sin TACC"></div>
             <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
+            <div class="map-explore-tools" hidden>
+              <button type="button" id="map-expand" aria-expanded="false" aria-controls="map-workspace">Expandir mapa</button>
+            </div>
 
             <aside class="place-panel" id="place-panel" aria-hidden="true"
               role="dialog" aria-modal="false" aria-label="Detalle del lugar" tabindex="-1">
@@ -927,6 +930,7 @@
        dead button when JavaScript is off. -->
   <button type="button" class="chat-fab" id="chat-fab" hidden
           aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-panel">
+    <span class="chat-welcome" data-chat-text="welcome" aria-hidden="true"></span>
     <svg class="chat-fab-icon chat-fab-icon--open" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
       <path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"
         d="M5 3.5h14a2.5 2.5 0 0 1 2.5 2.5v9a2.5 2.5 0 0 1-2.5 2.5h-6.6l-4.1 3.2a.7.7 0 0 1-1.1-.55V17.5H5A2.5 2.5 0 0 1 2.5 15V6A2.5 2.5 0 0 1 5 3.5z" />
@@ -942,7 +946,7 @@
   <div class="chat-panel" id="chat-panel" role="dialog" aria-modal="false"
        aria-labelledby="chat-panel-title" hidden>
     <header class="chat-panel-head">
-      <h2 class="chat-panel-title" id="chat-panel-title" data-chat-text="title"></h2>
+      <div class="chat-heading"><span class="chat-eyebrow" data-chat-text="eyebrow"></span><h2 class="chat-panel-title" id="chat-panel-title" data-chat-text="title"></h2></div>
       <button type="button" class="chat-panel-close" id="chat-panel-close" data-chat-aria="close">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18" />
@@ -950,6 +954,12 @@
       </button>
     </header>
     <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+    <div class="chat-actions" role="group" data-chat-aria="actions">
+      <button type="button" data-chat-action="browse" data-chat-text="browse"></button>
+      <button type="button" data-chat-action="dedicated" data-chat-text="dedicated"></button>
+      <button type="button" data-chat-action="guide" data-chat-text="guide"></button>
+      <button type="button" data-chat-action="suggest" data-chat-text="suggest"></button>
+    </div>
     <form class="chat-form" id="chat-form" autocomplete="off">
       <div class="chat-hp" aria-hidden="true">
         <label for="chat-hp">Website</label>

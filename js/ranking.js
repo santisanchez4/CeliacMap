@@ -225,7 +225,7 @@
     return (
       '<li class="map-top3-item">' +
         '<span class="mt3-rank">' + rank + "</span>" +
-        '<span class="mt3-name">' + esc(p.name) + "</span>" +
+        '<button type="button" class="mt3-name" data-map-place="' + esc(p.id) + '" aria-pressed="false">' + esc(p.name) + "</button>" +
         '<span class="mt3-meta" data-place-id="' + esc(p.id) + '">' + metaText(p) + "</span>" +
       "</li>"
     );
@@ -266,6 +266,13 @@
       ? picks.slice(0, 3).map(function (p, i) { return top3RowHtml(p, i + 1); }).join("")
       : '<li class="map-top3-empty">' + esc(t("top3Empty")) + "</li>";
     if (top3El) top3El.hidden = false;
+    Array.prototype.forEach.call(top3ListEl.querySelectorAll("[data-map-place]"), function (button) {
+      button.addEventListener("click", function (event) {
+        event.stopPropagation();
+        document.dispatchEvent(new CustomEvent("celiacmap:open-place", { detail: { id: button.getAttribute("data-map-place") } }));
+      });
+    });
+    document.dispatchEvent(new CustomEvent("celiacmap:ranking-render"));
   }
 
   function load() {

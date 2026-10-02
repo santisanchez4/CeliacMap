@@ -4,7 +4,7 @@ import { parseHTML } from "npm:linkedom@0.18.12";
 import vm from "node:vm";
 import assert from "node:assert/strict";
 
-async function fixture(mobile = false) {
+async function fixture(mobile = false, reducedMotion = false) {
   const html = await Deno.readTextFile("index.html");
   const source = await Deno.readTextFile("js/map.js");
   const { window, document } = parseHTML(html);
@@ -20,7 +20,7 @@ async function fixture(mobile = false) {
   const levels = ["gluten_free_100", "celiac_friendly", "options_available"];
   const rows = Array.from({ length: 12 }, (_, i) => ({
     id: "place-" + i, name: "Place " + String(i).padStart(2, "0"), city: "Montevideo",
-    category: i === 0 ? "cafe" : "restaurant", safety_level: levels[i % 3], lat: -34.9, lng: -56.1,
+    category: i === 0 ? "cafe" : "restaurant", safety_level: levels[i % 3], lat: -34.9 + i * .01, lng: -56.1,
     // The fixture clock starts at epoch + 10 s: place-3 was reported "now", place-6 over 30 days ago.
     community_warning_at: i === 3 ? "1970-01-01T00:00:05Z" : i === 6 ? "1969-11-01T00:00:00Z" : null,
   }));
@@ -42,7 +42,8 @@ async function fixture(mobile = false) {
     divIcon: x => x, layerGroup: () => group,
     featureGroup: () => ({ getBounds: () => ({ pad() { return {}; } }) }),
     marker(coords, options) {
-      const m = { options, on() {}, getLatLng: () => coords, setIcon(icon) { this.options.icon = icon; } };
+      const element = document.createElement("div");
+      const m = { options, on() {}, getElement: () => element, getLatLng: () => coords, setIcon(icon) { this.options.icon = icon; } };
       markers.push(m); return m;
     },
   };
@@ -50,17 +51,19 @@ async function fixture(mobile = false) {
   const browser = {
     innerHeight: 700,
     CELIACMAP_CONFIG: { SUPABASE_URL: "https://fixture.invalid", SUPABASE_ANON_KEY: "fixture" },
-    matchMedia: query => ({ matches: mobile && query.includes("max-width") }), addEventListener() {},
+    matchMedia: query => ({ matches: query.includes("max-width") ? mobile : reducedMotion }), addEventListener() {},
     scrollX: 0, scrollY: 840,
     scrollTo(x, y) { this.scrollX = x; this.scrollY = y; },
     visualViewport: { height: 500, offsetTop: 0, addEventListener(name, fn) { viewportListeners[name] = fn; } },
   };
   let now = 10000;
+  const navigator = {};
+  const requests = [];
   const context = {
-    window: browser, document, L, navigator: {}, CustomEvent: window.CustomEvent,
+    window: browser, document, L, navigator, CustomEvent: window.CustomEvent,
     Date: { now: () => (now += 3000), parse: Date.parse },
-    fetch: async url => ({ ok: true, json: async () => String(url).includes("functions/v1/chat")
-      ? { reply: "Found a place", places: [rows[0]], pending_submission: null } : rows }),
+    fetch: async url => { requests.push(String(url)); return { ok: true, json: async () => String(url).includes("functions/v1/chat")
+      ? { reply: "Found a place", places: [rows[0]], pending_submission: null } : rows }; },
     setTimeout, clearTimeout,
   };
   vm.runInNewContext(source, context);
@@ -71,7 +74,7 @@ async function fixture(mobile = false) {
     el.dispatchEvent(new window.Event("click", { bubbles: true }));
     return el;
   }
-  return { document, window, browser, map, viewportListeners, click, markers, layers, mutations: () => mutations,
+  return { document, window, browser, map, navigator, requests, viewportListeners, click, markers, layers, mutations: () => mutations,
     loadChat: async () => vm.runInNewContext(await Deno.readTextFile("js/chat.js"), context),
     loadOpinions: async rows => {
       context.fetch = async () => ({ ok: true, json: async () => rows });
@@ -259,7 +262,7 @@ Deno.test("opening a place scrolls the map itself into view, not the section hea
   assert.equal(targets.includes("map"), false, "must not scroll to the section heading");
 });
 
-Deno.test("chat opens with only its intro: no suggested prompts", async () => {
+Deno.test("chat keeps intro in the log and exposes four local actions separately", async () => {
   const f = await fixture();
   await f.loadChat();
   f.click("#chat-fab");
@@ -267,6 +270,7 @@ Deno.test("chat opens with only its intro: no suggested prompts", async () => {
   assert.equal(log.children.length, 1);
   assert.ok(log.children[0].classList.contains("chat-msg--intro"));
   assert.equal(log.querySelectorAll("button").length, 0);
+  assert.equal(f.document.querySelectorAll("[data-chat-action]").length, 4);
 });
 
 async function rankingFixture({ votes, fail = false }) {
@@ -412,4 +416,99 @@ Deno.test("the place detail explains the level label", async () => {
   assert.match(body.textContent, /se cocinan y venden solo productos aptos para celíacos/);
   f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-1" } }));
   assert.match(body.textContent, /puede que también cocine con gluten/);
+});
+
+Deno.test("expanded map isolates background, handles Escape and restores scroll and focus", async () => {
+  const f = await fixture();
+  assert.equal(f.document.getElementById("map-search-area"), null);
+  assert.equal(f.document.querySelector(".map-area-tools"), null);
+  const preexisting = f.document.querySelector(".site-footer");
+  preexisting.setAttribute("inert", "");
+  f.click("#map-expand");
+  const workspace = f.document.getElementById("map-workspace");
+  assert.equal(workspace.getAttribute("aria-modal"), "true");
+  assert.equal(f.document.getElementById("hero").hasAttribute("inert"), true);
+  assert.equal(workspace.closest("[inert]"), null);
+  assert.equal(f.document.body.style.getPropertyValue("--map-scroll-top"), "-840px");
+  const event = new f.window.Event("keydown", { bubbles: true });
+  event.key = "Escape";
+  workspace.dispatchEvent(event);
+  assert.equal(workspace.hasAttribute("aria-modal"), false);
+  assert.equal(f.document.getElementById("hero").hasAttribute("inert"), false);
+  assert.equal(preexisting.hasAttribute("inert"), true);
+  assert.equal(f.browser.scrollY, 840);
+  assert.equal(f.document.activeElement.id, "map-expand");
+});
+
+Deno.test("manual map shortcut does not request the user location", async () => {
+  const f = await fixture(false, true);
+  let locationCalls = 0;
+  f.navigator.geolocation = { getCurrentPosition() { locationCalls++; } };
+  await f.loadChat();
+  f.click("#chat-fab");
+  f.click('[data-chat-action="browse"]');
+  assert.equal(locationCalls, 0);
+  assert.equal(f.document.getElementById("map-locate"), null);
+  assert.equal(f.document.activeElement.id, "cm-map");
+  assert.equal(f.document.getElementById("chat-panel").hidden, true);
+});
+
+Deno.test("chat actions filter the map, explain it and focus the suggestion form without requests", async () => {
+  const f = await fixture(false, true);
+  await f.loadChat();
+  const requests = f.requests.length;
+  f.click("#chat-fab");
+  f.click('[data-chat-action="guide"]');
+  f.click('[data-chat-action="guide"]');
+  assert.equal(f.document.querySelectorAll("#chat-log .chat-msg--bot").length, 1);
+  f.click('[data-chat-action="dedicated"]');
+  assert.equal(f.layers.size, 4);
+  assert.equal(f.document.getElementById("chat-panel").hidden, true);
+  f.click("#chat-fab");
+  f.click('[data-chat-action="suggest"]');
+  assert.equal(f.document.activeElement.id, "sg-name");
+  assert.equal(f.requests.length, requests);
+});
+
+Deno.test("closing and quickly reopening chat cancels the exit timer", async () => {
+  const f = await fixture();
+  await f.loadChat();
+  f.click("#chat-fab");
+  f.click("#chat-panel-close");
+  assert.equal(f.document.getElementById("chat-panel").inert, true);
+  f.click("#chat-fab");
+  await new Promise(resolve => setTimeout(resolve, 200));
+  assert.equal(f.document.getElementById("chat-panel").hidden, false);
+  assert.equal(f.document.getElementById("chat-panel").inert, false);
+  assert.equal(f.document.getElementById("chat-fab").getAttribute("aria-expanded"), "true");
+});
+
+Deno.test("detail has directions; closing clears the pin and disables hidden details", async () => {
+  const f = await fixture();
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-0" } }));
+  assert.match(f.document.querySelector(".pp-directions").getAttribute("href"), /destination=-34.9%2C-56.1/);
+  assert.match(f.markers[0].options.icon.html, /is-selected/);
+  f.click("#place-panel-close");
+  assert.equal(f.document.getElementById("place-panel").inert, true);
+  assert.equal(f.markers[0].options.icon.html.includes("is-selected"), false);
+});
+
+Deno.test("autocomplete hover highlights its marker and clearing restores it", async () => {
+  const f = await fixture();
+  const input = f.document.getElementById("place-search");
+  input.value = "Place";
+  input.dispatchEvent(new f.window.Event("input"));
+  f.document.querySelector(".map-suggest-item").dispatchEvent(new f.window.Event("mouseenter"));
+  assert.equal(f.markers[0].getElement().classList.contains("is-highlighted"), true);
+  f.click("#search-clear");
+  assert.equal(f.markers[0].getElement().classList.contains("is-highlighted"), false);
+  await new Promise(resolve => setTimeout(resolve, 300));
+});
+
+Deno.test("Top 3 names open their map place", async () => {
+  const f = await rankingFixture({ votes: { Argentina: placesFor("AR", 3) } });
+  let selected;
+  f.document.addEventListener("celiacmap:open-place", event => { selected = event.detail.id; });
+  await f.click('.mt3-name[data-map-place="AR0"]');
+  assert.equal(selected, "AR0");
 });

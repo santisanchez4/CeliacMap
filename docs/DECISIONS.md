@@ -3727,6 +3727,59 @@ for now: nothing confirms it is also 100%.
   también habla con Anthropic, vía esa Edge Function. Ver
   docs/architecture/C4-diagrams.md.
 
+### Assistant and map interaction polish (2026-10-01)
+
+**Scope:** two frontend phases, ready for local review, not deployed. Files: `index.html`,
+`css/styles.css`, `js/chat.js`, `js/map.js`, `js/ranking.js`, and `tests/frontend_explorer.test.js`.
+
+**Phase 1 — assistant.** Larger floating control with layered CSS gradients/shadows and two brief
+idle cycles (under five seconds), a temporary welcome hint that remains available on hover/focus,
+and interruptible enter/exit transitions. Reduced motion disables these effects. The four bilingual
+actions open manual map exploration, the dedicated-only filter, a local map guide, or the existing
+suggestion form. They do not send model requests or modify conversation history/pending submissions.
+The mobile sheet retains viewport-aware keyboard sizing, scroll restoration and focus isolation.
+The closing panel becomes inert immediately, before its exit animation finishes.
+
+**Phase 2 — map.** Following local review, restore the original circular markers (18px, 28px selected),
+without category symbols. Recent community warnings still take priority with a red `!`. The two
+public safety labels and their disclaimers remain unchanged. Marker names expose category, level
+and warning through accessible labels; selecting a pin opens and focuses the existing detail card.
+The address and a Google Maps directions link are visible before expanding the mobile details.
+Ratings render only when present. Top 3 names now open the same card; hover/focus and selection
+connect them to pins. Autocomplete hover/keyboard navigation also highlights the matching pin.
+
+**Trade-offs:**
+
+- No Three.js, React, animation library, assets or runtime dependencies: depth is CSS and icons are SVG.
+- Keep the existing persistent card and Top 3 instead of introducing a second full results list.
+- Final local review removes visible-area search, its bounds filter, movement listeners and controls.
+  Keep only the expand button among the new map controls. Existing name/city/category/safety filters
+  remain; panning and zooming do not change the result set. Location features are deferred to the app.
+- Local review favored manual exploration: remove the new geolocation control and replace the
+  assistant's nearby shortcut with “Explorar el mapa” / “Explore the map”. No location permission is
+  requested. Browser location can be supported later, but must expose its reported accuracy rather
+  than imply an exact location.
+- Expanded mode fills the browser viewport with CSS, keeping search, filters and legend available;
+  it does not require the Fullscreen API. Background content becomes inert, Tab stays inside, Escape
+  closes a selected card first and then exits, and exit restores scroll and focus. No history entry.
+- Selection shows the venue coordinates in an outbound Google Maps link; it never supplies the
+  user's coordinates as the origin. No backend/schema/prompt or safety-classification changes.
+
+**Validation:** `node --check` on all three changed scripts; frontend Deno suite (85 tests, including
+seven new behavior tests); `test_places_public_columns.py` and `test_claude_md_size.py` (7 tests);
+`git diff --check`. There is no configured frontend build or lint script. DOM fixtures mock Leaflet,
+geolocation and network: they verify interactions, not actual browser layout or tile rendering.
+The session exposed no connected browser, so visual QA remains pending; no screenshot verification
+or live geolocation/model request is claimed.
+
+**Local review:** run `python -m http.server 8765 --bind 127.0.0.1` from the repo, then open
+`http://127.0.0.1:8765`. Review at 1440, 1024, 768 and 390px, plus a short mobile landscape viewport:
+assistant entry/exit and quick actions; keyboard-only focus/Tab/Escape; reduced motion; both languages;
+map zoom/drag with the result set unchanged; selected card and directions; Top 3 and autocomplete;
+expanded mode with open filters and selected card; the manual map shortcut without a location prompt.
+Production endpoints remain configured: no need to send a chat message, form or vote for this review.
+Revert the listed frontend/test files as one change set if needed; no migrations or lockfile changes.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

@@ -45,6 +45,14 @@
   var MSG = {
     es: {
       title: "Asistente CeliacMap",
+      welcome: "¿Buscás un lugar sin TACC?",
+      eyebrow: "Explorá con confianza",
+      actions: "Acciones rápidas",
+      browse: "Explorar el mapa",
+      dedicated: "Ver lugares 100% sin gluten",
+      guide: "Cómo funciona el mapa",
+      suggest: "Sugerir un lugar",
+      mapGuide: "Buscá por nombre o elegí una ciudad en los filtros. Los pines verdes indican espacios 100% sin gluten; los ámbar, lugares con opciones sin TACC. Un signo ! indica un reporte reciente: consultá antes de ir. Tocá un pin para ver su ficha y cómo llegar. Podés expandir el mapa para explorar con más espacio. Confirmá siempre con el local.",
       open: "Abrir el asistente de CeliacMap",
       close: "Cerrar el asistente",
       inputLabel: "Tu mensaje",
@@ -59,6 +67,14 @@
     },
     en: {
       title: "CeliacMap assistant",
+      welcome: "Looking for a gluten-free place?",
+      eyebrow: "Explore with confidence",
+      actions: "Quick actions",
+      browse: "Explore the map",
+      dedicated: "View 100% gluten-free places",
+      guide: "How the map works",
+      suggest: "Suggest a place",
+      mapGuide: "Search by name or choose a city in the filters. Green pins mark 100% gluten-free venues; amber pins mark places with gluten-free options. A ! indicates a recent report: check before you go. Select a pin for details and directions. Expand the map for more room to explore. Always confirm with the venue.",
       open: "Open the CeliacMap assistant",
       close: "Close the assistant",
       inputLabel: "Your message",
@@ -105,6 +121,9 @@
   var introEl = null;
   var waitEl = null;
   var lockedScroll = null;
+  var closeTimer;
+  var guideEl = null;
+  var motionMq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
   var backgroundNodes = Array.prototype.map.call(document.querySelectorAll("main, .site-header, .site-footer"), function (node) {
     return { node: node, originallyInert: node.hasAttribute("inert") };
   });
@@ -130,6 +149,7 @@
     eachNode("[data-chat-aria]", function (n) { n.setAttribute("aria-label", t(n.getAttribute("data-chat-aria"))); });
     eachNode("[data-chat-placeholder]", function (n) { n.setAttribute("placeholder", t(n.getAttribute("data-chat-placeholder"))); });
     if (introEl) introEl.firstChild.textContent = t("intro");
+    if (guideEl) guideEl.firstChild.textContent = t("mapGuide");
     syncFab();
   }
 
@@ -224,9 +244,20 @@
 
   /* ---------------------------- Open / close ---------------------- */
   function setOpen(open, returnFocus) {
+    clearTimeout(closeTimer);
     if (!open && panel.contains(document.activeElement)) document.activeElement.blur();
     isOpen = open;
-    panel.hidden = !open;
+    panel.classList.toggle("is-closing", !open);
+    panel.inert = !open;
+    panel.setAttribute("aria-hidden", String(!open));
+    if (open) {
+      panel.hidden = false;
+      fab.classList.add("has-opened");
+    } else if (motionMq && !motionMq.matches) {
+      closeTimer = setTimeout(function () { panel.hidden = true; panel.classList.remove("is-closing"); }, 180);
+    } else {
+      panel.hidden = true;
+    }
     fab.setAttribute("aria-expanded", open ? "true" : "false");
     syncFab();
     syncViewport();
@@ -288,6 +319,23 @@
 
   fab.addEventListener("click", function () { setOpen(!isOpen, true); });
   closeBtn.addEventListener("click", function () { setOpen(false, true); });
+  eachNode("[data-chat-action]", function (button) {
+    button.addEventListener("click", function () {
+      var action = button.getAttribute("data-chat-action");
+      if (action === "guide") {
+        if (!guideEl) guideEl = addMessage("bot", t("mapGuide"));
+        scrollToEnd();
+        return;
+      }
+      setOpen(false, false);
+      if (action === "suggest") {
+        document.getElementById("suggest").scrollIntoView({ behavior: motionMq && motionMq.matches ? "auto" : "smooth" });
+        document.getElementById("sg-name").focus({ preventScroll: true });
+      } else {
+        document.dispatchEvent(new CustomEvent("celiacmap:explore", { detail: { action: action } }));
+      }
+    });
+  });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && isOpen) setOpen(false, true);
   });
@@ -301,6 +349,9 @@
   });
   document.addEventListener("celiacmap:panel-close", function () {
     fab.classList.remove("is-suppressed");
+  });
+  document.addEventListener("celiacmap:map-expand", function () {
+    if (isOpen) setOpen(false, false);
   });
 
   /* ------------------------------ Sending ------------------------- */

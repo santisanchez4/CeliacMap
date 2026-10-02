@@ -2386,3 +2386,16 @@ already on the map by a manual approval of 2026-09-01, and the `validation_notes
 `docs/architecture/ADR-009-sponsorships-separate-from-safety.md`, and the Decisions Log entry "Sponsorships — visible and
 separate from the safety evaluation". No LLM prompt changed. The chatbot prompt's pre-existing Bienestar few-shot example
 (§27) is noted there as debt for the next deliberate prompt edit.
+
+## 36. Assistant and map UI polish (2026-10-01)
+
+**Prompt (summary, development):** Improve the floating assistant and map in two phases after
+inspecting the actual stack. Keep a clean, warm, trustworthy visual identity, lightweight subtle
+motion, accessible keyboard/focus/reduced-motion behavior, and useful quick actions. Improve pins,
+selection details, map/result synchronization, visible-area search and expanded exploration. Leave
+a reversible local change set with tests and documented trade-offs; do not deploy.
+
+**Result:** CSS-only assistant depth and motion; four local shortcuts; original circular pins (restored after local review), directions,
+linked Top 3 and expanded Leaflet exploration. Local review removed area search and geolocation in favor of manual map exploration, deferring location features to the app. See the Decisions Log entry
+[Assistant and map interaction polish](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01).
+No LLM system prompt changed. Browser visual review remains pending (no browser connected in the session).
