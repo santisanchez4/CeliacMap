@@ -15,7 +15,7 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - ✅ Landing page (single page, fully responsive, bilingual ES/EN).
 - ✅ Supabase backend (`places` / `reviews` / `agent_log`, RLS, community-ranking seed).
 - ✅ Live Leaflet map backed by Supabase (reads approved places, category filters).
-- **Local UI update (2026-10-01, not deployed):** larger CSS-animated assistant with four local
+- **UI update (2026-10-01, deployed):** larger CSS-animated assistant with four local
   shortcuts; original circular pins, directions, linked Top 3, manual exploration,
   and an expanded map. No new dependencies. [Decisions and local review](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01).
 - ✅ **Search agent** — discovers places via Google Places, inserts candidates as

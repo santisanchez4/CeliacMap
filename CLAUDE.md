@@ -420,7 +420,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 
 ## Decisions Log (índice)
 
-- **Assistant and map interaction polish (2026-10-01, local only)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)
+- **Assistant and map interaction polish (2026-10-01, deployed)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)
 
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).

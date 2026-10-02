@@ -3729,7 +3729,7 @@ for now: nothing confirms it is also 100%.
 
 ### Assistant and map interaction polish (2026-10-01)
 
-**Scope:** two frontend phases, ready for local review, not deployed. Files: `index.html`,
+**Scope:** two frontend phases, locally reviewed and deployed after explicit user authorization. Files: `index.html`,
 `css/styles.css`, `js/chat.js`, `js/map.js`, `js/ranking.js`, and `tests/frontend_explorer.test.js`.
 
 **Phase 1 — assistant.** Larger floating control with layered CSS gradients/shadows and two brief
@@ -3779,6 +3779,14 @@ map zoom/drag with the result set unchanged; selected card and directions; Top 3
 expanded mode with open filters and selected card; the manual map shortcut without a location prompt.
 Production endpoints remain configured: no need to send a chat message, form or vote for this review.
 Revert the listed frontend/test files as one change set if needed; no migrations or lockfile changes.
+
+**Production verification (2026-10-01):** merged `0cea3fd` into `main` and pushed to the existing
+`santisanchez4/CeliacMap` origin after the user requested deployment. GitHub Pages
+[run 36950824149](https://github.com/santisanchez4/CeliacMap/actions/runs/36950824149) completed successfully.
+HTTPS checks against `https://celiacmap.org/` returned 200 for the page, `js/chat.js`, `js/map.js`, and
+`css/styles.css`; their contents matched the local deployed commit after line-ending normalization.
+The served files contain neither the removed area-search control nor a geolocation call. This is
+deployment/content verification, not an automated browser visual review.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
