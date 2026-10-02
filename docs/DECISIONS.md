@@ -3788,6 +3788,32 @@ HTTPS checks against `https://celiacmap.org/` returned 200 for the page, `js/cha
 The served files contain neither the removed area-search control nor a geolocation call. This is
 deployment/content verification, not an automated browser visual review.
 
+### Mobile demo pilot and PR workflow (2026-10-02)
+
+El responsable desarrolla CeliacMap como persona física. La próxima etapa es un piloto para presentar a la Intendencia
+y posibles financiadores: PWA instalable primero, luego Capacitor Android distribuido como APK y, opcionalmente,
+Play internal testing. La publicación pública en tiendas, iOS y una eventual cuenta de organización quedan para
+después de financiación. [ADR-010](architecture/ADR-010-mobile-strategy.md) y [plan actualizado](plans/PLAN-mobile-app.md).
+
+El piloto conserva la web y suma «cerca mío»: lectura de ubicación solo al tocar, coordenadas en memoria, sin enviarlas
+a API/modelo ni guardarlas. Los tiles pueden revelar el área visualizada; no se promete anonimato de la zona frente al
+proveedor de mapas. Sin cuentas, fotos ni push. PWA antes de reestructurar carpetas; extraer solo lógica pura protegida
+por tests. No implementar la app en esta tarea preparatoria.
+
+Ramas por tarea, PR y suite completa obligatorios; `main` no recibe pushes de trabajo. El responsable activará su
+protección en GitHub ([guía](runbooks/pr-ci-main.md)); se comprobó que hoy no está protegida. `ci.yml` corre Pytest,
+Deno Edge y frontend en cada PR, sin filtros de paths. `CI required` rechaza cualquier suite fallida, omitida o
+cancelada. Pages reutiliza la suite sobre el mismo commit y publica solo desde `main`, incluso en dispatch manual.
+Validación local: 821 Python + 268 Edge + 85 frontend aprobados; sin cambios en el código productivo.
+
+La [auditoría Google](legal/auditoria-datos-google.md) es de lectura/documentación: el responsable decide la alternativa.
+El corte del 02-10 contiene 417 aprobados, 374 con origen `google_places`; `source` no prueba procedencia por campo.
+No bloquea este piloto por
+decisión de alcance; sí debe resolverse antes de publicar en tiendas, sin implicar una exención contractual para demos.
+CARTO se trata como uso comercial por los aliados. HMAC ya fue configurado/verificado; las purgas de fase 2 tienen su
+primera ejecución prevista para el 05-10 y el drop de `owner_celiac` sigue diferido al 07-10 o después. Los cambios de
+perfiles sociales ya aplicados se conservan. Este registro no ejecuta esas tareas ni cambia datos productivos.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

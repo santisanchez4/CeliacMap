@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# SQL parser used by the schema and data-fix regression tests.
+pglast==8.4

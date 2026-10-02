@@ -305,7 +305,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   └── checks/                 # verification evidence: BEGIN;…ROLLBACK; scripts, jailbreak battery, live runs, prompt A/B tool
 ├── docs/                       # DECISIONS.md (decisions log + design detail), architecture/ (ADRs, C4), plans/, runbooks/, metodologia/ (public methodology, ES, .md + .pdf)
 ├── tests/                      # offline unit tests (all external calls mocked)
-├── .github/workflows/          # agents-monthly cron + Pages deploy
+├── .github/workflows/          # full PR CI, gated Pages deploy + operational jobs
 ├── requirements.txt
 ├── .env.example
 └── README.md  CLAUDE.md  prompts.md  .gitignore
@@ -344,8 +344,20 @@ call (Supabase, Google Places, Anthropic) is mocked, so no `.env` or network is
 needed:
 
 ```bash
+python -m pip install -r requirements-test.txt
 python -m pytest tests/ -v
+deno test --frozen --node-modules-dir=none --allow-read --allow-env=RESEND_BASE_URL,RESEND_USER_AGENT supabase/functions/
+deno test --frozen --node-modules-dir=none --allow-read tests/frontend_*.test.js
 ```
+
+Deno tests cover Edge Functions and the frontend DOM (Deno 2.9.4; dependency
+downloads require network on the first run). Every PR runs all three suites,
+including documentation-only PRs. Pages reruns the same suite before publishing
+the exact commit. See [branch/PR workflow and main protection](docs/runbooks/pr-ci-main.md).
+
+The [mobile pilot plan](docs/plans/PLAN-mobile-app.md) and
+[ADR-010](docs/architecture/ADR-010-mobile-strategy.md) define PWA first, then
+Capacitor Android for demos; mobile implementation has not started.
 
 In production the pipeline runs automatically once per month via the
 `Agents — monthly pipeline` GitHub Actions workflow
@@ -374,7 +386,8 @@ Claude Desktop config.
 
 Deployed from `main` via GitHub Actions
 ([`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)) on
-every push that touches the frontend.
+every push that touches the frontend or its CI/deployment workflows, after the
+complete test suite passes. Only `main` can deploy, including manual runs.
 
 ## Repository
 

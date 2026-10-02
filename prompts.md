@@ -2399,3 +2399,14 @@ a reversible local change set with tests and documented trade-offs; do not deplo
 linked Top 3 and expanded Leaflet exploration. Local review removed area search and geolocation in favor of manual map exploration, deferring location features to the app. See the Decisions Log entry
 [Assistant and map interaction polish](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01).
 No LLM system prompt changed. Browser visual review remains pending (no browser connected in the session).
+
+## 37. Preparación del piloto móvil y flujo PR (2026-10-02)
+
+**Pedido de desarrollo, resumido:** preparar CeliacMap como piloto de demostración de una persona física para la
+Intendencia/financiadores: plan en `docs/plans/PLAN-mobile-app.md`, ADR-010 por architecture-docs, PWA antes de
+reestructurar y Capacitor Android/APK después. Paridad web más cercanía local bajo demanda; sin GPS en servidor/modelo,
+cuentas, fotos o push. Documentar estado de privacidad/HMAC/owner_celiac/redes/CARTO comercial. Auditar en lectura los
+campos Google y políticas, dejando la decisión al responsable. Agregar suite completa por PR y compuerta al deploy,
+explicar protección de main. Rama nueva y PR, mostrando cada punto antes del siguiente. No implementar la app ahora.
+
+**Alcance:** documentación y CI; ningún prompt de modelos, criterio de seguridad ni dato productivo cambia.

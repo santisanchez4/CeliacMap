@@ -70,10 +70,9 @@ The long risks are summarized (the three short ones are verbatim); the full text
 
 - **Secrets boundary:** never ship the `service_role` key or any API key to the
   browser — only the anon key, made safe by correct RLS.
-- **Google Places** requires billing enabled; cap calls per run. Caching/storage
-  ToS handling (specifically for reviews) is resolved — see **Google Places
-  reviews — ToS-driven access restriction + 30-day expiration** in the
-  Decisions Log.
+- **Google Places** requires billing enabled; cap calls per run. Server-only reviews + 30-day purge
+  are access/retention controls, not proof of licensing compliance. Non-Google maps, caching and
+  attribution remain under review: [Google data audit](docs/legal/auditoria-datos-google.md).
 - **Health-sensitive false approvals:** `verified` stays `false` until confirmed;
   `status` + `agent_log` act as a human review queue; surface a UI disclaimer that
   `safety_level` is a community/AI estimate, not a medical guarantee.
@@ -328,6 +327,9 @@ The priority is quality, visual clarity, good structure, and clear communication
 
 ## Reglas vigentes
 
+**Entrega de cambios**
+- Una rama por tarea, PR y CI completo obligatorio antes de merge a `main`; nunca trabajar o publicar cambios directamente en `main`. La protección remota la activa el responsable. [Piloto móvil](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02).
+
 Standing rules taken from the Decisions Log; the incident and reasoning behind each is in the entry named in brackets in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
@@ -420,6 +422,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 
 ## Decisions Log (índice)
 
+- **Piloto móvil y flujo PR (2026-10-02)** — persona física, PWA primero y Capacitor Android para demos, GPS local bajo demanda y tiendas/iOS diferidos; [ADR-010](docs/architecture/ADR-010-mobile-strategy.md), [plan](docs/plans/PLAN-mobile-app.md) y [decisión](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02).
 - **Assistant and map interaction polish (2026-10-01, deployed)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)
 
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
@@ -507,5 +510,5 @@ Detail of every phase, with its verification notes: [Build status (phases)](docs
 - **Open:** chatbot soft-launch with organic traffic (Fase F: ADR-006 closure, C4, README); F4 Option 1 prompt
   reformulation (non-blocking); live confirmation of a real outreach reply and opt-out.
 
-**ADRs:** `docs/architecture/ADR-001…009` (the file names give the topic) and `C4-diagrams.md` (Mermaid `flowchart`, not C4
+**ADRs:** `docs/architecture/ADR-001…010` (the file names give the topic) and `C4-diagrams.md` (Mermaid `flowchart`, not C4
 syntax, which overlaps text on GitHub). Pointer bullets for the first six are at the end of the "GitHub Pages deploy" entry.
