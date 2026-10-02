@@ -1,5 +1,33 @@
 # Diagramas de Arquitectura C4 — CeliacMap
 
+## Evolución propuesta — piloto móvil (ADR-010)
+
+**Plan aceptado el 02-10-2026; componentes móviles todavía no implementados ni desplegados.** Los diagramas de estado actual que siguen permanecen vigentes. [ADR-010](ADR-010-mobile-strategy.md) prevé PWA primero y APK Android después, sin backend nuevo ni GPS enviado al servidor/modelo. iOS y tiendas públicas quedan después de financiación.
+
+```mermaid
+flowchart TB
+    demo["Responsable y asistentes a la demo"]
+    subgraph propuesto["Evolución propuesta: no desplegada"]
+        pwa["PWA instalable: frontend actual adaptado"]
+        apk["APK Android: mismos assets + Capacitor"]
+        geo["Ubicación puntual al tocar; memoria y distancias locales"]
+    end
+    subgraph actual["Servicios existentes compartidos"]
+        api["Supabase REST / RLS / Edge chat"]
+        modelo["Anthropic: chat actual sin GPS del dispositivo"]
+        tiles["CARTO comercial / OSM"]
+    end
+    demo --> pwa
+    demo --> apk
+    pwa --> geo
+    apk --> geo
+    pwa -->|"Contratos actuales, sin GPS"| api
+    apk -->|"Contratos actuales, sin GPS"| api
+    api --> modelo
+    pwa -->|"Tiles del área visible; zona inferible"| tiles
+    apk -->|"Tiles del área visible; zona inferible"| tiles
+```
+
 ## Nivel 1 — Contexto del sistema
 
 ```mermaid
