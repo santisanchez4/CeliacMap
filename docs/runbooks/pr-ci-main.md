@@ -44,13 +44,13 @@ No utiliza secretos ni credenciales de producción. Las APIs están simuladas; l
 Comandos locales, después de instalar Python/dependencias y Deno:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-test.txt
 python -m pytest tests/ -q
 deno test --frozen --node-modules-dir=none --allow-read --allow-env=RESEND_BASE_URL,RESEND_USER_AGENT supabase/functions/
 deno test --frozen --node-modules-dir=none --allow-read tests/frontend_*.test.js
 ```
 
-El frontend no tiene build ni linter configurados; estos tests verifican comportamiento DOM, contratos y copy, sin reemplazar QA visual en navegador. La configuración de dependencias Python conserva los rangos existentes; una actualización puede provocar un fallo legítimo que se debe investigar, no omitir.
+El frontend no tiene build ni linter configurados; estos tests verifican comportamiento DOM, contratos y copy, sin reemplazar QA visual en navegador. `requirements-test.txt` incluye las dependencias actuales y fija `pglast`, necesario para las regresiones SQL y antes presente solo en el entorno local. Las dependencias Python productivas conservan sus rangos existentes; una actualización puede provocar un fallo legítimo que se debe investigar, no omitir.
 
 ## Gate del despliegue
 

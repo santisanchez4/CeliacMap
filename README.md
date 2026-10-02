@@ -344,6 +344,7 @@ call (Supabase, Google Places, Anthropic) is mocked, so no `.env` or network is
 needed:
 
 ```bash
+python -m pip install -r requirements-test.txt
 python -m pytest tests/ -v
 deno test --frozen --node-modules-dir=none --allow-read --allow-env=RESEND_BASE_URL,RESEND_USER_AGENT supabase/functions/
 deno test --frozen --node-modules-dir=none --allow-read tests/frontend_*.test.js
