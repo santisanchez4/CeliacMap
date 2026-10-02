@@ -1724,6 +1724,23 @@ h1, h2, h3 {
   }
 }
 
+/* ========================== Offline notice ========================== */
+.offline-notice {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1500;
+  margin: 0;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: var(--green-deepest);
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: center;
+}
+.offline-notice[hidden] { display: none; }
+
 /* ============================ Responsive ============================ */
 @media (min-width: 600px) {
   .grid-3 { grid-template-columns: repeat(2, 1fr); }

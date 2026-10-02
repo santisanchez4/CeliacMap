@@ -85,6 +85,7 @@
   // so the dictionary below only needs to hold the English strings.
   var EN = {
     "skip": "Skip to main content",
+    "offline.notice": "You're offline. The map, the assistant and the forms need an internet connection: try again once it's back.",
 
     "nav.problem": "Problem",
     "nav.solution": "Solution",

@@ -13,6 +13,7 @@
   <link rel="icon" type="image/png" sizes="48x48" href="assets/icons/favicon-48.png" />
   <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -32,6 +33,7 @@
 
 <body>
   <a class="skip-link" href="#main" data-i18n="skip">Saltar al contenido principal</a>
+  <p class="offline-notice" id="offline-notice" role="status" hidden data-i18n="offline.notice">Sin conexión. El mapa, el asistente y los formularios necesitan internet: volvé a intentarlo cuando se recupere.</p>
 
   <!-- ============================= HEADER / NAV ============================= -->
   <header class="site-header" id="top">
@@ -993,6 +995,7 @@
   <script src="js/ranking.js"></script>
   <script src="js/opinions.js"></script>
   <script src="js/chat.js"></script>
+  <script src="js/pwa.js"></script>
 
   <!-- Cloudflare Web Analytics: page views only, no cookies, no custom events. -->
   <script defer src="https://static.cloudflareinsights.com/beacon.min.js"

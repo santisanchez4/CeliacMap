@@ -1,5 +1,5 @@
 # Deploy frontend to GitHub Pages.
-# Publishes the static frontend (index.html + css/js/assets) to GitHub Pages on
+# Publishes the static frontend (index.html + PWA manifest/service worker + css/js/assets) to GitHub Pages on
 # every push to main that touches those files, and on manual dispatch. The Python
 # agents, db/ and config/ are deliberately NOT published - only the site is.
 # Requires the repo's Pages source to be set to "GitHub Actions"
@@ -11,6 +11,8 @@ on:
     branches: [main]
     paths:
       - "index.html"
+      - "manifest.webmanifest"
+      - "service-worker.js"
       - "css/**"
       - "js/**"
       - "assets/**"
@@ -48,7 +50,7 @@ jobs:
       - name: Stage static site
         run: |
           mkdir -p _site
-          cp index.html _site/
+          cp index.html manifest.webmanifest service-worker.js _site/
           cp -r css js assets _site/
 
       - name: Upload Pages artifact

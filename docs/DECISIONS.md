@@ -3833,6 +3833,29 @@ PR #2 mergeado (`23abe40`). Ruleset `Proteger main` (24349101) leído: activo, P
 sin bypass, sin borrado/force-push. **Rama actualizada todavía no exigida**: la API devuelve
 `strict_required_status_checks_policy: false`; se informó al responsable, sin modificar configuración remota.
 
+### PWA shell: installable app, network first (2026-10-02)
+
+Fase 1 del piloto móvil (ADR-010), sobre las carpetas actuales y sin herramientas de build. `manifest.webmanifest` (`scope` y
+`start_url` en `./`, standalone, `#2d6a4f` / `#fdfaf5`), íconos 192 / 512 y un 512 *maskable* generados desde `favicon.svg` con
+`scripts/gen_favicons.py` (el pin queda dentro del 80 % central; el script lo verifica). `service-worker.js` + `js/pwa.js`.
+
+**Red primero, caché solo como respaldo.** Online, cada pedido va a la red igual que sin service worker; la copia en caché se usa
+únicamente si la red falla. El worker solo intercepta `GET` del mismo origen que estén en la lista cerrada `SHELL` (HTML, CSS,
+JS, íconos, la imagen del aliado) y las navegaciones a la raíz / `index.html`. **Nunca intercepta ni guarda** lugares,
+Supabase, el chat, tiles, unpkg (Leaflet), fuentes, analytics ni pedidos con query string. Se descartó *cache first* con
+versión por despliegue: mezcla assets viejos y nuevos y obliga a recordar subir la versión; red primero evita ambas cosas
+porque cada visita online refresca la copia. `CACHE_NAME` solo cambia si cambia la forma de la caché.
+
+Sin conexión: la página abre desde la caché y un aviso `role="status"` (ES/EN) dice que el mapa, el asistente y los formularios
+necesitan internet. No hay colas de envío ni mapa offline. Leaflet viene de unpkg, así que offline el mapa no se dibuja: es
+esperado.
+
+Verificación: `tests/frontend_pwa.test.js` (14 tests: manifest e íconos, lista cerrada contra lo que carga la página,
+qué no se intercepta, red primero, respaldo offline, aviso). Suite completa local: 834 pytest + 268 Edge + 99 frontend.
+Chrome de escritorio en `127.0.0.1` con el sitio armado como el deploy: SW activo, 21 archivos en caché, 417 lugares desde la
+red; con el servidor apagado la página abre desde la caché. Pendiente: instalar en un Android real (necesita HTTPS, o sea el
+sitio publicado o `adb reverse`) y Lighthouse.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

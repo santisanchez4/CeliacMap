@@ -252,12 +252,15 @@ serif display headings over a clean sans body, and generous spacing.
   leaving a comment and general celiac-disease questions, in Spanish or English.
 - Conceptual interactive map built entirely with HTML/CSS (no map library).
 - Accessible: semantic landmarks, skip link, focus styles, reduced-motion support.
+- Installable PWA: manifest + network-first service worker for the app shell only.
 
 ## Project Structure
 
 ```txt
 /
 ├── index.html                  # frontend shell + Leaflet map
+├── manifest.webmanifest        # PWA manifest (installable app)
+├── service-worker.js           # PWA: network-first app shell, never data/chat/tiles
 ├── css/styles.css
 ├── js/
 │   ├── main.js                 # i18n, nav, reveal
@@ -268,7 +271,8 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── report.js               # public "recommend / report" form → place_reports
 │   ├── ranking.js              # community ranking (#ranking) + place_votes voting
 │   ├── opinions.js             # "La voz de la comunidad": approved community opinions
-│   └── chat.js                 # floating assistant widget → `chat` Edge Function
+│   ├── chat.js                 # floating assistant widget → `chat` Edge Function
+│   └── pwa.js                  # registers the service worker + offline notice
 ├── assets/{images,icons}/
 ├── agents/                     # Python agents
 │   ├── base.py                 # shared base + agent_log helper
@@ -360,7 +364,9 @@ the exact commit. See [branch/PR workflow and main protection](docs/runbooks/pr-
 
 The [mobile pilot plan](docs/plans/PLAN-mobile-app.md) and
 [ADR-010](docs/architecture/ADR-010-mobile-strategy.md) define PWA first, then
-Capacitor Android for demos; mobile implementation has not started.
+Capacitor Android for demos. Phase 1 (installable PWA shell) is implemented:
+the site can be installed from the browser and opens offline with a notice;
+places, the assistant and the forms still need a connection.
 
 In production the pipeline runs automatically once per month via the
 `Agents — monthly pipeline` GitHub Actions workflow
