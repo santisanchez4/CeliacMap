@@ -334,7 +334,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
 **Validator, overrides and labels**
-- **Updater y contacto manual:** preservar `website`/`phone`/`opening_hours` con `APROBACIÓN MANUAL`; registrar correcciones por campo en `config/manual_contact_fields.json` antes de aplicarlas. [Regla y ensayo Rikuras](docs/runbooks/manual-contact-fields.md).
+- **Updater y contacto manual:** preservar `website`/`phone`/`opening_hours` con `APROBACIÓN MANUAL`; registrar correcciones por campo en `config/manual_contact_fields.json` antes de aplicarlas. [Regla y restauración Rikuras](docs/runbooks/manual-contact-fields.md).
 - **Manual overrides are never silent** [Manual Validator overrides]. Record them in `places.validation_notes` under a
   header (`OVERRIDE MANUAL` / `APROBACIÓN MANUAL` / `CORRECCIÓN MANUAL`): who, what direct knowledge, what the Validator
   had said. Never inflate or deflate `validation_confidence`; leave `verified` alone unless a human vouches for it.

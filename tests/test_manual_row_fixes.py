@@ -29,8 +29,8 @@ PIU_CORDON_ID = "d1420754-dca8-47e2-8d60-97ac779de1c2"
 MALVIN_PLACE_ID = "ChIJ64hoV1KHn5URvCEqq2PDcI4"
 
 
-def test_rikuras_restoration_is_guarded_and_rolls_back_by_default():
-    pending = FIXES / "2026-10-02-rikuras-malvin-website.PENDING.sql"
+def test_rikuras_restoration_is_guarded_and_the_file_stays_a_rehearsal():
+    pending = FIXES / "2026-10-02-rikuras-malvin-website.sql"
     sql = code(pending)
     parse_sql(sql)
     assert sql.strip().lower().endswith("rollback;")

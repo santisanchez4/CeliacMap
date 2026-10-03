@@ -1,6 +1,6 @@
--- PENDING: restoration requested by the admin; default is a rehearsal with ROLLBACK.
--- Apply only after explicit "dale", and after merging the Updater protection PR.
--- At that point replace ONLY the final rollback with commit in the reviewed execution copy.
+-- APPLIED 2026-10-03 (admin's "dale", after the Updater protection was merged): restores the website of the business card.
+-- A fresh rehearsal passed first; the execution copy differed from this file ONLY in the final rollback -> commit.
+-- This file keeps the ROLLBACK, so running it is always a rehearsal; it now fails its own guard (the old website is gone).
 -- No notes, safety labels, contacts or coordinates are changed.
 begin;
 
