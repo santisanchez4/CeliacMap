@@ -426,7 +426,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 ## Decisions Log (índice)
 
 - **Piloto móvil y flujo PR (2026-10-02)** — persona física, PWA primero y Capacitor Android para demos, GPS local bajo demanda y tiendas/iOS diferidos; [ADR-010](docs/architecture/ADR-010-mobile-strategy.md), [plan](docs/plans/PLAN-mobile-app.md) y [decisión](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02).
-- **«Cerca mío» (2026-10-02)** — one location reading per tap, in memory only, never stored or sent; 10 nearest in 5 km (20 on demand), public label + straight-line distance; chat shortcut is a widget button. [→](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02)
+- **«Cerca mío» (2026-10-02)** — one location reading per tap, in memory only, never stored or sent; 10 nearest in 5 km (20 on demand), public label + straight-line distance; chat shortcut is a widget button; verified on a real Android (10-03). [→](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02)
 - **PWA shell + icons (2026-10-02)** — network-first service worker over a closed allowlist, verified on a real Android; favicon and app icons = header logo (pin + ✓). [PWA](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02) · [icons](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02)
 - **Assistant and map interaction polish (2026-10-01, deployed)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)
 
