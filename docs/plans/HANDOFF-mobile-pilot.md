@@ -87,6 +87,21 @@ Archivo `db/fixes/2026-10-02-rikuras-malvin-website.PENDING.sql`, termina en `ro
   PC al 03-10: Node 22.20, JDK 21 en `C:\Program Files\Android\openjdk` (el `java` del PATH es 25), sin Android SDK ni `adb`.
   Capacitor vigente 8.5.2 (pide Node ≥ 22). CORS de `chat`: solo `celiacmap.org`, `www` y `http://localhost(:puerto)`.
 
+## Actualización 2026-10-03 (fase 3 implementada)
+
+- **PR #11** (`feat/capacitor-android`, `dfba2a6`), sin merge: `apps/mobile/` con Capacitor 8.5.2, `org.celiacmap.app`, sin
+  beacon ni service worker en la app, geolocalización por la WebView (sin plugin), botón Atrás, runbook
+  `docs/runbooks/apk-demo.md`. Incluye el commit del PR #8 para no chocar en DECISIONS. Local: 834 + 268 + 136.
+- **PR #12** (`fix/chat-cors-capacitor`), sin merge: `https://localhost` exacto en el CORS de `chat`. **Deploy pendiente del
+  «dale»**: `node_modules/.bin/supabase functions deploy chat` desde `main` ya mergeado; después `functions list`
+  (`verify_jwt=false`) y `functions download chat --use-api` comparado contra `HEAD`. Hoy desplegada: chat v24.
+- PC: Android SDK por línea de comandos en `%LOCALAPPDATA%/Android/Sdk` (cmdline-tools 19, platform-tools, plataforma 36,
+  build-tools 35 y 36). El build usa `JAVA_HOME` = JDK 21 de `C:/Program Files/Android/openjdk`.
+- Clave de firma generada en `%USERPROFILE%/celiacmap-signing/` (`celiacmap-release.jks` + `keystore.properties`), fuera del
+  repo; el responsable debe respaldar los dos archivos. APK firmado 0.1.0 en `%USERPROFILE%/celiacmap-apk/`.
+- **Pendiente: prueba en Android real** con la lista del runbook (no había teléfono conectado): CARTO en la WebView, teclado,
+  enlaces externos, permiso de ubicación. El asistente no responde en la app hasta el deploy de `chat`.
+
 ## PWA (sección original, ya resuelta: ver actualización arriba)
 
 Se mostró el plan antes de implementar. No se creó su rama ni se modificó frontend por esta tarea. Usuario la llamó «Fase 2», aunque el documento enumera PWA como fase 1 y cercanía como fase 2: seguir el alcance PWA solicitado, sin geolocalización ahora.
