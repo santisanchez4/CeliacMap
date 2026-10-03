@@ -106,7 +106,7 @@ Fuentes: [manual Montevideo 07-09](../../db/fixes/2026-09-07-montevideo-manual-p
 | La Commedia | `phone`, `rating`, `user_ratings_total` | SQL 07-09; los valores actuales coinciden |
 | CROC Galletas Artesanales | `user_ratings_total` | SQL 07-09 fija 168; coincide. El rating no se escribe en ese UPDATE |
 | Piu Helados Cordón | `phone` | SQL 27-09 fija contacto; origen de fila sigue `google_places` |
-| Rikuras Sin Gluten (Malvín) | `website` | Corrección por tarjeta a `pidedirecto.uy` documentada; lectura actual volvió a `ambit.la`. No asumir que la corrección persiste |
+| Rikuras Sin Gluten (Malvín) | `website` | Corrección por tarjeta a `pidedirecto.uy` documentada; lectura del corte (02-10) volvió a `ambit.la`; restaurada el 03-10 con el Updater ya protegido ([SQL](../../db/fixes/2026-10-02-rikuras-malvin-website.sql)) |
 | ChocAra MVD | `opening_hours` | Corrección 01-10 de horario dominical; además `social_url`. Coordenadas no cambiaron |
 | Alimentos NutriCiencia SRL | `website`, `opening_hours` | Corrección 01-10 a HTTPS y horario continuo; coordenadas no cambiaron |
 | Pastas Lo de Flor (`source=user`) | `lat/lng` y datos de negocio en insert asistido | Resolución manual de sugerencia, pero coordenadas de Google Geocoding; `external_id` nulo |

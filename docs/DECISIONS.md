@@ -3829,6 +3829,11 @@ conserva el dato actual; no restaura automáticamente un valor que ya fue pisado
 asserts de una fila y solo website/updated_at; lectura posterior confirma ambit.la. **Aplicación pendiente del «dale» del responsable**
 y del merge de la protección. El futuro destino autorizado es `https://rikurassingluten.pidedirecto.uy/`.
 
+**Aplicado el 2026-10-03** con el «dale» del responsable: ensayo fresco con rollback aprobado, después la copia de ejecución
+(única diferencia: `rollback` → `commit`). Lectura posterior: `website` = `https://rikurassingluten.pidedirecto.uy/`; 1 385 filas
+y 417 aprobadas, sin cambios; estado, etiqueta, confianza y `verified` iguales. El archivo pasó a
+`db/fixes/2026-10-02-rikuras-malvin-website.sql` (conserva el `ROLLBACK`). [Detalle](runbooks/manual-contact-fields.md).
+
 PR #2 mergeado (`23abe40`). Ruleset `Proteger main` (24349101) leído: activo, PR y check `CI required` de GitHub Actions,
 sin bypass, sin borrado/force-push. **Rama actualizada todavía no exigida**: la API devuelve
 `strict_required_status_checks_policy: false`; se informó al responsable, sin modificar configuración remota.
