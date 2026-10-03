@@ -224,6 +224,7 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 │               review_handler.py · manual_overrides.py · admin_notify.py · evidence_finder.py · evidence_freeze.py ·
 │               clients/ (supabase, google_places, tavily,
 │               llm, resend, website_scraper)
+├── apps/mobile/ Capacitor Android shell: capacitor.config.json · scripts/ (sync-web, web-bundle, icons) · native/native.js · android/
 ├── mcp_server/ server.py (6 tools over Supabase + the RUBRIC) · skills/validator-rubric/SKILL.md (academic deliverable)
 ├── supabase/functions/  outreach-reply/ · place-report-created/ · chat/ (index.ts, prompts.ts, regions.ts, index.test.ts, regions.test.ts) — Deno/TS
 ├── config/     settings.py (env-driven) · targets.yaml (countries, cities, search terms, `web: true` opt-in)
@@ -412,6 +413,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 **Frontend**
 - **Location only on tap, in memory** [«Cerca mío»]: one `getCurrentPosition` per tap, no `watchPosition`; never stored, sent (backend, chat, model, events, DOM) or cached; dropped when the page hides. `tests/frontend_nearby.test.js` guards it.
 - **Service worker = app shell only** [PWA shell]: network first, closed `SHELL` allowlist; a new page asset is added to it (`tests/frontend_pwa.test.js`). Never cache or intercept places, Supabase, chat, tiles or location.
+- **Android app = the site's files** [Android demo app]: `apps/mobile/` copies them at build time (never a second UI, no `server.url`); permissions are internet + foreground location only; no SDK, plugin or beacon is added without a decision; the APK is built locally, signed with the key outside the repo, never by CI. `tests/frontend_mobile.test.js`; [runbook](docs/runbooks/apk-demo.md).
 - **Any new link that dispatches `celiacmap:open-place` must be exempted in `js/map.js`'s outside-click handler**
   (`.chat-place-link`, `.review-place`, …); `tests/frontend_explorer.test.js` covers it.
 - **Verify `hidden` toggles and marker clicks in a real browser, with a real click**: DOM emulation cannot see
@@ -426,6 +428,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 ## Decisions Log (índice)
 
 - **Piloto móvil y flujo PR (2026-10-02)** — persona física, PWA primero y Capacitor Android para demos, GPS local bajo demanda y tiendas/iOS diferidos; [ADR-010](docs/architecture/ADR-010-mobile-strategy.md), [plan](docs/plans/PLAN-mobile-app.md) y [decisión](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02).
+- **Android demo app (2026-10-03)** — Capacitor in `apps/mobile/`: the site's own files, no beacon, no service worker, WebView geolocation (no plugin), key outside the repo; device test and `chat` CORS pending. [→](docs/DECISIONS.md#android-demo-app-with-capacitor-2026-10-03)
 - **«Cerca mío» (2026-10-02)** — one location reading per tap, in memory only, never stored or sent; 10 nearest in 5 km (20 on demand), public label + straight-line distance; chat shortcut is a widget button; verified on a real Android (10-03). [→](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02)
 - **PWA shell + icons (2026-10-02)** — network-first service worker over a closed allowlist, verified on a real Android; favicon and app icons = header logo (pin + ✓). [PWA](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02) · [icons](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02)
 - **Assistant and map interaction polish (2026-10-01, deployed)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)

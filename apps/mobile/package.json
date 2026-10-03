@@ -1,0 +1,19 @@
+{
+  "name": "celiacmap-mobile",
+  "private": true,
+  "description": "Capacitor Android shell for CeliacMap: packages the site's own files for demo APKs. Never published to a store from here.",
+  "scripts": {
+    "sync:web": "node scripts/sync-web.mjs",
+    "sync": "node scripts/sync-web.mjs && cap sync android",
+    "build:debug": "npm run sync && node scripts/gradle.mjs assembleDebug",
+    "build:release": "npm run sync && node scripts/gradle.mjs assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  }
+}

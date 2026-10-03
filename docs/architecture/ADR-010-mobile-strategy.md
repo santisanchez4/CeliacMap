@@ -24,4 +24,6 @@ Conserva web, backend, branding y gran parte de la UI; PWA/APK no exigen matríc
 
 Capacitor renderiza una WebView: mapa, teclado, permisos y clave de tiles necesitan QA físico. iOS sigue sin validación. La licencia de datos requiere decisión posterior; el servidor de tiles puede inferir la zona visualizada aunque no reciba el GPS explícito.
 
+**Actualización 2026-10-03:** la fase Capacitor se implementó en `apps/mobile/` (no en la raíz), sin plugin de geolocalización y sin beacon de analítica; ver [decisión](../DECISIONS.md#android-demo-app-with-capacitor-2026-10-03) y [runbook del APK](../runbooks/apk-demo.md).
+
 Detalle: [plan del piloto](../plans/PLAN-mobile-app.md). Diagramas: [evolución propuesta, no desplegada](C4-diagrams.md#evolución-propuesta--piloto-móvil-adr-010).
