@@ -263,6 +263,8 @@ const ALLOWED_ORIGINS = new Set([
   "https://celiacmap.org",
   "https://www.celiacmap.org",
   "https://santisanchez4.github.io",
+  // The Android demo app (apps/mobile): Capacitor serves the packaged site from this exact origin.
+  "https://localhost",
 ]);
 const LOCALHOST_ORIGIN_RE = /^http:\/\/localhost(:\d+)?$/;
 

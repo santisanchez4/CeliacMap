@@ -138,6 +138,14 @@ Deno.test("isAllowedOrigin accepts localhost on any port", () => {
   assertEquals(isAllowedOrigin("http://localhost"), true);
 });
 
+Deno.test("isAllowedOrigin accepts the Android app's origin, and only that exact https localhost", () => {
+  assertEquals(isAllowedOrigin("https://localhost"), true);
+  assertEquals(isAllowedOrigin("https://localhost:8443"), false);
+  assertEquals(isAllowedOrigin("https://localhost.evil.example.com"), false);
+  assertEquals(isAllowedOrigin("capacitor://localhost"), false);
+  assertEquals(buildCorsHeaders("https://localhost")["Access-Control-Allow-Origin"], "https://localhost");
+});
+
 Deno.test("isAllowedOrigin rejects an unrelated origin", () => {
   assertEquals(isAllowedOrigin("https://evil.example.com"), false);
 });

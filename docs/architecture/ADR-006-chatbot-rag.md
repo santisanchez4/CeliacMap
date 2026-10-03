@@ -432,7 +432,8 @@ corrigió una vez (`VALIDATOR_RESERVE` desactualizado) que no se repite.
 - **CORS:** la Edge Function maneja el preflight `OPTIONS` y responde
   `Access-Control-Allow-Origin` para un allowlist (`https://celiacmap.org`,
   `https://www.celiacmap.org`, `https://santisanchez4.github.io`,
-  `http://localhost:*` para dev). Las dos funciones actuales no lo
+  `http://localhost:*` para dev; desde el 2026-10-03 también el origen exacto
+  `https://localhost`, que es el de la app Android de demostración, `apps/mobile`). Las dos funciones actuales no lo
   necesitan (son server-to-server).
 
 ### 10. Logging y privacidad (2d)
