@@ -102,6 +102,19 @@ Archivo `db/fixes/2026-10-02-rikuras-malvin-website.PENDING.sql`, termina en `ro
 - **Pendiente: prueba en Android real** con la lista del runbook (no había teléfono conectado): CARTO en la WebView, teclado,
   enlaces externos, permiso de ubicación. El asistente no responde en la app hasta el deploy de `chat`.
 
+## Actualización 2026-10-03 (chat v25 desplegado)
+
+- PR #8, #9, #10, #11 y #12 mergeados por el responsable, en ese orden, con CI verde (`main` = `6b56d2d`).
+- **`chat` v25 desplegado** con el «dale», desde `main`: `node_modules/.bin/supabase functions deploy chat`. Verificado en
+  solo lectura: `verify_jwt=false`, versión 25, fuente descargada idéntica a `HEAD` (mismos hashes de `index.ts`, `prompts.ts`
+  y `regions.ts`). Preflight `OPTIONS`: `https://localhost` y `https://celiacmap.org` reciben `Access-Control-Allow-Origin`;
+  `https://localhost:8443` no. Sin llamadas al modelo. Los prompts no cambiaron: no reinicia el conteo del soft-launch.
+- El responsable respaldó la carpeta de la clave de firma.
+- **Pendiente: prueba del APK 0.1.0 en el Android del responsable** con la lista de `docs/runbooks/apk-demo.md`; pasa los
+  resultados al terminar. Recién entonces registrar la verificación en DECISIONS.
+- Pendientes del responsable sin cambios: §3.10 de la política de privacidad (borrador); decisión sobre los datos de Google
+  antes de mostrar el piloto a instituciones.
+
 ## PWA (sección original, ya resuelta: ver actualización arriba)
 
 Se mostró el plan antes de implementar. No se creó su rama ni se modificó frontend por esta tarea. Usuario la llamó «Fase 2», aunque el documento enumera PWA como fase 1 y cercanía como fase 2: seguir el alcance PWA solicitado, sin geolocalización ahora.
