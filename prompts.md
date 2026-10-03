@@ -2416,3 +2416,9 @@ explicar protección de main. Rama nueva y PR, mostrando cada punto antes del si
 **Pedido:** proteger website/phone/opening_hours del Updater con tests primero; preparar restauración de Rikuras con ensayo y esperar «dale». Google queda como decisión abierta prioritaria antes de tiendas o presentación institucional, sin bloquear el piloto.
 
 **Resultado:** protección por aprobación manual o registro explícito de campos/UUID, ensayo SQL con rollback y guardas, PR independiente. No cambia ningún prompt del modelo.
+
+## 39. App Android de demostración con Capacitor (2026-10-03)
+
+**Pedido:** fase 3 del piloto aprobada: `appId` `org.celiacmap.app`, SDK por línea de comandos, CORS de `chat` en un PR aparte con «dale» antes del deploy, sin beacon de Cloudflare en el APK, clave de firma fuera del repo; sin Play Store ni cambios de datos; rama propia, tests antes del push y PR sin merge; al terminar, pasos de instalación y lista de pruebas.
+
+**Resultado:** `apps/mobile/` empaqueta los archivos de la web; geolocalización por la WebView (sin plugin), permisos mínimos, botón Atrás, APK firmado y [runbook](docs/runbooks/apk-demo.md). No cambia ningún prompt del modelo.

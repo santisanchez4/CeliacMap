@@ -1,0 +1,9 @@
+{
+  "appId": "org.celiacmap.app",
+  "appName": "CeliacMap",
+  "webDir": "www",
+  "loggingBehavior": "none",
+  "android": {
+    "allowMixedContent": false
+  }
+}

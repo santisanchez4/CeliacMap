@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CeliacMap</string>
+    <string name="title_activity_main">CeliacMap</string>
+    <string name="package_name">org.celiacmap.app</string>
+    <string name="custom_url_scheme">org.celiacmap.app</string>
+</resources>

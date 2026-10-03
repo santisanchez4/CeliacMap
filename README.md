@@ -264,6 +264,7 @@ serif display headings over a clean sans body, and generous spacing.
 ├── manifest.webmanifest        # PWA manifest (installable app)
 ├── service-worker.js           # PWA: network-first app shell, never data/chat/tiles
 ├── css/styles.css
+├── apps/mobile/                # Android demo app (Capacitor): packages the files above into an APK
 ├── js/
 │   ├── main.js                 # i18n, nav, reveal
 │   ├── config.js               # Supabase URL + anon key (public)
@@ -324,6 +325,12 @@ serif display headings over a clean sans body, and generous spacing.
 
 Open `index.html` in your browser — no build step. The map reads public,
 read-only data from Supabase using the anon key in `js/config.js`.
+
+### Android demo app
+
+`apps/mobile/` wraps the same site in a Capacitor WebView and builds an APK for demos (no store). It needs
+Node 22+, JDK 21 and the Android SDK; build, signing key, install steps and the device checklist are in
+[`docs/runbooks/apk-demo.md`](docs/runbooks/apk-demo.md).
 
 ### Agents (Python)
 
