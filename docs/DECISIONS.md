@@ -3957,8 +3957,8 @@ permisos exactos, dependencias fijadas, clave fuera del repo, sin service worker
 834 pytest + 268 Edge + 136 frontend. APK release `0.1.0` (4,1 MB) compilado y firmado (esquema v2, certificado
 `CN=CeliacMap`); el APK inspeccionado declara solo esos tres permisos y no contiene beacon, manifest ni service worker.
 **Pendiente: la prueba en un Android real** (ningún teléfono conectado en la sesión) — en particular la clave de CARTO dentro
-de la WebView, el teclado, los enlaces externos y el permiso de ubicación — y el deploy de `chat` con el nuevo origen, sin el
-cual el asistente no responde dentro de la app. El riesgo de los datos de Google sigue abierto y no cambia con el APK.
+de la WebView, el teclado, los enlaces externos y el permiso de ubicación. **`chat` v25 desplegado el 2026-10-03** con el origen
+`https://localhost` (PR #12): `verify_jwt=false`, fuente desplegada igual a `main`, preflight aceptado solo para el origen exacto. El riesgo de los datos de Google sigue abierto y no cambia con el APK.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 

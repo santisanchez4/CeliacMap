@@ -99,7 +99,7 @@ Marcar cada punto; ante una falla, anotar qué se vio y en qué paso.
 11. Ajustes → Apps → CeliacMap → Permisos: solo «Ubicación», nunca «todo el tiempo».
 
 **Chat y formularios**
-12. El asistente responde (**requiere el deploy de `chat` con el origen `https://localhost`**; antes de eso falla con error de red).
+12. El asistente responde (`chat` v25, desplegado el 2026-10-03, acepta el origen `https://localhost` de la app).
 13. El teclado no tapa el campo del chat ni los formularios; el atajo «Lugares cerca mío» abre el flujo de cercanía.
 14. No enviar sugerencias, reportes ni votos de prueba: escriben en producción.
 
