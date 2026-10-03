@@ -3853,8 +3853,13 @@ esperado.
 Verificación: `tests/frontend_pwa.test.js` (14 tests: manifest e íconos, lista cerrada contra lo que carga la página,
 qué no se intercepta, red primero, respaldo offline, aviso). Suite completa local: 834 pytest + 268 Edge + 99 frontend.
 Chrome de escritorio en `127.0.0.1` con el sitio armado como el deploy: SW activo, 21 archivos en caché, 417 lugares desde la
-red; con el servidor apagado la página abre desde la caché. Pendiente: instalar en un Android real (necesita HTTPS, o sea el
-sitio publicado o `adb reverse`) y Lighthouse.
+red; con el servidor apagado la página abre desde la caché. Pendiente: Lighthouse.
+
+**Verificado en un Android real (2026-10-02), por el responsable,** tras el merge del PR #4 y el deploy de Pages (`5698291`):
+instalada desde Chrome ("Install and create shortcut"), ícono verde en la pantalla de inicio, abre a pantalla completa sin barra
+de Chrome. El mapa carga al abrir; **la primera vez hubo que recargar una vez** y después no volvió a pasar (sin diagnóstico
+todavía: queda como observación para la QA del APK). Al expandir el mapa y moverse hay un breve delay mientras bajan los tiles,
+igual que en la web. En modo avión aparece el aviso de sin conexión.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
