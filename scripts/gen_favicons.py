@@ -7,13 +7,14 @@ Run from the repo root:
 Produces, in assets/icons/:
     favicon-48.png       48x48   transparent   (Google's minimum for search)
     favicon-96.png       96x96   transparent   (crisper tab / search icon)
-    apple-touch-icon.png 180x180 white ground  (iOS home screen)
+    apple-touch-icon.png 180x180 cream ground  (iOS home screen)
     icon-192.png         192x192 transparent   (PWA manifest, "any")
     icon-512.png         512x512 transparent   (PWA manifest, "any", splash)
-    icon-maskable-512.png 512x512 off-white ground, pin inside the maskable
-                         safe zone (PWA manifest, "maskable": Android crops it)
+    icon-maskable-512.png 512x512 cream ground, pin and check badge inside the
+                         maskable safe zone (PWA manifest, "maskable": Android crops it)
 
-favicon.svg stays the source of truth; index.html lists the PNGs first
+favicon.svg is the header's brand mark (pin + check badge) with fixed colors
+(#2d6a4f and white) and stays the source of truth; index.html lists the PNGs first
 (Google Search recommends PNG as the primary favicon format — SVG support in
 search results is inconsistent), then the SVG, then the Apple touch icon.
 
@@ -44,32 +45,53 @@ OUT_DIR = Path("assets/icons")
 TRANSPARENT = Color(1, 1, 1, alpha=0)
 SUPERSAMPLE = 4
 
-WHITE = (255, 255, 255, 255)
-OFF_WHITE = (253, 250, 245, 255)  # #fdfaf5, the site's base background
+CREAM = (253, 250, 245, 255)  # #fdfaf5, the site's base background
+VIEWBOX = 24
+# Bounding box of the mark in favicon.svg units (pin 4..20 x 2..22.3, badge
+# reaching 22.45 with its stroke). A padded icon centres this box, not the
+# viewBox, so the mark sits in the middle of the maskable circle.
+MARK_BOX = (4.0, 2.0, 22.45, 22.3)
 
-# name -> (size, opaque background or None, fraction of the canvas the pin
+# Probe points in favicon.svg units: (x, y, expected colour).
+PROBES = {
+    "pin body": (8.0, 12.5, "green"),
+    "pin centre dot": (12.0, 10.0, "white"),
+    "badge inside": (15.0, 14.5, "white"),
+    "check mark": (17.85, 15.75, "green"),
+}
+
+# name -> (size, opaque background or None, fraction of the canvas the mark
 # fills). iOS flattens transparency to black, so the Apple touch icon gets a
-# solid white ground; the tab favicons stay transparent. The maskable icon's
-# pin fits the central 80% circle Android keeps after cropping.
+# solid cream ground; the tab favicons stay transparent. The maskable icon's
+# mark fits the central 80% circle Android keeps after cropping.
 TARGETS = {
     "favicon-48.png": (48, None, 1.0),
     "favicon-96.png": (96, None, 1.0),
-    "apple-touch-icon.png": (180, WHITE, 1.0),
+    "apple-touch-icon.png": (180, CREAM, 1.0),
     "icon-192.png": (192, None, 1.0),
     "icon-512.png": (512, None, 1.0),
-    "icon-maskable-512.png": (512, OFF_WHITE, 0.6),
+    "icon-maskable-512.png": (512, CREAM, 0.6),
 }
+
+
+def placement(size: int, inner: float) -> tuple[int, int, int]:
+    pin = round(size * inner)
+    ox = oy = (size - pin) // 2
+    if inner < 1.0:
+        x0, y0, x1, y1 = MARK_BOX
+        ox += round(pin * (VIEWBOX / 2 - (x0 + x1) / 2) / VIEWBOX)
+        oy += round(pin * (VIEWBOX / 2 - (y0 + y1) / 2) / VIEWBOX)
+    return pin, ox, oy
 
 
 def render(size: int, bg, inner: float, dest: Path) -> None:
     drawing = svg2rlg(str(SRC))
-    pin = round(size * inner)
+    pin, ox, oy = placement(size, inner)
     dpi = 72.0 * (pin * SUPERSAMPLE) / drawing.width
     im = renderPM.drawToPIL(drawing, dpi=dpi, bg=TRANSPARENT, backendFmt="RGBA")
     im = im.convert("RGBA").resize((pin, pin), Image.LANCZOS)
     canvas = Image.new("RGBA", (size, size), bg or (0, 0, 0, 0))
-    offset = (size - pin) // 2
-    canvas.alpha_composite(im, (offset, offset))
+    canvas.alpha_composite(im, (ox, oy))
     canvas.save(dest, "PNG")
 
 
@@ -79,10 +101,11 @@ def verify(dest: Path, size: int, bg, inner: float) -> None:
         assert im.size == (size, size), f"{dest.name}: wrong size {im.size}"
         assert im.mode == "RGBA", f"{dest.name}: wrong mode {im.mode}"
         px = im.load()
-        pin = round(size * inner)
-        offset = (size - pin) // 2
-        dot = px[size // 2, offset + int(pin * 0.42)]     # the pin's white centre dot
-        body = px[size // 2, offset + int(pin * 0.66)]    # lower pin body (green)
+        pin, ox, oy = placement(size, inner)
+        probes = {
+            label: (px[ox + int(pin * x / VIEWBOX), oy + int(pin * y / VIEWBOX)], colour)
+            for label, (x, y, colour) in PROBES.items()
+        }
         corner = px[1, 1]
         opaque = sum(
             1 for y in range(size) for x in range(size) if px[x, y][3] > 10
@@ -90,7 +113,7 @@ def verify(dest: Path, size: int, bg, inner: float) -> None:
         print(
             f"  {dest.name:22} {im.size[0]:>3}x{im.size[1]:<3}  "
             f"{dest.stat().st_size:>6} B  opaque={opaque:5.1%}  "
-            f"dot={dot}  body={body}  corner={corner}"
+            f"corner={corner}"
         )
         if opaque_bg:
             assert corner == bg, f"{dest.name}: corner {corner}"
@@ -104,13 +127,14 @@ def verify(dest: Path, size: int, bg, inner: float) -> None:
                 for y in range(size) for x in range(size)
                 if px[x, y][:3] != bg[:3]
             )
-            assert radius <= size * 0.4, f"{dest.name}: pin leaves the safe zone ({radius:.0f}px)"
-        assert body[3] > 200 and body[1] > body[0] and body[1] > body[2], (
-            f"{dest.name}: pin body not green: {body}"
-        )
-        assert dot[3] > 200 and min(dot[:3]) > 200, (
-            f"{dest.name}: centre dot not white: {dot}"
-        )
+            print(f"    mark reaches {radius:.0f}px from the centre; safe zone {size * 0.4:.0f}px")
+            assert radius <= size * 0.4, f"{dest.name}: mark leaves the safe zone ({radius:.0f}px)"
+        for label, (pixel, colour) in probes.items():
+            if colour == "green":
+                ok = pixel[3] > 200 and pixel[1] > pixel[0] and pixel[1] > pixel[2] and min(pixel[:3]) < 160
+            else:
+                ok = pixel[3] > 200 and min(pixel[:3]) > 200
+            assert ok, f"{dest.name}: {label} not {colour}: {pixel}"
 
 
 def main() -> int:
