@@ -3861,6 +3861,21 @@ de Chrome. El mapa carga al abrir; **la primera vez hubo que recargar una vez** 
 todavía: queda como observación para la QA del APK). Al expandir el mapa y moverse hay un breve delay mientras bajan los tiles,
 igual que en la web. En modo avión aparece el aviso de sin conexión.
 
+### Favicon and app icons unified with the header logo (2026-10-02)
+
+El logo correcto es el del header: pin + círculo con ✓. `assets/icons/favicon.svg` tenía solo el pin; ahora es el mismo dibujo
+del header con colores fijos (`#2d6a4f` y blanco, sin `currentColor`), y de él salen los seis PNG (`scripts/gen_favicons.py`):
+favicon 48 / 96 y PWA 192 / 512 transparentes; apple-touch-icon y maskable 512 con fondo crema `#fdfaf5`. El header y el footer
+no cambian. El script verifica cuatro puntos del dibujo (cuerpo del pin, su centro blanco, el interior del círculo y el ✓) y
+rechaza el ícono anterior.
+
+El dibujo no está centrado en su viewBox (el círculo del ✓ lo corre a la derecha), así que el **maskable se centra según la caja
+del dibujo**, no según el viewBox: queda a 139 px del centro con una zona segura de 205 px. Los demás tamaños usan el dibujo tal
+cual, igual que el header.
+
+**Tardan en actualizarse:** el ícono de Google en el buscador cambia cuando Google vuelve a rastrear el sitio (días o semanas), y
+las PWA ya instaladas pueden mostrar el pin anterior hasta que Chrome actualice la app o se reinstale.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
