@@ -425,6 +425,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 ## Decisions Log (índice)
 
 - **Piloto móvil y flujo PR (2026-10-02)** — persona física, PWA primero y Capacitor Android para demos, GPS local bajo demanda y tiendas/iOS diferidos; [ADR-010](docs/architecture/ADR-010-mobile-strategy.md), [plan](docs/plans/PLAN-mobile-app.md) y [decisión](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02).
+- **Favicon and app icons = header logo (2026-10-02)** — pin + ✓ with fixed colors in `favicon.svg` and all six PNGs; maskable centered on the drawing; Google and installed apps update late. [→](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02)
 - **PWA shell (2026-10-02)** — manifest, maskable icons and a network-first service worker over a closed same-origin allowlist; never caches data, chat, tiles or GPS; installed and verified on a real Android. [→](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02)
 - **Assistant and map interaction polish (2026-10-01, deployed)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)
 
