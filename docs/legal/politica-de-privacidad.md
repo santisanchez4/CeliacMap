@@ -113,6 +113,21 @@ navegador y no recibe nada de lo que escribís en el chat ni en los formularios.
 Para mostrar el sitio, tu navegador pide recursos a terceros, que reciben tu dirección IP como cualquier servidor: las
 tipografías (Google Fonts), las imágenes del mapa (CARTO, con datos de OpenStreetMap) y la librería del mapa (unpkg).
 
+### 3.10 Tu ubicación (función «Cerca mío»)
+
+> **BORRADOR — pendiente de revisión del responsable.** No forma parte de la versión 1.0 publicada.
+
+Solo si tocás «Cerca mío» y lo aceptás, tu navegador nos da tu ubicación **una vez**. La usamos únicamente en tu
+dispositivo, para calcular la distancia en línea recta a los lugares del mapa. **No la guardamos** (ni en nuestros
+servidores ni en el almacenamiento de tu navegador) y **no la enviamos** a CeliacMap, al chat ni al sistema de
+inteligencia artificial. Se borra de la memoria cuando tocás «Quitar mi ubicación», al pasar la página a segundo plano o
+al cerrarla. No hay seguimiento continuo ni ubicación en segundo plano.
+
+Si la rechazás, el mapa, la búsqueda y el chat funcionan igual: podés elegir una ciudad. Al centrar el mapa en tu zona,
+el proveedor de las imágenes del mapa (CARTO) recibe, como con cualquier zona que mires, los pedidos de esas imágenes, y
+por eso puede deducir aproximadamente qué zona estás viendo. Podés retirar el permiso en cualquier momento desde la
+configuración de tu navegador.
+
 ## 4. Base legal y consentimiento
 
 - Tratamos los datos que nos mandás **con tu consentimiento**: al enviar un formulario, un voto o un mensaje al chat

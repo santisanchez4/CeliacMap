@@ -401,6 +401,8 @@
     var html = '<h3 class="pp-title">' + esc(p.name) + "</h3>";
     if (p.city) html += '<p class="pp-meta">' + esc(p.city) + "</p>";
     if (p.address) html += '<p class="pp-address">' + esc(p.address) + '</p>';
+    var distance = nearbyDistance(p);
+    if (distance) html += '<p class="pp-distance">' + esc(distance) + '</p>';
     html += '<a class="pp-directions" href="https://www.google.com/maps/dir/?api=1&amp;destination=' +
       encodeURIComponent(p.lat + ',' + p.lng) + '" target="_blank" rel="noopener noreferrer">' +
       tr('Cómo llegar ↗', 'Get directions ↗') + '</a>';
@@ -540,7 +542,7 @@
       if (panelEl.contains(e.target) || mapEl.contains(e.target) || e.target.closest(".map-explore-tools")) return;
       // Links that open a place from elsewhere on the page (chat replies, "La voz de la comunidad" cards)
       // dispatch celiacmap:open-place; their own click must not be read as an outside click.
-      if (e.target.closest && e.target.closest(".chat-place-link, .review-place, .mt3-name")) return;
+      if (e.target.closest && e.target.closest(".chat-place-link, .review-place, .mt3-name, .nearby-place")) return;
       closePanel();
     });
     document.addEventListener("keydown", function (e) {
@@ -822,6 +824,7 @@
       selectedEntry = null;
     }
     updateCount(shown.length);
+    if (nearbyState === "results") renderNearby();
     return shown.length;
   }
 
@@ -924,6 +927,10 @@
   document.addEventListener("celiacmap:explore", function (event) {
     workspace.scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth", block: "start" });
     mapEl.focus({ preventScroll: true });
+    if (event.detail.action === "nearby") {
+      startNearby();
+      return;
+    }
     if (event.detail.action === "dedicated") {
       resetFilters();
       document.querySelector('[data-safety="gluten_free_100"]').click();
@@ -1083,6 +1090,251 @@
     closeSuggest();
   });
 
+  /* --------------------------- Cerca mío ----------------------------- */
+  // One reading per tap, kept only in this closure: never stored, never sent
+  // (not to Supabase, not to the chat, not in events or the DOM). It is
+  // reused for 60 s and dropped as soon as the page is hidden.
+  var NEARBY_REUSE_MS = 60000;
+  var NEARBY_LIMIT = 10;
+  var geo = window.CeliacGeo;
+  var nearbyButton = document.getElementById("nearby-button");
+  var nearbyEl = document.getElementById("nearby");
+  var nearbyPosition = null;
+  var nearbyRequest = 0;
+  var nearbyRadius = 5;
+  var nearbyExplained = false;
+  var nearbyState = null;
+  var placesLoaded = false;
+  var userLayer = L.layerGroup().addTo(map);
+  var geoSupported = !!(geo && navigator.geolocation && window.isSecureContext !== false);
+
+  function nearbyFiltersActive() { return currentCategory !== "all" || currentSafety !== "all"; }
+
+  function nearbyCandidates() {
+    return entries.filter(function (e) {
+      if (currentCategory !== "all" && e.category !== currentCategory) return false;
+      if (currentSafety !== "all" && safetyGroup(e.place.safety_level) !== currentSafety) return false;
+      return true;
+    });
+  }
+
+  function nearbyAction(name, es, en, primary) {
+    return '<button type="button" class="nearby-action' + (primary ? " nearby-action--primary" : "") +
+      '" data-nearby-action="' + name + '">' + esc(tr(es, en)) + "</button>";
+  }
+
+  function nearbyDistance(p) {
+    if (!nearbyPosition || !geo) return "";
+    return geo.formatDistance(geo.distanceKm(nearbyPosition, { lat: p.lat, lng: p.lng }), nearbyPosition.accuracy, lang());
+  }
+
+  function nearbyResultsHtml() {
+    if (!placesLoaded) return '<p class="nearby-status" role="status">' + esc(LABELS.status.loading[lang()]) + "</p>";
+    var found = geo.nearest(nearbyCandidates(), nearbyPosition, nearbyRadius, NEARBY_LIMIT);
+    var filters = nearbyFiltersActive() ? tr(" (con los filtros activos)", " (with the active filters)") : "";
+    var html = "";
+    if (found.length) {
+      html += '<p class="nearby-status" role="status">' + esc(found.length === 1
+        ? tr("1 lugar a menos de " + nearbyRadius + " km", "1 place within " + nearbyRadius + " km")
+        : tr("Los " + found.length + " lugares más cercanos, a menos de " + nearbyRadius + " km",
+          "The " + found.length + " nearest places, within " + nearbyRadius + " km")) +
+        esc(filters) + "</p>";
+    } else {
+      html += '<p class="nearby-status" role="status">' + esc(tr("No encontramos lugares a menos de " + nearbyRadius + " km",
+        "We found no places within " + nearbyRadius + " km")) + esc(filters) + ".</p>";
+    }
+    if (geo.isApproximate(nearbyPosition.accuracy)) {
+      var kmOff = Math.max(1, Math.round(nearbyPosition.accuracy / 1000));
+      html += '<p class="nearby-note">' + esc(tr(
+        "Tu ubicación es aproximada (unos " + kmOff + " km): las distancias son estimadas.",
+        "Your location is approximate (about " + kmOff + " km): distances are estimates.")) + "</p>";
+    }
+    if (found.length) {
+      html += '<ol class="nearby-list">' + found.map(function (r) {
+        var p = r.item.place;
+        var level = safetyGroup(p.safety_level);
+        return '<li><button type="button" class="nearby-place" data-nearby-id="' + esc(p.id) + '">' +
+          '<span class="nearby-name">' + esc(p.name) + "</span>" +
+          '<span class="pp-badge ' + safetyBadgeClass(p.safety_level) + '">' + esc(LABELS.safety[level][lang()]) + "</span>" +
+          '<span class="nearby-distance">' + esc(geo.formatDistance(r.km, nearbyPosition.accuracy, lang())) + "</span>" +
+          (hasWarning(p) ? '<span class="nearby-warning">' + esc(tr("Reportado por la comunidad: consultá antes de ir",
+            "Reported by the community: check before you go")) + "</span>" : "") +
+          "</button></li>";
+      }).join("") + "</ol>";
+    }
+    html += '<div class="nearby-actions">';
+    if (nearbyRadius < 20) html += nearbyAction("widen", "Ampliar a 20 km", "Widen to 20 km", !found.length);
+    if (!found.length) html += nearbyAction("city", "Elegir una ciudad", "Choose a city");
+    html += nearbyAction("clear", "Quitar mi ubicación", "Remove my location") + "</div>";
+    return html;
+  }
+
+  function renderNearby() {
+    if (!nearbyEl) return;
+    var html = "";
+    if (nearbyState === "explain") {
+      html = '<p class="nearby-status">' + esc(tr(
+        "Usamos tu ubicación una sola vez para calcular, en este dispositivo, qué lugares tenés cerca. No la guardamos ni la enviamos a CeliacMap. El proveedor del mapa puede deducir la zona que estás viendo.",
+        "We use your location once to work out, on this device, which places are near you. We don't store it or send it to CeliacMap. The map provider can infer the area you are viewing.")) + "</p>" +
+        '<div class="nearby-actions">' + nearbyAction("locate", "Usar mi ubicación", "Use my location", true) +
+        nearbyAction("city", "Elegir una ciudad", "Choose a city") + "</div>";
+    } else if (nearbyState === "locating") {
+      html = '<p class="nearby-status" role="status">' + esc(tr("Buscando tu ubicación…", "Finding your location…")) + "</p>";
+    } else if (nearbyState === "denied") {
+      html = '<p class="nearby-status" role="status">' + esc(tr(
+        "No tenemos permiso para usar tu ubicación. Podés elegir una ciudad, o habilitar la ubicación para este sitio en la configuración del navegador.",
+        "We don't have permission to use your location. You can choose a city, or allow location for this site in your browser settings.")) + "</p>" +
+        '<div class="nearby-actions">' + nearbyAction("city", "Elegir una ciudad", "Choose a city", true) + "</div>";
+    } else if (nearbyState === "failed") {
+      html = '<p class="nearby-status" role="status">' + esc(tr(
+        "No pudimos obtener tu ubicación. Probá de nuevo o elegí una ciudad.",
+        "We couldn't get your location. Try again or choose a city.")) + "</p>" +
+        '<div class="nearby-actions">' + nearbyAction("locate", "Probar de nuevo", "Try again", true) +
+        nearbyAction("city", "Elegir una ciudad", "Choose a city") + "</div>";
+    } else if (nearbyState === "unsupported") {
+      html = '<p class="nearby-status" role="status">' + esc(tr(
+        "Este navegador no puede darnos tu ubicación. Elegí una ciudad para ver sus lugares.",
+        "This browser can't share your location. Choose a city to see its places.")) + "</p>" +
+        '<div class="nearby-actions">' + nearbyAction("city", "Elegir una ciudad", "Choose a city", true) + "</div>";
+    } else if (nearbyState === "results") {
+      html = nearbyResultsHtml();
+    }
+    nearbyEl.innerHTML = html ? '<h3 class="nearby-title">' + esc(tr("Cerca mío", "Near me")) + "</h3>" + html : "";
+    nearbyEl.hidden = !html;
+  }
+
+  function setNearby(state) {
+    nearbyState = state;
+    renderNearby();
+  }
+
+  function drawUser() {
+    userLayer.clearLayers();
+    var point = [nearbyPosition.lat, nearbyPosition.lng];
+    if (typeof nearbyPosition.accuracy === "number" && nearbyPosition.accuracy > 0) {
+      userLayer.addLayer(L.circle(point, { radius: nearbyPosition.accuracy, className: "user-accuracy", interactive: false }));
+    }
+    userLayer.addLayer(L.marker(point, {
+      icon: L.divIcon({ className: "user-location", html: '<span class="user-location-dot"></span>', iconSize: [20, 20], iconAnchor: [10, 10] }),
+      title: tr("Tu ubicación", "Your location"), alt: tr("Tu ubicación", "Your location"),
+      keyboard: false, interactive: false
+    }));
+  }
+
+  function frameNearby() {
+    if (!nearbyPosition) return;
+    map.invalidateSize();
+    var found = placesLoaded ? geo.nearest(nearbyCandidates(), nearbyPosition, nearbyRadius, NEARBY_LIMIT) : [];
+    var points = [[nearbyPosition.lat, nearbyPosition.lng]].concat(found.map(function (r) { return [r.item.place.lat, r.item.place.lng]; }));
+    if (points.length > 1) map.fitBounds(L.latLngBounds(points).pad(0.15), { maxZoom: 15 });
+    else map.setView(points[0], 13);
+  }
+
+  function showNearbyResults(reframe) {
+    setNearby("results");
+    if (reframe) frameNearby();
+  }
+
+  function discardNearby() {
+    nearbyRequest++;
+    nearbyPosition = null;
+    nearbyRadius = 5;
+    userLayer.clearLayers();
+    setNearby(null);
+    if (panelBody) Array.prototype.forEach.call(panelBody.querySelectorAll(".pp-distance"), function (node) { node.remove(); });
+  }
+
+  function locate() {
+    var id = ++nearbyRequest;
+    setNearby("locating");
+    try {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        if (id !== nearbyRequest) return;
+        if (document.visibilityState === "hidden") { discardNearby(); return; }
+        nearbyPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, at: Date.now() };
+        nearbyRadius = 5;
+        drawUser();
+        showNearbyResults(true);
+      }, function (error) {
+        if (id !== nearbyRequest) return;
+        setNearby(error && error.code === 1 ? "denied" : "failed");
+      }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
+    } catch (e) {
+      setNearby("failed");
+    }
+  }
+
+  function permissionGranted() {
+    try {
+      return navigator.permissions.query({ name: "geolocation" })
+        .then(function (status) { return status.state === "granted"; }, function () { return false; });
+    } catch (e) {
+      return Promise.resolve(false);
+    }
+  }
+
+  function startNearby() {
+    if (!geoSupported) { setNearby("unsupported"); return; }
+    if (nearbyPosition && Date.now() - nearbyPosition.at < NEARBY_REUSE_MS) { showNearbyResults(true); return; }
+    nearbyPosition = null;
+    userLayer.clearLayers();
+    if (nearbyExplained) { locate(); return; }
+    permissionGranted().then(function (granted) {
+      if (granted) { nearbyExplained = true; locate(); } else setNearby("explain");
+    });
+  }
+
+  function chooseCity() {
+    setNearby(nearbyPosition ? "results" : null);
+    var filters = document.getElementById("explorer-filters");
+    if (filters) filters.open = true;
+    if (citySelect) citySelect.focus();
+  }
+
+  if (nearbyButton) {
+    nearbyButton.hidden = false;
+    nearbyButton.addEventListener("click", startNearby);
+  }
+  if (nearbyEl) {
+    nearbyEl.addEventListener("click", function (e) {
+      var action = e.target.closest && e.target.closest("[data-nearby-action]");
+      if (action) {
+        var name = action.getAttribute("data-nearby-action");
+        if (name === "locate") { nearbyExplained = true; locate(); }
+        else if (name === "city") chooseCity();
+        else if (name === "widen") { nearbyRadius = 20; showNearbyResults(true); }
+        else if (name === "clear") { discardNearby(); if (nearbyButton) nearbyButton.focus(); }
+        return;
+      }
+      var placeButton = e.target.closest && e.target.closest(".nearby-place");
+      if (!placeButton) return;
+      var id = placeButton.getAttribute("data-nearby-id");
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].place.id !== id) continue;
+        if (!matches(entries[i])) {
+          currentCity = "all";
+          currentQuery = "";
+          citySelect.value = "all";
+          searchInput.value = "";
+          searchClear.hidden = true;
+          refresh();
+        }
+        (document.querySelector("#map .map-wrap") || mapEl)
+          .scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth", block: "center" });
+        selectEntry(entries[i], true);
+        return;
+      }
+    });
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden" && (nearbyPosition || nearbyState)) discardNearby();
+  });
+  window.addEventListener("pagehide", function () { if (nearbyPosition || nearbyState) discardNearby(); });
+  document.addEventListener("celiacmap:lang", function () {
+    renderNearby();
+    if (nearbyPosition) drawUser();
+  });
+
   /* ----------------------------- Data ------------------------------- */
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
     setStatus("error");
@@ -1152,8 +1404,10 @@
         });
       });
       setStatus(null);
+      placesLoaded = true;
       refresh();
-      frameVisible();
+      if (nearbyPosition) frameNearby();
+      else frameVisible();
     })
     .catch(function () {
       setStatus("error");

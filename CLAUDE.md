@@ -219,7 +219,7 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 /
 ├── index.html · manifest.webmanifest · service-worker.js · css/styles.css · assets/{images,icons}/ (favicons + PWA icons)
 ├── js/         main.js (i18n, nav) · config.js (public keys) · map.js · suggest.js + kitchen.js (Form A) · report.js
-│               (Form B) · ranking.js · opinions.js · chat.js (widget -> the `chat` function) · pwa.js
+│               (Form B) · ranking.js · opinions.js · chat.js (widget -> the `chat` function) · pwa.js · geo.js
 ├── agents/     base.py · {search,social,web,validator,updater,suggestion,outreach}_agent.py · outreach_reply_handler.py ·
 │               review_handler.py · manual_overrides.py · admin_notify.py · evidence_finder.py · evidence_freeze.py ·
 │               clients/ (supabase, google_places, tavily,
@@ -410,6 +410,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   gluten figures, no severity or urgency judgments; `guardCeliaquiaReply` is the deterministic net.
 
 **Frontend**
+- **Location only on tap, in memory** [«Cerca mío»]: one `getCurrentPosition` per tap, no `watchPosition`; never stored, sent (backend, chat, model, events, DOM) or cached; dropped when the page hides. `tests/frontend_nearby.test.js` guards it.
 - **Service worker = app shell only** [PWA shell]: network first, closed `SHELL` allowlist; a new page asset is added to it (`tests/frontend_pwa.test.js`). Never cache or intercept places, Supabase, chat, tiles or location.
 - **Any new link that dispatches `celiacmap:open-place` must be exempted in `js/map.js`'s outside-click handler**
   (`.chat-place-link`, `.review-place`, …); `tests/frontend_explorer.test.js` covers it.
@@ -425,8 +426,8 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 ## Decisions Log (índice)
 
 - **Piloto móvil y flujo PR (2026-10-02)** — persona física, PWA primero y Capacitor Android para demos, GPS local bajo demanda y tiendas/iOS diferidos; [ADR-010](docs/architecture/ADR-010-mobile-strategy.md), [plan](docs/plans/PLAN-mobile-app.md) y [decisión](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02).
-- **Favicon and app icons = header logo (2026-10-02)** — pin + ✓ with fixed colors in `favicon.svg` and all six PNGs; maskable centered on the drawing; Google and installed apps update late. [→](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02)
-- **PWA shell (2026-10-02)** — manifest, maskable icons and a network-first service worker over a closed same-origin allowlist; never caches data, chat, tiles or GPS; installed and verified on a real Android. [→](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02)
+- **«Cerca mío» (2026-10-02)** — one location reading per tap, in memory only, never stored or sent; 10 nearest in 5 km (20 on demand), public label + straight-line distance; chat shortcut is a widget button. [→](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02)
+- **PWA shell + icons (2026-10-02)** — network-first service worker over a closed allowlist, verified on a real Android; favicon and app icons = header logo (pin + ✓). [PWA](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02) · [icons](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02)
 - **Assistant and map interaction polish (2026-10-01, deployed)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)
 
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives

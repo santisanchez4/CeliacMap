@@ -253,6 +253,8 @@ serif display headings over a clean sans body, and generous spacing.
 - Conceptual interactive map built entirely with HTML/CSS (no map library).
 - Accessible: semantic landmarks, skip link, focus styles, reduced-motion support.
 - Installable PWA: manifest + network-first service worker for the app shell only.
+- «Cerca mío» (near me): one location reading per tap, used only on the device and never
+  stored or sent; the 10 nearest places within 5 km (20 on demand), with straight-line distances.
 
 ## Project Structure
 
@@ -265,6 +267,7 @@ serif display headings over a clean sans body, and generous spacing.
 ├── js/
 │   ├── main.js                 # i18n, nav, reveal
 │   ├── config.js               # Supabase URL + anon key (public)
+│   ├── geo.js                  # «Cerca mío»: pure straight-line distance helpers
 │   ├── map.js                  # Leaflet + Supabase data + filters + place panel
 │   ├── kitchen.js              # "Sobre la cocina" block of the "add a place" form
 │   ├── suggest.js              # public "Suggest a Place" form → suggestions table
@@ -366,7 +369,8 @@ The [mobile pilot plan](docs/plans/PLAN-mobile-app.md) and
 [ADR-010](docs/architecture/ADR-010-mobile-strategy.md) define PWA first, then
 Capacitor Android for demos. Phase 1 (installable PWA shell) is implemented:
 the site can be installed from the browser and opens offline with a notice;
-places, the assistant and the forms still need a connection.
+places, the assistant and the forms still need a connection. Phase 2 («Cerca mío»)
+is implemented: location on tap only, in memory, never sent.
 
 In production the pipeline runs automatically once per month via the
 `Agents — monthly pipeline` GitHub Actions workflow
