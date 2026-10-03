@@ -18,6 +18,7 @@ var SHELL = [
   "css/styles.css",
   "js/main.js",
   "js/config.js",
+  "js/geo.js",
   "js/map.js",
   "js/kitchen.js",
   "js/suggest.js",

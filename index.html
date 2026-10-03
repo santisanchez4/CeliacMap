@@ -165,6 +165,8 @@
               <ul class="map-suggest" id="search-suggest" role="listbox"
                 aria-label="Sugerencias de lugares" hidden></ul>
             </div>
+          <button type="button" class="nearby-button" id="nearby-button" aria-controls="nearby"
+            data-explorer-es="Cerca mío" data-explorer-en="Near me" hidden>Cerca mío</button>
           <details class="explorer-filters" id="explorer-filters">
           <summary data-explorer-es="Filtros" data-explorer-en="Filters">Filtros</summary>
           <div class="map-chips" role="group" aria-label="Filtros del mapa">
@@ -250,6 +252,8 @@
               <div class="place-panel-body" id="place-panel-body"></div>
             </aside>
           </div>
+
+          <section class="nearby" id="nearby" aria-label="Cerca mío" hidden></section>
 
           <ul class="map-legend">
             <li><span class="dot dot-safe"></span><span>Espacio 100% sin gluten</span></li>
@@ -959,6 +963,7 @@
     <div class="chat-actions" role="group" data-chat-aria="actions">
       <button type="button" data-chat-action="browse" data-chat-text="browse"></button>
       <button type="button" data-chat-action="dedicated" data-chat-text="dedicated"></button>
+      <button type="button" data-chat-action="nearby" data-chat-text="nearby"></button>
       <button type="button" data-chat-action="guide" data-chat-text="guide"></button>
       <button type="button" data-chat-action="suggest" data-chat-text="suggest"></button>
     </div>
@@ -988,6 +993,7 @@
     crossorigin=""></script>
   <script src="js/main.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/geo.js"></script>
   <script src="js/map.js"></script>
   <script src="js/kitchen.js"></script>
   <script src="js/suggest.js"></script>

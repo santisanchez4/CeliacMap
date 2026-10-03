@@ -262,7 +262,7 @@ Deno.test("opening a place scrolls the map itself into view, not the section hea
   assert.equal(targets.includes("map"), false, "must not scroll to the section heading");
 });
 
-Deno.test("chat keeps intro in the log and exposes four local actions separately", async () => {
+Deno.test("chat keeps intro in the log and exposes five local actions separately", async () => {
   const f = await fixture();
   await f.loadChat();
   f.click("#chat-fab");
@@ -270,7 +270,7 @@ Deno.test("chat keeps intro in the log and exposes four local actions separately
   assert.equal(log.children.length, 1);
   assert.ok(log.children[0].classList.contains("chat-msg--intro"));
   assert.equal(log.querySelectorAll("button").length, 0);
-  assert.equal(f.document.querySelectorAll("[data-chat-action]").length, 4);
+  assert.equal(f.document.querySelectorAll("[data-chat-action]").length, 5);
 });
 
 async function rankingFixture({ votes, fail = false }) {

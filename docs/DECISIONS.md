@@ -3876,6 +3876,37 @@ cual, igual que el header.
 **Tardan en actualizarse:** el ícono de Google en el buscador cambia cuando Google vuelve a rastrear el sitio (días o semanas), y
 las PWA ya instaladas pueden mostrar el pin anterior hasta que Chrome actualice la app o se reinstale.
 
+### «Cerca mío» — location on tap, in memory only (2026-10-02)
+
+Fase 2 del piloto móvil (ADR-010, plan §8). Botón «Cerca mío» bajo el buscador del mapa, más un atajo «Lugares cerca mío» en el
+widget del chat que solo abre este flujo (`js/chat.js`: un botón y su texto; **sin cambios en `prompts.ts`, el router ni el
+redactor**, ni llamadas al modelo).
+
+**Flujo.** Al cargar no se pide nada. El primer toque de la sesión explica antes del permiso del navegador (una sola lectura,
+cálculo en el dispositivo, no se guarda ni se envía, el proveedor del mapa puede deducir la zona vista) con *Usar mi ubicación* /
+*Elegir una ciudad*; si el permiso ya está concedido, no se repite. Resultado: marcador «Tu ubicación» con círculo de precisión
+y los **10 lugares más cercanos a menos de 5 km** (opción *Ampliar a 20 km*), con los filtros de categoría y nivel activos
+(no el de ciudad ni la búsqueda). Cada lugar muestra su **etiqueta pública vía `safetyGroup()`** y la distancia **«en línea
+recta»** (ES/EN), también dentro de la ficha. Rechazo, timeout (10 s) o navegador sin geolocalización ofrecen elegir ciudad; el
+mapa, la búsqueda y el chat siguen igual.
+
+**Privacidad.** Una lectura por toque (`getCurrentPosition`, `enableHighAccuracy: false`, `maximumAge: 0`), nunca
+`watchPosition`. La posición vive solo en una variable de `js/map.js`: se reutiliza 60 s, y se borra con «Quitar mi
+ubicación», `visibilitychange` a oculto o `pagehide`; una respuesta que llega con la página oculta se descarta. No va a
+storage, requests, eventos, DOM, chat ni service worker. Precisión: metros redondeados a 50 (a 100 si la lectura es peor que
+100 m); con más de 1 km de error se avisa «ubicación aproximada» y solo se dan kilómetros enteros.
+
+**Código.** `js/geo.js` (puro: Haversine, formato, más cercanos; en el `SHELL` del service worker) y el módulo en `js/map.js`.
+El marcador del usuario es azul para no confundirse con los pines verdes de los lugares. Política de privacidad: §3.10 agregada
+como **borrador** pendiente de revisión del responsable.
+
+**Verificación.** `tests/frontend_geo.test.js` y `tests/frontend_nearby.test.js` (capturan requests, incluido un mensaje real
+del chat, storage, eventos y DOM; prueba de mutación: una fuga a un evento, al DOM o `maximumAge` cacheado hacen fallar los
+tests). Chrome de escritorio en `127.0.0.1` con geolocalización simulada y datos reales: 10 lugares en Montevideo, aproximada,
+inglés, ficha, «Quitar», rechazo y atajo del chat sin pedidos al modelo. La QA en Chrome encontró y corrigió dos casos: una
+respuesta con la página ya oculta dejaba «Buscando…», y «Quitar» dejaba la distancia en la ficha cerrada. La pestaña de QA
+estaba oculta, así que la visibilidad se simuló; **pendiente: permiso concedido, rechazado y aproximado en un Android real.**
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
