@@ -17,7 +17,8 @@
   window.addEventListener("offline", updateNotice);
   updateNotice();
 
-  if (!("serviceWorker" in navigator)) return;
+  // The Android app ships these files inside the APK: no shell to cache there.
+  if (window.Capacitor || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", function () {
     navigator.serviceWorker.register("service-worker.js").catch(function () {});
   });

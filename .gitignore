@@ -42,3 +42,9 @@ db/checks/evidence-proposals/
 
 # Partner logo source (only the optimized WebP is committed, ADR-009)
 assets/images/*-original.*
+
+# Android app (apps/mobile): generated web copy, and anything that could hold a signing key
+apps/mobile/www/
+*.jks
+*.keystore
+keystore.properties

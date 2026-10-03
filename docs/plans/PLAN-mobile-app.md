@@ -106,7 +106,7 @@ CeliacMap/
 └── .github/workflows/            # PR + suite completa + deploy condicionado
 ```
 
-Árbol propuesto, no implementado. Primeras extracciones: normalización/filtros cuando haga falta, etiqueta conservadora de seguridad, Haversine/formato de distancias. Funciones sin DOM, red ni almacenamiento, con pruebas antes/después. No separar API/estado/i18n completos como prerrequisito de PWA.
+Árbol propuesto. **Implementado distinto el 03-10:** Capacitor vive en `apps/mobile/` (config, scripts, `native.js`, `android/`) y la web sigue en la raíz; sin `js/shared/` ni adaptador de ubicación, porque la WebView usa la geolocalización web ([decisión](../DECISIONS.md#android-demo-app-with-capacitor-2026-10-03)). Primeras extracciones: normalización/filtros cuando haga falta, etiqueta conservadora de seguridad, Haversine/formato de distancias. Funciones sin DOM, red ni almacenamiento, con pruebas antes/después. No separar API/estado/i18n completos como prerrequisito de PWA.
 
 Adaptador mínimo de ubicación web/nativa cuando se integre Capacitor. Mismos endpoints/columnas y traducciones; validar en servidor y RLS. No importar prompts privados, credenciales o servicios Python al bundle. Compatibilidad aditiva: apps instaladas pueden quedar atrás del servidor. `apps/web`, `apps/mobile`, paquetes y workspaces se evaluarán después si simplifican dependencias reales.
 
