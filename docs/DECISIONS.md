@@ -3829,6 +3829,11 @@ conserva el dato actual; no restaura automáticamente un valor que ya fue pisado
 asserts de una fila y solo website/updated_at; lectura posterior confirma ambit.la. **Aplicación pendiente del «dale» del responsable**
 y del merge de la protección. El futuro destino autorizado es `https://rikurassingluten.pidedirecto.uy/`.
 
+**Aplicado el 2026-10-03** con el «dale» del responsable: ensayo fresco con rollback aprobado, después la copia de ejecución
+(única diferencia: `rollback` → `commit`). Lectura posterior: `website` = `https://rikurassingluten.pidedirecto.uy/`; 1 385 filas
+y 417 aprobadas, sin cambios; estado, etiqueta, confianza y `verified` iguales. El archivo pasó a
+`db/fixes/2026-10-02-rikuras-malvin-website.sql` (conserva el `ROLLBACK`). [Detalle](runbooks/manual-contact-fields.md).
+
 PR #2 mergeado (`23abe40`). Ruleset `Proteger main` (24349101) leído: activo, PR y check `CI required` de GitHub Actions,
 sin bypass, sin borrado/force-push. **Rama actualizada todavía no exigida**: la API devuelve
 `strict_required_status_checks_policy: false`; se informó al responsable, sin modificar configuración remota.
@@ -3905,7 +3910,15 @@ del chat, storage, eventos y DOM; prueba de mutación: una fuga a un evento, al 
 tests). Chrome de escritorio en `127.0.0.1` con geolocalización simulada y datos reales: 10 lugares en Montevideo, aproximada,
 inglés, ficha, «Quitar», rechazo y atajo del chat sin pedidos al modelo. La QA en Chrome encontró y corrigió dos casos: una
 respuesta con la página ya oculta dejaba «Buscando…», y «Quitar» dejaba la distancia en la ficha cerrada. La pestaña de QA
-estaba oculta, así que la visibilidad se simuló; **pendiente: permiso concedido, rechazado y aproximado en un Android real.**
+estaba oculta, así que la visibilidad se simuló; la prueba en un teléfono quedó pendiente hasta el párrafo siguiente.
+
+**Verificado en un Android real (2026-10-03), por el responsable,** tras el merge del PR #7 y el deploy de Pages (`9ff567c`).
+Los siete casos funcionaron: permiso concedido (marcador y lista de cercanos), distancia dentro de la ficha, la ubicación se
+borra al volver de otra app, permiso rechazado (ofrece elegir ciudad), ubicación aproximada, el atajo «Lugares cerca mío» del
+chat y la interfaz en inglés. **El mapa cargó sin recargar**: la recarga única vista en la primera apertura de la PWA
+(entrada anterior) no se repitió; sigue sin diagnóstico y se vuelve a observar en la QA del APK. Es una prueba manual en un
+solo dispositivo: lo que garantiza que la posición no sale del teléfono son los tests de captura de `frontend_nearby.test.js`,
+no esta prueba. Sigue pendiente la revisión del responsable de la §3.10 de la política de privacidad (borrador).
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 

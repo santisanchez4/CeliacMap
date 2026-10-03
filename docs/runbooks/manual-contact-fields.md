@@ -10,10 +10,10 @@ Trade-off: registro versionado pequeño, sin migración ni nueva columna públic
 
 Rating, cantidad de reseñas, nombre, dirección, categoría y tratamiento de cierres mantienen su lógica actual. `social_url` mantiene su política de solo rellenar si está vacío. Una protección de contacto no certifica la licencia de los datos.
 
-## Restauración de Rikuras Malvín — pendiente
+## Restauración de Rikuras Malvín — aplicada el 03-10-2026
 
-[SQL preparado](../../db/fixes/2026-10-02-rikuras-malvin-website.PENDING.sql), con final `ROLLBACK`. Verifica UUID, Place ID, estado aprobado y URL anterior; exige exactamente una fila y comprueba que solo cambien `website`/`updated_at`.
+[SQL](../../db/fixes/2026-10-02-rikuras-malvin-website.sql), con final `ROLLBACK` (el archivo versionado es siempre un ensayo). Verifica UUID, Place ID, estado aprobado y URL anterior; exige exactamente una fila y comprueba que solo cambien `website`/`updated_at`.
 
 Ensayo 02-10-2026: trigger de `places` inspeccionado (solo `set_updated_at`); ejecución enlazada completada, todas las aserciones pasaron y mostró `https://rikurassingluten.pidedirecto.uy/` dentro de la transacción. Terminó con rollback. La lectura posterior confirmó que sigue `https://rikurassingluten.ambit.la/`.
 
-Aplicación: **esperar el «dale» del responsable** y el merge del PR de protección. Preparar una copia de ejecución que cambie únicamente el `rollback` final por `commit`, revisar diff y ejecutar. Si hubo cambios entre ensayo y aplicación, las guardas abortan y se revisa el caso; no quitar guardas para forzar el UPDATE. Después leer de nuevo la fila y registrar resultado. No volver a ejecutar el script histórico del 27-09.
+Aplicación 03-10-2026, con el «dale» del responsable y la protección ya en `main`: ensayo fresco con rollback (aserciones aprobadas; la lectura posterior seguía en `ambit.la`), luego la copia de ejecución, que difería solo en el `rollback` final cambiado por `commit`. Lectura posterior: `website` = `https://rikurassingluten.pidedirecto.uy/`, `updated_at` 2026-10-03 21:09 UTC; 1 385 filas y 417 aprobadas, igual que antes; estado, etiqueta, confianza y `verified` sin cambios. El archivo ya no se puede reaplicar: su guarda exige la URL anterior. No volver a ejecutar el script histórico del 27-09.
