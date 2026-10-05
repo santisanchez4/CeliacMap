@@ -3960,6 +3960,20 @@ permisos exactos, dependencias fijadas, clave fuera del repo, sin service worker
 de la WebView, el teclado, los enlaces externos y el permiso de ubicación. **`chat` v25 desplegado el 2026-10-03** con el origen
 `https://localhost` (PR #12): `verify_jwt=false`, fuente desplegada igual a `main`, preflight aceptado solo para el origen exacto. El riesgo de los datos de Google sigue abierto y no cambia con el APK.
 
+### CI runners pinned to ubuntu-24.04 (2026-10-05)
+
+Los 12 jobs de los 9 workflows de `.github/workflows/` pasan de `runs-on: ubuntu-latest` a `runs-on: ubuntu-24.04`. Motivo:
+GitHub mueve la etiqueta `ubuntu-latest` a Ubuntu 26 (migración anunciada para el 2026-10-19), y con la etiqueta flotante el
+entorno del pipeline mensual, del Validator de mitad de mes, de la purga semanal y del deploy de Pages habría cambiado solo, sin
+un commit que lo registre. Con la versión fija, el cambio de sistema operativo es un PR propio y revisable. No cambia ninguna
+otra cosa: mismas acciones, mismas versiones de Python (3.12) y Deno (2.9.4), mismos crons.
+
+**Deuda: migrar a Ubuntu 26 de forma deliberada.** Fijar la versión no es quedarse en 24.04: GitHub retira las imágenes viejas
+y, mientras tanto, 24.04 deja de recibir herramientas nuevas. Cuando se haga, en una rama propia: cambiar `runs-on` en un
+workflow por vez empezando por `ci.yml` (lo valida el propio PR), después disparar a mano con `workflow_dispatch` los que
+escriben en producción (`agents-monthly`, `validator-midmonth`, `chat-log-purge`) antes de que corra su cron, y dejar
+`deploy-pages.yml` para el final. Sin fecha asignada; revisar cuando GitHub anuncie el retiro de la imagen 24.04.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
