@@ -427,6 +427,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 
 ## Decisions Log (índice)
 
+- **Runners en `ubuntu-24.04` (2026-10-05)** — deuda: migrar a 26 a propósito. [→](docs/DECISIONS.md#ci-runners-pinned-to-ubuntu-2404-2026-10-05)
 - **Piloto móvil y flujo PR (2026-10-02)** — persona física, PWA primero y Capacitor Android para demos, GPS local bajo demanda y tiendas/iOS diferidos; [ADR-010](docs/architecture/ADR-010-mobile-strategy.md), [plan](docs/plans/PLAN-mobile-app.md) y [decisión](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02).
 - **Android demo app (2026-10-03)** — Capacitor in `apps/mobile/`: the site's own files, no beacon, no service worker, WebView geolocation (no plugin), key outside the repo; `chat` v25 allows its origin; device test pending. [→](docs/DECISIONS.md#android-demo-app-with-capacitor-2026-10-03)
 - **«Cerca mío» (2026-10-02)** — one location reading per tap, in memory only, never stored or sent; 10 nearest in 5 km (20 on demand), public label + straight-line distance; chat shortcut is a widget button; verified on a real Android (10-03). [→](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02)

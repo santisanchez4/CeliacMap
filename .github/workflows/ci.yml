@@ -10,7 +10,7 @@ permissions:
 jobs:
   pytest:
     name: Pytest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -28,7 +28,7 @@ jobs:
 
   edge:
     name: Deno Edge Functions
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -41,7 +41,7 @@ jobs:
 
   frontend:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -56,7 +56,7 @@ jobs:
     name: CI required
     if: ${{ always() }}
     needs: [pytest, edge, frontend]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       # A skipped or cancelled suite must never count as a passing gate.
