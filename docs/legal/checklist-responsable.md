@@ -32,8 +32,11 @@ tiene que confirmar la revisión (política = `politica-de-privacidad.md`, térm
 - [ ] **Datos de salud en textos libres y en el chat** (política 3.4 y 4). Lectura prudente: no se piden, se pide no
       escribirlos, no se publican, plazos cortos (30 días en el chat) y borrado a pedido. No se pide un consentimiento
       expreso por escrito antes de chatear. ¿Alcanza, o hace falta una casilla de consentimiento para el chat?
-- [ ] **Edad mínima** (política 9, términos 1). Lectura prudente: 18 años para enviar contenido, o con autorización de
-      madre, padre o tutor; mirar el mapa, sin límite. ¿Es correcto para Uruguay y Argentina?
+- [ ] **Menores de edad** (política 9, términos 1; redacción de la v1.1). El sitio está pensado para personas adultas
+      y mirar el mapa no tiene límite; a quien tiene menos de 18 años se le pide usar los formularios, los votos y el chat
+      acompañado por una persona adulta responsable. No se exige una edad ni una autorización porque, sin cuentas, no se
+      pueden verificar; los datos de una persona menor se borran si una madre, un padre o un tutor avisa. ¿Alcanza para
+      Uruguay y Argentina, o hace falta un mecanismo de consentimiento de los padres?
 - [ ] **Transferencia internacional** (política 7). Lectura prudente: se informa que los países pueden no tener un
       nivel equivalente, la transferencia se apoya en el consentimiento y en los compromisos contractuales de cada
       proveedor. ¿Hace falta algo más (autorización de la URCDP, cláusulas firmadas)?

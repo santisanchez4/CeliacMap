@@ -4027,6 +4027,25 @@ tipografías, click real en "Privacidad" del footer, los tres avisos visibles en
 probar en un Android real que el link del chat abre la página dentro de la app. La revisión legal por un abogado y el
 registro ante la URCDP siguen pendientes (`docs/legal/checklist-responsable.md`).
 
+### Legal texts v1.1 — minors clause (2026-10-06)
+
+Decisión del responsable, al día siguiente de la publicación de la v1.0: la cláusula ya no promete un control que no se puede hacer. La cláusula de menores exigía "18 años o más, o hacerlo
+con la autorización de tu madre, padre o tutor" para usar los formularios, los votos y el chat, y prometía borrar los datos
+de una persona menor "sin esa autorización". Sin cuentas ni datos de identidad, CeliacMap no puede verificar la edad ni esa
+autorización: el texto prometía un control que no existe.
+
+**Texto nuevo.** Política §9: el sitio está pensado para personas adultas y cualquiera puede mirar el mapa; a quien tiene
+menos de 18 años se le pide que use los formularios, los votos y el chat acompañado por una persona adulta responsable; se
+dice expresamente que la edad no se puede verificar y que por eso se pide a todas las personas que no escriban datos
+personales propios ni de terceros; y los datos de una persona menor se borran cuando una madre, un padre o un tutor avisa.
+Términos §1: la frase de los 18 años pasa a ser el mismo pedido de acompañamiento. Nada más cambia en los dos textos.
+
+**Versión.** 1.1 en los dos documentos, con fecha 2026-10-06 (la v1.0 es del 2026-10-05). Cambian los `.md`, `privacidad.html`,
+`terminos.html` y la versión que fija `tests/frontend_legal.test.js`. Sin cambios de código, de base ni de prompts.
+
+**Para la revisión legal.** El punto "Edad mínima" de `docs/legal/checklist-responsable.md` describe ahora la redacción de
+la v1.1 y pregunta si alcanza para Uruguay y Argentina. El APK que se compile después de este cambio lleva la v1.1.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

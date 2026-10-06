@@ -1,6 +1,6 @@
 # Términos de uso de CeliacMap
 
-**Versión 1.0 · Última actualización: 5 de octubre de 2026**
+**Versión 1.1 · Última actualización: 6 de octubre de 2026**
 
 ## 1. Qué es CeliacMap
 
@@ -11,8 +11,8 @@ asistente automático (el chat). Es gratis y no necesita una cuenta.
 Al usar el sitio aceptás estos términos y la [Política de privacidad](politica-de-privacidad.md). Si no estás de
 acuerdo, no uses los formularios, los votos ni el chat.
 
-Cualquier persona puede mirar el mapa. Para mandar sugerencias, comentarios, votos o mensajes al chat tenés que tener
-18 años o más, o hacerlo con la autorización de tu madre, padre o tutor.
+Cualquier persona puede mirar el mapa. Si sos menor de 18 años, usá los formularios, los votos y el chat con el
+acompañamiento de una persona adulta responsable.
 
 ## 2. Las etiquetas no son una garantía médica
 
