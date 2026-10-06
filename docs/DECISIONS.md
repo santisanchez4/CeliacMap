@@ -4046,6 +4046,29 @@ Términos §1: la frase de los 18 años pasa a ser el mismo pedido de acompañam
 **Para la revisión legal.** El punto "Edad mínima" de `docs/legal/checklist-responsable.md` describe ahora la redacción de
 la v1.1 y pregunta si alcanza para Uruguay y Argentina. El APK que se compile después de este cambio lleva la v1.1.
 
+### Contact data frozen only by the registry (2026-10-06)
+
+**Problema.** Desde el 2026-10-02 toda fila con `APROBACIÓN MANUAL` congelaba `website`, `phone` y `opening_hours` para el
+Updater. El 2026-10-06 el responsable aprobó a mano 20 lugares de la cola del 100% para confirmar su etiqueta, no para corregir
+su contacto: esas filas dejaban de recibir los cambios de Google (un horario nuevo de una cadena, por ejemplo).
+
+**Decisión.** Una `APROBACIÓN MANUAL` es una decisión sobre la seguridad y la sigue protegiendo como hasta ahora
+(`manual_override_marker` no cambia). Los datos de contacto se congelan solo si el campo está en
+`config/manual_contact_fields.json`, con su fuente. `protected_contact_fields()` ya no lee `validation_notes`.
+
+**Auditoría previa (solo lectura, 2026-10-06).** 38 filas con `APROBACIÓN MANUAL`, todas aprobadas: 7 fuera del Updater
+(`source` manual / user); de las 31 que revisa, 19 tienen el contacto igual al de Google, 2 difieren solo en campos ya registrados
+y 10 difieren en campos sin registrar. De esas 10 ninguna es una corrección manual: los valores los escribió el Updater
+(Café Nasazzi, Senza Tacc), no los toca ningún `db/fixes` (GOUT Palermo, Local Celíacos) o el campo está vacío (Piu Cordón,
+cinco sucursales de GOUT). No se agregó ninguna fila al registro. Local Celíacos queda sin registrar por decisión del
+responsable: la ficha de Google la mantiene el local. Límite: una edición hecha a mano en el panel, sin SQL versionado, no se
+puede detectar.
+
+**Efecto.** Sin escrituras en la base. En su próxima corrida el Updater vuelve a actualizar el contacto de esas filas. No
+cambian nombre, dirección, categoría ni el tratamiento de cierres; el parche del Updater nunca lleva `status`, `safety_level`,
+`flags`, `verified`, `validation_confidence` ni `validation_notes` (un test lo fija). Tests primero: seis fallaron antes del cambio.
+[Runbook](runbooks/manual-contact-fields.md).
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

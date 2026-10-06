@@ -12,7 +12,23 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-from agents.manual_overrides import DATA_CORRECTION_PHRASES, manual_override_marker
+from agents.manual_overrides import DATA_CORRECTION_PHRASES, manual_override_marker, protected_contact_fields
+
+
+@pytest.mark.parametrize("notes", [
+    "APROBACIÓN MANUAL (2026-10-06, review_queue): espacio 100% sin gluten.",
+    "aprobacion manual: confirmada anteriormente.",
+    "OVERRIDE MANUAL (2026-09-05): aprobado por el administrador.",
+])
+def test_a_manual_decision_protects_the_safety_label_but_freezes_no_contact_field(notes):
+    assert manual_override_marker(notes) is not None
+    assert protected_contact_fields({"id": "not-in-the-registry", "validation_notes": notes}) == frozenset()
+
+
+def test_contact_fields_are_frozen_only_by_the_registry_with_or_without_an_approval():
+    rikuras = "339efc28-af19-4ce4-96ea-a9c1aa5176d4"
+    assert protected_contact_fields({"id": rikuras}) == frozenset({"website"})
+    assert protected_contact_fields({"id": rikuras, "validation_notes": "APROBACIÓN MANUAL: lo conozco."}) == frozenset({"website"})
 
 
 def test_contact_correction_registry_has_valid_fields_and_auditable_sources():

@@ -106,15 +106,41 @@ def test_patch_combines_multiple_changes():
     "APROBACIÓN MANUAL (2026-10-01): confirmado por el administrador.",
     "Nota reciente\n\n--- aprobacion manual: confirmada anteriormente.",
 ])
-def test_manual_approval_preserves_contact_fields_but_refreshes_rating(notes):
+def test_manual_approval_alone_does_not_freeze_contact_fields(notes):
+    # An approval confirms the safety label, not the contact data: Google keeps refreshing it.
     agent, _, _ = make_agent()
-    place = {"validation_notes": notes, "website": None, "phone": "Manual",
-             "opening_hours": ["Horario confirmado"], "rating": 4.0}
+    place = {"validation_notes": notes, "website": None, "phone": "Viejo",
+             "opening_hours": ["Horario viejo"], "rating": 4.0}
     patch = agent._build_patch(place, {
-        "website": "https://old.example", "formatted_phone_number": "Google",
+        "website": "https://google.example", "formatted_phone_number": "Google",
         "opening_hours": {"weekday_text": ["Horario Google"]}, "rating": 4.5,
     })
-    assert patch == {"rating": 4.5}
+    assert patch == {"website": "https://google.example", "phone": "Google",
+                     "opening_hours": ["Horario Google"], "rating": 4.5}
+
+
+def test_a_registered_place_with_a_manual_approval_keeps_only_its_registered_fields():
+    agent, _, _ = make_agent()
+    place = {"id": "d1420754-dca8-47e2-8d60-97ac779de1c2", "phone": "091 651 051",  # Piu Cordón: phone registered
+             "validation_notes": "APROBACIÓN MANUAL (2026-09-27, review_queue): Revisado por el admin."}
+    patch = agent._build_patch(place, {
+        "website": "https://google.example", "formatted_phone_number": "Google",
+        "opening_hours": {"weekday_text": ["Horario Google"]},
+    })
+    assert patch == {"website": "https://google.example", "opening_hours": ["Horario Google"]}
+
+
+def test_the_patch_never_carries_the_safety_decision_of_a_manual_approval():
+    agent, _, _ = make_agent()
+    place = {"validation_notes": "APROBACIÓN MANUAL (2026-10-06, review_queue): espacio 100% sin gluten.",
+             "status": "approved", "safety_level": "gluten_free_100", "flags": [], "verified": False,
+             "validation_confidence": 0.92, "name": "Local", "address": "Addr 1", "category": "shop"}
+    patch = agent._build_patch(place, {
+        "name": "Local nuevo", "formatted_address": "Addr 2", "types": ["store"],
+        "website": "https://google.example", "formatted_phone_number": "Google",
+        "opening_hours": {"weekday_text": ["Horario Google"]}, "rating": 4.5, "user_ratings_total": 10,
+    })
+    assert not set(patch) & {"status", "safety_level", "flags", "verified", "validation_confidence", "validation_notes"}
 
 
 def test_rikuras_manual_website_survives_a_real_updater_run():
