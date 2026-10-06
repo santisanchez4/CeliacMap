@@ -62,6 +62,9 @@
       intro: "Hola. Te ayudo a encontrar lugares sin TACC en Argentina y Uruguay, a dejar un comentario sobre un lugar o a sumar uno que conozcas. También respondo dudas generales sobre la celiaquía.",
       disclaimer: "El nivel de seguridad es una estimación de la comunidad y del sistema, no una garantía médica.",
       logNotice: "Las conversaciones marcadas como fuera de lo esperado pueden guardarse temporalmente (hasta 30 días) para mejorar la seguridad del servicio.",
+      privacyPre: "Al escribir aceptás la",
+      privacyLink: "política de privacidad",
+      privacyPost: ". No compartas datos de salud tuyos ni de otras personas.",
       thinking: "Pensando…",
       error: "No pude responder ahora. Probá de nuevo en un momento.",
       wait: "Esperá un momento antes de enviar otro mensaje."
@@ -85,6 +88,9 @@
       intro: "Hi. I can help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or add one you know. I also answer general questions about celiac disease.",
       disclaimer: "The safety level is an estimate from the community and the system, not a medical guarantee.",
       logNotice: "Conversations flagged as unexpected may be stored temporarily (up to 30 days) to improve the safety of the service.",
+      privacyPre: "By writing, you accept the",
+      privacyLink: "privacy policy (in Spanish)",
+      privacyPost: ". Don't share health data about yourself or others.",
       thinking: "Thinking…",
       error: "I couldn't answer right now. Try again in a moment.",
       wait: "Wait a moment before sending another message."

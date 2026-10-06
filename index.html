@@ -640,12 +640,13 @@
           </div>
 
           <div class="suggest-actions">
-            <button class="btn btn-accent" type="submit" id="sg-submit"
+            <button class="btn btn-accent" type="submit" id="sg-submit" aria-describedby="sg-privacy"
               data-i18n="suggest.form.submit">Enviar sugerencia</button>
             <p class="suggest-disclaimer" data-i18n="suggest.form.disclaimer">
               Tu sugerencia se valida antes de publicarse. El nivel de seguridad es una
               estimación de la comunidad, no una garantía médica.
             </p>
+            <p class="suggest-disclaimer" id="sg-privacy"><span data-i18n="privacy.notice.send">Al enviar aceptás la</span> <a href="privacidad.html" data-i18n="privacy.notice.link">política de privacidad</a>.</p>
           </div>
 
           <p class="suggest-status" id="sg-status" role="status" aria-live="polite" hidden></p>
@@ -726,12 +727,13 @@
             </div>
 
             <div class="suggest-actions">
-              <button class="btn btn-accent" type="submit" id="rp-submit"
+              <button class="btn btn-accent" type="submit" id="rp-submit" aria-describedby="rp-privacy"
                 data-i18n="report.form.submit">Enviar</button>
               <p class="suggest-disclaimer" data-i18n="report.form.disclaimer">
                 Tu aporte se suma como evidencia y se revisa junto con la información
                 existente del lugar; no cambia su estado de forma automática.
               </p>
+              <p class="suggest-disclaimer" id="rp-privacy"><span data-i18n="privacy.notice.send">Al enviar aceptás la</span> <a href="privacidad.html" data-i18n="privacy.notice.link">política de privacidad</a>.</p>
             </div>
           </div>
 
@@ -895,6 +897,8 @@
         <a href="#features" data-i18n="nav.features">Funciones</a>
         <a href="#about" data-i18n="nav.about">Acerca</a>
         <a href="#aliados" data-i18n="nav.partners">Aliados</a>
+        <a href="privacidad.html" data-i18n="footer.privacy">Privacidad</a>
+        <a href="terminos.html" data-i18n="footer.terms">Términos</a>
       </nav>
 
       <div class="footer-social" id="contact">
@@ -985,6 +989,7 @@
     <div class="chat-disclaimers">
       <p class="chat-disclaimer" data-chat-text="disclaimer"></p>
       <p class="chat-disclaimer chat-disclaimer--log" data-chat-text="logNotice"></p>
+      <p class="chat-disclaimer"><span data-chat-text="privacyPre"></span> <a href="privacidad.html" target="_blank" rel="noopener" data-chat-text="privacyLink"></a><span data-chat-text="privacyPost"></span></p>
     </div>
   </div>
 

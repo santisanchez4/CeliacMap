@@ -1,11 +1,11 @@
 # Política de privacidad de CeliacMap
 
-**Versión 1.0 · Última actualización: 30 de septiembre de 2026**
+**Versión 1.0 · Última actualización: 5 de octubre de 2026**
 
 ## 1. Quién es responsable
 
-CeliacMap es un proyecto personal de **Santiago Sánchez**, persona física con domicilio en Uruguay. Es el responsable de
-los datos que se describen en esta política.
+CeliacMap es un proyecto personal de **Santiago Sánchez**, persona física con domicilio en Fray Bentos, departamento de
+Río Negro, Uruguay. Es el responsable de los datos que se describen en esta política.
 
 Contacto para cualquier tema de privacidad: **hola@celiacmap.org**.
 
@@ -115,18 +115,16 @@ tipografías (Google Fonts), las imágenes del mapa (CARTO, con datos de OpenStr
 
 ### 3.10 Tu ubicación (función «Cerca mío»)
 
-> **BORRADOR — pendiente de revisión del responsable.** No forma parte de la versión 1.0 publicada.
-
-Solo si tocás «Cerca mío» y lo aceptás, tu navegador nos da tu ubicación **una vez**. La usamos únicamente en tu
-dispositivo, para calcular la distancia en línea recta a los lugares del mapa. **No la guardamos** (ni en nuestros
-servidores ni en el almacenamiento de tu navegador) y **no la enviamos** a CeliacMap, al chat ni al sistema de
+Solo si tocás «Cerca mío» y lo aceptás, tu dispositivo le da tu ubicación a la página **una vez**. La usamos únicamente
+en tu dispositivo, para calcular la distancia en línea recta a los lugares del mapa. **No la guardamos** (ni en nuestros
+servidores ni en el almacenamiento de tu navegador o de la app) y **no la enviamos** a CeliacMap, al chat ni al sistema de
 inteligencia artificial. Se borra de la memoria cuando tocás «Quitar mi ubicación», al pasar la página a segundo plano o
 al cerrarla. No hay seguimiento continuo ni ubicación en segundo plano.
 
 Si la rechazás, el mapa, la búsqueda y el chat funcionan igual: podés elegir una ciudad. Al centrar el mapa en tu zona,
 el proveedor de las imágenes del mapa (CARTO) recibe, como con cualquier zona que mires, los pedidos de esas imágenes, y
 por eso puede deducir aproximadamente qué zona estás viendo. Podés retirar el permiso en cualquier momento desde la
-configuración de tu navegador.
+configuración de tu navegador o de la app.
 
 ## 4. Base legal y consentimiento
 
@@ -172,7 +170,7 @@ Estos proveedores procesan datos por cuenta de CeliacMap:
 
 | Proveedor | Para qué | Dónde | Cuánto guarda |
 |---|---|---|---|
-| Supabase (sobre Amazon Web Services) | Base de datos y funciones del servidor | La base, en Brasil (São Paulo). Las funciones corren en la región más cercana a quien usa el sitio | Los plazos de la sección 6; sus registros técnicos, hasta 90 días según el plan |
+| Supabase (sobre Amazon Web Services) | Base de datos y funciones del servidor | La base, en Brasil (São Paulo). Las funciones corren en la región más cercana a quien usa el sitio | Los plazos de la sección 6; sus registros técnicos, 1 día |
 | Anthropic | Inteligencia artificial del chat y de la revisión de lugares | Guarda en Estados Unidos; puede procesar en Estados Unidos, Europa, Asia y Australia | Hasta 30 días (hasta 2 años si un pedido viola su política de uso) |
 | Resend | Envío y recepción de emails | Estados Unidos | 30 días |
 | Zoho | Casilla de email | Estados Unidos | Lo que definimos nosotros (sección 6) |
@@ -233,5 +231,5 @@ los servicios nunca llegan al navegador.
 Si cambiamos esta política, publicamos la versión nueva en esta página, con su número de versión y su fecha. Si el cambio
 es importante (por ejemplo, un dato nuevo o un proveedor nuevo), lo avisamos en el sitio antes de aplicarlo.
 
-Esta política está escrita en español; la versión en inglés es una traducción. Si hay diferencias, vale la versión en
-español.
+Esta política está publicada solo en español. Si más adelante publicamos una traducción y hay diferencias, vale la
+versión en español.

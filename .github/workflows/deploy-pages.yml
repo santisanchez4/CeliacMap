@@ -50,7 +50,7 @@ jobs:
       - name: Stage static site
         run: |
           mkdir -p _site
-          cp index.html manifest.webmanifest service-worker.js _site/
+          cp index.html privacidad.html terminos.html manifest.webmanifest service-worker.js _site/
           cp -r css js assets _site/
 
       - name: Upload Pages artifact

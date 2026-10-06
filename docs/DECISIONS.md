@@ -3974,6 +3974,59 @@ workflow por vez empezando por `ci.yml` (lo valida el propio PR), después dispa
 escriben en producción (`agents-monthly`, `validator-midmonth`, `chat-log-purge`) antes de que corra su cron, y dejar
 `deploy-pages.yml` para el final. Sin fecha asignada; revisar cuando GitHub anuncie el retiro de la imagen 24.04.
 
+### Privacy policy and terms of use published, v1.0 (2026-10-05)
+
+El responsable aprobó publicar la política de privacidad y los términos de uso como **versión 1.0, con fecha 2026-10-05**.
+Los textos fuente siguen en `docs/legal/politica-de-privacidad.md` y `docs/legal/terminos-de-uso.md`; `privacidad.html` y
+`terminos.html` (raíz del sitio) son su copia publicada y `tests/frontend_legal.test.js` falla si una página pierde un párrafo
+de su fuente o agrega texto que la fuente no tiene. **Para cambiar un texto legal: editar el `.md`, llevar el cambio al
+`.html`, subir versión y fecha en ambos.**
+
+**Datos confirmados por el responsable.** Domicilio: Fray Bentos, departamento de Río Negro, Uruguay (política §1, términos
+§1). Supabase en **plan Free**. Zoho configurado (los MX de `celiacmap.org` apuntan a `mx.zoho.com`; `hola@celiacmap.org` es
+el contacto en los dos textos y en el footer).
+
+**Cambios al texto respecto del borrador del 2026-09-30.**
+- §3.10 (ubicación) aprobada y sin la marca BORRADOR, con dos ajustes del responsable: "tu dispositivo le da tu ubicación a la
+  página" (antes "tu navegador nos da tu ubicación", que contradecía "no la enviamos a CeliacMap") y "navegador o de la app"
+  donde decía "navegador" (existe la app de Android).
+- §7, fila de Supabase: "sus registros técnicos, hasta 90 días según el plan" pasó a "sus registros técnicos, 1 día".
+  Fuente: la página de precios de Supabase (plan Free: retención de logs de 1 día, respaldos automáticos no incluidos; los
+  respaldos diarios empiezan en Pro, 7 días). La política no habla de respaldos, por decisión del responsable. **Si el plan
+  cambia a Pro o superior, esta fila deja de ser cierta** (7 días de logs, y además un dato borrado seguiría hasta 7 días
+  en los respaldos diarios): hay que revisar el texto y publicar una versión nueva de la política.
+- §11 de la política y §9 de los términos: se publicó solo la versión en español, así que la frase "la versión en inglés es
+  una traducción" pasó a "publicada solo en español; si más adelante hay una traducción, vale la versión en español".
+
+**Páginas.** Estáticas, en español (`lang="es"`), con `css/styles.css` y las tipografías del sitio, encabezado con la marca y
+"Volver al sitio", y el footer con Inicio / Privacidad / Términos y el correo. **Sin ningún script**: ni `main.js`, ni Leaflet,
+ni el beacon de Cloudflare. Es un cambio respecto de `docs/legal/cambios-frontend.md`, que preveía ES + EN y el beacon: se
+publica solo en español por decisión del responsable, y sin beacon para que la página que explica la privacidad no cargue
+medición y para que el mismo archivo sirva tal cual dentro del APK (que no puede llevar el beacon). Las tablas de plazos y
+de proveedores llevan `<caption>` y se desplazan dentro de su caja en pantallas angostas.
+
+**Links y avisos.** Footer de la landing: "Privacidad" y "Términos" (EN: "Privacy", "Terms"). Formularios «Agregalo» y
+«Contanos»: "Al enviar aceptás la política de privacidad", junto al botón y asociado con `aria-describedby`. Chat: "Al
+escribir aceptás la política de privacidad. No compartas datos de salud tuyos ni de otras personas", debajo del aviso de los
+30 días, con el link en pestaña nueva para no perder la conversación. En inglés los avisos aclaran "(in Spanish)". Son
+informativos, sin casilla. El voto no lleva aviso propio: alcanza con el footer. Los prompts del chatbot no cambiaron.
+
+**Deploy y app.** `deploy-pages.yml` copia los dos archivos y `SITE_FILES` (`apps/mobile/scripts/web-bundle.mjs`) los empaqueta
+en el APK. **No entran en el service worker**: su lista `SHELL` es la cáscara de la landing y las navegaciones a otras
+páginas no se interceptan, así que sin conexión las páginas legales no abren.
+
+**Purga semanal del lunes 2026-10-05, verificada.** `chat-log-purge.yml`, corrida programada 37341676229 sobre `main`
+(`bc4e4a5`), 16:32 UTC, todos los pasos en verde. Borró 58 filas de `chat_usage` y 0 en el resto (logs del chat, reseñas de
+Google, `agent_log`, constancias de privacidad, sugerencias, reportes no publicados, evidencia de usuarios, emails de
+contacto y outreach), que es lo esperable: nada tiene todavía la antigüedad de esos plazos. Los `DELETE` de 2 años y de
+1 año ya corren, así que los plazos de la sección 6 de la política están activos.
+
+**Verificación.** `tests/frontend_legal.test.js` (7 tests). En Chrome, con un servidor local: las dos páginas con sus
+tipografías, click real en "Privacidad" del footer, los tres avisos visibles en ES y EN, y a 375 px sin desborde horizontal
+(las tablas se desplazan dentro de su caja). **Pendiente:** abrir `/privacidad.html` y `/terminos.html` en el deploy real, y
+probar en un Android real que el link del chat abre la página dentro de la app. La revisión legal por un abogado y el
+registro ante la URCDP siguen pendientes (`docs/legal/checklist-responsable.md`).
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
