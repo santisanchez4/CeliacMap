@@ -1,6 +1,6 @@
 # Punto de reanudación — piloto móvil CeliacMap
 
-**Iniciado:** 2026-10-02. **Última actualización:** 2026-10-03. Bitácora de sesiones del piloto: las secciones viejas se
+**Iniciado:** 2026-10-02. **Última actualización:** 2026-10-06. Bitácora de sesiones del piloto: las secciones viejas se
 conservan como historia; el estado vigente es el de la **última «Actualización»**. Versionado desde el 2026-10-03.
 
 ## Contexto y autorizaciones
@@ -114,6 +114,32 @@ Archivo `db/fixes/2026-10-02-rikuras-malvin-website.PENDING.sql`, termina en `ro
   resultados al terminar. Recién entonces registrar la verificación en DECISIONS.
 - Pendientes del responsable sin cambios: §3.10 de la política de privacidad (borrador); decisión sobre los datos de Google
   antes de mostrar el piloto a instituciones.
+
+## Actualización 2026-10-06 (revisión de la cola del 100%)
+
+Decisiones del administrador sobre la cola «100% pendiente de confirmación del administrador», aplicadas en producción con
+`scripts/review_queue.py --approve` (salvo Avanti) y verificadas en solo lectura. `validation_confidence` y `verified` no se
+tocaron en ninguna fila. La cola quedó en **236** (201 Argentina, 35 Uruguay); el 2026-09-27 eran 271.
+
+- **Confirmados en 100% (16):** Selkkis Gluten Free, Milena Gluten Free y Tu rincón de dulces gluten free by Flo Scalone
+  (Montevideo, conocimiento directo); Local Celíacos (Montevideo, revisado por el administrador); TACCOFF (Buenos Aires, cita
+  verificada de su sitio); las 11 sucursales de GOUT / Goût en Argentina (5 en CABA, 3 en Rosario, Vicente López, Nordelta y
+  Pilar), con la frase «Todo 100% gluten free, todo Goût.» que el administrador verificó en el Instagram oficial. Las 11 figuran
+  `OPERATIONAL` en Google Places.
+- **Bajados a «Tiene opciones sin TACC» (3):** Vichenzo Sin Tacc Monserrat, Senza Tacc y Delimade Viandas (Buenos Aires): sin
+  evidencia explícita de exclusividad; la nota dice que se pueden volver a subir si aparece evidencia.
+- **Avanti Gluten Free (`25d351e9-a5d9-4425-970f-c9f5fb71997a`): descartado y cerrado.** Decisión del administrador, sin
+  pendiente de verificación. Pasó a `discarded` por SQL con guardas (sin `DELETE`), con una `CORRECCIÓN MANUAL` arriba de las
+  notas; ya no sale con la anon key. Es la única fila «Avanti» de la base. No reabrir ni volver a aprobar sin un pedido expreso.
+- **Evidencia consultada:** `find_evidence` sobre 5 lugares de Buenos Aires (10 búsquedas de Tavily); reporte local en
+  `db/checks/evidence-proposals/evidence-ba5-20261006T192437Z.*` (ignorado por git).
+- **GOUT en Uruguay:** no se agregó nada. La única ficha de la cadena (Solano García 2496, Montevideo) figura
+  `CLOSED_PERMANENTLY`. Deuda de datos: la fila descartada `3eb6707b-f311-4ab3-b402-0805531906e3` está en Chile con
+  `country = 'Uruguay'`.
+- **Contacto y Updater:** PR #17 mergeado: una `APROBACIÓN MANUAL` ya no congela `website` / `phone` / `opening_hours`; solo
+  el registro `config/manual_contact_fields.json`. Local Celíacos queda sin registrar a propósito: el Updater le escribirá los
+  datos de Google en su próxima corrida.
+- **`CLAUDE.md`:** PR #18 mergeado: índice de decisiones agrupado por tema (44 359 caracteres en el checkout de Windows).
 
 ## PWA (sección original, ya resuelta: ver actualización arriba)
 
