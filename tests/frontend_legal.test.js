@@ -9,7 +9,7 @@ const PAGES = [
   { html: "privacidad.html", md: "docs/legal/politica-de-privacidad.md", title: "Política de privacidad de CeliacMap" },
   { html: "terminos.html", md: "docs/legal/terminos-de-uso.md", title: "Términos de uso de CeliacMap" },
 ];
-const VERSION = "Versión 1.0 · Última actualización: 5 de octubre de 2026";
+const VERSION = "Versión 1.1 · Última actualización: 6 de octubre de 2026";
 
 const squash = (s) => s.replace(/\s+/g, " ").trim();
 

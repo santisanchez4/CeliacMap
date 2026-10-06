@@ -1,6 +1,6 @@
 # Política de privacidad de CeliacMap
 
-**Versión 1.0 · Última actualización: 5 de octubre de 2026**
+**Versión 1.1 · Última actualización: 6 de octubre de 2026**
 
 ## 1. Quién es responsable
 
@@ -216,9 +216,11 @@ protección de datos personales.
 
 ## 9. Menores de edad
 
-Cualquier persona puede mirar el mapa. Para mandar sugerencias, comentarios, votos o mensajes al chat tenés que tener
-**18 años o más**, o hacerlo con la autorización de tu madre, padre o tutor. Si nos enteramos de que recibimos datos de
-una persona menor de edad sin esa autorización, los borramos.
+CeliacMap está pensado para personas adultas, aunque cualquiera puede mirar el mapa. Si sos menor de 18 años, te pedimos
+que uses los formularios, los votos y el chat con el acompañamiento de una persona adulta responsable. Como no pedimos
+cuenta ni datos de identidad, no podemos verificar la edad de quien nos escribe; por eso pedimos a todas las personas
+que no escriban datos personales propios ni de terceros. Si una madre, un padre o un tutor nos avisa que una persona
+menor de edad nos mandó datos, los borramos.
 
 ## 10. Seguridad
 
