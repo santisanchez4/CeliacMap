@@ -1,7 +1,7 @@
 // What goes into the app's www/ folder and how index.html differs from the site's. Pure: no file system, no network.
 // The lists mirror the "Stage static site" step of .github/workflows/deploy-pages.yml (tests/frontend_mobile.test.js).
 
-export const SITE_FILES = ["index.html"];
+export const SITE_FILES = ["index.html", "privacidad.html", "terminos.html"];
 export const SITE_DIRS = ["css", "js", "assets"];
 // Published on the web, left out of the app: the files are already local, so there is no shell to cache or install.
 export const WEB_ONLY_FILES = ["manifest.webmanifest", "service-worker.js"];

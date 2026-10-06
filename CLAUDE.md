@@ -217,7 +217,7 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 
 ```txt
 /
-├── index.html · manifest.webmanifest · service-worker.js · css/styles.css · assets/{images,icons}/ (favicons + PWA icons)
+├── index.html · privacidad.html · terminos.html · manifest.webmanifest · service-worker.js · css/styles.css · assets/{images,icons}/ (favicons + PWA icons)
 ├── js/         main.js (i18n, nav) · config.js (public keys) · map.js · suggest.js + kitchen.js (Form A) · report.js
 │               (Form B) · ranking.js · opinions.js · chat.js (widget -> the `chat` function) · pwa.js · geo.js
 ├── agents/     base.py · {search,social,web,validator,updater,suggestion,outreach}_agent.py · outreach_reply_handler.py ·
@@ -433,6 +433,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **«Cerca mío» (2026-10-02)** — one location reading per tap, in memory only, never stored or sent; 10 nearest in 5 km (20 on demand), public label + straight-line distance; chat shortcut is a widget button; verified on a real Android (10-03). [→](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02)
 - **PWA shell + icons (2026-10-02)** — network-first service worker over a closed allowlist, verified on a real Android; favicon and app icons = header logo (pin + ✓). [PWA](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02) · [icons](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02)
 - **Assistant and map interaction polish (2026-10-01, deployed)** — CSS motion, local shortcuts and accessible expanded exploration; location features deferred to the app. [→](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01)
+- **Privacy policy + terms v1.0 published (2026-10-05)** — `privacidad.html` / `terminos.html` mirror `docs/legal/*.md` (edit the `.md` first); ES only, no scripts. [→](docs/DECISIONS.md#privacy-policy-and-terms-of-use-published-v10-2026-10-05)
 
 One line per entry: title (date) — one sentence, linking to its anchor in `docs/DECISIONS.md`, where the full text lives
 ("s/f" = the entry states no date).
@@ -471,17 +472,13 @@ One line per entry: title (date) — one sentence, linking to its anchor in `doc
 - **Form B collects reviews, not kitchen data (2026-09-24)** — kitchen is asked only when adding a business. [→](docs/DECISIONS.md#form-b-collects-reviews-not-kitchen-data-2026-09-24)
 - **Community opinions (2026-09-24)** — approved positive opinions via a public view (ADR-008). [→](docs/DECISIONS.md#community-opinions-on-the-public-site-2026-09-24)
 - **Retroactive re-validation (2026-09-06)** — 173 approvals re-judged: 138 `needs_review`, 35 discarded. [→](docs/DECISIONS.md#retroactive-re-validation-of-pre-three-tier-rubric-approvals-2026-09-06)
-- **Validator: parametric knowledge (2026-09-06)** — Enharinate approved on the model's own knowledge; audit signal open. [→](docs/DECISIONS.md#validator--parametric-knowledge-vs-provided-evidence-2026-09-06)
-- **Validator: name-substring heuristic (2026-09-07)** — Serendipia-cea false positive; audit signal open. [→](docs/DECISIONS.md#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07)
+- **Validator audit signals, open (2026-09-06/07)** — approvals from the model's own knowledge (Enharinate) or a name substring (Serendipia-cea). [knowledge](docs/DECISIONS.md#validator--parametric-knowledge-vs-provided-evidence-2026-09-06) · [name](docs/DECISIONS.md#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07)
 - **`needs_review` queue with no way out (2026-09-06)** — 71 places without contact stuck; ideas, none decided. [→](docs/DECISIONS.md#cola-de-needs_review-sin-salida-automática--71-lugares-huérfanos-de-contacto-2026-09-06)
-- **Brazil out-of-scope places (2026-09-01)** — 6 Curitiba-area places via the ambiguous "Paraná"; three-layer fix. [→](docs/DECISIONS.md#brazil-out-of-scope-places--curitiba-cluster-2026-09-01)
-- **Geographic scope guard (2026-09-01)** — UY+AR bounding box in `insert_place_candidate()`. [→](docs/DECISIONS.md#geographic-scope-guard--insert_place_candidate-bounding-box-2026-09-01)
-- **Roadmap and GitHub links removed (2026-09-01)** — public-site content. [→](docs/DECISIONS.md#public-site--roadmap-section--github-links-removed-2026-09-01)
+- **Brazil places + scope guard (2026-09-01)** — 6 Curitiba-area places via the ambiguous "Paraná"; UY+AR bounding box in `insert_place_candidate()`. [places](docs/DECISIONS.md#brazil-out-of-scope-places--curitiba-cluster-2026-09-01) · [guard](docs/DECISIONS.md#geographic-scope-guard--insert_place_candidate-bounding-box-2026-09-01)
+- **Roadmap and GitHub links removed (2026-09-01)** [→](docs/DECISIONS.md#public-site--roadmap-section--github-links-removed-2026-09-01)
 - **Community ranking seed (2026-09-02)** — Marce Cakes city fix; JANA duplicate is data debt. [→](docs/DECISIONS.md#community-ranking-seed--data-quality-findings-adr-005-fase-d-2026-09-02)
 - **Google Places reviews, ToS (2026-09-05)** — server-only, purged after 30 days, re-fetched. [→](docs/DECISIONS.md#google-places-reviews--tos-driven-access-restriction--30-day-expiration-2026-09-05)
-- **Chatbot Fase C (2026-09-19)** — real `place_reports` / `suggestions` writes; four gaps, review findings. [→](docs/DECISIONS.md#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions)
-- **Chatbot Fase D (2026-09-19)** — `js/chat.js` widget decisions and findings. [→](docs/DECISIONS.md#chatbot-fase-d--widget-flotante-jschatjs-design-decisions)
-- **Chatbot Fase E (2026-09-20)** — no gluten figures, `cortesia`, deterministic guard (v11). [→](docs/DECISIONS.md#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía)
+- **Chatbot Fases C–E (2026-09-19/20)** — real writes, the widget, no gluten figures + deterministic guard (v11). [C](docs/DECISIONS.md#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](docs/DECISIONS.md#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](docs/DECISIONS.md#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía)
 - **Jailbreak battery on chat v18 (2026-09-25)** — 0 breaks; scope decline now refers to a professional (v19). [→](docs/DECISIONS.md#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25)
 - **Map explorer simplification (2026-09-20)** — Top 3 only, two safety labels, hero before map. [→](docs/DECISIONS.md#map-explorer--results-list-and-chat-prompts-removed-2026-09-20)
 - **Build status (phases)** — per-phase history; one line each below. [→](docs/DECISIONS.md#build-status-phases)

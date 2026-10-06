@@ -1,11 +1,11 @@
 # Términos de uso de CeliacMap
 
-**Versión 1.0 · Última actualización: 30 de septiembre de 2026**
+**Versión 1.0 · Última actualización: 5 de octubre de 2026**
 
 ## 1. Qué es CeliacMap
 
 CeliacMap es un mapa de lugares sin gluten / sin TACC en Uruguay y Argentina, hecho como proyecto personal por Santiago
-Sánchez (Uruguay). Podés buscar lugares, votarlos, sugerir lugares nuevos, dejar comentarios y consultar a un
+Sánchez (Fray Bentos, Río Negro, Uruguay). Podés buscar lugares, votarlos, sugerir lugares nuevos, dejar comentarios y consultar a un
 asistente automático (el chat). Es gratis y no necesita una cuenta.
 
 Al usar el sitio aceptás estos términos y la [Política de privacidad](politica-de-privacidad.md). Si no estás de
@@ -121,8 +121,8 @@ Estos términos se rigen por las leyes de la República Oriental del Uruguay, si
 normas del país donde vivís, incluido el de reclamar ante los tribunales o las autoridades de tu domicilio cuando esas
 normas lo permitan.
 
-Estos términos están escritos en español; la versión en inglés es una traducción. Si hay diferencias, vale la versión en
-español.
+Estos términos están publicados solo en español. Si más adelante publicamos una traducción y hay diferencias, vale la
+versión en español.
 
 ## 10. Contacto
 

@@ -630,6 +630,7 @@ h1, h2, h3 {
   color: var(--color-text-muted);
   line-height: 1.5;
 }
+.suggest-disclaimer a, .chat-disclaimer a { color: var(--color-primary); text-decoration: underline; }
 .suggest-status {
   margin-top: 18px;
   padding: 13px 16px;
@@ -2115,3 +2116,25 @@ body.map-expanded-open { position: fixed; top: var(--map-scroll-top); left: 0; r
 @media (prefers-reduced-motion: reduce) {
   .chat-fab, .chat-actions button, .chat-panel, .cm-marker, .map-explore-tools button { animation: none; transition: none; }
 }
+
+/* ============================ Legal pages =========================== */
+.legal-back { font-size: 0.9375rem; font-weight: 600; color: var(--color-primary); padding: 10px 0; }
+.legal-back:hover { text-decoration: underline; }
+.legal { max-width: 46rem; padding-top: clamp(40px, 8vw, 80px); padding-bottom: clamp(56px, 10vw, 112px); }
+.legal h1 { font-size: clamp(2rem, 5vw, 2.75rem); }
+.legal-version { margin-top: 12px; color: var(--color-text-muted); font-size: 0.9375rem; }
+.legal h2 { font-size: 1.5rem; margin-top: 56px; scroll-margin-top: calc(var(--header-h) + 16px); }
+.legal h3 { font-family: var(--font-sans); font-size: 1.0625rem; margin-top: 32px; scroll-margin-top: calc(var(--header-h) + 16px); }
+.legal p, .legal ul, .legal-table-wrap { margin-top: 16px; }
+.legal ul { list-style: disc; padding-left: 1.3em; }
+.legal ul ul { list-style: circle; margin-top: 8px; }
+.legal li + li { margin-top: 8px; }
+.legal a { color: var(--color-primary); text-decoration: underline; overflow-wrap: anywhere; }
+.legal code { font-size: 0.9em; background: var(--color-bg-alt); padding: 1px 5px; border-radius: 4px; }
+.legal-table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); }
+.legal-table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; line-height: 1.5; }
+.legal-table caption { caption-side: top; text-align: left; padding: 12px 14px; font-weight: 600; background: var(--color-bg-alt); }
+.legal-table th, .legal-table td { padding: 10px 14px; text-align: left; vertical-align: top; border-top: 1px solid var(--color-border); }
+.legal-table thead th { font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.legal-table tbody th { font-weight: 600; min-width: 9rem; }
+.legal-table td { min-width: 11rem; }

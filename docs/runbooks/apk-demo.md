@@ -30,7 +30,7 @@ Resultado: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`, 
 firma, así que **no se instala encima del release** (hay que desinstalar antes).
 
 `www/` es una copia generada (nunca se versiona): `index.html` sin el beacon de Cloudflare ni el enlace al manifest,
-`css/`, `js/`, `assets/` y `native.js`. Si el beacon o el manifest cambian de lugar en `index.html`, el build se detiene.
+`privacidad.html` y `terminos.html` tal cual (no cargan scripts), `css/`, `js/`, `assets/` y `native.js`. Si el beacon o el manifest cambian de lugar en `index.html`, el build se detiene.
 
 Antes de cada APK nuevo: subir `versionCode` (entero, siempre mayor) y `versionName` en `apps/mobile/android/app/build.gradle`.
 

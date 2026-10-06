@@ -1,5 +1,9 @@
 # Cambios de frontend para publicar la política y los términos
 
+> **Implementado el 2026-10-05 (v1.0), con tres diferencias:** solo en español, sin el beacon de Cloudflare en las
+> páginas legales y sin aviso propio en el voto. Detalle en `docs/DECISIONS.md`, «Privacy policy and terms of use
+> published, v1.0». Lo que sigue es el plan original.
+>
 > Lista para cuando se publique (2026-09-29). **Nada de esto está implementado.** Condición previa: los pendientes que
 > la política marca como **[PENDIENTE DE IMPLEMENTAR]** ya están resueltos o se sacaron del texto, y la revisión legal
 > está hecha.

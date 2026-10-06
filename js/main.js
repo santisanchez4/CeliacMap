@@ -260,6 +260,10 @@
 
     "footer.tagline": "Safe gluten-free places, mapped by the community.",
     "footer.contact": "Let's stay in touch",
+    "footer.privacy": "Privacy",
+    "footer.terms": "Terms",
+    "privacy.notice.send": "By sending, you accept the",
+    "privacy.notice.link": "privacy policy (in Spanish)",
     "footer.credit": "Made by Santiago Sanchez"
   };
 

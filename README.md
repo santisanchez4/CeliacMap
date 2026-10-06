@@ -253,6 +253,8 @@ serif display headings over a clean sans body, and generous spacing.
 - Conceptual interactive map built entirely with HTML/CSS (no map library).
 - Accessible: semantic landmarks, skip link, focus styles, reduced-motion support.
 - Installable PWA: manifest + network-first service worker for the app shell only.
+- Privacy policy and terms of use (v1.0, Spanish): `privacidad.html` and `terminos.html`, static pages linked from the
+  footer, both forms and the chat; their source text is `docs/legal/politica-de-privacidad.md` / `terminos-de-uso.md`.
 - «Cerca mío» (near me): one location reading per tap, used only on the device and never
   stored or sent; the 10 nearest places within 5 km (20 on demand), with straight-line distances.
 

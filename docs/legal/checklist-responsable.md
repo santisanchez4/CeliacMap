@@ -55,11 +55,12 @@ tiene que confirmar la revisión (política = `politica-de-privacidad.md`, térm
 ## Proveedores
 
 - [x] País y retención de cada proveedor, con fuentes oficiales (inventario, §6, fase 2).
-- [ ] Confirmar el **plan de Supabase** en el dashboard (define 1, 7, 28 o 90 días de logs; la política dice “hasta 90
-      días según el plan”).
+- [x] Plan de Supabase: **Free** (confirmado por el responsable, 2026-10-05): 1 día de logs (la política, §7, lo dice así) y sin
+      copias de respaldo automáticas. **Si se cambia de plan, revisar esa fila y los respaldos, y publicar una versión nueva.**
 - [ ] Leer y archivar el DPA de cada proveedor (Supabase, Anthropic, Resend, Google, Cloudflare, GitHub, Zoho, Tavily,
       CARTO) y anotar si se acepta por defecto o hay que firmarlo.
-- [ ] Configurar en Zoho el borrado de los avisos internos a los **90 días** (la política ya lo dice).
+- [x] Zoho configurado, con una regla que borra automáticamente los avisos internos a los **90 días**, como dice la
+      política (confirmado por el responsable, 2026-10-05).
 - [ ] Sin publicar por el proveedor (se informa así en la política): cuánto guardan la IP Google Fonts, GitHub Pages,
       unpkg y los logs de Cloudflare. Opcional: servir las tipografías y Leaflet desde el propio sitio para no enviar la
       IP a Google Fonts ni a unpkg.
@@ -72,10 +73,11 @@ tiene que confirmar la revisión (política = `politica-de-privacidad.md`, térm
 - [x] P2 — purga de `chat_usage` a los 7 días + HMAC de la IP (fase 1).
 - [x] P3 — `places` con grant por columna (fase 1).
 - [x] P4 — reseñas de Google en la purga semanal (fase 1).
-- [ ] P5 — plazos de 2 años / 1 año en la purga semanal: implementados (fase 2), activos después del “dale”.
+- [x] P5 — plazos de 2 años / 1 año en la purga semanal: activos (corrida del 2026-10-05 verificada en Actions).
 - [x] P7 — proveedores (fase 2).
 - [x] P8 — las recomendaciones del chat no se publican; el aviso en el chat va en la próxima tanda de prompts.
-- [ ] Publicar `/privacidad` y `/terminos` (ES + EN), links en el footer y avisos en los formularios y el chat.
+- [x] Publicar `privacidad.html` y `terminos.html` (v1.0, 2026-10-05, solo ES), links en el footer y avisos en los
+      formularios y el chat. La traducción al inglés queda sin hacer.
 
 ## Después de publicar
 
