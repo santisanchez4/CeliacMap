@@ -28,7 +28,7 @@ Se leyó la API, sin modificar configuración. Protección por ruleset (el endpo
 **PR #3:** https://github.com/santisanchez4/CeliacMap/pull/3 (abierto; sin merge).
 
 - Tests primero: siete casos reprodujeron la sobrescritura antes de implementar.
-- `agents/manual_overrides.py`: `protected_contact_fields()` protege website/phone/opening_hours cuando validation_notes contiene APROBACIÓN MANUAL (sin distinguir tildes/case).
+- `agents/manual_overrides.py`: `protected_contact_fields()` protege website/phone/opening_hours solo por campo registrado en `config/manual_contact_fields.json`. Desde el 2026-10-06 una APROBACIÓN MANUAL protege la etiqueta de seguridad, no el contacto (`docs/DECISIONS.md`, "Contact data frozen only by the registry").
 - `config/manual_contact_fields.json`: registro explícito UUID → campos + fuente SQL para correcciones históricas sin nota: Rikuras Malvín, Ramona Centro, Casa & Dispensa, La Commedia, Piu Cordón, ChocAra, NutriCiencia.
 - `agents/updater_agent.py`: excluye esos campos del patch. Conserva valor actual incluso vacío; no restaura automáticamente datos. Rating, otros campos y cierres siguen igual.
 - Nuevas correcciones deben registrarse por PR antes de aplicar datos. Limitación documentada: edición remota no registrada/sin aprobación no puede detectarse; coordinar cambios administrativos fuera de un Updater en ejecución.
