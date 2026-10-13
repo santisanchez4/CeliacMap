@@ -136,6 +136,33 @@ _BLOCK_TAG_RE = re.compile(
 _ANY_TAG_RE = re.compile(r"<[^>]+>")
 
 
+_HREF_RE = re.compile(r"""href\s*=\s*["']([^"'#\s]+)""", re.IGNORECASE)
+SOCIAL_LINK_HOSTS = ("instagram.com", "facebook.com")
+
+
+def fetch_social_links(url: str | None) -> list[str]:
+    """The Instagram / Facebook addresses a business's own page links to; [] on a social URL or any failure. Never raises.
+
+    The evidence finder reads the business's official accounts from them: a link on the business's own site is how an account is
+    verified as its own when the row has none.
+    """
+    if not url or is_social_url(url):
+        return []
+    try:
+        response = requests.get(url, timeout=PAGE_TIMEOUT, headers={"User-Agent": USER_AGENT})
+        response.raise_for_status()
+    except Exception:  # noqa: BLE001 - any transport/HTTP error means "no links"
+        logger.info("social links fetch failed for %r", url)
+        return []
+    links: list[str] = []
+    for href in _HREF_RE.findall(response.text):
+        href = html.unescape(href)
+        host = (urlparse(href if "//" in href else "//" + href).netloc or "").lower()
+        if any(host == h or host.endswith("." + h) for h in SOCIAL_LINK_HOSTS) and href not in links:
+            links.append(href)
+    return links
+
+
 def fetch_page_text(url: str | None) -> str:
     """Best-effort visible text of a business's own page; "" on a social URL or any failure. Never raises.
 

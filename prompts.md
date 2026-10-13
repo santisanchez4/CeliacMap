@@ -2422,3 +2422,19 @@ explicar protección de main. Rama nueva y PR, mostrando cada punto antes del si
 **Pedido:** fase 3 del piloto aprobada: `appId` `org.celiacmap.app`, SDK por línea de comandos, CORS de `chat` en un PR aparte con «dale» antes del deploy, sin beacon de Cloudflare en el APK, clave de firma fuera del repo; sin Play Store ni cambios de datos; rama propia, tests antes del push y PR sin merge; al terminar, pasos de instalación y lista de pruebas.
 
 **Resultado:** `apps/mobile/` empaqueta los archivos de la web; geolocalización por la WebView (sin plugin), permisos mínimos, botón Atrás, APK firmado y [runbook](docs/runbooks/apk-demo.md). No cambia ningún prompt del modelo.
+
+## 41. Atribución de citas sociales en el buscador de evidencia (2026-10-13)
+
+**Pedido de desarrollo, resumido:** tarea separada del PR #20, en rama nueva y con plan previo. (1) Reproducir con un test que falle
+que un reel o post cuyo autor no es la cuenta del negocio se acepta como evidencia propia, y corregirlo: una cita social cuenta solo si
+la cuenta autora coincide con la cuenta oficial (handle de la fila o verificable desde su sitio o ficha); si el autor no se puede
+verificar, se guarda como «no atribuible» y no suma. Tests para autor correcto, distinto y no verificable, y para que los reels de
+terceros no suban la confianza; suite completa en verde. (2) Auditoría en solo lectura de las filas sociales de `place_evidence` cuyo
+autor no coincide o no se puede verificar, con una tabla por lugar y, aparte, los aprobados en el mapa que dependan de ellas; reporte en
+`db/checks/` y frenar hasta el OK. (3) Re-evaluar en dry-run Alárabi y gluteno Sana Ingesta con el Validator actual y el buscador
+corregido, sin cambiar su estado: un estado en el mapa no se baja sin aprobación. Las aprobaciones manuales no se tocan ni se
+re-evalúan; `validation_confidence` y `verified` no se modifican; todo write va con dry-run y «dale».
+
+**Resultado:** `social_account` / `official_accounts` / `social_attribution` en `agents/evidence_finder.py`, `fetch_social_links` en
+`agents/clients/website_scraper.py`, los enlaces del sitio grabados en el congelado, tests nuevos y el reporte
+`db/checks/2026-10-13-social-attribution-audit.md`. No cambia ningún prompt del modelo (ni la `RUBRIC` ni `SCOPE_RUBRIC`).

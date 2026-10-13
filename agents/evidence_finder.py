@@ -156,24 +156,79 @@ def _url_parts(url: str) -> tuple[str, list[str]]:
     return host, [seg for seg in parsed.path.split("/") if seg]
 
 
-def _is_own_url(place: dict, url: str) -> bool:
+# First path segments of a social address that are not an account: a reel, a post, a share link... say nothing about who published.
+_NOT_AN_ACCOUNT = {
+    "instagram": frozenset(
+        "reel reels p tv stories explore popular tags locations directory accounts share s direct about web legal developer".split()
+    ),
+    "facebook": frozenset(
+        "reel reels watch share sharer sharer.php photo photos photo.php video videos story.php permalink.php profile.php groups "
+        "people pages p events marketplace hashtag public search login dialog plugins help business".split()
+    ),
+}
+ATTRIBUTIONS = ("propia", "tercero", "no_atribuible")
+ATTRIBUTION_REASONS = {
+    "tercero": "red social: la cuenta que publica no es la cuenta oficial del negocio",
+    "no_atribuible": "red social: no se puede verificar que la cuenta que publica sea la del negocio",
+}
+MAX_UNATTRIBUTED = 10  # unattributed quotes kept per place, for the report only
+
+
+def social_account(url: str | None) -> tuple[str, str] | None:
+    """(platform, account) that published an Instagram / Facebook address, or None when the address does not say it.
+
+    ``instagram.com/cuenta`` and ``instagram.com/cuenta/reel/ID`` name their author; ``instagram.com/reel/ID`` and ``/p/ID`` do not
+    (found with the "Goût" row, 2026-10-13: its ``social_url`` was a reel, and every other reel passed as its own source).
+    """
     host, segs = _url_parts(url or "")
+    platform = next((p for p in _NOT_AN_ACCOUNT if host == f"{p}.com" or host.endswith(f".{p}.com")), None)
+    if not platform or not segs:
+        return None
+    account = segs[0].lower().lstrip("@")
+    if not account or account in _NOT_AN_ACCOUNT[platform]:
+        return None
+    return platform, account
+
+
+def official_accounts(place: dict, site_links=()) -> frozenset[tuple[str, str]]:
+    """The accounts known to be the business's: the ones in its row (``social_url``, a ``website`` that is a profile) and the ones
+    its own site links to (``site_links``). A row whose only social address is a reel or a post has none."""
+    urls = [place.get("social_url"), place.get("website"), *(site_links or ())]
+    return frozenset(account for account in (social_account(u) for u in urls if isinstance(u, str)) if account)
+
+
+def social_attribution(url: str | None, accounts) -> str | None:
+    """Whose a social source is. None for a page that is not Instagram / Facebook / a link-in-bio (the text rules decide those).
+
+    * "propia": the author is one of the business's official ``accounts``;
+    * "tercero": the author is known and is another account, while the business has an official one on that platform;
+    * "no_atribuible": the address does not say who published it, or no official account of the business is known there.
+
+    Only "propia" is evidence about the business: a reel that names a place proves nothing about who is speaking.
+    """
+    if not url or not is_social_url(url):
+        return None
+    author = social_account(url)
+    if author is None:
+        return "no_atribuible"
+    if author in accounts:
+        return "propia"
+    return "tercero" if any(platform == author[0] for platform, _ in accounts) else "no_atribuible"
+
+
+def _is_own_url(place: dict, url: str, accounts=None) -> bool:
+    if is_social_url(url or ""):
+        return social_attribution(url, official_accounts(place) if accounts is None else accounts) == "propia"
+    host, _ = _url_parts(url or "")
     for own in (place.get("website"), place.get("social_url")):
-        if not own:
-            continue
-        own_host, own_segs = _url_parts(own)
-        if not own_host or own_host != host:
-            continue
-        if not is_social_url(own):
-            return True
-        if own_segs and segs and own_segs[0].lower() == segs[0].lower():
+        if own and not is_social_url(own) and host and _url_parts(own)[0] == host:
             return True
     return False
 
 
-def source_kind(url: str, place: dict) -> str:
-    """"propia" (the business's own site or profile), "asociacion" (ACELU / ACELA / ACA) or "tercero"."""
-    if _is_own_url(place, url):
+def source_kind(url: str, place: dict, accounts=None) -> str:
+    """"propia" (the business's own site or official account), "asociacion" (ACELU / ACELA / ACA) or "tercero"."""
+    if _is_own_url(place, url, accounts):
         return "propia"
     host, _ = _url_parts(url or "")
     if any(host == d or host.endswith("." + d) for d in ASSOCIATION_DOMAINS):
@@ -212,17 +267,22 @@ def _place_mentioned(place: dict, source: dict) -> bool:
     return any(_has_phrase(haystack, normalize(place.get(key))) for key in ("city", "region"))
 
 
-def match_reason(place: dict, source: dict) -> str | None:
+def match_reason(place: dict, source: dict, accounts=None) -> str | None:
     """Why ``source`` is about THIS business, decided by the code and never by the name alone:
 
-    * "own_url": its URL is the place's own website / social profile;
+    * "own_url": its URL is the place's own website, or a page of its official social account;
     * "name_and_city": the whole name and the city appear together in the text;
     * "title_tokens_and_place": its title or URL holds every distinctive word of the name AND the city or the region appears.
 
-    A generic name ("Sin Gluten") is never enough on its own: it only matches through the place's own URL.
+    A generic name ("Sin Gluten") is never enough on its own: it only matches through the place's own URL. A social source
+    (Instagram, Facebook...) only ever matches as "own_url": what another account says, or a post whose author cannot be told,
+    is not evidence about the business however much it names it (``social_attribution``).
     """
-    if _is_own_url(place, source.get("url") or ""):
+    url = source.get("url") or ""
+    if _is_own_url(place, url, accounts):
         return "own_url"
+    if is_social_url(url):
+        return None
     if not distinctive_tokens(place.get("name")):
         return None
     has_city, has_name = _text_mentions(place, source)
@@ -233,8 +293,11 @@ def match_reason(place: dict, source: dict) -> str | None:
     return None
 
 
-def why_not_about_place(place: dict, source: dict) -> str:
+def why_not_about_place(place: dict, source: dict, accounts=None) -> str:
     """The reason a source was not taken as being about this business (for the report of an insuficiente)."""
+    attribution = social_attribution(source.get("url"), official_accounts(place) if accounts is None else accounts)
+    if attribution in ATTRIBUTION_REASONS:
+        return ATTRIBUTION_REASONS[attribution]
     if not distinctive_tokens(place.get("name")):
         return "nombre genérico: solo vale la URL propia"
     if not _identity_tokens(place):
@@ -524,13 +587,14 @@ class EvidenceFinder:
     """Searches and quotes; never writes. ``search`` is a TavilySearchClient, ``llm`` an LLMClient (or None)."""
 
     def __init__(self, search, llm=None, model: str | None = None, fetch_text=fetch_page_text,
-                 queries: int = 2, results_per_query: int = RESULTS_PER_QUERY):
+                 queries: int = 2, results_per_query: int = RESULTS_PER_QUERY, fetch_links=None):
         if queries not in (2, 3):
             raise ValueError("queries must be 2 (open web + social) or 3 (+ associations)")
         self.search = search
         self.llm = llm
         self.model = model
         self.fetch_text = fetch_text
+        self.fetch_links = fetch_links  # url -> the social addresses the place's own site links to; None: only the row's accounts count
         self.queries = queries
         self.results_per_query = results_per_query
         self.searches_used = 0
@@ -539,7 +603,8 @@ class EvidenceFinder:
     # -- one place ------------------------------------------------------------------------------------------------------
     def find(self, place: dict) -> dict:
         stats = {"searches": 0, "search_errors": 0, "sources_seen": 0, "sources_about_place": 0,
-                 "quotes_candidate": 0, "quotes_dropped_by_llm": 0, "quotes_dropped_far_from_name": 0, "llm_error": False,
+                 "quotes_candidate": 0, "quotes_dropped_by_llm": 0, "quotes_dropped_far_from_name": 0, "quotes_unattributed": 0,
+                 "llm_error": False,
                  "llm_tokens": {"input": 0, "output": 0}}
         sources: dict[str, dict] = {}
         for query, domains in build_queries(place)[: self.queries]:
@@ -562,16 +627,36 @@ class EvidenceFinder:
                 sources[site] = {"url": site, "title": "", "text": text, "origin": "fetch"}
         stats["sources_seen"] = len(sources)
 
+        # Whose a social source is: only the business's official accounts speak for it (its row, or the links of its own site).
+        site_links = []
+        if self.fetch_links and site and not is_social_url(site):
+            try:
+                site_links = list(self.fetch_links(site) or [])
+            except Exception:  # noqa: BLE001 - no links just means fewer accounts can be verified
+                logger.exception("reading the social links of %r failed", site)
+        accounts = official_accounts(place, site_links)
+
         candidates: list[dict] = []
         seen: set[str] = set()
         discarded: list[dict] = []
+        unattributed: list[dict] = []
         for source in sources.values():
-            reason = match_reason(place, source)
+            reason = match_reason(place, source, accounts)
             if not reason:
-                discarded.append({"url": source["url"], "title": source["title"], "why": why_not_about_place(place, source)})
+                discarded.append({"url": source["url"], "title": source["title"], "why": why_not_about_place(place, source, accounts)})
+                attribution = social_attribution(source["url"], accounts)
+                if attribution in ATTRIBUTION_REASONS:
+                    # Kept for the report only: it is never a citation, never reaches the model and never becomes evidence.
+                    author = social_account(source["url"])
+                    for text in extract_quotes(source["text"], place.get("name")):
+                        stats["quotes_unattributed"] += 1
+                        if len(unattributed) < MAX_UNATTRIBUTED:
+                            unattributed.append({"text": text, "url": source["url"], "atribucion": attribution,
+                                                 "autor": ":".join(author) if author else None,
+                                                 "motivo": ATTRIBUTION_REASONS[attribution]})
                 continue
             stats["sources_about_place"] += 1
-            kind = source_kind(source["url"], place)
+            kind = source_kind(source["url"], place, accounts)
             # A page matched to the business only by its text (its title does not name it) may be about several: a quote counts only
             # if it is in the same sentence as the name or shortly after it.
             text_only = reason == "name_and_city" and not _title_url_has_every_token(place, source)
@@ -626,7 +711,8 @@ class EvidenceFinder:
             "place_id": place.get("id"), "name": place.get("name"), "city": place.get("city"), "country": place.get("country"),
             "category": place.get("category"), "website": place.get("website"), "social_url": place.get("social_url"),
             "safety_level": place.get("safety_level"), "updated_at": place.get("updated_at"), "link_kind": link_kind(place),
-            **verdict, "citations": kept, "dropped_by_model": dropped,
+            **verdict, "citations": kept, "dropped_by_model": dropped, "unattributed": unattributed,
+            "official_accounts": sorted(":".join(a) for a in accounts),
             "discarded_sources": discarded[:MAX_DISCARDED_SOURCES] if verdict["proposal"] == "insuficiente" else [],
             "stats": stats, "found_at": datetime.now(timezone.utc).isoformat(),
         }

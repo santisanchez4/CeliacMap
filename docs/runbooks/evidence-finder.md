@@ -21,6 +21,12 @@ For each one the finder looks for **public** evidence about **that** business an
   the whole name and the city appear together; or its title / URL holds every distinctive word of the name AND the city or `places.region` appears.
   A name made only of generic or place words ("Concepción sin TACC" in Concepción del Uruguay) identifies no business: it matches only by its full
   name plus the city, or by its own URL. The model can only veto a quote ("this sentence is about another place"), never accept one the code rejected.
+- **Instagram / Facebook: only the business's official account speaks for it** (2026-10-13). A social source is a citation only when
+  the account in its address is one of the place's official accounts: the one in its row (`social_url`, or a `website` that is a
+  profile) or one its own site links to. `instagram.com/reel/ID` and `/p/ID` name no author, so they are **no atribuible**; so is any
+  profile when the row has no account on that platform; another account's post is **tercero**. Both are listed in the report under
+  "citas de redes NO atribuibles" and never count, reach the model, become `place_evidence` or enter the public note. To make a
+  profile count, the admin stores it in the place's `social_url`.
 - On a page matched to the business only by its text (its title does not name it), a quote counts only in the same sentence as the name or up to 400
   characters after it. A page that lists several businesses (a listing word in its title or address, a blog, a numbered list of 3+ entries) never supports
   a plain 100: at most "100 · verificar en la fuente" (the citation is labelled "guía de varios negocios" and never quoted in the public note).

@@ -109,13 +109,23 @@ def src(url, title="", text=""):
     return {"url": url, "title": title, "text": text}
 
 
-def test_the_michela_profile_is_about_the_place_by_its_title_words_and_the_city():
-    s = src("https://www.instagram.com/michela.singluten?hl=en", "MICHELA (@michela.singluten) · Guaymallén, Mendoza", "Panadería sin gluten")
+MICHELA_PAGE = "https://directorio.example/michela-singluten"
+
+
+def test_a_page_is_about_the_place_by_its_title_words_and_the_city():
+    s = src(MICHELA_PAGE, "MICHELA (panadería) · Guaymallén, Mendoza", "Panadería sin gluten")
     assert match_reason(MICHELA, s) == "title_tokens_and_place"
 
 
-def test_the_same_profile_without_the_city_or_region_is_not_accepted_never_by_the_name_alone():
-    s = src("https://www.instagram.com/michela.singluten?hl=en", "MICHELA (@michela.singluten) · Guaymallén, Argentina", "Panadería sin gluten")
+def test_the_michela_profile_is_no_longer_accepted_by_its_title_only_as_the_official_account():
+    s = src("https://www.instagram.com/michela.singluten?hl=en", "MICHELA (@michela.singluten) · Guaymallén, Mendoza", "Panadería sin gluten")
+    assert match_reason(MICHELA, s) is None  # no official account in the row: the author cannot be verified
+    assert why_not_about_place(MICHELA, s) == "red social: no se puede verificar que la cuenta que publica sea la del negocio"
+    assert match_reason({**MICHELA, "social_url": "https://instagram.com/michela.singluten"}, s) == "own_url"
+
+
+def test_the_same_page_without_the_city_or_region_is_not_accepted_never_by_the_name_alone():
+    s = src(MICHELA_PAGE, "MICHELA (panadería) · Guaymallén, Argentina", "Panadería sin gluten")
     assert match_reason(MICHELA, s) is None
     assert why_not_about_place(MICHELA, s) == "el título tiene el nombre pero no menciona la ciudad ni la región"
 
@@ -169,6 +179,9 @@ QUINTA_REEL = ("https://www.instagram.com/reel/C_X5QD1RJAg", "¡Descubrí la pri
 
 def test_a_name_made_only_of_place_words_matches_only_through_its_full_name_and_city_or_its_own_url():
     other = src(*QUINTA_REEL)
+    assert match_reason(CONCEPCION, other) is None  # a reel: its address names no author (section E)
+    assert why_not_about_place(CONCEPCION, other) == "red social: no se puede verificar que la cuenta que publica sea la del negocio"
+    other = src("https://blog.example/quinta", *QUINTA_REEL[1:])  # the same text on a web page: the name rule decides
     assert match_reason(CONCEPCION, other) is None
     assert why_not_about_place(CONCEPCION, other) ==         "el nombre solo tiene palabras genéricas o de lugar: hace falta el nombre completo con la ciudad, o la URL propia"
     assert match_reason(CONCEPCION, src("https://blog.example/x", "Concepción sin TACC",
@@ -184,7 +197,7 @@ def test_a_barrio_in_the_address_is_a_place_word_too():
 
 def test_a_locality_word_of_the_name_still_counts_when_the_name_has_a_word_of_identity():
     p = place(name="Michela Sin Gluten Guaymallen", city="Mendoza", region="Mendoza", address="Calle Falsa 123, Guaymallén, Mendoza")
-    s = src("https://www.instagram.com/michela.singluten?hl=en", "MICHELA (@michela.singluten) · Guaymallén, Mendoza", "Panadería")
+    s = src(MICHELA_PAGE, "MICHELA (panadería) · Guaymallén, Mendoza", "Panadería")
     assert match_reason(p, s) == "title_tokens_and_place"
 
 
@@ -249,3 +262,98 @@ def test_the_prompt_says_the_pages_were_already_verified_and_that_the_model_may_
     rubric = " ".join(SCOPE_RUBRIC.split())
     assert "YA verificó" in rubric and "Solo podés VETAR" in rubric
     assert "OTRO lugar" in rubric and "Nunca aceptes" in rubric
+
+
+# --- E. a social quote is the business's only when its author is the business's official account (2026-10-13) -------------------
+# Found with the "Goût" row: its social_url is a reel, and every other Instagram reel passed as its "own" source.
+
+GOUT = place(name="Goût", city="Montevideo", region="Montevideo", country="Uruguay",
+             social_url="https://www.instagram.com/reel/DTrDA7ogJOF")
+OTHER_REEL = hit("https://www.instagram.com/reel/DKSsbBjsd2d?hl=en",
+                 "Si comes sin gluten y estás en Montevideo @boutiquedecosasricas es 100% libre de gluten!")
+
+
+def test_a_reel_of_another_account_is_not_the_places_own_source():
+    result = finder([OTHER_REEL], llm=FakeLLM()).find(GOUT)
+    assert result["citations"] == [] and result["proposal"] == "insuficiente"
+    (lost,) = result["unattributed"]
+    assert lost["atribucion"] == "no_atribuible" and lost["autor"] is None and "100% libre de gluten" in lost["text"]
+
+
+def test_social_account_reads_the_author_from_the_address_or_says_it_cannot():
+    from agents.evidence_finder import social_account
+    assert social_account("https://www.instagram.com/megusta_uy?hl=en") == ("instagram", "megusta_uy")
+    assert social_account("https://instagram.com/MeGusta_UY/reel/C1abc/") == ("instagram", "megusta_uy")
+    assert social_account("https://m.facebook.com/cooperativahelix/posts/pizza/822278316261044") == ("facebook", "cooperativahelix")
+    for no_author in ("https://www.instagram.com/reel/DKSsbBjsd2d", "https://www.instagram.com/p/BXsjx4uDRHT", "https://www.instagram.com/",
+                      "https://www.instagram.com/popular/pan-sin-gluten-en-panetera", "https://www.instagram.com/explore/tags/singluten",
+                      "https://www.facebook.com/reel/123", "https://www.facebook.com/profile.php?id=1", "https://www.facebook.com/share/p/x",
+                      "https://ejemplo.uy/instagram"):
+        assert social_account(no_author) is None, no_author
+
+
+def test_a_post_of_the_official_account_is_the_places_own_source():
+    p = place(name="Me Gusta", city="Montevideo", region="Montevideo", social_url="https://www.instagram.com/megusta_uy")
+    hits = [hit("https://www.instagram.com/megusta_uy/reel/C1abc", "Todo es sin gluten en nuestra cocina.")]
+    result = finder(hits, llm=FakeLLM()).find(p)
+    (cite,) = result["citations"]
+    assert cite["source_kind"] == "propia" and cite["matched_by"] == "own_url" and result["unattributed"] == []
+    assert result["official_accounts"] == ["instagram:megusta_uy"]
+
+
+def test_a_post_of_a_different_account_is_not_evidence_even_if_it_names_the_place_and_the_city():
+    p = place(social_url="https://www.instagram.com/tiempolibre.rosario")
+    hits = [hit("https://www.instagram.com/guia.celiaca/p/C9xyz", "Panadería Tiempo Libre en Rosario: todo es sin gluten.",
+                "Panadería Tiempo Libre Rosario")]
+    result = finder(hits, llm=FakeLLM()).find(p)
+    assert result["citations"] == [] and result["proposal"] == "insuficiente"
+    (lost,) = result["unattributed"]
+    assert lost["atribucion"] == "tercero" and lost["autor"] == "instagram:guia.celiaca"
+
+
+def test_a_profile_cannot_be_attributed_when_the_place_has_no_known_official_account():
+    hits = [hit("https://www.instagram.com/tiempolibre.rosario", "Todo es sin gluten.", "Panadería Tiempo Libre (@tiempolibre.rosario) · Rosario")]
+    result = finder(hits, llm=FakeLLM()).find(place())
+    assert result["citations"] == [] and result["official_accounts"] == []
+    assert result["unattributed"][0]["atribucion"] == "no_atribuible"
+    assert result["unattributed"][0]["autor"] == "instagram:tiempolibre.rosario"
+
+
+def test_an_account_of_another_platform_does_not_verify_the_author():
+    p = place(social_url="https://www.instagram.com/tiempolibre.rosario")
+    hits = [hit("https://www.facebook.com/tiempolibrerosario", "Todo es sin gluten.", "Panadería Tiempo Libre Rosario")]
+    result = finder(hits, llm=FakeLLM()).find(p)
+    assert result["citations"] == [] and result["unattributed"][0]["atribucion"] == "no_atribuible"
+
+
+def test_the_official_account_can_be_read_from_the_places_own_site():
+    p = place(website="https://tiempolibre.example")
+    hits = [hit("https://www.instagram.com/tiempolibre.rosario/p/C9xyz", "Todo es sin gluten en nuestra cocina.")]
+    found = EvidenceFinder(FakeTavily(hits), llm=FakeLLM(), fetch_text=lambda url: "",
+                           fetch_links=lambda url: ["https://www.instagram.com/tiempolibre.rosario/", "https://wa.me/598"]).find(p)
+    assert found["official_accounts"] == ["instagram:tiempolibre.rosario"]
+    assert [c["source_kind"] for c in found["citations"]] == ["propia"]
+    # without the site's links the same post cannot be attributed
+    assert finder(hits, llm=FakeLLM()).find(p)["citations"] == []
+
+
+def test_third_party_reels_never_raise_a_proposal_nor_become_stored_evidence():
+    from agents.evidence_finder import build_acceptance_note
+    p = place(website="https://tiempolibre.example", social_url="https://www.instagram.com/reel/AAA111")
+    reel = hit("https://www.instagram.com/reel/BBB222", "Panadería Tiempo Libre en Rosario: 100% libre de gluten, todo es sin gluten.")
+    alone = finder([reel], llm=FakeLLM()).find(p)
+    assert alone["proposal"] == "insuficiente" and build_acceptance_note(alone) is None
+
+    own = hit("https://tiempolibre.example/menu", "Tenemos opciones sin gluten.")
+    options = {"citas": [{"n": 1, "alcance": "opciones", "contradice_exclusividad": False, "habla_de_este_negocio": True, "motivo": "opciones"}]}
+    both = finder([own, reel], llm=FakeLLM(options)).find(p)
+    assert both["proposal"] == "options" and [c["url"] for c in both["citations"]] == ["https://tiempolibre.example/menu"]
+    _note, rows = build_acceptance_note(both)
+    assert all("instagram.com" not in (r["url"] or "") for r in rows)
+    assert both["stats"]["quotes_unattributed"] == 1
+
+
+def test_the_model_never_sees_an_unattributed_quote():
+    llm = FakeLLM()
+    finder([OTHER_REEL], llm=llm).find(GOUT)
+    assert llm.users == []

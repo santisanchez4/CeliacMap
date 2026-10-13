@@ -233,3 +233,33 @@ def test_fetch_page_text_never_raises(mock_get):
 def test_fetch_page_text_is_bounded(mock_get):
     mock_get.return_value = _mock_response("<p>" + "sin gluten " * 100_000 + "</p>")
     assert len(fetch_page_text("https://cafex.com")) <= 100_000
+
+
+# --- fetch_social_links: the accounts a business's own page links to -------------------------------------------------------------
+
+def test_fetch_social_links_returns_the_instagram_and_facebook_links_of_the_page(monkeypatch):
+    from agents.clients import website_scraper
+
+    class Response:
+        text = ("<a href=\"https://www.instagram.com/tiempolibre.rosario/\">IG</a> <a href='https://facebook.com/tiempolibre?x=1&amp;y=2'>FB</a>"
+                "<a href=\"https://www.instagram.com/tiempolibre.rosario/\">otra vez</a> <a href=\"https://wa.me/598\">WA</a>"
+                "<a href=\"/contacto\">c</a> <a href=\"https://noesinstagram.com/x\">no</a>")
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(website_scraper.requests, "get", lambda *a, **k: Response())
+    assert website_scraper.fetch_social_links("https://tiempolibre.example") == [
+        "https://www.instagram.com/tiempolibre.rosario/", "https://facebook.com/tiempolibre?x=1&y=2"]
+
+
+def test_fetch_social_links_is_empty_for_a_social_url_or_a_failure(monkeypatch):
+    from agents.clients import website_scraper
+
+    def boom(*a, **k):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(website_scraper.requests, "get", boom)
+    assert website_scraper.fetch_social_links("https://tiempolibre.example") == []
+    assert website_scraper.fetch_social_links("https://www.instagram.com/tiempolibre") == []
+    assert website_scraper.fetch_social_links(None) == []

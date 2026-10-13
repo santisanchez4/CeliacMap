@@ -34,8 +34,24 @@ class RecordingFetch:
         return self.pages[url]
 
 
-def build_freeze(search: RecordingSearch, fetch: RecordingFetch, meta: dict) -> dict:
-    return {"created_at": meta.get("created_at"), "meta": meta, "searches": search.calls, "pages": fetch.pages}
+class RecordingLinks:
+    """Wraps the reader of a site's social links and keeps each answer once (a site that could not be read: [])."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.links: dict[str, list[str]] = {}
+
+    def __call__(self, url):
+        if url not in self.links:
+            self.links[url] = list(self.inner(url) or [])
+        return self.links[url]
+
+
+def build_freeze(search: RecordingSearch, fetch: RecordingFetch, meta: dict, links: RecordingLinks | None = None) -> dict:
+    freeze = {"created_at": meta.get("created_at"), "meta": meta, "searches": search.calls, "pages": fetch.pages}
+    if links is not None:
+        freeze["links"] = links.links
+    return freeze
 
 
 def load_freeze(data) -> dict:
@@ -56,6 +72,23 @@ class ReplaySearch:
             self.misses += 1
             return []
         return self.index[key]
+
+
+class ReplayLinks:
+    """The social links a run read from the places' own sites. A freeze made before they were recorded has none: every site
+    answers [] then (only the accounts in the row count), which is not a miss."""
+
+    def __init__(self, freeze: dict):
+        self.links = freeze.get("links")
+        self.misses = 0
+
+    def __call__(self, url):
+        if self.links is None:
+            return []
+        if url not in self.links:
+            self.misses += 1
+            return []
+        return list(self.links[url] or [])
 
 
 class ReplayFetch:

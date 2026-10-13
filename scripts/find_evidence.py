@@ -21,11 +21,13 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agents.clients.website_scraper import fetch_page_text
+from agents.clients.website_scraper import fetch_page_text, fetch_social_links
 from agents.evidence_freeze import (
     RecordingFetch,
+    RecordingLinks,
     RecordingSearch,
     ReplayFetch,
+    ReplayLinks,
     ReplaySearch,
     build_freeze,
     load_freeze,
@@ -142,6 +144,12 @@ def render_markdown(results: list[dict], summary: dict, meta: dict) -> str:
                 q = r.get("possible_100_quote") or {}
                 lines.append(f"posible 100: «{q.get('text')}» {q.get('url')} — frase de exclusividad que has_exclusive_signal no "
                              f"reconoce; no es una propuesta de 100, revisala en la fuente")
+            if r.get("official_accounts") is not None:
+                lines.append("cuentas oficiales conocidas: " + (", ".join(r["official_accounts"]) or "ninguna"))
+            if r.get("unattributed"):
+                lines.append("citas de redes NO atribuibles al negocio (no cuentan para la propuesta ni se guardan como evidencia):")
+                lines += [f"- [{u['atribucion']}] «{u['text']}» {u['url']} — autor: {u.get('autor') or 'no se puede saber'}"
+                          for u in r["unattributed"]]
             if r.get("dropped_by_model"):
                 lines.append("citas que el modelo descartó:")
                 lines += [f"- «{d['text']}» {d['url']} — {d['razon']}: {d.get('motivo') or 'sin motivo'}" for d in r["dropped_by_model"]]
@@ -174,7 +182,7 @@ def write_report(results: list[dict], skipped: list[dict], meta: dict, out_dir: 
     return json_path, md_path
 
 
-def run(db, search, llm, args, out=print, fetch_text=fetch_page_text) -> int:
+def run(db, search, llm, args, out=print, fetch_text=fetch_page_text, fetch_links=None) -> int:
     places = _select(db, args, out)
     if not places:
         out("No hay lugares para buscar.")
@@ -187,7 +195,7 @@ def run(db, search, llm, args, out=print, fetch_text=fetch_page_text) -> int:
         except (OSError, ValueError) as exc:
             out(f"{args.replay} no es un congelado de scripts/find_evidence: {exc}")
             return 2
-        search, fetch_text = ReplaySearch(freeze), ReplayFetch(freeze)
+        search, fetch_text, fetch_links = ReplaySearch(freeze), ReplayFetch(freeze), ReplayLinks(freeze)
     else:
         if not args.pilot and len(places) > CAP_REQUIRED_ABOVE and args.max_searches is None:
             out(f"{len(places)} lugares × {args.queries} búsquedas: indicá --max-searches N (la cuota de Tavily es compartida con el "
@@ -195,11 +203,13 @@ def run(db, search, llm, args, out=print, fetch_text=fetch_page_text) -> int:
             return 2
         if not args.no_freeze:
             search, fetch_text = RecordingSearch(search), RecordingFetch(fetch_text)
-            recorder = (search, fetch_text)
+            fetch_links = RecordingLinks(fetch_links) if fetch_links else None  # None: only the accounts in the row count
+            recorder = (search, fetch_text, fetch_links)
     cap = None if args.replay else (args.max_searches if args.max_searches is not None else len(places) * args.queries)
-    finder = EvidenceFinder(search, llm=None if args.no_llm else llm, fetch_text=fetch_text, queries=args.queries)
+    finder = EvidenceFinder(search, llm=None if args.no_llm else llm, fetch_text=fetch_text, queries=args.queries,
+                            fetch_links=fetch_links)
     results, skipped = finder.find_many(places, cap)
-    misses = (search.misses + fetch_text.misses) if args.replay else 0
+    misses = (search.misses + fetch_text.misses + fetch_links.misses) if args.replay else 0
     meta = {
         "created_at": datetime.now(timezone.utc).isoformat(), "mode": "pilot" if args.pilot else ("ids" if args.ids else "queue"),
         "queries": args.queries, "llm": not args.no_llm, "selected": len(places),
@@ -211,7 +221,8 @@ def run(db, search, llm, args, out=print, fetch_text=fetch_page_text) -> int:
     freeze_path = None
     if recorder:
         freeze_path = json_path.with_name(json_path.stem + ".frozen.json")
-        freeze_path.write_text(json.dumps(build_freeze(*recorder, meta), ensure_ascii=False), encoding="utf-8")
+        freeze_path.write_text(json.dumps(build_freeze(recorder[0], recorder[1], meta, recorder[2]), ensure_ascii=False),
+                               encoding="utf-8")
     summary = summarize(results)
     spent = "repetición sobre un congelado: 0 búsquedas de Tavily" if args.replay else f"{finder.searches_used} búsquedas de Tavily"
     out(f"{len(results)} lugares procesados · {spent} · sin escrituras en la base.")
@@ -252,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     db = SupabaseClient(settings.supabase_url, settings.supabase_service_role_key)
     search = TavilySearchClient(settings.tavily_api_key)
     llm = None if args.no_llm else LLMClient(settings.anthropic_api_key, settings.haiku_model)
-    return run(db, search, llm, args)
+    return run(db, search, llm, args, fetch_links=fetch_social_links)
 
 
 if __name__ == "__main__":
