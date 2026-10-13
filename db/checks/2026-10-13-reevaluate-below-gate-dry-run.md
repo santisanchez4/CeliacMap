@@ -87,3 +87,33 @@ ninguna evidencia en el sistema.
   (`db/checks/2026-10-13-official-accounts-survey.md`).
 - En esta corrida no se pudieron leer los enlaces del sitio de gluteno (la descarga falló esa vez); no cambia el resultado, porque
   las citas estaban en reels sin autor.
+
+## Cierre — qué se decidió (2026-10-13)
+
+Las propuestas de arriba son las del dry-run; lo que sigue es lo que decidió el admin (Santiago Sánchez) el mismo día. En los cuatro
+casos la nota anterior del Validator quedó debajo del encabezado nuevo, y `validation_confidence` y `verified` no se tocaron.
+
+| Lugar | Decisión final | Estado | Archivo en `db/fixes/` |
+|---|---|---|---|
+| Géant Fresh Market | Descartado: cadena de supermercados, comercio general; no aplica al mapa | `approved` → `discarded` | `2026-10-13-below-gate-admin-decisions.sql` |
+| By Gessi Cocina Inclusiva | Descartado: escuela de cocina, sin venta de comida ni productos al público | `approved` → `discarded` | `2026-10-13-below-gate-admin-decisions.sql` |
+| Alárabi Cocina Inclusiva | A revisión para que el admin lo verificara, y luego aprobado por él como 100% | `approved` → `needs_review` → `approved` · `gluten_free_100` | `2026-10-13-below-gate-admin-decisions.sql`, `2026-10-13-alarabi-admin-evidence.sql`, `2026-10-13-alarabi-manual-approval.sh` |
+| gluteno Sana Ingesta | Sin cambio de estado ni de nivel; solo se cargó su cuenta oficial | sigue `approved` · `celiac_friendly` | `2026-10-13-below-gate-admin-decisions.sql` |
+
+- **Géant Fresh Market** — `CORRECCIÓN MANUAL 2026-10-13: no aplica al mapa…`. Se apartó de la propuesta del dry-run (revisión o
+  aprobación manual): el admin decidió que una cadena de comercio general no corresponde a este mapa.
+- **By Gessi Cocina Inclusiva** — `CORRECCIÓN MANUAL 2026-10-13: no es un comercio…`, como se propuso.
+- **Alárabi Cocina Inclusiva** — tres pasos, cada uno en su archivo:
+  1. `2026-10-13-below-gate-admin-decisions.sql`: `OVERRIDE MANUAL` que lo baja a `needs_review` con lo que había que verificar (las
+     dos reseñas negativas resumidas, sin su texto; la cita del blog; la habilitación vencida de la IM). La cita del blog entra
+     también en `place_evidence` (`source = 'web'`).
+  2. `2026-10-13-alarabi-admin-evidence.sql`: la revisión del propio admin como evidencia (dos filas `source = 'admin'`: la bio de
+     `@alarabi__glutenfree` y la carta online) y su cuenta oficial en `social_url`. No aprueba nada.
+  3. `2026-10-13-alarabi-manual-approval.sh`: `APROBACIÓN MANUAL` en 100% con `scripts.review_queue --approve … --level 100`. Las dos
+     reseñas negativas quedan registradas, sin refutar, en el `OVERRIDE MANUAL` de abajo.
+- **gluteno Sana Ingesta** — como se propuso: `social_url = https://www.instagram.com/glutenosanaingesta`, la cuenta que enlaza su
+  propio sitio (`glutenouy.com`), para que el buscador de evidencia pueda atribuirle sus publicaciones. Queda pendiente volver a
+  correr este dry-run con la cuenta cargada.
+
+Los dos descartes son el origen de la regla de alcance del mapa (cadenas de comercio general y lugares que enseñan o informan sin
+vender), que se trabaja como tarea aparte.
