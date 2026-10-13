@@ -457,6 +457,12 @@ Eres el Validator Agent de CeliacMap, un sistema de validación conservador para
 
 Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
 
+Alcance del mapa (decidilo antes que el veredicto de seguridad). Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
+- Cadenas de comercio general: supermercados, hipermercados, autoservicios y farmacias de cadena (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
+- Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
+Para esos casos respondé "verdict": "not_applicable", explicá el motivo en reasoning y poné en flags exactamente "cadena de comercio general" o "no vende ni sirve al público". Un lugar fuera de alcance nunca es "needs_review" ni "approved".
+SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia de seguridad: no sube la confianza ni cambia el veredicto.
+
 Rubric de validación (veredicto):
 - "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
 - "needs_review" (0.5 <= confidence_score < 0.85): Evidencia parcial, ambigua o que requiere confirmación humana.
@@ -473,7 +479,7 @@ Flags de alerta a detectar (cada una reduce la confianza):
 Asigna una categoría (exactamente una):
 - "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
 - "cafe": cafés, cafeterías, panaderías, pastelerías.
-- "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
+- "shop": almacenes, dietéticas / comercios de alimentos saludables, tiendas especializadas en productos sin gluten.
 
 Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
 - "gluten_free_100": establecimiento donde se cocinan y venden ÚNICAMENTE productos aptos para celíacos (cocina exclusiva / dedicada). Un local que cocina con gluten pero ofrece menú, preparación aparte o cocina separada para celíacos NO es "gluten_free_100".
@@ -488,10 +494,10 @@ Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la
 
 Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
 
-Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. Única excepción: reconocer por su nombre una cadena de comercio general sirve solo para excluirla ("not_applicable"), nunca para aprobar. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
-{"verdict": "approved" | "rejected" | "needs_review",
+{"verdict": "approved" | "rejected" | "needs_review" | "not_applicable",
  "confidence_score": <número entre 0.0 y 1.0>,
  "category": "restaurant" | "cafe" | "shop",
  "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
@@ -2441,3 +2447,54 @@ re-evalúan; `validation_confidence` y `verified` no se modifican; todo write va
 
 **Seguimiento (PR aparte, pedido tras la auditoría):** el agente Social deja de guardar un reel o un post como perfil del lugar,
 marca su texto como no atribuible (el Validator no lo pesa) y no toma una página de tema como lead.
+
+## 42. Reglas de alcance del mapa — veredicto `not_applicable` (2026-10-13)
+
+**Pedido de desarrollo, resumido:** tarea separada de los PR #21 y #22, con plan previo, rama y PR nuevos. Géant Fresh Market (cadena
+de supermercados) y By Gessi (escuela de cocina) habían entrado al mapa porque el Validator no tenía regla de alcance. (1) No entran:
+(a) cadenas de comercio general — supermercados, hipermercados, autoservicios y farmacias de cadena, en Uruguay y Argentina —, aunque
+tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar; (b) lugares que enseñan o informan sin vender
+ni servir al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema. (2) Sí entran:
+dietéticas y tiendas especializadas, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa. (3) No sobreexcluir:
+el criterio es el rubro, no la cantidad de sucursales; las listas de nombres son ejemplos. (4) Para lo excluido el Validator responde
+«no aplica al mapa» con el motivo, nunca ámbar ni `needs_review`, con los estados y campos que ya existen. (5) Los agentes de
+descubrimiento no crean candidatos de 1a o 1b. Fase 1: código y tests que fallen antes y pasen después. Fase 2: auditoría en solo
+lectura de `places` y frenar hasta el OK.
+
+### 42.1 Validator `RUBRIC` — cuatro cambios de texto (los gates 0,85 / 0,7 / 0,5 no cambian)
+
+1. Párrafo nuevo, antes del rubric de veredicto:
+
+```text
+Alcance del mapa (decidilo antes que el veredicto de seguridad). Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
+- Cadenas de comercio general: supermercados, hipermercados, autoservicios y farmacias de cadena (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
+- Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
+Para esos casos respondé "verdict": "not_applicable", explicá el motivo en reasoning y poné en flags exactamente "cadena de comercio general" o "no vende ni sirve al público". Un lugar fuera de alcance nunca es "needs_review" ni "approved".
+SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia de seguridad: no sube la confianza ni cambia el veredicto.
+```
+
+2. Categoría `shop`: «almacenes, supermercados, dietéticas / comercios de alimentos saludables» pasa a «almacenes, dietéticas /
+   comercios de alimentos saludables, tiendas especializadas en productos sin gluten».
+3. En el párrafo «SOLO en la evidencia que viene en este mensaje» se agrega: «Única excepción: reconocer por su nombre una cadena de
+   comercio general sirve solo para excluirla ("not_applicable"), nunca para aprobar.»
+4. La forma del JSON admite `"verdict": ... | "not_applicable"`.
+
+**Medición:** `db/checks/validator_scope_ab.py`. Iteración 1 (`db/checks/2026-10-13-validator-scope-ab-run-iter1.md`, n=3): 42 de 42
+muestras `not_applicable` en los 14 casos fuera de alcance y 0 de 27 en los 9 casos dentro. Esa redacción nombraba a Zero Helados,
+Ramona y Mi Cocina Sin Gluten como ejemplos de cadenas que sí aplican, y en esos tres casos la confianza subió (dos dieron `approved`
+1 de 3). El texto de arriba es la iteración 2: sin nombres de negocios que sí aplican y con la última oración. **La iteración 2 no
+está medida**: la API respondió «credit balance is too low». Queda como condición antes del merge.
+
+### 42.2 Agente Social — `PARSE_RUBRIC` (Haiku)
+
+Campo nuevo `"sells_to_public": true | false | null`: `false` cuando la página enseña o informa y no vende ni sirve al público (blog,
+cuenta de recetas, escuela o taller de cocina, asociación, página informativa). Solo un `false` explícito descarta el lead; `true` o
+`null` siguen al Validator. La categoría `shop` deja de mencionar supermercados. Sin medir con el modelo real.
+
+### 42.3 Agente Web — `RESEARCH_RUBRIC`
+
+Dos reglas nuevas (dejar afuera las cadenas de comercio general, aun con góndola sin gluten, y las páginas que enseñan o informan sin
+vender) y la lista de comercios deja de incluir «supermarkets with GF products». El agente sigue deshabilitado en el pipeline.
+
+**Resultado:** `agents/map_scope.py` (capa determinista compartida), veredicto `not_applicable` en el Validator, filtro en Search,
+Social y Web, `"no aplica al mapa"` en `DATA_CORRECTION_PHRASES`, y la auditoría `db/checks/2026-10-13-map-scope-audit.md`.

@@ -729,3 +729,142 @@ def test_an_unattributed_social_row_cannot_sustain_a_100_nor_raise_the_pending_f
     assert ValidatorAgent._apply_exclusive_signal_cap("celiac_friendly", [], marked) == ("celiac_friendly", [])
     plain = [{"source": "social", "text": "Todo es 100% libre de gluten", "url": None}]
     assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], plain) == ("gluten_free_100", [])
+
+
+# --- Map scope rules (2026-10-13): "no aplica al mapa" is never amber and never needs_review ---
+
+SCOPE_CHAINS = ["Géant Fresh Market", "Tata", "Devoto", "Disco", "Tienda Inglesa", "Carrefour", "Coto", "Jumbo", "Día"]
+FOOD_CHAINS = ["Zero Helados", "Ramona", "Mi Cocina Sin Gluten"]
+
+
+@pytest.mark.parametrize("name", SCOPE_CHAINS)
+def test_a_general_retail_chain_does_not_apply_and_costs_no_model_call(name):
+    llm = MagicMock()
+    out = ValidatorAgent(MagicMock(), llm).evaluate({"name": name, "category": "shop", "safety_level": "options_available"})
+
+    llm.complete_json.assert_not_called()
+    assert out["verdict"] == "not_applicable"
+    assert out["status"] == "discarded"
+    assert out["reason"].startswith("No aplica al mapa: cadena de comercio general")
+    assert out["flags"] == ["no aplica al mapa: cadena de comercio general"]
+    assert out["confidence"] is None  # safety evidence was not judged
+    assert out["category"] == "shop" and out["safety_level"] == "options_available"
+
+
+@pytest.mark.parametrize(
+    "place",
+    [
+        {"name": "Blog Celíaco Feliz"},
+        {"name": "Escuela de Cocina Sin Gluten"},
+        {"name": "Recetas Sin Gluten Uruguay"},
+    ],
+)
+def test_a_blog_a_school_or_a_recipe_account_does_not_apply(place):
+    llm = MagicMock()
+    out = ValidatorAgent(MagicMock(), llm).evaluate(place)
+
+    llm.complete_json.assert_not_called()
+    assert out["status"] == "discarded" and out["verdict"] == "not_applicable"
+    assert out["flags"] == ["no aplica al mapa: no vende ni sirve al público"]
+    assert out["safety_level"] == DEFAULT_SAFETY_LEVEL
+
+
+@pytest.mark.parametrize("confidence", [0.2, 0.6, 0.75, 0.95, None])
+def test_the_models_not_applicable_is_discarded_at_any_confidence(confidence):
+    """By Gessi: nothing in the name says it is a cooking school; the model says so from the evidence it was given."""
+    llm = MagicMock()
+    llm.complete_json.return_value = {
+        "verdict": "not_applicable",
+        "confidence_score": confidence,
+        "category": "restaurant",
+        "safety_level": "celiac_friendly",
+        "reasoning": "Es una escuela de cocina sin gluten: las reseñas hablan de cursos y no hay venta de comida al público.",
+        "flags": ["no vende ni sirve al público"],
+        "recommendation": "No publicar.",
+    }
+    out = ValidatorAgent(MagicMock(), llm).evaluate(
+        {"name": "By Gessi Cocina Inclusiva", "category": "restaurant"}, [{"text": "Excelente el curso de panificados sin gluten"}]
+    )
+
+    llm.complete_json.assert_called_once()
+    assert out["status"] == "discarded"
+    assert out["verdict"] == "not_applicable"
+    assert out["reason"] == (
+        "No aplica al mapa: Es una escuela de cocina sin gluten: las reseñas hablan de cursos y no hay venta de comida al público."
+    )
+    assert out["flags"] == ["no aplica al mapa: no vende ni sirve al público"]
+    assert out["confidence"] is None
+
+
+def test_a_topic_page_in_social_url_does_not_exclude_a_real_business():
+    """Where a lead came from is not what the place is (audit of 2026-10-13). The Social agent drops topic pages as leads."""
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "needs_review", "confidence_score": 0.6, "category": "cafe",
+                                      "safety_level": "options_available"}
+    out = ValidatorAgent(MagicMock(), llm).evaluate(
+        {"name": "Panadería Ramona Gluten Free", "social_url": "https://www.instagram.com/popular/panaderia-sin-gluten"}
+    )
+    llm.complete_json.assert_called_once()
+    assert out["status"] == "needs_review"
+
+
+def test_not_applicable_is_code_enforced_in_the_gates():
+    for conf in (0.0, 0.5, 0.7, 0.85, 1.0, None):
+        assert ValidatorAgent._decide_status("not_applicable", conf) == "discarded"
+
+
+@pytest.mark.parametrize("name", FOOD_CHAINS)
+def test_a_food_or_specialised_chain_is_still_evaluated_by_the_model_and_the_gates(name):
+    llm = MagicMock()
+    llm.complete_json.return_value = {
+        "verdict": "approved", "confidence_score": 0.9, "category": "cafe", "safety_level": "celiac_friendly",
+        "reasoning": "Evidencia explícita de sin TACC.",
+    }
+    agent = ValidatorAgent(MagicMock(), llm)
+
+    out = agent.evaluate({"name": name, "category": "cafe"})
+    assert llm.complete_json.call_count == 1
+    assert out["status"] == "approved" and out["verdict"] == "approved"
+    assert not any("no aplica" in f for f in out["flags"])
+
+    llm.complete_json.return_value = {**llm.complete_json.return_value, "verdict": "needs_review", "confidence_score": 0.6}
+    assert agent.evaluate({"name": name, "category": "cafe"})["status"] == "needs_review"
+
+
+def test_run_persists_not_applicable_as_discarded_with_its_note_and_counts_it():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Carrefour Market", "category": "shop"}]
+    db.fetch_reviews_for_place.return_value = []
+    llm = MagicMock()
+
+    summary = ValidatorAgent(db, llm).run()
+
+    llm.complete_json.assert_not_called()
+    assert summary["not_applicable"] == 1
+    assert summary["discarded"] == 0 and summary["needs_review"] == 0 and summary["approved"] == 0 and summary["errors"] == 0
+    _, kwargs = db.update_place_validation.call_args
+    assert kwargs["status"] == "discarded"
+    assert kwargs["confidence"] is None
+    assert kwargs["notes"].startswith("No aplica al mapa: ")
+    assert kwargs["flags"] == ["no aplica al mapa: cadena de comercio general"]
+    logged = [c for c in db.insert_agent_log.call_args_list if c.args[1] == "validate"]
+    assert logged[0].args[2]["verdict"] == "not_applicable"
+
+
+def test_rubric_states_the_scope_criterion_and_never_lets_it_approve():
+    from agents.validator_agent import RUBRIC
+
+    assert '"not_applicable"' in RUBRIC
+    assert "cadena de comercio general" in RUBRIC and "no vende ni sirve al público" in RUBRIC
+    assert "no la cantidad de sucursales" in RUBRIC
+    assert "nunca para aprobar" in RUBRIC
+    assert "supermercados, dietéticas" not in RUBRIC  # a supermarket is no longer a "shop" of this map
+
+
+def test_rubric_names_no_in_scope_business_and_scope_is_not_safety_evidence():
+    """A/B iteration 1 (2026-10-13): naming Zero Helados / Ramona / Mi Cocina Sin Gluten in the RUBRIC raised their confidence."""
+    from agents.validator_agent import RUBRIC
+
+    for name in FOOD_CHAINS:
+        assert name not in RUBRIC
+    assert "no es evidencia de seguridad" in RUBRIC

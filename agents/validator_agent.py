@@ -6,7 +6,9 @@ verdict ``{verdict, confidence_score, category, safety_level, reasoning, flags,
 recommendation}``. A three-tier verdict (``approved`` / ``needs_review`` /
 ``rejected``) maps to the candidate's ``status``: ``approved`` → ``approved``,
 ``rejected`` → ``discarded``, ``needs_review`` → ``needs_review`` (the human-review
-queue, held back from the map). Confidence, reasoning, flags and the suggested
+queue, held back from the map). A fourth verdict, ``not_applicable`` (map scope
+rules: a general retail chain, or a place that does not sell to the public), is
+always ``discarded``, with a "No aplica al mapa" note. Confidence, reasoning, flags and the suggested
 operator action are persisted for auditing. Each validation — and a final run
 summary — is written to ``agent_log``.
 
@@ -25,12 +27,19 @@ import unicodedata
 from agents.base import BaseAgent
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.map_scope import out_of_scope_reason, scope_flag, scope_kind_from_flags, scope_note
 
 logger = logging.getLogger("celiacmap.agent")
 
 ALLOWED_CATEGORIES = {"restaurant", "cafe", "shop"}
 ALLOWED_SAFETY = {"gluten_free_100", "celiac_friendly", "options_available"}
-ALLOWED_VERDICTS = {"approved", "rejected", "needs_review"}
+ALLOWED_VERDICTS = {"approved", "rejected", "needs_review", "not_applicable"}
+# Map scope rules (2026-10-13): a general retail chain, or a place that teaches or informs without selling to the public, does not
+# apply to the map. It is discarded at any confidence: never amber, never needs_review (agents/map_scope.py, RUBRIC "Alcance").
+NOT_APPLICABLE = "not_applicable"
+NOT_APPLICABLE_RECOMMENDATION = (
+    "No publicar: fuera del alcance del mapa. Si es un error, el administrador puede aprobarlo con una APROBACIÓN MANUAL."
+)
 DEFAULT_SAFETY_LEVEL = "options_available"
 
 # Community kitchen declarations (docs/superpowers/specs/2026-09-24-kitchen-info-design.md).
@@ -85,6 +94,7 @@ VERDICT_TO_STATUS = {
     "approved": "approved",
     "rejected": "discarded",
     "needs_review": "needs_review",
+    "not_applicable": "discarded",
 }
 
 # Fixed across every candidate in a run, so it is sent as a cached system block.
@@ -97,6 +107,12 @@ dirección, ciudad/país y una categoría estimada.
 
 Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas \
 celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
+
+Alcance del mapa (decidilo antes que el veredicto de seguridad). Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
+- Cadenas de comercio general: supermercados, hipermercados, autoservicios y farmacias de cadena (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
+- Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
+Para esos casos respondé "verdict": "not_applicable", explicá el motivo en reasoning y poné en flags exactamente "cadena de comercio general" o "no vende ni sirve al público". Un lugar fuera de alcance nunca es "needs_review" ni "approved".
+SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia de seguridad: no sube la confianza ni cambia el veredicto.
 
 Rubric de validación (veredicto):
 - "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el \
@@ -118,7 +134,7 @@ Flags de alerta a detectar (cada una reduce la confianza):
 Asigna una categoría (exactamente una):
 - "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
 - "cafe": cafés, cafeterías, panaderías, pastelerías.
-- "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
+- "shop": almacenes, dietéticas / comercios de alimentos saludables, tiendas especializadas en productos sin gluten.
 
 Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
 - "gluten_free_100": establecimiento donde se cocinan y venden ÚNICAMENTE \
@@ -146,11 +162,11 @@ reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_r
 
 Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
 
-Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. Única excepción: reconocer por su nombre una cadena de comercio general sirve solo para excluirla ("not_applicable"), nunca para aprobar. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, \
 exactamente con esta forma:
-{"verdict": "approved" | "rejected" | "needs_review",
+{"verdict": "approved" | "rejected" | "needs_review" | "not_applicable",
  "confidence_score": <número entre 0.0 y 1.0>,
  "category": "restaurant" | "cafe" | "shop",
  "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
@@ -310,6 +326,10 @@ class ValidatorAgent(BaseAgent):
         (``scripts/revalidate_low_confidence.py``) reuses it so batch and one-off
         re-evaluation share one code path.
         """
+        excluded = out_of_scope_reason(place.get("name"), website=place.get("website"))
+        if excluded:
+            # Deterministic layer of the map scope rules: no model call, no safety judgement.
+            return self._not_applicable(place, excluded.kind, excluded.detail)
         raw = self.llm.complete_json(
             RUBRIC, self._build_user_prompt(place, reviews, claims, evidence), model=self.model
         )
@@ -328,8 +348,11 @@ class ValidatorAgent(BaseAgent):
         Defense in depth: regardless of the model's stated verdict, auto-approval
         requires confidence >= 0.85; confidence < 0.5 (or an explicit 'rejected')
         rejects; everything in between (and the < 0.7 safety floor) is held for a
-        human as 'needs_review'.
+        human as 'needs_review'. 'not_applicable' (map scope rules) is discarded
+        whatever the confidence.
         """
+        if verdict == NOT_APPLICABLE:
+            return "discarded"  # out of the map's scope at any confidence: never amber, never needs_review
         conf = confidence if confidence is not None else 0.0
         if verdict == "rejected" or conf < REJECT_THRESHOLD:
             return "discarded"
@@ -349,6 +372,12 @@ class ValidatorAgent(BaseAgent):
         """Coerce the model output into safe, schema-valid values."""
         raw = str(verdict.get("verdict", "")).strip().lower()
         verdict_label = raw if raw in ALLOWED_VERDICTS else "needs_review"
+        if verdict_label == NOT_APPLICABLE:
+            return self._not_applicable(
+                place,
+                scope_kind_from_flags(self._coerce_flags(verdict.get("flags"))),
+                self._scrub_owner_health(str(verdict.get("reasoning", verdict.get("reason", ""))).strip()),
+            )
 
         category = verdict.get("category")
         if category not in ALLOWED_CATEGORIES:
@@ -384,6 +413,22 @@ class ValidatorAgent(BaseAgent):
                 str(verdict.get("recommendation", "")).strip()
             )
             or None,
+        }
+
+    @staticmethod
+    def _not_applicable(place: dict, kind: str | None, detail: str | None) -> dict:
+        """The verdict of a place outside the map's scope: discarded, with a fixed note header and flag.
+
+        Safety was not judged, so no confidence is written and the row's category and safety level stay as they were."""
+        return {
+            "verdict": NOT_APPLICABLE,
+            "status": "discarded",
+            "category": place.get("category"),
+            "safety_level": place.get("safety_level") or DEFAULT_SAFETY_LEVEL,
+            "confidence": None,
+            "reason": scope_note(kind, detail),
+            "flags": [scope_flag(kind)],
+            "recommendation": NOT_APPLICABLE_RECOMMENDATION,
         }
 
     @staticmethod
@@ -465,6 +510,7 @@ class ValidatorAgent(BaseAgent):
         approved = 0
         needs_review = 0
         discarded = 0
+        not_applicable = 0
         errors = 0
 
         for place in pending:
@@ -524,7 +570,9 @@ class ValidatorAgent(BaseAgent):
                 )
                 continue
 
-            if status == "approved":
+            if v["verdict"] == NOT_APPLICABLE:
+                not_applicable += 1
+            elif status == "approved":
                 approved += 1
             elif status == "needs_review":
                 needs_review += 1
@@ -553,6 +601,7 @@ class ValidatorAgent(BaseAgent):
             "approved": approved,
             "needs_review": needs_review,
             "discarded": discarded,
+            "not_applicable": not_applicable,
             "errors": errors,
         }
         self.log(

@@ -125,12 +125,24 @@ to `validation_notes`, and `flags` / `recommendation` to their own columns.
 `category` + `safety_level` are retained in the output (the schema requires them and
 the map renders safety badges).
 
+**Map scope — a fourth verdict, `not_applicable` (adopted 2026-10-13).** A general retail chain (supermarket, hypermarket,
+self-service store, pharmacy chain) or a place that teaches or informs without selling or serving to the public does not apply
+to the map. `_decide_status` maps it to `discarded` at any confidence (never `needs_review`, never `approved`);
+`validation_notes` starts with `No aplica al mapa:`, `flags` carries one fixed text and `validation_confidence` is not written.
+`agents/map_scope.py` is the deterministic layer (no model call) that the discovery agents share.
+
 **Full rubric (Spanish — as it exists in code):**
 
 ```text
 Eres el Validator Agent de CeliacMap, un sistema de validación conservador para lugares gluten free / sin TACC en Uruguay y Argentina. Recibes un único lugar candidato descubierto automáticamente — vía Google Places, páginas públicas de redes sociales o investigación web — así que normalmente solo tienes su nombre, dirección, ciudad/país y una categoría estimada.
 
 Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
+
+Alcance del mapa (decidilo antes que el veredicto de seguridad). Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
+- Cadenas de comercio general: supermercados, hipermercados, autoservicios y farmacias de cadena (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
+- Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
+Para esos casos respondé "verdict": "not_applicable", explicá el motivo en reasoning y poné en flags exactamente "cadena de comercio general" o "no vende ni sirve al público". Un lugar fuera de alcance nunca es "needs_review" ni "approved".
+SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia de seguridad: no sube la confianza ni cambia el veredicto.
 
 Rubric de validación (veredicto):
 - "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
@@ -148,7 +160,7 @@ Flags de alerta a detectar (cada una reduce la confianza):
 Asigna una categoría (exactamente una):
 - "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
 - "cafe": cafés, cafeterías, panaderías, pastelerías.
-- "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
+- "shop": almacenes, dietéticas / comercios de alimentos saludables, tiendas especializadas en productos sin gluten.
 
 Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
 - "gluten_free_100": establecimiento donde se cocinan y venden ÚNICAMENTE productos aptos para celíacos (cocina exclusiva / dedicada). Un local que cocina con gluten pero ofrece menú, preparación aparte o cocina separada para celíacos NO es "gluten_free_100".
@@ -163,10 +175,10 @@ Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la
 
 Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
 
-Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. Única excepción: reconocer por su nombre una cadena de comercio general sirve solo para excluirla ("not_applicable"), nunca para aprobar. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
-{"verdict": "approved" | "rejected" | "needs_review",
+{"verdict": "approved" | "rejected" | "needs_review" | "not_applicable",
  "confidence_score": <número entre 0.0 y 1.0>,
  "category": "restaurant" | "cafe" | "shop",
  "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
@@ -188,7 +200,8 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdo
 > kitchen change — `gluten_free_100` defined as "only celiac-safe products are
 > cooked and sold" plus the `declaraciones_comunidad` paragraph, measured in four
 > real-model A/B iterations — is recorded under **Kitchen information as review
-> evidence** there, in ADR-007 and in prompts.md §31.)
+> evidence** there, in ADR-007 and in prompts.md §31. The 2026-10-13
+> map scope paragraph and the `not_applicable` verdict are recorded under **Map scope rules** there and in prompts.md §42.)
 
 ## The Chatbot System Prompts — Router + Redactor
 
@@ -222,7 +235,7 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 │               (Form B) · ranking.js · opinions.js · chat.js (widget -> the `chat` function) · pwa.js · geo.js
 ├── agents/     base.py · {search,social,web,validator,updater,suggestion,outreach}_agent.py · outreach_reply_handler.py ·
 │               review_handler.py · manual_overrides.py · admin_notify.py · evidence_finder.py · evidence_freeze.py ·
-│               clients/ (supabase, google_places, tavily,
+│               map_scope.py · clients/ (supabase, google_places, tavily,
 │               llm, resend, website_scraper)
 ├── apps/mobile/ Capacitor Android shell: capacitor.config.json · scripts/ (sync-web, web-bundle, icons) · native/native.js · android/
 ├── mcp_server/ server.py (6 tools over Supabase + the RUBRIC) · skills/validator-rubric/SKILL.md (academic deliverable)
@@ -341,12 +354,18 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   had said. Never inflate or deflate `validation_confidence`; leave `verified` alone unless a human vouches for it.
 - **`DATA_CORRECTION_PHRASES`** (`agents/manual_overrides.py`): a `CORRECCIÓN MANUAL` header that only corrects data
   ("país/ciudad corregidos", "ciudad corregida", "dirección corregida", "duplicado de", "lugar de ejemplo del seed", "no es un comercio",
-  "fuera del alcance geográfico") does not protect a place; each header line is judged on its own; `OVERRIDE` / `APROBACIÓN MANUAL` always
+  "fuera del alcance geográfico", "no aplica al mapa") does not protect a place; each header line is judged on its own; `OVERRIDE` / `APROBACIÓN MANUAL` always
   protect. In fix scripts, a data-only note uses one of those phrases and a safety decision goes on its own line.
 - **100% label** [Manual Validator overrides; Kitchen information]: `gluten_free_100` means only celiac-safe products are
   cooked and sold. Cooking everything but offering a celiac menu, separate prep or a separate kitchen is
   `options_available`; one shared kitchen is not 100% by default. Only the admin upgrades to 100%. Kitchen declarations
   are unverified and live only on `suggestions` / `place_reports` (never `places`).
+- **Map scope** [Map scope rules]: general retail chains (supermarkets, hypermarkets, self-service stores, pharmacy chains) and places that
+  teach or inform without selling or serving to the public (cooking schools, workshops, blogs, recipe accounts, information and topic pages) do
+  not go on the map, even with a gluten-free shelf. The criterion is the line of business, never the number of branches: a food or specialised
+  chain is evaluated branch by branch. The Validator answers `not_applicable` (always `discarded`, note `No aplica al mapa:`); Search, Social and
+  Web create no candidate (`agents/map_scope.py`). The brand lists are examples; the RUBRIC names no in-scope business. An existing row is
+  discarded only by the admin, with `CORRECCIÓN MANUAL: no aplica al mapa`.
 - **No third-party health data is collected** [Privacy phase 1]: whether an owner is celiac is no longer asked, stored,
   shown to the admin or sent to the model (`owner_celiac` columns dropped from 2026-10-07; the chat stops asking in the
   next prompt batch). Never add a question about a person's health. A free-text claim about one is evidence for human
@@ -434,7 +453,7 @@ lives ("s/f" = no date stated).
 
 - **Mobile, PWA and location (2026-10-01 → 10-05)** — PWA first, Capacitor Android for demos (device test pending), location only on tap, branch + PR workflow, runners on `ubuntu-24.04` (debt: move to 26). [pilot](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02) · [ADR-010](docs/architecture/ADR-010-mobile-strategy.md) · [plan](docs/plans/PLAN-mobile-app.md) · [Android](docs/DECISIONS.md#android-demo-app-with-capacitor-2026-10-03) · [«Cerca mío»](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02) · [PWA](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02) · [icons](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02) · [polish](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01) · [runners](docs/DECISIONS.md#ci-runners-pinned-to-ubuntu-2404-2026-10-05)
 - **Privacy and legal texts (2026-09-29 → 10-06)** — `places` read by column grant, `owner_celiac` out (column drop 2026-10-07), retention windows, deletion requests, policy + terms v1.1 (edit the `.md` first). [grant](docs/DECISIONS.md#places-public-read-by-column-grant--privacy-phase-1-2026-09-29) · [phase 1](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29) · [phase 2](docs/DECISIONS.md#privacy-phase-2--retention-windows-and-providers-2026-09-30) · [v1.0](docs/DECISIONS.md#privacy-policy-and-terms-of-use-published-v10-2026-10-05) · [v1.1](docs/DECISIONS.md#legal-texts-v11--minors-clause-2026-10-06) · [Google reviews ToS](docs/DECISIONS.md#google-places-reviews--tos-driven-access-restriction--30-day-expiration-2026-09-05)
-- **Validator, evidence and overrides (2026-09-01 → 10-13)** — overrides never silent, the 100% labeling rule, `place_evidence`, the evidence finder, contact frozen only by the registry; two audit signals and the `needs_review` queue stay open. [overrides](docs/DECISIONS.md#manual-validator-overrides--allowed-but-never-silent) · [audit](docs/DECISIONS.md#audit-2026-09-24--evidence-for-the-validator--100-only-with-explicit-evidence) · [evidence finder](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27) · [re-validation](docs/DECISIONS.md#retroactive-re-validation-of-pre-three-tier-rubric-approvals-2026-09-06) · [own knowledge](docs/DECISIONS.md#validator--parametric-knowledge-vs-provided-evidence-2026-09-06) · [name substring](docs/DECISIONS.md#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07) · [queue](docs/DECISIONS.md#cola-de-needs_review-sin-salida-automática--71-lugares-huérfanos-de-contacto-2026-09-06) · [Updater + Google risk](docs/DECISIONS.md#updater-manual-contact-protection-and-google-risk-2026-10-02) · [contact registry](docs/DECISIONS.md#contact-data-frozen-only-by-the-registry-2026-10-06) · [social author](docs/DECISIONS.md#evidence-finder--a-social-quote-needs-a-verified-author-2026-10-13) · [post ≠ profile](docs/DECISIONS.md#social-agent--a-post-is-not-a-profile-2026-10-13)
+- **Validator, evidence and overrides (2026-09-01 → 10-13)** — overrides never silent, the 100% labeling rule, `place_evidence`, the evidence finder, contact frozen only by the registry; two audit signals and the `needs_review` queue stay open. [overrides](docs/DECISIONS.md#manual-validator-overrides--allowed-but-never-silent) · [audit](docs/DECISIONS.md#audit-2026-09-24--evidence-for-the-validator--100-only-with-explicit-evidence) · [evidence finder](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27) · [re-validation](docs/DECISIONS.md#retroactive-re-validation-of-pre-three-tier-rubric-approvals-2026-09-06) · [own knowledge](docs/DECISIONS.md#validator--parametric-knowledge-vs-provided-evidence-2026-09-06) · [name substring](docs/DECISIONS.md#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07) · [queue](docs/DECISIONS.md#cola-de-needs_review-sin-salida-automática--71-lugares-huérfanos-de-contacto-2026-09-06) · [Updater + Google risk](docs/DECISIONS.md#updater-manual-contact-protection-and-google-risk-2026-10-02) · [contact registry](docs/DECISIONS.md#contact-data-frozen-only-by-the-registry-2026-10-06) · [social author](docs/DECISIONS.md#evidence-finder--a-social-quote-needs-a-verified-author-2026-10-13) · [post ≠ profile](docs/DECISIONS.md#social-agent--a-post-is-not-a-profile-2026-10-13) · [map scope](docs/DECISIONS.md#map-scope-rules-2026-10-13)
 - **Data quality, dedup and scope (2026-09-01 → 10-01)** — one Google place one row, a social profile is not a website, UY+AR bounding box, Brazil / Chile rows discarded, address geocode fallback. [dedup](docs/DECISIONS.md#one-google-place-one-row--dedup-across-sources-2026-09-27) · [social profile](docs/DECISIONS.md#a-social-profile-is-not-a-website-2026-10-01) · [monthly review](docs/DECISIONS.md#monthly-run-review-and-admin-decisions-2026-10-01) · [data pass](docs/DECISIONS.md#audit-data-quality-pass-2026-09-25--fictional-seed-places-wrong-countrycity-non-business-rows) · [Brazil](docs/DECISIONS.md#brazil-out-of-scope-places--curitiba-cluster-2026-09-01) · [scope guard](docs/DECISIONS.md#geographic-scope-guard--insert_place_candidate-bounding-box-2026-09-01) · [geocode-gate](docs/DECISIONS.md#geocode-gate--address-fallback-resolve_location) · [ranking seed](docs/DECISIONS.md#community-ranking-seed--data-quality-findings-adr-005-fase-d-2026-09-02)
 - **Forms, kitchen and community (Jun 2026 → 09-24)** — anon INSERT-only suggestions, unverified kitchen questions (ADR-007), reports as evidence, opinions through a public view (ADR-008). [suggest form](docs/DECISIONS.md#suggest-a-place-public-form-design-decisions) · [kitchen](docs/DECISIONS.md#kitchen-information-as-review-evidence-2026-09-24) · [Form B](docs/DECISIONS.md#form-b-collects-reviews-not-kitchen-data-2026-09-24) · [opinions](docs/DECISIONS.md#community-opinions-on-the-public-site-2026-09-24) · [reports](docs/DECISIONS.md#community-reports-place_reports-design-decisions)
 - **Chatbot (2026-09-19 → 09-27)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [C](docs/DECISIONS.md#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](docs/DECISIONS.md#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](docs/DECISIONS.md#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía) · [by name](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23) · [battery](docs/DECISIONS.md#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25) · [region](docs/DECISIONS.md#department--province-search--placesregion-2026-09-26) · [`category_zero`](docs/DECISIONS.md#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)

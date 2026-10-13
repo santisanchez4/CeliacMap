@@ -23,7 +23,9 @@ then turn each promising result into a real ``places`` candidate:
    Only an account's own page is a profile: a lead that came from a reel or a post
    gets no ``social_url``, and its text is stored as not attributable (the address
    does not say who published it), which the Validator does not weigh. A topic or
-   search page of the platform is not a lead at all.
+   search page of the platform is not a lead at all, and neither is a page that
+   does not sell to the public or a general retail chain (map scope rules,
+   ``agents/map_scope.py``).
 
 Every result and a final run summary are written to ``agent_log``. The Validator
 judges social candidates exactly like any other pending place.
@@ -40,6 +42,7 @@ from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
 from agents.clients.tavily_client import TavilySearchClient
 from agents.evidence_finder import social_page_kind
+from agents.map_scope import out_of_scope_reason
 from agents.validator_agent import UNATTRIBUTED_ROW_PREFIX
 
 logger = logging.getLogger("celiacmap.agent")
@@ -61,14 +64,19 @@ From the title and snippet, extract:
 name, use null.
 - "city": the city if mentioned, else null.
 - "category": exactly one of "restaurant" (somewhere to eat), "cafe" (cafe, \
-coffee shop, bakery, pastry shop) or "shop" (grocery, supermarket, health-food / \
-dietetica). If unclear, use null.
+coffee shop, bakery, pastry shop) or "shop" (grocery, health-food / dietetica, \
+specialised gluten-free shop). If unclear, use null.
 - "address": a street address if present in the text, else null.
+- "sells_to_public": false when the page teaches or informs and does not sell or \
+serve food or products to the public (a blog, a recipe account, a cooking school or \
+workshop, an association or information page); true when it is a business that \
+sells or serves food. If the text does not make it clear, use null.
 
 Respond with ONLY a JSON object, no prose, exactly:
 {"name": <string|null>, "city": <string|null>,
  "category": "restaurant" | "cafe" | "shop" | null,
- "address": <string|null>}
+ "address": <string|null>,
+ "sells_to_public": true | false | null}
 """
 
 
@@ -172,6 +180,8 @@ class SocialAgent(BaseAgent):
             "city": (verdict.get("city") or "").strip() or None,
             "category": category,
             "address": (verdict.get("address") or "").strip() or None,
+            # Only an explicit false drops the lead; true or unknown goes on to the Validator.
+            "sells_to_public": verdict.get("sells_to_public"),
             # The post/profile text itself ("100% sin TACC", "cocina exclusiva"...) is the
             # evidence that separates a dedicated venue from one with options; the Validator
             # reads it from place_evidence (audit plan step 1).
@@ -197,6 +207,7 @@ class SocialAgent(BaseAgent):
         geocoded = 0
         inserted = 0
         skipped = 0
+        not_for_map = 0
         errors = 0
 
         for q in queries:
@@ -237,6 +248,21 @@ class SocialAgent(BaseAgent):
                 # Only an account's own page is the business's profile. A reel or a post is where the lead came from, not whose it
                 # is: it is not stored as the profile, and its text is kept as not attributable (the Validator does not weigh it).
                 attributable = kind != "post"
+
+
+                # Map scope rules: a page that does not sell or serve to the public (a blog, a recipe account, a cooking school),
+                # or a general retail chain, is not a lead. Decided before geocoding, so it costs no Google call.
+                excluded = out_of_scope_reason(lead["name"])
+                if lead["sells_to_public"] is False or excluded:
+                    skipped += 1
+                    not_for_map += 1
+                    self.log(
+                        "social_not_for_map",
+                        {"name": lead["name"], "url": url,
+                         "reason": excluded.detail if excluded else "la página no vende ni sirve al público"},
+                        status="success",
+                    )
+                    continue
 
                 lead_city = lead["city"] or q["city"]
 
@@ -284,6 +310,18 @@ class SocialAgent(BaseAgent):
 
                 if resolved.business_status == "CLOSED_PERMANENTLY":
                     skipped += 1
+                    continue
+
+                # The lead can resolve to a branch of a general retail chain ("Fresh Market" -> "Géant Fresh Market").
+                excluded = out_of_scope_reason(resolved.name)
+                if excluded:
+                    skipped += 1
+                    not_for_map += 1
+                    self.log(
+                        "social_not_for_map",
+                        {"name": resolved.name, "reason": excluded.detail},
+                        status="success",
+                    )
                     continue
 
                 external_id = resolved.place_id
@@ -356,6 +394,7 @@ class SocialAgent(BaseAgent):
             "geocoded": geocoded,
             "inserted": inserted,
             "skipped": skipped,
+            "not_for_map": not_for_map,
             "errors": errors,
         }
         self.log(

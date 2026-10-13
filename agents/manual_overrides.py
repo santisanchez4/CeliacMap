@@ -5,7 +5,7 @@ knowledge the model cannot reproduce. Automatic re-evaluations must not erase th
 record or overturn the admin's safety level on their own.
 
 Exception: a ``CORRECCIÓN MANUAL`` header whose text is a pure *data* correction (a geography fix,
-"not a business", a sample place) is not a decision about the place's safety and protects nothing —
+"not a business", a sample place, outside the map's scope) is not a decision about the place's safety and protects nothing —
 see ``DATA_CORRECTION_PHRASES``.
 """
 
@@ -48,6 +48,7 @@ DATA_CORRECTION_PHRASES = (
     "fuera del alcance geográfico",
     "dirección corregida",
     "duplicado de",
+    "no aplica al mapa",
 )
 
 
