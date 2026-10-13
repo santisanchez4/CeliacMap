@@ -3,48 +3,48 @@
   "n": 3,
   "mode": "reevaluate",
   "place_id": "861899db-1abe-4a8b-8d09-b52393df02a9",
-  "action": "reevaluate"
+  "action": "sin_cambios",
+  "motivo": "Por decisión del admin (2026-10-13) queda como está (needs_review); el dry-run del Validator daba approved 0,88 en ámbar."
  },
  {
   "n": 6,
   "mode": "reevaluate",
   "place_id": "61fa7e8b-3366-4724-b09c-fb7150e35653",
-  "action": "reevaluate",
-  "nota": "Parece una planta/empresa (Google no la clasifica como comercio de alimentos; giros IM: elaboración, fraccionamiento, importador, depósito). Se re-evalúa por decisión del admin."
+  "action": "aprobacion_manual",
+  "nota": "Parece una planta/empresa (Google no la clasifica como comercio de alimentos; giros IM: elaboración, fraccionamiento, importador, depósito). Se re-evalúa por decisión del admin.",
+  "motivo": "Decisión manual del admin (Santiago Sánchez, 2026-10-13): aprobado en verde con APROBACIÓN MANUAL (db/checks/2026-10-13-imm/aprobaciones_manuales.sh); evidencia en db/fixes/2026-10-13-imm-admin-evidence.sql. Reemplaza la re-evaluación del Validator."
  },
  {
   "n": 9,
   "mode": "reevaluate",
   "place_id": "dbc2db5e-3078-44a3-9e03-f0cbcf19d07d",
-  "action": "reevaluate",
+  "action": "aprobacion_manual",
   "exclude": [
    "soy celíaca"
   ],
-  "nota": "Se excluye un testimonio que menciona la salud de una persona."
+  "nota": "Se excluye un testimonio que menciona la salud de una persona.",
+  "motivo": "Decisión manual del admin (Santiago Sánchez, 2026-10-13): aprobado en verde con APROBACIÓN MANUAL (db/checks/2026-10-13-imm/aprobaciones_manuales.sh); evidencia en db/fixes/2026-10-13-imm-admin-evidence.sql. Reemplaza la re-evaluación del Validator."
  },
  {
   "n": 23,
   "mode": "reevaluate",
   "place_id": "4f865c2a-afd7-4d95-b3fb-853f50f406fa",
-  "action": "reevaluate"
+  "action": "sin_cambios",
+  "motivo": "Por decisión del admin (2026-10-13) queda como está (needs_review); el dry-run del Validator daba needs_review 0,62."
  },
  {
   "n": 28,
   "mode": "reevaluate",
   "place_id": "7362c23b-b02d-4930-9dba-8e00a9fc6bf6",
-  "action": "reevaluate"
+  "action": "aprobacion_manual",
+  "motivo": "Decisión manual del admin (Santiago Sánchez, 2026-10-13): aprobado en verde con APROBACIÓN MANUAL (db/checks/2026-10-13-imm/aprobaciones_manuales.sh); evidencia en db/fixes/2026-10-13-imm-admin-evidence.sql. Reemplaza la re-evaluación del Validator."
  },
  {
   "n": 26,
   "mode": "reevaluate",
   "place_id": "698389ce-b609-43a2-9298-312a46233aa2",
-  "other_address": true,
-  "action": "reevaluate",
-  "exclude": [
-   "instagram.com",
-   "facebook.com/goutglutenfree"
-  ],
-  "nota": "Citas excluidas: hablan de otros negocios (cuenta @boutiquedecosasricas; locales de GOUT en CABA/Recoleta) o son reels que no se pueden atribuir a esta ficha. El sitio del listado de Google (gout.com.uy) no tiene texto. Queda solo la habilitación IM, que es de otra dirección."
+  "action": "ya_esta",
+  "motivo": "La habilitación IM de GOÛT GLUTEN FREE (Solano García 2496, vencida 30/11/2025) corresponde a Casa & Dispensa (1e21c93a…, verde, override manual 2026-09-07; «formerly Goût Gluten Free»). La fila «Goût» de Paraguay 1962 (698389ce…) no se toca: nada la vincula con la habilitación."
  },
  {
   "n": 34,
@@ -145,10 +145,11 @@
  {
   "n": 20,
   "mode": "new",
-  "action": "insert",
+  "action": "sin_cambios",
   "name": "Alfajores Juana La Loca",
   "category": "shop",
-  "nota": "Elaborador con tienda online; su sitio ofrece «pick up» en Marcelino Sosa 2433 y Google muestra horario. Caso límite de venta al público."
+  "nota": "Elaborador con tienda online; su sitio ofrece «pick up» en Marcelino Sosa 2433 y Google muestra horario. Caso límite de venta al público.",
+  "motivo": "Por decisión del admin (2026-10-13) no se inserta por ahora; el dry-run del Validator daba needs_review 0,72."
  },
  {
   "n": 21,

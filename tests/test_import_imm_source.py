@@ -190,7 +190,8 @@ def test_plan_file_covers_its_rows_once_with_a_reason():
     numbers = [e["n"] for e in plan]
     assert len(numbers) == len(set(numbers))
     for entry in plan:
-        assert entry["action"] in imm.WRITE_ACTIONS + ("no_aplica", "no_verificable", "rechazado", "solo_reporte")
+        assert entry["action"] in imm.WRITE_ACTIONS + ("no_aplica", "no_verificable", "rechazado", "solo_reporte", "aprobacion_manual", "ya_esta",
+                                                      "sin_cambios")
         if entry["action"] not in imm.WRITE_ACTIONS:
             assert entry.get("motivo")
         if entry["action"] == "reevaluate":

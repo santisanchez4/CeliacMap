@@ -4069,6 +4069,46 @@ cambian nombre, dirección, categoría ni el tratamiento de cierres; el parche d
 `flags`, `verified`, `validation_confidence` ni `validation_notes` (un test lo fija). Tests primero: seis fallaron antes del cambio.
 [Runbook](runbooks/manual-contact-fields.md).
 
+### IM Montevideo as an evidence source (2026-10-13)
+
+**Contexto.** La Intendencia de Montevideo (Servicio de Regulación Alimentaria) publica la capa `Locales_Gluten_Free`: los locales con
+habilitación «libre de gluten» (35 el 2026-10-13: 17 vigentes, 18 vencidas; última edición de la capa 25/01/2024). Es la primera fuente
+oficial que entra a CeliacMap.
+
+**Decisión.** La capa se usa como **evidencia, no como aprobación**:
+
+- Una habilitación entra como una fila `admin` en `place_evidence` con el texto literal de la capa (nombre, dirección, rubro, giros,
+  fechas) más la etiqueta `IM Montevideo - Locales_Gluten_Free` y la fecha de captura. `places.source` no gana un valor nuevo (los lugares
+  nuevos entran como `manual`); la fuente queda también en `agent_log`.
+- Todo lugar nuevo pasa por `insert_place_candidate` (`pending`) y por el Validator con la `RUBRIC` y los gates sin cambios. Una fila que
+  ya existe como `needs_review` / `discarded` se re-evalúa en su lugar o la aprueba el admin a mano: nunca vuelve a `pending`.
+- **La habilitación sola no da el 100%.** El texto de la capa no es una frase de exclusividad (`im_evidence_text` falla si alguna vez lo
+  pareciera): sin otra evidencia explícita, el Tope C deja «Tiene opciones sin TACC» con el flag del 100% pendiente del admin.
+- **Habilitación vencida = señal, no descarte.** Se anota «figura vencida en la fuente» y el lugar se valida igual; `CLOSED_PERMANENTLY`
+  en Google sí lo descarta.
+- **Un elaborador o distribuidor sin venta al público no es un lugar del mapa** («no aplica al mapa»). Se decide con los giros de la IM,
+  la ficha de Google y el sitio propio, y se lista con su motivo en el plan.
+
+**Herramienta.** `scripts/import_imm_source.py` (`gather` solo lee: Google + buscador de evidencia; `apply` es dry-run salvo `--apply`),
+guiado por `db/checks/2026-10-13-imm/plan.json`, donde cada fila de la capa tiene su decisión y su motivo. El plan puede excluir citas que
+hablan de otro negocio y sumar frases del sitio propio, que el código verifica como literales antes de usarlas.
+
+**Resultado** (detalle en `db/checks/2026-10-13-imm/reporte_final_imm.md`). De 35: 11 ya estaban en el mapa (8 «100%», 3 «opciones»; el
+registro «GOÛT GLUTEN FREE» de Solano García 2496 es Casa & Dispensa); 3 filas descartadas pasaron al mapa en 100% por `APROBACIÓN MANUAL`
+del admin (Cooperativa Helix, Ferniland, Me Gusta); 2 nuevas (Zero Helados Pocitos y Carrasco) quedaron en `needs_review` 0,72 por el
+Validator; 2 siguen en `needs_review` y 1 no se insertó por decisión del admin; 1 rechazada por cierre (Celicatessen); 14 no aplican al
+mapa; 1 solo reporte (la dirección la ocupa otro negocio).
+
+**Regla: las revisiones manuales se registran en el sistema.** Antes de aplicar se buscó una aprobación anterior de Helix, Ferniland y
+Me Gusta que el admin recordaba haber hecho: no había rastro en `agent_log`, `place_evidence` ni en las notas. Una revisión de redes o
+web que no se escribe no existe para el sistema. Desde ahora toda revisión manual deja **las dos cosas**: el encabezado `APROBACIÓN MANUAL`
+(o `OVERRIDE` / `CORRECCIÓN MANUAL`) en `validation_notes` con `scripts/review_queue.py`, y una fila `admin` en `place_evidence` con las
+citas textuales, la URL y la fecha.
+
+**Deuda.** (1) `agents/evidence_finder.py` toma como «propia» cualquier URL de Instagram con el mismo primer tramo que `social_url`
+(un reel): a la fila «Goût» de Paraguay 1962 le atribuyó citas de otros negocios; se excluyeron a mano y la fila no se tocó. (2) La capa
+es una foto: volver a capturarla es un trabajo manual. (3) Zero Helados Carrasco no tiene ficha de Google (`address_only`).
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

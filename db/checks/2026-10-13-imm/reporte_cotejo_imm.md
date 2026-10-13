@@ -21,13 +21,13 @@
 
 | Grupo | Cantidad | Detalle |
 |---|---|---|
-| YA ESTÁ en el mapa | 10 | 7 verdes, 3 ámbar |
+| YA ESTÁ en el mapa | 11 | 8 verdes, 3 ámbar |
 | YA ESTÁ en la base, fuera del mapa | 5 | 2 `needs_review`, 3 `discarded` |
-| DUDOSO (coincidencia parcial) | 4 | |
+| DUDOSO (coincidencia parcial) | 3 | |
 | NO ESTÁ | 16 | |
 | **Total** | **35** | |
 
-## 1. YA ESTÁ — publicado en el mapa (10)
+## 1. YA ESTÁ — publicado en el mapa (11)
 
 | # | IM (nombre · dirección) | En CeliacMap | Color | Status | Última validación | Dist. | Habilitación IM |
 |---|---|---|---|---|---|---|---|
@@ -38,6 +38,7 @@
 | 16 | UN LUGAR SIN GLUTEN · Dr. D. Terra 2148 | Un Lugar Sin Gluten · Dr. D. Terra 2148 | 🟢 verde | approved | Manual 2026-09-27 (Validator 2026-06-04, 0.95) | 0 m | vigente hasta 30/10/2027 |
 | 18 | ALARABI · Colonia 1779 | Alárabi Cocina Inclusiva · Colonia 1779 | 🟠 ámbar (`celiac_friendly`) | approved | Validator 2026-06-04 (0.82) | 0 m | vencida 30/11/2025 |
 | 25 | GLUTENO · Dr. J. Scoseria 2637 | gluteno Sana Ingesta · Dr. J. Scoseria 2637 | 🟠 ámbar (`celiac_friendly`) | approved | Validator 2026-06-04 (0.72) | 4 m | vencida 30/04/2024 |
+| 26 | GOÛT GLUTEN FREE · Solano García 2496 | **Casa & Dispensa** · Solano García 2496 (nombre actual del local) | 🟢 verde | approved | Override manual 2026-09-07 | 4 m | vencida 30/11/2025 |
 | 30 | RAMONA · Av. L. A. de Herrera 1196 | Café Ramona - WTC · Av. L. A. de Herrera 1196 | 🟢 verde | approved | Override manual 2026-09-07 | 15 m | vencida 06/04/2024 |
 | 31 | RAMONA · San José 900 | Café Ramona - Centro · San José 900 | 🟢 verde | approved | Override manual 2026-09-07 | 10 m | vencida 18/02/2025 |
 | 33 | SELKKIS · Paysandú 1846 bis | Selkkis Gluten Free · Paysandú 1846 bis | 🟢 verde | approved | Manual 2026-10-06 (Validator 2026-06-04, 0.95) | 5 m | vencida 14/07/2025 |
@@ -49,8 +50,11 @@ Notas:
 - **#18 y #25** se aprobaron en junio con el rubric binario anterior y confianza menor a 0,85 (0,82 y 0,72); hoy no
   pasarían el gate automático. No es parte de este cotejo, queda señalado.
 - **#18:** además existe una fila duplicada `discarded` (fuente social, marcada "duplicado de…"). Correcto como está.
+- **#26 (corregido el 2026-10-13):** en la primera versión figuraba como dudoso. El fix del 2026-09-07 que aprobó Casa & Dispensa ya
+  anotaba «formerly Goût Gluten Free»: la habilitación IM es de ese local, que está en el mapa en verde con su nombre actual. La fila
+  «Goût» de Paraguay 1962 (needs_review) es otro negocio y no se toca.
 - **#31:** en San José 894 hay otra fila verde, "La Panadería de Ramona" (17 m); la IM tiene una sola habilitación en el 900.
-- Tres de los verdes (**#30, #31, #33**) figuran con habilitación vencida en la fuente.
+- Cuatro de los verdes (**#26, #30, #31, #33**) figuran con habilitación vencida en la fuente.
 
 ## 2. YA ESTÁ en la base, pero NO en el mapa (5)
 
@@ -72,12 +76,11 @@ vigente dice que un `discarded` / `needs_review` no se manda de nuevo por `pendi
 `place_evidence` (IM + web/redes) y **re-evaluarlas en su misma fila con el Validator**, como hacen el re-validador
 retroactivo y el handler de reportes. Alternativa: dejarlas fuera de este trabajo.
 
-## 3. DUDOSO — coincidencia parcial (4)
+## 3. DUDOSO — coincidencia parcial (3)
 
 | # | IM (nombre · dirección) | Lo que hay en la base | Por qué es dudoso | Habilitación IM |
 |---|---|---|---|---|
 | 12 | MILENA GLUTEN FREE · El Greco 5994 | Milena Gluten Free · Bv. Gral. Artigas 2748 — 🟢 verde, approved (manual 2026-10-06) | Mismo nombre, a 10,4 km. ¿Otra sucursal, planta de elaboración o dirección anterior? | vigente hasta 26/09/2028 |
-| 26 | GOÛT GLUTEN FREE · Solano García 2496 | (a) **Casa & Dispensa** · Solano García 2496 — 🟢 verde, approved (override 2026-09-07), a 4 m. (b) **Goût** · Paraguay 1962 — needs_review (0.52), a 4,5 km | En esa dirección hoy figura otro comercio; el nombre Goût aparece en otra dirección. ¿Se mudó o cambió de nombre? | vencida 30/11/2025 |
 | 27 | HELADERIA ZERO · Av. Millán 3665 | **Piu Helados Prado** · Av. Millán 3665 — 🟢 verde, approved (manual 2026-09-27), a 17 m | Misma dirección, otro nombre: probable cambio de marca o de dueño. | vencida 09/03/2026 |
 | 32 | RICCA · Cuaró 3139 | **Ríccoli** · Cuaró 3151 — needs_review (0.52, Validator 2026-07-17), a 27 m | Nombre parecido, misma cuadra, otro número de puerta. Puede ser el mismo negocio o un vecino. | vencida 16/08/2024 |
 
@@ -111,6 +114,6 @@ Argentina.
 
 ## Lo que sigue (no ejecutado)
 
-Con tu OK, la Fase 2 toma los 16 de **NO ESTÁ** y, según lo que decidas, los 5 de la sección 2 y los 4 dudosos. Con la
+Con tu OK, la Fase 2 toma los 16 de **NO ESTÁ** y, según lo que decidas, los 5 de la sección 2 y los 3 dudosos. Con la
 lectura preliminar, solo #34 y #35 (y tal vez #5) son claramente locales para visitar; el resto parece elaboración o
 distribución y terminaría en "no aplica al mapa", pero eso lo decide la evidencia, no este reporte.
