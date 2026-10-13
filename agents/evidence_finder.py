@@ -172,6 +172,12 @@ ATTRIBUTION_REASONS = {
     "no_atribuible": "red social: no se puede verificar que la cuenta que publica sea la del negocio",
 }
 MAX_UNATTRIBUTED = 10  # unattributed quotes kept per place, for the report only
+# Accounts a site links to because of the tool it was built with, not because they are the business's (survey of 2026-10-13:
+# a Wix site links instagram.com/wix by default). Never an official account, wherever the link comes from.
+PLATFORM_ACCOUNTS = frozenset(
+    "wix wixsite squarespace shopify tiendanube nuvemshop mitiendanube empretienda godaddy wordpress weebly webnode jimdo "
+    "linktree instagram facebook meta whatsapp google pedidosya rappi mercadolibre mercadopago".split()
+)
 
 
 def social_account(url: str | None) -> tuple[str, str] | None:
@@ -194,7 +200,8 @@ def official_accounts(place: dict, site_links=()) -> frozenset[tuple[str, str]]:
     """The accounts known to be the business's: the ones in its row (``social_url``, a ``website`` that is a profile) and the ones
     its own site links to (``site_links``). A row whose only social address is a reel or a post has none."""
     urls = [place.get("social_url"), place.get("website"), *(site_links or ())]
-    return frozenset(account for account in (social_account(u) for u in urls if isinstance(u, str)) if account)
+    return frozenset(account for account in (social_account(u) for u in urls if isinstance(u, str))
+                     if account and account[1] not in PLATFORM_ACCOUNTS)
 
 
 def social_attribution(url: str | None, accounts) -> str | None:

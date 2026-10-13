@@ -337,6 +337,13 @@ def test_the_official_account_can_be_read_from_the_places_own_site():
     assert finder(hits, llm=FakeLLM()).find(p)["citations"] == []
 
 
+def test_the_account_of_the_site_builder_is_never_the_places_official_account():
+    from agents.evidence_finder import official_accounts
+    links = ["https://www.instagram.com/wix", "https://www.facebook.com/wix", "https://www.instagram.com/milena.glutenfree/"]
+    assert official_accounts(place(website="https://milena.example"), links) == {("instagram", "milena.glutenfree")}
+    assert official_accounts(place(website="https://milena.example"), links[:2]) == frozenset()
+
+
 def test_third_party_reels_never_raise_a_proposal_nor_become_stored_evidence():
     from agents.evidence_finder import build_acceptance_note
     p = place(website="https://tiempolibre.example", social_url="https://www.instagram.com/reel/AAA111")
