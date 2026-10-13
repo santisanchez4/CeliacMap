@@ -52,6 +52,11 @@ _EVIDENCE_LABELS = {
     "admin": "administrador de CeliacMap",
 }
 
+# A social post whose author could not be verified as the business (a reel or a post: the address does not say who published it,
+# and a post that names a place proves nothing about who is speaking). The Social agent stores it with this prefix so the admin still
+# sees where the lead came from, and the Validator leaves it out: it is neither shown to the model nor counted by Tope C.
+UNATTRIBUTED_ROW_PREFIX = "(no atribuible: publicación de redes sin autor verificado) "
+
 # Tope C (audit plan step 2): an automatic "gluten_free_100" needs an explicit exclusivity
 # phrase in the evidence the model was given (reviews + place_evidence). The place's NAME
 # never counts: it is not in the texts searched here. Matched after lower-casing and
@@ -223,7 +228,7 @@ class ValidatorAgent(BaseAgent):
         nothing, so a place without evidence gets exactly the prompt it got before.
         """
         lines = []
-        for e in list(evidence or [])[:MAX_EVIDENCE]:
+        for e in ValidatorAgent._attributable(evidence)[:MAX_EVIDENCE]:
             if not isinstance(e, dict):
                 continue
             text = " ".join(str(e.get("text") or "").split())[:MAX_EVIDENCE_CHARS]
@@ -309,6 +314,12 @@ class ValidatorAgent(BaseAgent):
             RUBRIC, self._build_user_prompt(place, reviews, claims, evidence), model=self.model
         )
         return self._normalize(raw, place, claims, reviews=reviews, evidence=evidence)
+
+    @staticmethod
+    def _attributable(evidence) -> list:
+        """The evidence rows the Validator weighs: everything except the ones marked as not attributable to the business."""
+        return [e for e in list(evidence or [])
+                if not (isinstance(e, dict) and str(e.get("text") or "").startswith(UNATTRIBUTED_ROW_PREFIX))]
 
     @staticmethod
     def _decide_status(verdict: str, confidence: float | None) -> str:
@@ -432,7 +443,7 @@ class ValidatorAgent(BaseAgent):
         The level is not raised here; the flag puts the place in the admin's 100% queue with its
         evidence, so the 100% comes from a person, as the labeling rule requires."""
         texts = [r.get("text") for r in list(reviews or []) if isinstance(r, dict)]
-        texts += [e.get("text") for e in list(evidence or []) if isinstance(e, dict)]
+        texts += [e.get("text") for e in cls._attributable(evidence) if isinstance(e, dict)]
         signal = cls.has_exclusive_signal(texts)
         if safety != "gluten_free_100":
             return safety, ([PENDING_ADMIN_FLAG] if signal else [])

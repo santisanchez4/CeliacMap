@@ -2438,3 +2438,6 @@ re-evalúan; `validation_confidence` y `verified` no se modifican; todo write va
 **Resultado:** `social_account` / `official_accounts` / `social_attribution` en `agents/evidence_finder.py`, `fetch_social_links` en
 `agents/clients/website_scraper.py`, los enlaces del sitio grabados en el congelado, tests nuevos y el reporte
 `db/checks/2026-10-13-social-attribution-audit.md`. No cambia ningún prompt del modelo (ni la `RUBRIC` ni `SCOPE_RUBRIC`).
+
+**Seguimiento (PR aparte, pedido tras la auditoría):** el agente Social deja de guardar un reel o un post como perfil del lugar,
+marca su texto como no atribuible (el Validator no lo pesa) y no toma una página de tema como lead.

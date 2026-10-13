@@ -196,6 +196,29 @@ def social_account(url: str | None) -> tuple[str, str] | None:
     return platform, account
 
 
+# Segments that make a social address a publication (of an account, or of nobody the address names).
+_POST_SEGMENTS = frozenset("reel reels p tv posts photos photo photo.php video videos watch story.php permalink.php share".split())
+# First segments of pages that are neither an account nor a publication: a topic, a search, a login.
+_TOPIC_SEGMENTS = {
+    "instagram": frozenset("explore popular tags locations directory accounts about web legal developer".split()),
+    "facebook": frozenset("hashtag public search login dialog plugins help business marketplace events groups".split()),
+}
+
+
+def social_page_kind(url: str | None) -> str | None:
+    """What an Instagram / Facebook address is: "profile" (an account's own page), "post" (a publication, or a profile whose
+    address names no account), "topic" (a topic / search page: nobody's), or None for any other site."""
+    host, segs = _url_parts(url or "")
+    platform = next((p for p in _NOT_AN_ACCOUNT if host == f"{p}.com" or host.endswith(f".{p}.com")), None)
+    if not platform:
+        return None
+    if not segs or segs[0].lower() in _TOPIC_SEGMENTS[platform]:
+        return "topic"
+    if social_account(url) and not any(seg.lower() in _POST_SEGMENTS for seg in segs[1:]):
+        return "profile"
+    return "post"
+
+
 def official_accounts(place: dict, site_links=()) -> frozenset[tuple[str, str]]:
     """The accounts known to be the business's: the ones in its row (``social_url``, a ``website`` that is a profile) and the ones
     its own site links to (``site_links``). A row whose only social address is a reel or a post has none."""

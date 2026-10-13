@@ -707,3 +707,25 @@ def test_tope_c_no_flag_for_options_evidence():
     out = _norm({"safety_level": "options_available"}, place={"source": "social"},
                 evidence=[{"source": "social", "text": "Tenemos opciones sin TACC"}])
     assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
+# --- Evidence the Social agent could not attribute to the business is not weighed (2026-10-13) ------------------------------------
+
+def test_an_unattributed_social_row_is_left_out_of_the_prompt():
+    from agents.validator_agent import UNATTRIBUTED_ROW_PREFIX
+
+    evidence = [{"source": "social", "text": UNATTRIBUTED_ROW_PREFIX + "Todo es 100% libre de gluten", "url": "https://www.instagram.com/reel/X"},
+                {"source": "web", "text": "Tenemos opciones sin gluten", "url": "https://cafex.example"}]
+    block = ValidatorAgent._evidence_block(evidence)
+    assert "Tenemos opciones sin gluten" in block and "100% libre de gluten" not in block and "instagram.com/reel/X" not in block
+    assert ValidatorAgent._evidence_block(evidence[:1]) == ""
+
+
+def test_an_unattributed_social_row_cannot_sustain_a_100_nor_raise_the_pending_flag():
+    from agents.validator_agent import PENDING_ADMIN_FLAG, UNATTRIBUTED_ROW_PREFIX
+
+    marked = [{"source": "social", "text": UNATTRIBUTED_ROW_PREFIX + "Todo es 100% libre de gluten", "url": None}]
+    assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], marked) == ("celiac_friendly", [PENDING_ADMIN_FLAG])
+    assert ValidatorAgent._apply_exclusive_signal_cap("celiac_friendly", [], marked) == ("celiac_friendly", [])
+    plain = [{"source": "social", "text": "Todo es 100% libre de gluten", "url": None}]
+    assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], plain) == ("gluten_free_100", [])
