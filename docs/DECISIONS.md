@@ -4109,6 +4109,41 @@ citas textuales, la URL y la fecha.
 (un reel): a la fila «Goût» de Paraguay 1962 le atribuyó citas de otros negocios; se excluyeron a mano y la fila no se tocó. (2) La capa
 es una foto: volver a capturarla es un trabajo manual. (3) Zero Helados Carrasco no tiene ficha de Google (`address_only`).
 
+### Evidence finder — a social quote needs a verified author (2026-10-13)
+
+**Problema.** Al cotejar la capa de la IM (PR #20), el buscador de evidencia le atribuyó a la fila «Goût» (Paraguay 1962) citas de
+otros negocios: un reel que hablaba de otra cuenta y publicaciones de la cadena GOUT de Buenos Aires. Causa: `_is_own_url` decidía que
+una dirección social era «propia» comparando solo el **primer tramo de la ruta** con el de `social_url`. El `social_url` de la fila era
+`instagram.com/reel/…`, así que cualquier `instagram.com/reel/…` pasaba como fuente propia (`own_url`), sin la regla de nombre + ciudad.
+En producción hay 207 filas cuyo `social_url` es un reel o un post de Instagram (8 aprobadas) y 34 con un post de Facebook.
+
+**Decisión.** Una fuente de Instagram / Facebook es evidencia del negocio **solo si la cuenta que publica es una cuenta oficial suya**:
+
+- `social_account(url)` lee la cuenta de la dirección (`instagram.com/cuenta`, `instagram.com/cuenta/reel/ID`,
+  `facebook.com/cuenta/posts/…`). Un reel o un post sin cuenta en la dirección, una página de tema o un enlace de «compartir» no dicen
+  quién publicó. No se adivina el autor por el título.
+- `official_accounts(place)`: las cuentas de la fila (`social_url`, o un `website` que es un perfil) y las que enlaza el **sitio propio**
+  del lugar (`fetch_social_links`, grabado en el congelado). La web de la ficha de Google la aporta quien llama.
+- `social_attribution`: **propia** (autor = cuenta oficial), **tercero** (otra cuenta) o **no atribuible** (no se puede saber el autor,
+  o el negocio no tiene cuenta oficial conocida en esa plataforma). Solo «propia» es una cita: las otras dos se listan en el reporte
+  («citas de redes NO atribuibles») y no cuentan para la propuesta, no llegan al modelo, no se guardan en `place_evidence` y no entran
+  en la nota pública.
+- Esto **reemplaza**, para fuentes de redes, la regla del 2026-09-27 que aceptaba un perfil por las palabras de su título más la
+  ciudad. Para páginas web esa regla no cambia.
+
+**Medición** (`db/checks/2026-10-13-social-attribution-audit.md`). Repetidas sobre sus fuentes congeladas, tres corridas viejas cambian
+donde debían: «Apto Libre de Gluten» pasa de `100` a `insuficiente` (sus tres citas eran de redes sin cuenta verificable) y «Pagana
+Gluten Free» de `100` a `options` (la frase de exclusividad venía de un reel sin autor). Ninguna de esas propuestas se había aceptado en
+la base. En `place_evidence` hay 6 filas `social` (agente Social, 2026-10-01): ninguna tiene autor verificable y todas están en lugares
+`needs_review`; ningún lugar aprobado depende de ellas.
+
+**Costo aceptado.** Un perfil que a simple vista es del negocio queda «no atribuible» si la fila no tiene esa cuenta y su sitio no la
+enlaza. Se resuelve cargando el perfil en `social_url`, no aflojando la regla.
+
+**Resuelve** la deuda (1) anotada en «IM Montevideo as an evidence source» (PR #20). **Queda abierto:** el agente Social sigue
+guardando como `social_url` y como evidencia el post del que sacó el lead (de ahí salen las 207 + 34 filas y dos candidatos que no son
+negocios: «Empieza entero», «Pan Sin Gluten En Panetera»). La `RUBRIC` y los gates no cambian.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
