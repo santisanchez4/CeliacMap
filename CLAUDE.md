@@ -421,8 +421,9 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   `SECURITY DEFINER`.
 
 **Prompts and chatbot**
-- **No paid API call without the admin asking** [Map scope rules]: before any model or search run, state the number of calls and the cost; the
-  script carries a hard cap (`--max-calls`, with `--dry-run`); a failed call is reported, never retried with another model.
+- **No paid API call without the admin asking** [Map scope rules]: no web search and no model call is launched without an estimate (calls and
+  cost) and the admin's OK first, **also to investigate or verify data**; the script carries a hard cap (`--max-calls`, with `--dry-run`); a
+  failed call is reported, never retried with another model.
 - **The `RUBRIC` and the chatbot prompts are health gates.** Source of truth in code (`agents/validator_agent.py`,
   `supabase/functions/chat/prompts.ts`); copies guarded by `test_rubric_docs_sync.py` / `test_chat_prompts_sync.py`. Any
   change is deliberate, measured (real-model A/B, jailbreak battery) and recorded in `docs/DECISIONS.md` + `prompts.md`.
