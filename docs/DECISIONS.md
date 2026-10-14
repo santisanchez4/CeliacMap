@@ -4150,7 +4150,7 @@ porque el Validator no tenía regla de alcance: evaluaba «¿tiene opciones sin 
 
 **Cómo se representa, sin cambio de esquema.** Cuarto veredicto del modelo, `not_applicable`. `_decide_status` lo lleva a
 `status = 'discarded'` a cualquier confianza. `validation_notes` empieza con `No aplica al mapa: <motivo>`; `flags` lleva un texto
-fijo puesto por el código (`no aplica al mapa: cadena de comercio general` / `no aplica al mapa: no vende ni sirve al público`);
+fijo puesto por el código (`no aplica al mapa: comercio general` / `no aplica al mapa: no vende ni sirve al público`);
 `validation_confidence` no se escribe, porque la confianza mide evidencia de seguridad y no se evaluó; `category` y `safety_level`
 quedan como estaban. En `agent_log` queda `verdict: not_applicable`, que lo distingue de un `rejected`, y el resumen de la corrida
 los cuenta aparte (`not_applicable`).
@@ -4229,6 +4229,41 @@ cambió ningún estado: las decisiones quedan para el admin.
   (`db/fixes/2026-10-13-la-molienda-scope-note.sql`), con el override debajo sin tocar.
 - Las 21 filas con una página de tema en `social_url` quedan listadas como datos a corregir en
   `db/checks/2026-10-13-official-accounts-survey.md` (sección 3).
+- La línea `ACLARACIÓN 2026-10-13 (admin)` de La Molienda quedó aplicada en las 9 sucursales (solo `validation_notes`; aprobados
+  en 416, `place_evidence` sin cambios).
+
+**Regla explícita: comercio general independiente (decisión del admin, 2026-10-13).** Cierra el supuesto abierto de más arriba.
+
+- **Queda excluido** el autoservicio, minimercado o almacén general **independiente** cuya única oferta sin gluten es una góndola o
+  algunos productos sueltos. No hace falta que sea una cadena: lo que lo deja afuera es ser comercio general.
+- **Entran** los comercios con oferta sin gluten **dedicada y verificable**: cocina o elaboración propia sin gluten, o una sección
+  sin gluten grande y curada. Son los casos de Minimarket La Isla (más de 1 500 productos y cocina propia), EntreSano (671
+  productos en su categoría Sin TACC) y La Molienda (sección curada de 444 artículos).
+- En el código: lo decide el modelo con la `RUBRIC` (la capa determinista solo conoce cadenas por nombre o por dominio y no opina
+  sobre un independiente). El flag fijo pasa de «cadena de comercio general» a **«comercio general»**, porque ya no describe solo
+  cadenas. En el A/B, el autoservicio independiente con una góndola pasa de caso informativo a caso «fuera de alcance».
+
+**Iteración 4 de la `RUBRIC` (escrita, sin medir).** El admin no acepta el efecto lateral de la iteración 3 (el restaurante con
+parrilla compartida, `rejected` en 2 de 5): el alcance no cambia el criterio de seguridad. Tres cambios:
+
+1. Se quita «Un lugar fuera de alcance nunca es "needs_review" ni "approved"». Es la hipótesis de la causa: un «nunca
+   needs_review» escrito en el prompt puede empujar a `rejected` un caso que no tiene nada que ver con el alcance. Que lo excluido
+   nunca sea ámbar ni vaya a revisión lo garantiza el código (`_decide_status`), no esa oración. Pasa a «Para esos casos, y solo
+   para esos, el veredicto es "not_applicable"».
+2. La última oración pasa a: «El alcance no cambia el criterio de seguridad. […] para un lugar que aplica, el veredicto y la
+   confianza se deciden únicamente con el rubric de validación que sigue, igual que si este apartado no existiera, sin volverse
+   más estricto ni más permisivo».
+3. La regla del comercio general independiente y la de la oferta dedicada, de arriba.
+
+`validator_scope_ab.py` suma el criterio `EXPECT_STATUS`: el restaurante con parrilla compartida debe dar `needs_review` en todas
+las muestras, como con la `RUBRIC` anterior (6 de 6). Si la iteración 4 no lo logra, la alternativa a probar es mover el apartado de
+alcance al final del prompt, después del rubric de seguridad.
+
+**Regla de gasto de API (decisión del admin, 2026-10-13).** Ninguna llamada paga (Sonnet, Haiku, búsquedas) sin que el admin la
+pida. Antes de cada corrida se informa cuántas llamadas son y cuánto cuestan; el script lleva un tope duro (`--max-calls`,
+obligatorio, con `--dry-run` para ver el plan sin llamar) que corta la corrida al llegar; si algo falla, no se reintenta con otro
+modelo. Motivo: el reintento del A/B del agente Web con Sonnet, sin consultar, agotó el crédito recién recargado y cortó la
+medición que sí se había pedido. La prueba corta de la iteración 4 y la corrida completa quedan pendientes del pedido del admin.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 

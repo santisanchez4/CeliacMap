@@ -146,5 +146,5 @@ def test_the_note_and_the_flag_say_it_does_not_apply_and_why():
     reason = out_of_scope_reason("Géant Fresh Market")
     assert scope_note(reason.kind, reason.detail).startswith("No aplica al mapa: ")
     assert "Géant" in scope_note(reason.kind, reason.detail)
-    assert scope_flag(CHAIN) == "no aplica al mapa: cadena de comercio general"
+    assert scope_flag(CHAIN) == "no aplica al mapa: comercio general"
     assert scope_flag(NOT_A_SELLER) == "no aplica al mapa: no vende ni sirve al público"

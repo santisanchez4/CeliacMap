@@ -139,10 +139,10 @@ Eres el Validator Agent de CeliacMap, un sistema de validación conservador para
 Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
 
 Alcance del mapa (decidilo antes que el veredicto de seguridad). Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
-- Cadenas de comercio general: supermercados, hipermercados, autoservicios y farmacias de cadena (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
+- Comercio general: las cadenas de supermercados, hipermercados, autoservicios y farmacias (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea), que quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar; y también el autoservicio, minimercado o almacén general independiente cuya única oferta sin gluten es una góndola o algunos productos sueltos.
 - Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
-Para esos casos respondé "verdict": "not_applicable", explicá el motivo en reasoning y poné en flags exactamente "cadena de comercio general" o "no vende ni sirve al público". Un lugar fuera de alcance nunca es "needs_review" ni "approved".
-SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Un comercio especializado en alimentación saludable, natural o sin gluten aplica aunque su nombre diga "supermercado", "market" o "minimarket", aunque también venda otros productos y aunque tenga varias sucursales: lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia a favor ni en contra de su seguridad: para un lugar que aplica, decidí el veredicto y la confianza exactamente igual que si este párrafo no existiera.
+Para esos casos, y solo para esos, el veredicto es "not_applicable": explicá el motivo en reasoning y poné en flags exactamente "comercio general" o "no vende ni sirve al público".
+SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Un comercio especializado en alimentación saludable, natural o sin gluten, o con una oferta sin gluten dedicada (cocina o elaboración propia sin gluten, una sección sin gluten amplia y curada), aplica aunque su nombre diga "supermercado", "market" o "minimarket", aunque también venda otros productos y aunque tenga varias sucursales: lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. El alcance no cambia el criterio de seguridad. Que un lugar aplique al mapa no es evidencia a favor ni en contra: para un lugar que aplica, el veredicto y la confianza se deciden únicamente con el rubric de validación que sigue, igual que si este apartado no existiera, sin volverse más estricto ni más permisivo.
 
 Rubric de validación (veredicto):
 - "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
@@ -360,11 +360,13 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   cooked and sold. Cooking everything but offering a celiac menu, separate prep or a separate kitchen is
   `options_available`; one shared kitchen is not 100% by default. Only the admin upgrades to 100%. Kitchen declarations
   are unverified and live only on `suggestions` / `place_reports` (never `places`).
-- **Map scope** [Map scope rules]: general retail chains (supermarkets, hypermarkets, self-service stores, pharmacy chains) and places that
+- **Map scope** [Map scope rules]: general retail (supermarket, hypermarket, self-service and pharmacy chains, and an independent self-service
+  shop or minimarket whose only gluten-free offer is a shelf) and places that
   teach or inform without selling or serving to the public (cooking schools, workshops, blogs, recipe accounts, information and topic pages) do
   not go on the map, even with a gluten-free shelf. The criterion is the line of business, never the number of branches: a food or specialised
   chain is evaluated branch by branch. The Validator answers `not_applicable` (always `discarded`, note `No aplica al mapa:`); Search, Social and
-  Web create no candidate (`agents/map_scope.py`). The brand lists are examples; the RUBRIC names no in-scope business. A specialised health-food or gluten-free shop stays in scope whatever its name says ("supermarket", "minimarket"). An existing row is
+  Web create no candidate (`agents/map_scope.py`). The brand lists are examples; the RUBRIC names no in-scope business. A specialised shop, or one with a dedicated, verifiable gluten-free offer (own kitchen, a large curated section), stays in scope whatever its
+  name says ("supermarket", "minimarket"). An existing row is
   discarded only by the admin, with `CORRECCIÓN MANUAL: no aplica al mapa`.
 - **No third-party health data is collected** [Privacy phase 1]: whether an owner is celiac is no longer asked, stored,
   shown to the admin or sent to the model (`owner_celiac` columns dropped from 2026-10-07; the chat stops asking in the
@@ -425,6 +427,8 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   `SECURITY DEFINER`.
 
 **Prompts and chatbot**
+- **No paid API call without the admin asking** [Map scope rules]: before any model or search run, state the number of calls and the cost; the
+  script carries a hard cap (`--max-calls`, with `--dry-run`); a failed call is reported, never retried with another model.
 - **The `RUBRIC` and the chatbot prompts are health gates.** Source of truth in code (`agents/validator_agent.py`,
   `supabase/functions/chat/prompts.ts`); copies guarded by `test_rubric_docs_sync.py` / `test_chat_prompts_sync.py`. Any
   change is deliberate, measured (real-model A/B, jailbreak battery) and recorded in `docs/DECISIONS.md` + `prompts.md`.

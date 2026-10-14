@@ -13,6 +13,10 @@ Both arms receive the SAME user prompt; only the system prompt differs (OLD = a 
   python db/checks/discovery_scope_ab.py social --old-rev fix/social-agent-post-is-not-a-profile --n 3
   python db/checks/discovery_scope_ab.py web    --old-rev fix/social-agent-post-is-not-a-profile --n 2
 
+Paid calls are never made without the admin asking: --max-calls is mandatory and the run aborts before the call that would exceed
+it (for web, one research turn counts as one call but costs far more than a plain call). A failed call stops the run; nothing is
+retried with another model.
+
 No production reads or writes. Uses ANTHROPIC_API_KEY from .env (never printed).
 Cost: social ~US$0.001 per call (19 cases x 2 arms x n); web ~US$0.10-0.50 per research turn (cities x 2 arms x n).
 """
@@ -23,6 +27,7 @@ import ast
 import collections
 import subprocess
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -34,6 +39,19 @@ from agents.map_scope import out_of_scope_reason  # noqa: E402
 from agents.social_agent import PARSE_RUBRIC  # noqa: E402
 from agents.web_agent import RESEARCH_RUBRIC, WebAgent  # noqa: E402
 from config.settings import get_settings  # noqa: E402
+
+
+class CallCap:
+    """Hard stop on paid calls: the run aborts before the call that would exceed ``limit``."""
+
+    def __init__(self, limit: int):
+        self.limit, self.used, self._lock = limit, 0, threading.Lock()
+
+    def spend(self) -> None:
+        with self._lock:
+            if self.used >= self.limit:
+                raise SystemExit(f"HARD CAP: {self.limit} paid call(s) reached; run stopped.")
+            self.used += 1
 
 
 def constant_at(rev: str, path: str, name: str) -> str:
@@ -91,7 +109,7 @@ SOCIAL_CASES = [
 WEB_CITIES = [("Uruguay", "Montevideo"), ("Argentina", "Buenos Aires")]
 
 
-def run_social(llm: LLMClient, model: str, old: str, n: int) -> int:
+def run_social(llm: LLMClient, model: str, old: str, n: int, cap: CallCap) -> int:
     failures = 0
     for kind, label, title, snippet in SOCIAL_CASES:
         user = f"title: {title}\nsnippet: {snippet}"
@@ -99,7 +117,7 @@ def run_social(llm: LLMClient, model: str, old: str, n: int) -> int:
         seen = {}
         for tag, rubric in (("OLD", old), ("NEW", PARSE_RUBRIC)):
             with ThreadPoolExecutor(max_workers=3) as ex:
-                outs = list(ex.map(lambda _: llm.complete_json(rubric, user, model=model, max_tokens=200), range(n)))
+                outs = list(ex.map(lambda _: (cap.spend(), llm.complete_json(rubric, user, model=model, max_tokens=200))[1], range(n)))
             seen[tag] = outs
             sells = collections.Counter(repr(o.get("sells_to_public", "—")) for o in outs)
             names = collections.Counter(str(o.get("name")) for o in outs)
@@ -120,12 +138,13 @@ def run_social(llm: LLMClient, model: str, old: str, n: int) -> int:
     return 1 if failures else 0
 
 
-def run_web(llm: LLMClient, model: str, old: str, n: int, max_searches: int) -> int:
+def run_web(llm: LLMClient, model: str, old: str, n: int, max_searches: int, cap: CallCap) -> int:
     jobs = [(country, city, tag, rubric, i) for country, city in WEB_CITIES for tag, rubric in (("OLD", old), ("NEW", RESEARCH_RUBRIC))
             for i in range(n)]
 
     def research(job):
         country, city, tag, rubric, i = job
+        cap.spend()
         try:
             result = llm.research_with_web_search(rubric, WebAgent._user_prompt(country, city), model=model, max_searches=max_searches)
             return job, (result or {}).get("places") or [], None
@@ -156,17 +175,28 @@ def main() -> int:
     ap.add_argument("prompt", choices=("social", "web"))
     ap.add_argument("--old-rev", default="main", help="git rev with the previous prompt (default: main)")
     ap.add_argument("--n", type=int, default=3, help="samples per case (social) or research turns per city (web), per arm")
+    ap.add_argument("--max-calls", type=int, required=True, help="hard cap on paid calls; the run aborts when reached")
+    ap.add_argument("--dry-run", action="store_true", help="print the plan and the estimated cost; make no call")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
     settings = get_settings()
+    planned = (len(SOCIAL_CASES) if args.prompt == "social" else len(WEB_CITIES)) * 2 * args.n
+    each = "~US$0.001 each" if args.prompt == "social" else "~US$0.10-0.50 each with Haiku, several times that with a larger model"
+    print(f"PLAN: {planned} call(s), {each}; hard cap {args.max_calls} call(s)")
+    if planned > args.max_calls:
+        raise SystemExit(f"the plan ({planned}) exceeds --max-calls ({args.max_calls}): nothing was called")
+    if args.dry_run:
+        print("dry run: no call made")
+        return 0
+    cap = CallCap(args.max_calls)
     llm = LLMClient(settings.anthropic_api_key, default_model=settings.haiku_model)
     if args.prompt == "social":
         print(f"model: {settings.haiku_model} · n={args.n} · OLD = {args.old_rev}")
-        return run_social(llm, settings.haiku_model, constant_at(args.old_rev, "agents/social_agent.py", "PARSE_RUBRIC"), args.n)
+        return run_social(llm, settings.haiku_model, constant_at(args.old_rev, "agents/social_agent.py", "PARSE_RUBRIC"), args.n, cap)
     print(f"model: {settings.web_search_model} · n={args.n} · OLD = {args.old_rev} · max searches {settings.max_web_searches_per_city}")
     return run_web(llm, settings.web_search_model, constant_at(args.old_rev, "agents/web_agent.py", "RESEARCH_RUBRIC"), args.n,
-                   settings.max_web_searches_per_city)
+                   settings.max_web_searches_per_city, cap)
 
 
 if __name__ == "__main__":

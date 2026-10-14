@@ -748,7 +748,7 @@ def test_a_general_retail_chain_does_not_apply_and_costs_no_model_call(name):
     assert out["verdict"] == "not_applicable"
     assert out["status"] == "discarded"
     assert out["reason"].startswith("No aplica al mapa: cadena de comercio general")
-    assert out["flags"] == ["no aplica al mapa: cadena de comercio general"]
+    assert out["flags"] == ["no aplica al mapa: comercio general"]
     assert out["confidence"] is None  # safety evidence was not judged
     assert out["category"] == "shop" and out["safety_level"] == "options_available"
 
@@ -848,7 +848,7 @@ def test_run_persists_not_applicable_as_discarded_with_its_note_and_counts_it():
     assert kwargs["status"] == "discarded"
     assert kwargs["confidence"] is None
     assert kwargs["notes"].startswith("No aplica al mapa: ")
-    assert kwargs["flags"] == ["no aplica al mapa: cadena de comercio general"]
+    assert kwargs["flags"] == ["no aplica al mapa: comercio general"]
     logged = [c for c in db.insert_agent_log.call_args_list if c.args[1] == "validate"]
     assert logged[0].args[2]["verdict"] == "not_applicable"
 
@@ -869,7 +869,9 @@ def test_rubric_names_no_in_scope_business_and_scope_is_not_safety_evidence():
 
     for name in FOOD_CHAINS:
         assert name not in RUBRIC
-    assert "no es evidencia a favor ni en contra de su seguridad" in RUBRIC
+    assert "El alcance no cambia el criterio de seguridad" in RUBRIC
+    # iterations 1-3 said a place out of scope is "never needs_review": a restaurant with a shared grill went from review to rejected
+    assert 'nunca es "needs_review"' not in RUBRIC
 
 
 def test_rubric_keeps_a_specialised_shop_in_scope_whatever_its_name_says():
@@ -877,5 +879,6 @@ def test_rubric_keeps_a_specialised_shop_in_scope_whatever_its_name_says():
     from agents.validator_agent import RUBRIC
 
     assert "lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre" in RUBRIC
+    assert "oferta sin gluten dedicada" in RUBRIC
     for name in ("EntreSano", "La Isla", "La Molienda"):
         assert name not in RUBRIC

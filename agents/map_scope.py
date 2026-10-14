@@ -25,11 +25,11 @@ NOT_A_SELLER = "not_a_seller"
 
 NOTE_PREFIX = "No aplica al mapa: "
 _FLAG_PREFIX = "no aplica al mapa"
-_FLAG_TEXT = {CHAIN: "cadena de comercio general", NOT_A_SELLER: "no vende ni sirve al público"}
+_FLAG_TEXT = {CHAIN: "comercio general", NOT_A_SELLER: "no vende ni sirve al público"}
 
 
 class ScopeExclusion(NamedTuple):
-    kind: str    # CHAIN | NOT_A_SELLER
+    kind: str    # CHAIN (general retail: a chain, or an independent shop with only a shelf) | NOT_A_SELLER
     detail: str  # the reason, in Spanish, as it is stored in validation_notes
 
 
@@ -46,7 +46,7 @@ def scope_note(kind: str | None, detail: str | None) -> str:
 def scope_kind_from_flags(flags) -> str | None:
     """The kind the model named in its flags (the RUBRIC gives it the two texts), or None."""
     joined = _norm(" ".join(str(f) for f in flags or []))
-    if "cadena de comercio general" in joined:
+    if "comercio general" in joined:
         return CHAIN
     if "no vende ni sirve" in joined:
         return NOT_A_SELLER
