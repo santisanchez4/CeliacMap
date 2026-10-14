@@ -473,7 +473,7 @@ Flags de alerta a detectar (cada una reduce la confianza):
 Asigna una categoría (exactamente una):
 - "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
 - "cafe": cafés, cafeterías, panaderías, pastelerías.
-- "shop": almacenes, dietéticas / comercios de alimentos saludables, tiendas especializadas en productos sin gluten.
+- "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
 
 Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
 - "gluten_free_100": establecimiento donde se cocinan y venden ÚNICAMENTE productos aptos para celíacos (cocina exclusiva / dedicada). Un local que cocina con gluten pero ofrece menú, preparación aparte o cocina separada para celíacos NO es "gluten_free_100".
@@ -488,16 +488,10 @@ Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la
 
 Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
 
-Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. Única excepción: reconocer por su nombre una cadena de comercio general sirve solo para excluirla ("not_applicable"), nunca para aprobar. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
-
-Alcance del mapa. Antes de responder, verificá si el lugar aplica al mapa. Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
-- Comercio general: las cadenas de supermercados, hipermercados, autoservicios y farmacias (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea), que quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar; y también el autoservicio, minimercado o almacén general independiente cuya única oferta sin gluten es una góndola o algunos productos sueltos.
-- Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
-Para esos casos, y solo para esos, el veredicto es "not_applicable": explicá el motivo en reasoning y poné en flags exactamente "comercio general" o "no vende ni sirve al público".
-SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Un comercio especializado en alimentación saludable, natural o sin gluten, o cuya oferta sin gluten es una parte central y amplia de lo que vende, no una góndola, aplica aunque su nombre diga "supermercado", "market" o "minimarket", aunque también venda otros productos y aunque tenga varias sucursales: lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. El alcance responde qué tipo de lugar es, nunca si es seguro, y no cambia el criterio de seguridad. Que un lugar aplique al mapa no es evidencia a favor ni en contra: para un lugar que aplica, el veredicto y la confianza se deciden únicamente con el rubric de validación de arriba, igual que si este apartado no existiera, sin volverse más estricto ni más permisivo.
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, exactamente con esta forma:
-{"verdict": "approved" | "rejected" | "needs_review" | "not_applicable",
+{"verdict": "approved" | "rejected" | "needs_review",
  "confidence_score": <número entre 0.0 y 1.0>,
  "category": "restaurant" | "cafe" | "shop",
  "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
@@ -2461,43 +2455,26 @@ el criterio es el rubro, no la cantidad de sucursales; las listas de nombres son
 descubrimiento no crean candidatos de 1a o 1b. Fase 1: código y tests que fallen antes y pasen después. Fase 2: auditoría en solo
 lectura de `places` y frenar hasta el OK.
 
-### 42.1 Validator `RUBRIC` — cuatro cambios de texto (los gates 0,85 / 0,7 / 0,5 no cambian)
+### 42.1 Validator `RUBRIC` — sin cambios: el alcance se probó en el prompt y se sacó (2026-10-14)
 
-1. Apartado nuevo al final del prompt, después del rubric de seguridad y antes de la forma del JSON (iteración 6):
+**Resultado final: la `RUBRIC` quedó exactamente como estaba antes de esta tarea** (la de la sección de arriba, PR #22). El alcance
+se decide solo en código (`agents/map_scope.py`), antes de llamar al modelo, y un test fija el hash del texto
+(`test_the_safety_rubric_is_the_measured_text`).
 
-```text
-Alcance del mapa. Antes de responder, verificá si el lugar aplica al mapa. Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
-- Comercio general: las cadenas de supermercados, hipermercados, autoservicios y farmacias (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea), que quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar; y también el autoservicio, minimercado o almacén general independiente cuya única oferta sin gluten es una góndola o algunos productos sueltos.
-- Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
-Para esos casos, y solo para esos, el veredicto es "not_applicable": explicá el motivo en reasoning y poné en flags exactamente "comercio general" o "no vende ni sirve al público".
-SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Un comercio especializado en alimentación saludable, natural o sin gluten, o cuya oferta sin gluten es una parte central y amplia de lo que vende, no una góndola, aplica aunque su nombre diga "supermercado", "market" o "minimarket", aunque también venda otros productos y aunque tenga varias sucursales: lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. El alcance responde qué tipo de lugar es, nunca si es seguro, y no cambia el criterio de seguridad. Que un lugar aplique al mapa no es evidencia a favor ni en contra: para un lugar que aplica, el veredicto y la confianza se deciden únicamente con el rubric de validación de arriba, igual que si este apartado no existiera, sin volverse más estricto ni más permisivo.
-```
+Se probaron seis redacciones de un apartado «Alcance del mapa» dentro del prompt, con el veredicto `not_applicable`, contra el
+modelo real (`db/checks/validator_scope_ab.py`). Todas excluían bien lo que no aplica, pero cada una movió el veredicto de
+seguridad de algún lugar que sí aplica:
 
-2. Categoría `shop`: «almacenes, supermercados, dietéticas / comercios de alimentos saludables» pasa a «almacenes, dietéticas /
-   comercios de alimentos saludables, tiendas especializadas en productos sin gluten».
-3. En el párrafo «SOLO en la evidencia que viene en este mensaje» se agrega: «Única excepción: reconocer por su nombre una cadena de
-   comercio general sirve solo para excluirla ("not_applicable"), nunca para aprobar.»
-4. La forma del JSON admite `"verdict": ... | "not_applicable"`.
+| Iteración | Qué cambiaba | Resultado | Reporte |
+|---|---|---|---|
+| 1 | apartado al principio, nombraba cadenas que sí aplican | Ramona y Mi Cocina Sin Gluten `approved` 1 de 3 (antes 0 de 3) | `db/checks/2026-10-13-validator-scope-ab-run-iter1.md` |
+| 2 | sin esos nombres; «no es evidencia de seguridad» | EntreSano excluido 1 de 3; parrilla compartida `rejected` 3 de 3 | `db/checks/2026-10-13-scope-ab-run-iter2-iter3.md` |
+| 3 | «comercio especializado aplica aunque se llame supermercado» | parrilla compartida `rejected` 2 de 5 | ídem |
+| 4 | sin «nunca es needs_review»; regla del autoservicio independiente | parrilla `rejected` 3 de 5; Ramona `approved` 5 de 5 | `db/checks/2026-10-13-scope-ab-run-iter4-iter5.md` |
+| 5 | el mismo texto al final del prompt | parrilla bien; Mi Cocina `approved` 4 de 5, Ramona 3 de 5 | ídem |
+| 6 | al final, sin vocabulario de seguridad | Ramona `approved` 2 de 5 (tope 1), Mi Cocina 1 de 5 (tope 0) | `db/checks/2026-10-14-scope-ab-run-iter6.md` |
 
-**Medición:** `db/checks/validator_scope_ab.py`. Iteración 1 (`db/checks/2026-10-13-validator-scope-ab-run-iter1.md`, n=3): 42 de 42
-muestras `not_applicable` en los 14 casos fuera de alcance y 0 de 27 en los 9 casos dentro. Esa redacción nombraba a Zero Helados,
-Ramona y Mi Cocina Sin Gluten, y en esos tres casos la confianza subió (dos dieron `approved` 1 de 3). Iteración 2 (sin esos
-nombres, con «no es evidencia de seguridad»; `db/checks/2026-10-13-scope-ab-run-iter2-iter3.md`, n=3, 27 casos): falló: EntreSano
-Healthy Supermarket, control dentro de alcance, salió `not_applicable` en 1 de 3, y un restaurante con parrilla compartida pasó de
-`needs_review` a `rejected` en 3 de 3. El texto de arriba es la iteración 3: suma la oración del comercio especializado y cambia la
-última. Prueba corta (brazo nuevo, n=5, 7 casos): pasa, con EntreSano `approved` 5 de 5 como antes del cambio; el restaurante con
-parrilla compartida sigue en `rejected` 2 de 5, y su corrida completa se cortó en el caso 7 de 27 por falta de crédito.
-
-**Iteración 6 (el texto de arriba, al final del prompt): prueba corta del 2026-10-14 (`db/checks/2026-10-14-scope-ab-run-iter6.md`)
-falla en Ramona (aprobado 2 de 5) y Mi Cocina Sin Gluten (1 de 5); los otros 13 casos pasan.** La iteración 5 fue el texto de la 4
-movido al final (parrilla en revisión 5 de 5, pero Mi Cocina aprobado 4 de 5). La iteración 4, escrita al principio del prompt: El admin no acepta ese endurecimiento: el alcance no cambia el
-criterio de seguridad. Cambios sobre la 3: (a) sale «Un lugar fuera de alcance nunca es "needs_review" ni "approved"» (lo garantiza
-el código; escrita en el prompt es la causa probable del efecto lateral) y entra «Para esos casos, y solo para esos»; (b) la última
-oración pasa a «El alcance no cambia el criterio de seguridad […] sin volverse más estricto ni más permisivo»; (c) regla nueva del
-admin: el autoservicio, minimercado o almacén general independiente con solo una góndola queda afuera, y un comercio con oferta sin
-gluten dedicada (cocina o elaboración propia, sección amplia y curada) aplica; el flag pasa de «cadena de comercio general» a
-«comercio general». Medirla (prueba corta y después corrida completa) es condición antes del merge, y se corre solo cuando el admin
-lo pida: `--max-calls` es obligatorio y `--dry-run` muestra llamadas y costo sin llamar.
+Referencia de la `RUBRIC` anterior: Ramona `approved` 1 de 6, Mi Cocina Sin Gluten 0 de 6, parrilla compartida `needs_review` 6 de 6.
 
 ### 42.2 Agente Social — `PARSE_RUBRIC` (Haiku)
 

@@ -7,7 +7,7 @@ recommendation}``. A three-tier verdict (``approved`` / ``needs_review`` /
 ``rejected``) maps to the candidate's ``status``: ``approved`` → ``approved``,
 ``rejected`` → ``discarded``, ``needs_review`` → ``needs_review`` (the human-review
 queue, held back from the map). A fourth verdict, ``not_applicable`` (map scope
-rules: a general retail chain, or a place that does not sell to the public), is
+rules), is set by code only (``agents/map_scope.py``, no model call) and is
 always ``discarded``, with a "No aplica al mapa" note. Confidence, reasoning, flags and the suggested
 operator action are persisted for auditing. Each validation — and a final run
 summary — is written to ``agent_log``.
@@ -27,15 +27,16 @@ import unicodedata
 from agents.base import BaseAgent
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
-from agents.map_scope import out_of_scope_reason, scope_flag, scope_kind_from_flags, scope_note
+from agents.map_scope import out_of_scope_reason, scope_flag, scope_note
 
 logger = logging.getLogger("celiacmap.agent")
 
 ALLOWED_CATEGORIES = {"restaurant", "cafe", "shop"}
 ALLOWED_SAFETY = {"gluten_free_100", "celiac_friendly", "options_available"}
-ALLOWED_VERDICTS = {"approved", "rejected", "needs_review", "not_applicable"}
-# Map scope rules (2026-10-13): a general retail chain, or a place that teaches or informs without selling to the public, does not
-# apply to the map. It is discarded at any confidence: never amber, never needs_review (agents/map_scope.py, RUBRIC "Alcance").
+ALLOWED_VERDICTS = {"approved", "rejected", "needs_review"}
+# Map scope rules (2026-10-13): general retail, or a place that teaches or informs without selling to the public, does not apply to
+# the map. Decided only in code, by agents/map_scope.py, before the model is called; the RUBRIC knows nothing about scope (six
+# wordings measured against the real model all moved safety verdicts). The verdict is discarded at any confidence.
 NOT_APPLICABLE = "not_applicable"
 NOT_APPLICABLE_RECOMMENDATION = (
     "No publicar: fuera del alcance del mapa. Si es un error, el administrador puede aprobarlo con una APROBACIÓN MANUAL."
@@ -128,7 +129,7 @@ Flags de alerta a detectar (cada una reduce la confianza):
 Asigna una categoría (exactamente una):
 - "restaurant": restaurantes, comida para llevar, lugares para comer una comida.
 - "cafe": cafés, cafeterías, panaderías, pastelerías.
-- "shop": almacenes, dietéticas / comercios de alimentos saludables, tiendas especializadas en productos sin gluten.
+- "shop": almacenes, supermercados, dietéticas / comercios de alimentos saludables.
 
 Asigna un safety_level (exactamente uno), eligiendo el nivel MÁS BAJO ante la duda:
 - "gluten_free_100": establecimiento donde se cocinan y venden ÚNICAMENTE \
@@ -156,17 +157,11 @@ reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_r
 
 Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
 
-Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. Única excepción: reconocer por su nombre una cadena de comercio general sirve solo para excluirla ("not_applicable"), nunca para aprobar. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
-
-Alcance del mapa. Antes de responder, verificá si el lugar aplica al mapa. Hay dos tipos de lugar que NO aplican al mapa, tengan o no oferta sin gluten:
-- Comercio general: las cadenas de supermercados, hipermercados, autoservicios y farmacias (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea), que quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar; y también el autoservicio, minimercado o almacén general independiente cuya única oferta sin gluten es una góndola o algunos productos sueltos.
-- Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
-Para esos casos, y solo para esos, el veredicto es "not_applicable": explicá el motivo en reasoning y poné en flags exactamente "comercio general" o "no vende ni sirve al público".
-SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Un comercio especializado en alimentación saludable, natural o sin gluten, o cuya oferta sin gluten es una parte central y amplia de lo que vende, no una góndola, aplica aunque su nombre diga "supermercado", "market" o "minimarket", aunque también venda otros productos y aunque tenga varias sucursales: lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. El alcance responde qué tipo de lugar es, nunca si es seguro, y no cambia el criterio de seguridad. Que un lugar aplique al mapa no es evidencia a favor ni en contra: para un lugar que aplica, el veredicto y la confianza se deciden únicamente con el rubric de validación de arriba, igual que si este apartado no existiera, sin volverse más estricto ni más permisivo.
+Basá el veredicto y el safety_level SOLO en la evidencia que viene en este mensaje. No uses lo que creas saber del negocio por tu cuenta, ni tomes el nombre o una parte del nombre como evidencia: que el nombre diga "sin gluten" no prueba que la cocina sea exclusiva, y que no lo diga no prueba lo contrario. No menciones en reasoning, flags ni recommendation datos de salud de ninguna persona (por ejemplo, si el dueño o la dueña es celíaco/a).
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, \
 exactamente con esta forma:
-{"verdict": "approved" | "rejected" | "needs_review" | "not_applicable",
+{"verdict": "approved" | "rejected" | "needs_review",
  "confidence_score": <número entre 0.0 y 1.0>,
  "category": "restaurant" | "cafe" | "shop",
  "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
@@ -372,12 +367,6 @@ class ValidatorAgent(BaseAgent):
         """Coerce the model output into safe, schema-valid values."""
         raw = str(verdict.get("verdict", "")).strip().lower()
         verdict_label = raw if raw in ALLOWED_VERDICTS else "needs_review"
-        if verdict_label == NOT_APPLICABLE:
-            return self._not_applicable(
-                place,
-                scope_kind_from_flags(self._coerce_flags(verdict.get("flags"))),
-                self._scrub_owner_health(str(verdict.get("reasoning", verdict.get("reason", ""))).strip()),
-            )
 
         category = verdict.get("category")
         if category not in ALLOWED_CATEGORIES:

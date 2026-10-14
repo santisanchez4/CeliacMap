@@ -34,13 +34,13 @@ renombrar los estados existentes): `rejected` reutiliza `discarded`, y
 | `>= 0.85` | `approved` | `approved` | Publicar en el mapa |
 | `0.50 – 0.84` | `needs_review` | `needs_review` | Escalar a revisión humana |
 | `< 0.50` | `rejected` | `discarded` | No publicar, registrar motivo |
-| cualquiera | `not_applicable` | `discarded` | Fuera del alcance del mapa: nota «No aplica al mapa: …», sin confianza |
+| — (código) | `not_applicable` | `discarded` | Fuera del alcance del mapa, decidido por `agents/map_scope.py` sin llamar al modelo: nota «No aplica al mapa: …», sin confianza |
 
-**Alcance del mapa (2026-10-13).** No aplican, tengan o no oferta sin gluten: las cadenas de comercio general (supermercados,
-hipermercados, autoservicios y farmacias de cadena) y los lugares que enseñan o informan sin vender ni servir al público
-(escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas). El criterio es el rubro, no la cantidad de
-sucursales: una cadena gastronómica o especializada se evalúa por sucursal. `agents/map_scope.py` resuelve los casos evidentes
-sin llamar al modelo.
+**Alcance del mapa (2026-10-13/14).** No aplican, tengan o no oferta sin gluten: el comercio general (cadenas de supermercados,
+hipermercados, autoservicios y farmacias, y el autoservicio o supermercado independiente sin rubro especializado en el nombre) y
+los lugares que enseñan o informan sin vender ni servir al público. Lo decide **solo el código** (`agents/map_scope.py`), antes de
+llamar al modelo: el rubric no tiene texto de alcance, porque seis redacciones medidas con el modelo real movieron veredictos de
+seguridad de lugares que sí aplican.
 
 > **Piso de seguridad (regla de oro):** cualquier `confidence_score < 0.7` se
 > fuerza a `needs_review` en el código (`ValidatorAgent._decide_status`), sin
@@ -140,7 +140,7 @@ porque el esquema los requiere y el mapa los usa para los badges de seguridad:
 
 ```json
 {
-  "verdict": "approved" | "rejected" | "needs_review" | "not_applicable",
+  "verdict": "approved" | "rejected" | "needs_review",
   "confidence_score": 0.0,
   "category": "restaurant" | "cafe" | "shop",
   "safety_level": "gluten_free_100" | "celiac_friendly" | "options_available",
@@ -175,7 +175,7 @@ raw = llm.complete_json(RUBRIC, user_prompt, model="claude-sonnet-4-6")
 v = self._normalize(raw, place)        # parsea + clamp + flags + decide estado
 
 # _decide_status (defensa en profundidad, code-enforced):
-#   verdict == "not_applicable"                  -> "discarded" (a cualquier confianza)
+#   verdict == "not_applicable" (solo map_scope) -> "discarded" (a cualquier confianza)
 #   verdict == "rejected" or confidence < 0.50  -> "discarded"
 #   verdict == "approved" and confidence >= 0.85 -> "approved"
 #   en cualquier otro caso (incl. < 0.70)        -> "needs_review"

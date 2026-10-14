@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from agents.clients.llm import _parse_json
+from scope_fixtures import IN_SCOPE, OUT_OF_SCOPE, label
 from agents.validator_agent import DEFAULT_SAFETY_LEVEL, ValidatorAgent
 
 
@@ -771,31 +772,18 @@ def test_a_blog_a_school_or_a_recipe_account_does_not_apply(place):
     assert out["safety_level"] == DEFAULT_SAFETY_LEVEL
 
 
-@pytest.mark.parametrize("confidence", [0.2, 0.6, 0.75, 0.95, None])
-def test_the_models_not_applicable_is_discarded_at_any_confidence(confidence):
-    """By Gessi: nothing in the name says it is a cooking school; the model says so from the evidence it was given."""
+def test_the_model_cannot_answer_not_applicable():
+    """Scope is decided in code only. The RUBRIC does not offer the verdict; if the model ever says it, it is an unknown verdict
+    and goes to human review like any other, never straight to discarded."""
     llm = MagicMock()
     llm.complete_json.return_value = {
-        "verdict": "not_applicable",
-        "confidence_score": confidence,
-        "category": "restaurant",
-        "safety_level": "celiac_friendly",
-        "reasoning": "Es una escuela de cocina sin gluten: las reseñas hablan de cursos y no hay venta de comida al público.",
-        "flags": ["no vende ni sirve al público"],
-        "recommendation": "No publicar.",
+        "verdict": "not_applicable", "confidence_score": 0.6, "category": "restaurant", "safety_level": "celiac_friendly",
+        "reasoning": "Es una escuela de cocina.", "flags": ["no vende ni sirve al público"],
     }
-    out = ValidatorAgent(MagicMock(), llm).evaluate(
-        {"name": "By Gessi Cocina Inclusiva", "category": "restaurant"}, [{"text": "Excelente el curso de panificados sin gluten"}]
-    )
+    out = ValidatorAgent(MagicMock(), llm).evaluate({"name": "By Gessi Cocina Inclusiva", "category": "restaurant"})
 
     llm.complete_json.assert_called_once()
-    assert out["status"] == "discarded"
-    assert out["verdict"] == "not_applicable"
-    assert out["reason"] == (
-        "No aplica al mapa: Es una escuela de cocina sin gluten: las reseñas hablan de cursos y no hay venta de comida al público."
-    )
-    assert out["flags"] == ["no aplica al mapa: no vende ni sirve al público"]
-    assert out["confidence"] is None
+    assert out["verdict"] == "needs_review" and out["status"] == "needs_review"
 
 
 def test_a_topic_page_in_social_url_does_not_exclude_a_real_business():
@@ -853,45 +841,50 @@ def test_run_persists_not_applicable_as_discarded_with_its_note_and_counts_it():
     assert logged[0].args[2]["verdict"] == "not_applicable"
 
 
-def test_rubric_states_the_scope_criterion_and_never_lets_it_approve():
+# The safety RUBRIC as measured before the map scope work (PR #22; the OLD arm of every scope A/B: Ramona approved 1 of 6, Mi Cocina
+# Sin Gluten 0 of 6, the shared-grill restaurant needs_review 6 of 6). Six scope wordings inside it all moved those verdicts, so
+# scope lives in agents/map_scope.py. Changing this text needs a real-model A/B recorded in docs/DECISIONS.md and prompts.md; only
+# then update the hash.
+MEASURED_RUBRIC_SHA256 = "aa89e29a330b8d27b1987b565a863ab2b2e0b1502b6ba8a70b04710a6b287e82"
+
+
+def test_the_safety_rubric_is_the_measured_text():
+    import hashlib
+
     from agents.validator_agent import RUBRIC
 
-    assert '"not_applicable"' in RUBRIC
-    assert "cadena de comercio general" in RUBRIC and "no vende ni sirve al público" in RUBRIC
-    assert "no la cantidad de sucursales" in RUBRIC
-    assert "nunca para aprobar" in RUBRIC
-    assert "supermercados, dietéticas" not in RUBRIC  # a supermarket is no longer a "shop" of this map
+    assert hashlib.sha256(RUBRIC.encode("utf-8")).hexdigest() == MEASURED_RUBRIC_SHA256, (
+        "The Validator RUBRIC changed. It is a health gate: measure the change with a real-model A/B, record it, then update the hash."
+    )
 
 
-def test_rubric_names_no_in_scope_business_and_scope_is_not_safety_evidence():
-    """A/B iteration 1 (2026-10-13): naming Zero Helados / Ramona / Mi Cocina Sin Gluten in the RUBRIC raised their confidence."""
+def test_the_rubric_knows_nothing_about_map_scope():
     from agents.validator_agent import RUBRIC
 
-    for name in FOOD_CHAINS:
-        assert name not in RUBRIC
-    assert "nunca si es seguro, y no cambia el criterio de seguridad" in RUBRIC
-    # iterations 1-3 said a place out of scope is "never needs_review": a restaurant with a shared grill went from review to rejected
-    assert 'nunca es "needs_review"' not in RUBRIC
+    assert "not_applicable" not in RUBRIC
+    assert "Alcance del mapa" not in RUBRIC
 
 
-def test_the_scope_section_comes_last_and_uses_no_safety_vocabulary():
-    """A/B iterations 4 and 5 (2026-10-13): before the safety rubric, the section moved a shared-grill restaurant from review to
-    rejected; describing scope with "dedicada / elaboración propia / curada" raised approvals on two in-scope controls."""
-    from agents.validator_agent import RUBRIC
+@pytest.mark.parametrize("place", OUT_OF_SCOPE, ids=label)
+def test_the_ab_places_out_of_scope_are_discarded_with_no_model_call(place):
+    llm = MagicMock()
+    out = ValidatorAgent(MagicMock(), llm).evaluate(dict(place))
 
-    start = RUBRIC.index("Alcance del mapa.")
-    end = RUBRIC.index("Responde ÚNICAMENTE con un objeto JSON válido")
-    assert RUBRIC.index("Rubric de validación (veredicto):") < RUBRIC.index("Basá el veredicto y el safety_level SOLO") < start < end
-    scope = RUBRIC[start:end].lower()
-    for word in ("dedicad", "curad", "elaboración propia", "cocina sin gluten", "cocina propia", "exclusiv", "certific"):
-        assert word not in scope, word
+    llm.complete_json.assert_not_called()
+    assert out["verdict"] == "not_applicable" and out["status"] == "discarded"
+    assert out["flags"] == ["no aplica al mapa: comercio general"]
+    assert out["confidence"] is None
 
 
-def test_rubric_keeps_a_specialised_shop_in_scope_whatever_its_name_says():
-    """A/B iteration 2 (2026-10-13): a health-food shop called "supermarket" was excluded in 1 of 3 samples."""
-    from agents.validator_agent import RUBRIC
+@pytest.mark.parametrize("place", IN_SCOPE, ids=label)
+def test_the_ab_places_in_scope_are_judged_by_the_model_and_the_gates_only(place):
+    llm = MagicMock()
+    llm.complete_json.return_value = {
+        "verdict": "needs_review", "confidence_score": 0.62, "category": place["category"], "safety_level": "options_available",
+        "reasoning": "Evidencia parcial.",
+    }
+    out = ValidatorAgent(MagicMock(), llm).evaluate(dict(place))
 
-    assert "lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre" in RUBRIC
-    assert "una parte central y amplia de lo que vende, no una góndola" in RUBRIC
-    for name in ("EntreSano", "La Isla", "La Molienda"):
-        assert name not in RUBRIC
+    llm.complete_json.assert_called_once()
+    assert out["verdict"] == "needs_review" and out["status"] == "needs_review"
+    assert not any("no aplica" in f for f in out["flags"])

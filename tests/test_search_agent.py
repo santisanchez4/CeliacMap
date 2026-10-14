@@ -807,6 +807,16 @@ def test_a_food_or_specialised_chain_is_still_a_candidate(name):
     assert db.insert_place_candidate.call_args.args[0]["name"] == name
 
 
+def test_an_independent_self_service_shop_is_not_a_candidate():
+    agent, db, places = make_agent()
+    places.text_search.return_value = {"results": [make_result("OUT", name="Autoservicio El Trébol", types=["store", "food"])]}
+
+    summary = agent.run()
+
+    assert summary["not_for_map"] == 1 and summary["inserted"] == 0
+    db.insert_place_candidate.assert_not_called()
+
+
 @pytest.mark.parametrize("name", ["EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"])
 def test_a_place_the_admin_kept_on_the_map_is_still_a_candidate_even_with_retail_types(name):
     agent, db, places = make_agent()

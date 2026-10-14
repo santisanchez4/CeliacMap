@@ -1,15 +1,17 @@
 """Map scope rules (decided 2026-10-13): what never belongs on the map, whatever its gluten-free offer.
 
-1a. General retail chains: supermarkets, hypermarkets, self-service stores and pharmacy chains. Their offer changes from branch to
-    branch and cannot be verified.
+1a. General retail: supermarket, hypermarket, self-service and pharmacy chains (their offer changes from branch to branch and
+    cannot be verified), and an independent self-service shop or supermarket whose only gluten-free offer is a shelf (decided by
+    the admin on 2026-10-14).
 1b. Places that teach or inform without selling or serving food or products to the public: cooking schools, workshops, blogs,
     recipe accounts, information pages and a platform's topic pages.
 
 The criterion is the line of business (general retail vs. food service or a specialised shop), never the number of branches: a
 food or specialised chain (Zero Helados, Ramona, Mi Cocina Sin Gluten) is evaluated branch by branch like any other place.
 
-This module is the deterministic, high-precision layer, shared by the discovery agents (no candidate is created) and the Validator
-(no model call). A platform's topic page is handled where it appears, in the Social agent, not here. The brand lists are examples that help, not the rule: anything they miss is judged by the Validator's RUBRIC, which
+This module is the ONLY place where scope is decided: the discovery agents create no candidate and the Validator makes no model
+call. The Validator's RUBRIC knows nothing about scope: six wordings measured against the real model (2026-10-13/14) all moved
+safety verdicts of places that do apply, so scope was taken out of the prompt (docs/DECISIONS.md, "Map scope rules"). A platform's topic page is handled where it appears, in the Social agent, not here. The brand lists are examples that help, not the rule: anything they miss is judged by the Validator's RUBRIC, which
 states the criterion. When a name is ambiguous this layer says nothing.
 """
 
@@ -41,16 +43,6 @@ def scope_flag(kind: str | None) -> str:
 def scope_note(kind: str | None, detail: str | None) -> str:
     detail = (detail or "").strip() or _FLAG_TEXT.get(kind, "fuera del alcance del mapa")
     return NOTE_PREFIX + detail
-
-
-def scope_kind_from_flags(flags) -> str | None:
-    """The kind the model named in its flags (the RUBRIC gives it the two texts), or None."""
-    joined = _norm(" ".join(str(f) for f in flags or []))
-    if "comercio general" in joined:
-        return CHAIN
-    if "no vende ni sirve" in joined:
-        return NOT_A_SELLER
-    return None
 
 
 def _norm(text) -> str:
@@ -103,6 +95,15 @@ _TEACHES_RE = re.compile(
     r"|^recetas (?:sin gluten|sin tacc|gluten free|libres de gluten|para celiacos|aptas|saludables)\b"
 )
 _BUSINESS_WORDS = _FOOD_WORDS - {"cocina", "natural", "naturales", "organico", "saludable"}
+# 1a for an independent shop, by the name: it starts with one of these words. "Minimarket" is deliberately not here: Minimarket La
+# Isla has a dedicated, verifiable gluten-free offer and stays on the map (admin decision, 2026-10-14).
+_GENERAL_RETAIL_START = frozenset("autoservicio autoservicios minimercado minimercados supermercado supermercados".split())
+# Any of these in the name says the shop is specialised, so the name rule does not apply: "Supermercado Natural", "Autoservicio Sin
+# Gluten". The Validator still judges its safety.
+_SPECIALISED_WORDS = _FOOD_WORDS | frozenset(
+    "saludables sano sana sanos organica organicos organicas integral vegano vegana veganos veganas vegetariano keto gluten tacc "
+    "celiaco celiaca celiacos celiacas glutenfree healthy herboristeria macrobiotica dieteticas".split()
+)
 _SCHOOL_TYPES = frozenset({"school", "university", "primary_school", "secondary_school"})
 _FOOD_TYPES = frozenset(
     "restaurant cafe bakery food meal_takeaway meal_delivery bar store grocery_or_supermarket supermarket health".split()
@@ -159,6 +160,12 @@ def out_of_scope_reason(name, *, types=(), website: str | None = None) -> ScopeE
         return ScopeExclusion(
             CHAIN,
             f"cadena de comercio general ({label}); su oferta sin gluten varía por sucursal y no se puede verificar.",
+        )
+    if tokens and tokens[0] in _GENERAL_RETAIL_START and not _SPECIALISED_WORDS & set(tokens):
+        return ScopeExclusion(
+            CHAIN,
+            "comercio general (autoservicio, minimercado o supermercado sin rubro especializado en el nombre); una góndola sin "
+            "gluten no lo hace un lugar del mapa.",
         )
 
     if _TEACHES_RE.search(" ".join(tokens)) or ("blog" in tokens and not _BUSINESS_WORDS & set(tokens)):

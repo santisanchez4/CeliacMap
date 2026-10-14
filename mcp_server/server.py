@@ -184,7 +184,7 @@ def validate_place(
                   descripciones de Google Maps, reseñas, etc.).
 
     Returns:
-        JSON con: verdict (approved | rejected | needs_review | not_applicable), confidence_score,
+        JSON con: verdict (approved | rejected | needs_review), confidence_score,
         category, safety_level, reasoning, flags, recommendation, y db_status
         (el estado al que se mapearía en la base de datos).
     """

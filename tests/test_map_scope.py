@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from scope_fixtures import IN_SCOPE, OUT_OF_SCOPE, label
 from agents.map_scope import CHAIN, NOT_A_SELLER, out_of_scope_reason, scope_flag, scope_note
 
 
@@ -148,3 +149,42 @@ def test_the_note_and_the_flag_say_it_does_not_apply_and_why():
     assert "Géant" in scope_note(reason.kind, reason.detail)
     assert scope_flag(CHAIN) == "no aplica al mapa: comercio general"
     assert scope_flag(NOT_A_SELLER) == "no aplica al mapa: no vende ni sirve al público"
+
+
+@pytest.mark.parametrize("place", OUT_OF_SCOPE, ids=label)
+def test_the_ab_places_out_of_scope_are_excluded(place):
+    reason = out_of_scope_reason(place["name"], website=place.get("website"))
+    assert reason is not None and reason.kind == CHAIN, place["name"]
+
+
+@pytest.mark.parametrize("place", IN_SCOPE, ids=label)
+@pytest.mark.parametrize("types", [(), ("supermarket", "grocery_or_supermarket", "store", "food")])
+def test_the_ab_places_in_scope_are_never_excluded(place, types):
+    assert out_of_scope_reason(place["name"], types=types, website=place.get("website")) is None, place["name"]
+
+
+@pytest.mark.parametrize(
+    "name", ["Autoservicio El Trébol", "Autoservicio Los Pinos", "Minimercado Lo de Pepe", "Supermercado El Ahorro", "Supermercados Toledo"]
+)
+def test_an_independent_self_service_shop_or_supermarket_is_general_retail(name):
+    reason = out_of_scope_reason(name)
+    assert reason is not None and reason.kind == CHAIN, name
+    assert reason.detail.startswith("comercio general")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Minimarket La Isla 24 hours.",   # "minimarket" is deliberately not a general retail word
+        "Supermercado Natural Vida",
+        "Autoservicio Sin Gluten",
+        "Supermercado Celíaco",
+        "Minimercado Dietética San José",
+        "Supermercado Saludable Verde",
+        "Autoservicio y Panadería La Familia",
+        "El Autoservicio de la Esquina",  # the rule looks only at the first word
+        "EntreSano Healthy Supermarket",
+    ],
+)
+def test_a_specialised_word_or_another_first_word_keeps_the_shop_in_scope(name):
+    assert out_of_scope_reason(name) is None, name
