@@ -409,8 +409,10 @@ create index if not exists place_reports_status_idx   on public.place_reports (s
 -- ---------------------------------------------------------------------
 -- What the community says about HOW a place cooks: optional, UNVERIFIED, and
 -- server-side only. suggestions / place_reports are anon INSERT-only (no SELECT
--- policy), so owner_celiac -- a third party's health condition -- is never publicly
--- readable. Deliberately NOT added to public.places (public read). The Validator
+-- policy), so none of it is publicly readable. Deliberately NOT added to
+-- public.places (public read). No question about a person's health is stored:
+-- owner_celiac (whether the owner is celiac) was dropped on 2026-10-14
+-- (db/migrations/2026-10-14-drop-owner-celiac.sql, docs/legal/owner-celiac-plan.md). The Validator
 -- reads these via SupabaseClient.fetch_community_claims and treats them as
 -- unverified evidence; only the admin can raise a place to gluten_free_100.
 --   kitchen_exclusive  true  = only celiac-safe products are cooked/sold there
@@ -419,14 +421,11 @@ create index if not exists place_reports_status_idx   on public.place_reports (s
 --                      is prepared: separate_kitchen | separate_prep (same kitchen,
 --                      separate utensils/surfaces/schedule) | shared_kitchen (no
 --                      separation)
---   owner_celiac       the owner is celiac (raises confidence, never a label)
 -- KITCHEN-DECLARATIONS-BEGIN
 alter table public.suggestions   add column if not exists kitchen_exclusive boolean;
 alter table public.suggestions   add column if not exists celiac_prep       text;
-alter table public.suggestions   add column if not exists owner_celiac      boolean;
 alter table public.place_reports add column if not exists kitchen_exclusive boolean;
 alter table public.place_reports add column if not exists celiac_prep       text;
-alter table public.place_reports add column if not exists owner_celiac      boolean;
 
 do $$
 begin
@@ -465,7 +464,7 @@ begin
   if not exists (select 1 from pg_constraint where conname = 'place_reports_kitchen_positive_only_check') then
     alter table public.place_reports add constraint place_reports_kitchen_positive_only_check
       check (report_type = 'positive'
-             or (kitchen_exclusive is null and celiac_prep is null and owner_celiac is null));
+             or (kitchen_exclusive is null and celiac_prep is null));
   end if;
 end $$;
 -- KITCHEN-DECLARATIONS-END
@@ -476,8 +475,8 @@ end $$;
 -- (published_at = when). author_name is what the person chose to show; empty
 -- means "Anonimo" (the frontend decides the label). place_reports itself stays
 -- closed to the public: the ONLY public read path is the view below, with an
--- explicit column list, so kitchen_exclusive / celiac_prep / owner_celiac
--- (a third party's health condition), status and place_name_text never leave.
+-- explicit column list, so kitchen_exclusive / celiac_prep, status and
+-- place_name_text never leave.
 -- The view runs with its owner's rights (that is what lets it read the closed
 -- table); its WHERE is the only barrier and includes p.status = 'approved', so
 -- an opinion disappears by itself if its place stops being published.
