@@ -1,6 +1,6 @@
 # Punto de reanudación — piloto móvil CeliacMap
 
-**Iniciado:** 2026-10-02. **Última actualización:** 2026-10-06. Bitácora de sesiones del piloto: las secciones viejas se
+**Iniciado:** 2026-10-02. **Última actualización:** 2026-10-14. Bitácora de sesiones del piloto: las secciones viejas se
 conservan como historia; el estado vigente es el de la **última «Actualización»**. Versionado desde el 2026-10-03.
 
 ## Contexto y autorizaciones
@@ -140,6 +140,33 @@ tocaron en ninguna fila. La cola quedó en **236** (201 Argentina, 35 Uruguay); 
   el registro `config/manual_contact_fields.json`. Local Celíacos queda sin registrar a propósito: el Updater le escribirá los
   datos de Google en su próxima corrida.
 - **`CLAUDE.md`:** PR #18 mergeado: índice de decisiones agrupado por tema (44 359 caracteres en el checkout de Windows).
+
+## Actualización 2026-10-14 (PR #20 a #24 mergeados)
+
+Los cinco PR quedaron mergeados en `main` el 2026-10-14, en este orden (#20 → #21 → #22 → #23; #24 independiente). Los
+conflictos de documentación se resolvieron con merge de `main` en cada rama, sin rebase ni force-push, combinando las dos
+versiones de `CLAUDE.md`, `docs/DECISIONS.md` y `prompts.md`.
+
+| PR | Merge | Qué deja |
+|---|---|---|
+| #20 | `1da9b4c` | Capa de la IM Montevideo (`Locales_Gluten_Free`) como evidencia, nunca como aprobación; `scripts/import_imm_source.py`. |
+| #21 | `2714cbf` | Buscador de evidencia: una cita de Instagram / Facebook cuenta solo si la publica la cuenta oficial del lugar. |
+| #22 | `9da5300` | Agente Social: un post no es el perfil del lugar y su texto no se pesa como evidencia. |
+| #23 | `5b2d87a` | Reglas de alcance del mapa, decididas solo en código (`agents/map_scope.py`); la `RUBRIC` del Validator no cambió (un test fija su hash). |
+| #24 | `482d57c` | Cliente de búsqueda web: herramientas declaradas como llamada directa (con Haiku daba 400). |
+
+- **Datos aplicados en producción con dry-run y «dale»:** descartes de Géant, By Gessi, Tienda Inglesa ×2 y Carrefour Market
+  (La Plata); Alárabi aprobado en 100% por el admin; aclaración de alcance en las 9 sucursales de La Molienda.
+- **Alcance:** el apartado de alcance dentro de la `RUBRIC` se probó en seis redacciones con el modelo real y se descartó (movía
+  veredictos de seguridad). Limitaciones aceptadas: una escuela cuyo nombre no lo dice o una cadena no listada pasan por el
+  Validator y las decide el admin; una cadena nueva se agrega a mano a `agents/map_scope.py`.
+- **Agente Web:** sigue deshabilitado. El arreglo de #24 no está verificado contra la API real: no reactivar ninguna ciudad con
+  `web: true` sin una prueba real y chica, pedida y con tope de gasto.
+- **Regla de gasto (en `CLAUDE.md`):** ninguna búsqueda web ni llamada a un modelo sin estimación y OK previo del admin, también
+  para investigar o verificar datos; los scripts de A/B llevan `--max-calls` y `--dry-run`.
+- **Pendiente:** drop de las columnas `owner_celiac` (PR #25, migración con guardas, ensayada con rollback; espera el «dale»).
+  Datos a corregir: las 21 filas con una página de tema en `social_url` (`db/checks/2026-10-13-official-accounts-survey.md`,
+  sección 3).
 
 ## PWA (sección original, ya resuelta: ver actualización arriba)
 
