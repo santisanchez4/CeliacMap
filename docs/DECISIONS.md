@@ -4391,6 +4391,26 @@ una ciudad.
 necesita: que el modelo las llame directamente. `tests/test_llm_web_tools.py` lo fija. **No se verificó contra la API real**: es
 una llamada paga y queda para cuando el admin la pida. El agente sigue deshabilitado en el pipeline.
 
+### owner_celiac columns dropped (2026-10-14)
+
+Etapa 3 de `docs/legal/owner-celiac-plan.md` (Privacy phase 1): se eliminaron `suggestions.owner_celiac` y
+`place_reports.owner_celiac`, que guardaban si el dueño o la dueña de un negocio es celíaco/a, un dato de salud de una tercera
+persona. Estaba previsto desde el 2026-10-07 (una semana después de que el formulario y el chat dejaran de mandarlo).
+
+- **Inventario previo, solo lectura:** columnas solo en esas dos tablas, 0 valores, 2 + 2 filas y ninguna nueva desde el
+  2026-09-30. El único objeto que las usaba era el CHECK `place_reports_kitchen_positive_only_check`. El `chat` desplegado (v25)
+  era idéntico a `main` y descartaba el campo; los archivos publicados del formulario no lo mencionaban.
+- **Migración** `db/migrations/2026-10-14-drop-owner-celiac.sql`, una transacción con guardas: aborta si hay algún valor, otra
+  dependencia (vista, función, policy) o cualquier desvío. Recrea el CHECK como `report_type = 'positive' or (kitchen_exclusive
+  is null and celiac_prep is null)`, borra las columnas, verifica y recarga el esquema de PostgREST. Se ensayó con rollback (y
+  con una verificación rota a propósito, que abortó) y se aplicó tras el «dale» del admin.
+- **Verificación posterior:** no queda ninguna columna `owner_celiac`; el CHECK es el nuevo; la anon key trae los 416 lugares
+  aprobados; como `anon`, dentro de una transacción con rollback, entraron un INSERT de cada escritor (formulario de sugerencias,
+  formulario de reportes, sugerencia y reporte del chat: `db/checks/2026-10-14-intake-inserts-after-owner-celiac-drop.sql`) sin
+  dejar filas ni pedidos de webhook; un turno de búsqueda del chat («lugares sin gluten en Fray Bentos») respondió con 6 lugares;
+  el sitio responde 200.
+- `db/schema.sql` ya no las crea y `tests/test_schema_kitchen_checks.py` falla si una sentencia del esquema vuelve a usarlas.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

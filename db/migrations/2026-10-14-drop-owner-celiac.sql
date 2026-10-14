@@ -1,7 +1,7 @@
--- NOT APPLIED YET. Stage 3 of docs/legal/owner-celiac-plan.md: drop suggestions.owner_celiac and place_reports.owner_celiac
+-- APPLIED to production on 2026-10-14, after the admin's "dale". Stage 3 of docs/legal/owner-celiac-plan.md: drop suggestions.owner_celiac and place_reports.owner_celiac
 -- (a named third party's health condition; the question left the form on 2026-09-29 and the chat on 2026-09-30).
 -- Planned from 2026-10-07 (one week after the later of the two deploys, so a cached page cannot lose a suggestion to an
--- unknown-column error); prepared as 2026-10-07-drop-owner-celiac.PENDING.sql, applied 2026-10-14 if the admin says "dale".
+-- unknown-column error); prepared as 2026-10-07-drop-owner-celiac.PENDING.sql, applied on 2026-10-14.
 --
 -- Read-only inventory of 2026-10-14 (production): the columns exist only in public.suggestions and public.place_reports, with
 -- 0 non-null values (2 and 2 rows in all, none created since 2026-09-30); the only object that uses them is the CHECK
@@ -12,9 +12,9 @@
 -- One transaction with guards: it aborts if any row holds a value, if anything other than that CHECK depends on the columns, or
 -- if the result is not exactly the intended one. The row counts must not move.
 --
--- Apply:    node_modules/.bin/supabase db query --linked --file db/migrations/2026-10-14-drop-owner-celiac.PENDING.sql
--- Dry run:  the same statements with the final `commit;` replaced by `rollback;`.
--- After applying: rename this file without ".PENDING".
+-- Applied:  node_modules/.bin/supabase db query --linked --file db/migrations/2026-10-14-drop-owner-celiac.PENDING.sql
+-- Dry run:  the same statements with the final `commit;` replaced by `rollback;` (rehearsed before applying).
+-- Checks after applying: db/checks/2026-10-14-intake-inserts-after-owner-celiac-drop.sql (anon inserts, rollback).
 
 begin;
 
