@@ -166,14 +166,15 @@ def test_a_page_that_cannot_be_downloaded_leaves_the_quote_a_snippet():
 
 
 def test_a_social_snippet_is_not_verifiable_and_its_page_is_never_downloaded():
-    tavily = FakeTavily({("instagram.com", "facebook.com"): [hit("https://www.instagram.com/reel/abc", "Panadería Tiempo Libre en Rosario. 100% sin gluten.")]})
+    # a post of the place's official account (a reel whose address names no author is not attributable: test_evidence_attribution, E)
+    tavily = FakeTavily({("instagram.com", "facebook.com"): [hit("https://www.instagram.com/tiempolibre.rosario/reel/abc", "Panadería Tiempo Libre en Rosario. 100% sin gluten.")]})
     fetched = []
 
     def fetch(url):
         fetched.append(url)
         return ""
 
-    result = finder(tavily=tavily, llm=FakeLLM(scope()), fetch_text=fetch).find(place())
+    result = finder(tavily=tavily, llm=FakeLLM(scope()), fetch_text=fetch).find(place(social_url="https://www.instagram.com/tiempolibre.rosario"))
     assert result["citations"][0]["verificacion"] == "no_verificable" and fetched == []
     assert result["proposal"] == "100" and result["verify_in_source"] is True
 

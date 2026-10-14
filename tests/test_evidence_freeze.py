@@ -86,3 +86,31 @@ def test_a_file_that_is_not_a_freeze_is_refused():
         except ValueError:
             continue
         raise AssertionError(f"accepted {bad!r}")
+
+
+# --- the social links of the places' own sites (official accounts, 2026-10-13) ---------------------------------------------------
+
+def test_the_links_of_a_site_are_recorded_once_and_replayed():
+    from agents.evidence_freeze import RecordingFetch, RecordingLinks, RecordingSearch, ReplayLinks, build_freeze
+
+    calls = []
+
+    def read(url):
+        calls.append(url)
+        return ["https://www.instagram.com/tiempolibre.rosario/"] if url == "https://a.example" else []
+
+    links = RecordingLinks(read)
+    assert links("https://a.example") == links("https://a.example") == ["https://www.instagram.com/tiempolibre.rosario/"]
+    assert links("https://b.example") == [] and calls == ["https://a.example", "https://b.example"]
+
+    freeze = build_freeze(RecordingSearch(None), RecordingFetch(lambda url: ""), {"created_at": "x"}, links)
+    replay = ReplayLinks(freeze)
+    assert replay("https://a.example") == ["https://www.instagram.com/tiempolibre.rosario/"] and replay.misses == 0
+    assert replay("https://never-read.example") == [] and replay.misses == 1
+
+
+def test_a_freeze_made_before_links_were_recorded_replays_with_no_links_and_no_misses():
+    from agents.evidence_freeze import ReplayLinks
+
+    replay = ReplayLinks({"searches": [], "pages": {}})
+    assert replay("https://a.example") == [] and replay.misses == 0
