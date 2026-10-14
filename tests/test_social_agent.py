@@ -395,3 +395,65 @@ def test_evidence_write_failure_does_not_undo_the_insert():
     summary = agent.run()
 
     assert summary["inserted"] == 1 and summary["errors"] == 0
+
+
+# --- A post is not a profile, and a topic page is not a lead (2026-10-13) ------------------------------------------------------
+
+def _run_with(link, title="Cafe X | Instagram", snippet="Cocina 100% sin TACC en Pocitos"):
+    agent, db, search, places, llm = make_agent(max_queries=1)
+    search.search.return_value = [{"title": title, "link": link, "snippet": snippet}]
+    summary = agent.run()
+    return summary, db, places, llm
+
+
+def test_a_profile_page_is_stored_as_the_profile_and_its_text_as_plain_evidence():
+    summary, db, _, _ = _run_with("https://www.instagram.com/cafex/?hl=es")
+    assert summary["inserted"] == 1
+    assert db.insert_place_candidate.call_args[0][0]["social_url"] == "https://www.instagram.com/cafex"
+    assert db.add_place_evidence.call_args[0][2] == "Cafe X | Instagram — Cocina 100% sin TACC en Pocitos"
+
+
+def test_a_reel_is_not_stored_as_the_profile_and_its_text_is_marked_not_attributable():
+    from agents.validator_agent import UNATTRIBUTED_ROW_PREFIX
+
+    summary, db, _, _ = _run_with("https://www.instagram.com/reel/DTrDA7ogJOF")
+    assert summary["inserted"] == 1
+    assert db.insert_place_candidate.call_args[0][0]["social_url"] is None
+    row_id, source, text, url = db.add_place_evidence.call_args[0]
+    assert text == UNATTRIBUTED_ROW_PREFIX + "Cafe X | Instagram — Cocina 100% sin TACC en Pocitos"
+    assert url == "https://www.instagram.com/reel/DTrDA7ogJOF"  # where the lead came from stays on record
+
+
+def test_a_post_of_some_account_is_not_the_leads_profile_either():
+    from agents.validator_agent import UNATTRIBUTED_ROW_PREFIX
+
+    for link in ("https://www.instagram.com/guia.celiaca/p/C9xyz", "https://www.facebook.com/cooperativahelix/posts/pizza/822278316261044",
+                 "https://www.facebook.com/profile.php"):
+        _, db, _, _ = _run_with(link)
+        assert db.insert_place_candidate.call_args[0][0]["social_url"] is None, link
+        assert db.add_place_evidence.call_args[0][2].startswith(UNATTRIBUTED_ROW_PREFIX), link
+
+
+def test_a_topic_page_is_not_a_lead_and_costs_no_model_or_geocoding_call():
+    summary, db, places, llm = _run_with("https://www.instagram.com/popular/pan-sin-gluten-en-panetera",
+                                         title="Pan Sin Gluten En Panetera", snippet="Watch short videos about pan sin gluten")
+    assert summary["inserted"] == 0 and summary["skipped"] == 1
+    db.insert_place_candidate.assert_not_called()
+    llm.complete_json.assert_not_called()
+    places.resolve_location.assert_not_called()
+    assert any(call.args[1] == "social_not_a_source" for call in db.insert_agent_log.call_args_list)
+
+
+def test_social_page_kind():
+    from agents.evidence_finder import social_page_kind
+
+    assert social_page_kind("https://www.instagram.com/cafex") == "profile"
+    assert social_page_kind("https://www.instagram.com/cafex/reels") == "post"
+    assert social_page_kind("https://www.instagram.com/cafex/p/C9xyz") == "post"
+    assert social_page_kind("https://www.instagram.com/reel/DTrDA7ogJOF") == "post"
+    assert social_page_kind("https://www.facebook.com/cafex") == "profile"
+    assert social_page_kind("https://www.facebook.com/cafex/about") == "profile"
+    assert social_page_kind("https://www.facebook.com/people/Cafe-X/100064") == "post"
+    assert social_page_kind("https://www.instagram.com/explore/tags/singluten") == "topic"
+    assert social_page_kind("https://www.instagram.com/") == "topic"
+    assert social_page_kind("https://cafex.example/instagram") is None

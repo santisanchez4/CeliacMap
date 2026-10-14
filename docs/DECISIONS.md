@@ -4144,6 +4144,28 @@ enlaza. Se resuelve cargando el perfil en `social_url`, no aflojando la regla.
 guardando como `social_url` y como evidencia el post del que sacó el lead (de ahí salen las 207 + 34 filas y dos candidatos que no son
 negocios: «Empieza entero», «Pan Sin Gluten En Panetera»). La `RUBRIC` y los gates no cambian.
 
+### Social agent — a post is not a profile (2026-10-13)
+
+**Problema.** El agente Social guardaba como `social_url` (el «perfil» del lugar) y como evidencia la dirección del resultado del que
+sacó el lead, fuera lo que fuera: 207 filas tienen como perfil un reel o un post de Instagram y 34 un post de Facebook. De ahí salió el
+error de atribución del buscador (entrada anterior) y dos candidatos que no eran negocios: «Empieza entero» (el comienzo del texto de
+una publicación de GOUT de Argentina) y «Pan Sin Gluten En Panetera» (una página de tema de Instagram).
+
+**Decisión.**
+
+- `social_page_kind(url)` (`agents/evidence_finder.py`) dice qué es una dirección de Instagram / Facebook: `profile` (la página de una
+  cuenta), `post` (una publicación, con o sin su autor en la dirección) o `topic` (una página de tema o de búsqueda).
+- Una página `topic` **no es un lead**: se saltea antes de gastar la llamada al modelo y el geocoding (`social_not_a_source`).
+- Solo un `profile` se guarda en `social_url`. Un lead que salió de un `post` queda sin perfil: el post es de dónde salió, no de quién es.
+- La evidencia de un `post` se guarda con el prefijo `UNATTRIBUTED_ROW_PREFIX` («(no atribuible: publicación de redes sin autor
+  verificado)») y su URL, para que el admin vea el origen. **El Validator no la pesa**: `_evidence_block` no se la muestra al modelo y
+  el Tope C no la cuenta como frase de exclusividad. Es un filtro determinista en el código, como los topes: la `RUBRIC` no cambia.
+
+**Alcance.** No es retroactivo: las 207 + 34 filas y las filas de evidencia ya guardadas quedan como están (el buscador corregido ya
+no les atribuye nada por un reel). Un candidato que sale de un post llega al Validator sin evidencia de redes, o sea, más conservador
+que antes. Límite conocido: un perfil cuyo título nombra a otro negocio sigue pasando; el Validator es el respaldo. No se midió con un
+A/B del modelo: el texto que recibe solo cambia en que pierde las publicaciones sin autor.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
