@@ -4166,6 +4166,212 @@ no les atribuye nada por un reel). Un candidato que sale de un post llega al Val
 que antes. Límite conocido: un perfil cuyo título nombra a otro negocio sigue pasando; el Validator es el respaldo. No se midió con un
 A/B del modelo: el texto que recibe solo cambia en que pierde las publicaciones sin autor.
 
+### Map scope rules (2026-10-13)
+
+> **Actualización 2026-10-14: el alcance salió del prompt.** Lo que sigue describe también las redacciones del apartado de alcance
+> que se probaron en la `RUBRIC`; ninguna quedó. Ver **Decisión final** al final de esta entrada.
+
+**Contexto.** Géant Fresh Market (cadena de supermercados) y By Gessi Cocina Inclusiva (escuela de cocina) estuvieron aprobados en el
+mapa desde junio y salieron el 2026-10-13 por decisión del admin (`db/fixes/2026-10-13-below-gate-admin-decisions.sql`). Entraron
+porque el Validator no tenía regla de alcance: evaluaba «¿tiene opciones sin gluten?» y nunca «¿es un lugar de este mapa?».
+
+**Las reglas (decisión del admin).**
+
+1. **No entran al mapa:**
+   a. **Cadenas de comercio general:** supermercados, hipermercados, autoservicios y farmacias de cadena, en Uruguay y Argentina
+      (ejemplos: Tata, Devoto, Disco, Géant, Tienda Inglesa; Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan
+      góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
+   b. **Lugares que enseñan o informan sin vender ni servir comida o productos al público:** escuelas de cocina, talleres, blogs,
+      cuentas de recetas, páginas informativas y páginas de tema de redes.
+2. **Sí entran:** dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes y cafés, y
+   fábricas con venta directa o punto de venta.
+3. **No sobreexcluir:** una cadena gastronómica o especializada (Zero Helados, Ramona, Mi Cocina Sin Gluten) no es una cadena de
+   comercio general y se sigue evaluando por sucursal. El criterio es el rubro, no la cantidad de sucursales. Las listas de nombres
+   son ejemplos de ayuda; la regla es el criterio.
+4. **Veredicto:** para lo excluido el Validator responde «no aplica al mapa» con el motivo; nunca ámbar ni `needs_review`.
+5. **Descubrimiento:** Search, Social y Web no crean candidatos que caigan en 1a o 1b.
+
+**Cómo se representa, sin cambio de esquema.** Cuarto veredicto del modelo, `not_applicable`. `_decide_status` lo lleva a
+`status = 'discarded'` a cualquier confianza. `validation_notes` empieza con `No aplica al mapa: <motivo>`; `flags` lleva un texto
+fijo puesto por el código (`no aplica al mapa: comercio general` / `no aplica al mapa: no vende ni sirve al público`);
+`validation_confidence` no se escribe, porque la confianza mide evidencia de seguridad y no se evaluó; `category` y `safety_level`
+quedan como estaban. En `agent_log` queda `verdict: not_applicable`, que lo distingue de un `rejected`, y el resumen de la corrida
+los cuenta aparte (`not_applicable`).
+
+**Dos capas.**
+
+- **Determinista** (`agents/map_scope.py`, `out_of_scope_reason`), de alta precisión y sin llamada al modelo. 1a: marcas
+  inequívocas en cualquier parte del nombre (Géant, Tienda Inglesa, Devoto, Ta-Ta, Macromercado, Multi Ahorro, Farmashop, Carrefour,
+  Jumbo, Chango Más, Walmart, Makro, Farmacity), el dominio del sitio de la cadena, y marcas que también son palabras comunes (Tata,
+  Disco, Día, Vea, Coto, El Dorado, La Anónima, San Roque) solo cuando el nombre es la marca, o empieza con ella y trae un marcador
+  de sucursal o de rubro, o un tipo de Google lo confirma. Una palabra gastronómica o especializada en el nombre deja el lugar
+  adentro («Disco Bar», «Tata Panadería», «Pan de Cada Día»). 1b: nombre que empieza con «escuela / academia / instituto», «cursos /
+  taller de cocina», «recetas sin gluten», la palabra «blog» sin rubro, o tipo de Google `school` sin ningún tipo de comida o
+  comercio. La usan el Validator (`evaluate()`, antes del modelo) y los agentes Search, Social y Web (antes de insertar; contador
+  `not_for_map` y `agent_log`).
+- **Criterio** (el párrafo «Alcance del mapa» de la `RUBRIC`): lo que las listas no cubren. Incluye la única excepción a «no tomes
+  el nombre como evidencia»: reconocer una cadena de comercio general por su nombre sirve solo para excluir, nunca para aprobar.
+- El agente Social suma `sells_to_public` a `PARSE_RUBRIC`: solo un `false` explícito descarta el lead.
+
+**Lo que no hace.** No va en `insert_place_candidate`: las sugerencias de personas y las altas manuales siguen entrando (una cadena
+sugerida recibe «no aplica» del Validator). No es retroactivo: `run()` solo procesa `pending`; una fila existente la descarta el
+admin con `CORRECCIÓN MANUAL: no aplica al mapa`, frase que se agrega a `DATA_CORRECTION_PHRASES` (dice qué tipo de comercio es, no
+qué tan seguro es).
+
+**Supuesto abierto.** 1a habla de cadenas: un supermercado, autoservicio o farmacia independiente no se excluye automáticamente y se
+sigue evaluando. La auditoría los lista como dudosos para que el admin decida.
+
+**Corrección durante el trabajo: una página de tema no excluye una fila.** El primer borrador excluía en el Validator toda fila cuyo
+`social_url` fuera una página de tema. La auditoría mostró 21 filas así, casi todas negocios reales (una panadería aprobada en 100%):
+el lead salió de esa página y el negocio se resolvió después en Google. Se quitó; la página de tema se descarta donde aparece, en el
+agente Social, antes de ser un lead (PR #22).
+
+**Medición con el modelo real** (`db/checks/validator_scope_ab.py`, lugares sintéticos, la capa determinista no interviene).
+Iteración 1, n=3 (`db/checks/2026-10-13-validator-scope-ab-run-iter1.md`): los 14 casos fuera de alcance dieron `not_applicable` en
+42 de 42 muestras (con la RUBRIC anterior, Devoto Express con una reseña de góndola sin TACC salía `approved` 3 de 3) y los 9 casos
+dentro de alcance, 0 de 27, incluida una panadería que también dicta talleres. Esa redacción nombraba a Zero Helados, Ramona y Mi
+Cocina Sin Gluten como ejemplos de cadenas que sí aplican, y justo en esos tres casos la confianza subió (Zero Helados de 0,50 a
+0,65 citando su «reputación»; Ramona y Mi Cocina Sin Gluten `approved` 0,87 en 1 de 3, antes 0 de 3). Iteración 2, la que está en
+no nombra ningún negocio que sí aplica y agrega «Que un lugar aplique al mapa no es evidencia de seguridad». Medida completa
+(n=3, 27 casos, `db/checks/2026-10-13-scope-ab-run-iter2-iter3.md`): **falló**. Fuera de alcance, 42 de 42; pero EntreSano Healthy
+Supermarket —uno de los tres controles que el admin dejó en el mapa— salió `not_applicable` en 1 de 3 y bajó de `approved` 0,87 a
+`needs_review` 0,62 en las otras dos, y un restaurante con parrilla compartida pasó de `needs_review` (3 de 3) a `rejected` (3 de 3).
+Iteración 3, la que está en el código: agrega que un comercio especializado en alimentación saludable, natural o sin gluten aplica
+aunque su nombre diga «supermercado», «market» o «minimarket», venda también otros productos o tenga varias sucursales, y cambia la
+última oración por «no es evidencia a favor ni en contra de su seguridad: […] decidí el veredicto y la confianza exactamente igual
+que si este párrafo no existiera». Prueba corta (brazo nuevo, n=5, 7 casos): pasa; EntreSano vuelve a `approved` 0,87 en 5 de 5,
+La Isla y La Molienda `needs_review` en 5 de 5, Mi Cocina Sin Gluten `needs_review` en 5 de 5. **Queda un efecto lateral:** el
+restaurante con parrilla compartida sale `rejected` en 2 de 5 (antes 0 de 6); va en la dirección conservadora, pero es un cambio de
+conducta fuera del alcance. **La corrida completa de la iteración 3 se cortó en el caso 7 de 27** (otra vez «credit balance is too
+low»; los seis medidos, fuera de alcance, 18 de 18). Completarla es condición para el merge.
+
+`PARSE_RUBRIC` (Social, Haiku, `db/checks/discovery_scope_ab.py social`, n=3, 19 casos): pasa. `sells_to_public` es `false` en 18
+de 18 muestras de las seis páginas que no venden y en 0 de 33 de los once negocios, con nombre y categoría iguales a los de antes.
+`RESEARCH_RUBRIC` (Web): **sin medir**. Con el modelo por defecto la llamada da 400 («claude-haiku-4-5 does not support programmatic
+tool calling» con `web_search_20260209` / `web_fetch_20260209`): el agente Web no puede correr hoy con `WEB_SEARCH_MODEL` por defecto,
+un defecto previo de `agents/clients/llm.py` que queda anotado y sin arreglar (el agente está deshabilitado desde la Fase 11). El
+reintento con Sonnet no devolvió resultados antes de agotarse el crédito.
+
+**Auditoría de lo existente** (solo lectura, `db/checks/map_scope_audit.py` → `db/checks/2026-10-13-map-scope-audit.md`): 1 387
+filas leídas; 9 caen seguras en la regla, de las cuales 1 está aprobada (Tienda Inglesa, Montevideo), 2 en `needs_review` y 6 ya
+descartadas; 69 dudosas, 14 de ellas aprobadas, entre ellas las 9 sucursales de La Molienda, todas con decisión manual. No se
+cambió ningún estado: las decisiones quedan para el admin.
+
+**Decisiones del admin sobre la auditoría (2026-10-13).**
+
+- Tienda Inglesa (Montevideo, aprobada), Tienda Inglesa (Punta del Este) y Carrefour Market (La Plata) pasan a `discarded` con
+  `CORRECCIÓN MANUAL 2026-10-13: no aplica al mapa: cadena de supermercados, comercio general`
+  (`db/fixes/2026-10-13-map-scope-chain-discards.sql`, aplicado; aprobados 417 → 416, `place_evidence` sin cambios).
+- **EntreSano Healthy Supermarket, Minimarket La Isla y La Molienda se quedan**, sin cambio de estado ni de nivel: son tiendas
+  especializadas o con oferta sin gluten dedicada, no comercio general. Quedan como casos de control «dentro de alcance» en los
+  tests y en los A/B: no deben excluirse nunca. Esto acota el supuesto abierto: la palabra «supermarket» o «minimarket» en el nombre
+  no excluye. Sigue sin decidir el autoservicio independiente que solo tiene una góndola: el modelo lo excluye (5 de 5 en la prueba
+  corta), la capa determinista no.
+- La Molienda: el `OVERRIDE MANUAL` del 2026-09-07 la llama «supermercado/mercado general»; por su propio sitio es una tienda
+  natural. Se agrega una línea `ACLARACIÓN 2026-10-13 (admin)` arriba de la nota de las 9 sucursales
+  (`db/fixes/2026-10-13-la-molienda-scope-note.sql`), con el override debajo sin tocar.
+- Las 21 filas con una página de tema en `social_url` quedan listadas como datos a corregir en
+  `db/checks/2026-10-13-official-accounts-survey.md` (sección 3).
+- La línea `ACLARACIÓN 2026-10-13 (admin)` de La Molienda quedó aplicada en las 9 sucursales (solo `validation_notes`; aprobados
+  en 416, `place_evidence` sin cambios).
+
+**Regla explícita: comercio general independiente (decisión del admin, 2026-10-13).** Cierra el supuesto abierto de más arriba.
+
+- **Queda excluido** el autoservicio, minimercado o almacén general **independiente** cuya única oferta sin gluten es una góndola o
+  algunos productos sueltos. No hace falta que sea una cadena: lo que lo deja afuera es ser comercio general.
+- **Entran** los comercios con oferta sin gluten **dedicada y verificable**: cocina o elaboración propia sin gluten, o una sección
+  sin gluten grande y curada. Son los casos de Minimarket La Isla (más de 1 500 productos y cocina propia), EntreSano (671
+  productos en su categoría Sin TACC) y La Molienda (sección curada de 444 artículos).
+- En el código: lo decide el modelo con la `RUBRIC` (la capa determinista solo conoce cadenas por nombre o por dominio y no opina
+  sobre un independiente). El flag fijo pasa de «cadena de comercio general» a **«comercio general»**, porque ya no describe solo
+  cadenas. En el A/B, el autoservicio independiente con una góndola pasa de caso informativo a caso «fuera de alcance».
+
+**Iteración 4 de la `RUBRIC` (escrita, sin medir).** El admin no acepta el efecto lateral de la iteración 3 (el restaurante con
+parrilla compartida, `rejected` en 2 de 5): el alcance no cambia el criterio de seguridad. Tres cambios:
+
+1. Se quita «Un lugar fuera de alcance nunca es "needs_review" ni "approved"». Es la hipótesis de la causa: un «nunca
+   needs_review» escrito en el prompt puede empujar a `rejected` un caso que no tiene nada que ver con el alcance. Que lo excluido
+   nunca sea ámbar ni vaya a revisión lo garantiza el código (`_decide_status`), no esa oración. Pasa a «Para esos casos, y solo
+   para esos, el veredicto es "not_applicable"».
+2. La última oración pasa a: «El alcance no cambia el criterio de seguridad. […] para un lugar que aplica, el veredicto y la
+   confianza se deciden únicamente con el rubric de validación que sigue, igual que si este apartado no existiera, sin volverse
+   más estricto ni más permisivo».
+3. La regla del comercio general independiente y la de la oferta dedicada, de arriba.
+
+`validator_scope_ab.py` suma el criterio `EXPECT_STATUS`: el restaurante con parrilla compartida debe dar `needs_review` en todas
+las muestras, como con la `RUBRIC` anterior (6 de 6). Si la iteración 4 no lo logra, la alternativa a probar es mover el apartado de
+alcance al final del prompt, después del rubric de seguridad.
+
+**Regla de gasto de API (decisión del admin, 2026-10-13).** Ninguna llamada paga (Sonnet, Haiku, búsquedas) sin que el admin la
+pida. Antes de cada corrida se informa cuántas llamadas son y cuánto cuestan; el script lleva un tope duro (`--max-calls`,
+obligatorio, con `--dry-run` para ver el plan sin llamar) que corta la corrida al llegar; si algo falla, no se reintenta con otro
+modelo. Motivo: el reintento del A/B del agente Web con Sonnet, sin consultar, agotó el crédito recién recargado y cortó la
+medición que sí se había pedido. La prueba corta de la iteración 4 y la corrida completa quedan pendientes del pedido del admin.
+
+**Iteraciones 4 a 6, pruebas cortas (2026-10-13/14; `db/checks/2026-10-13-scope-ab-run-iter4-iter5.md`,
+`db/checks/2026-10-14-scope-ab-run-iter6.md`; 75 llamadas cada una, ~US$0,82, todas dentro del tope).**
+
+- Iteración 4 (apartado al principio): falla; parrilla compartida rechazada 3 de 5.
+- Iteración 5 (el mismo texto al final del prompt): parrilla en revisión 5 de 5, pero Mi Cocina Sin Gluten aprobado 4 de 5 y Ramona
+  3 de 5 (antes 0 de 6 y 1 de 6). No se aplicó.
+- Iteración 6 (al final, la frase de la regla 5 sin vocabulario de seguridad: «cuya oferta sin gluten es una parte central y amplia
+  de lo que vende, no una góndola»; y «El alcance responde qué tipo de lugar es, nunca si es seguro»), la que está en el código:
+  **falla** los criterios del admin en Ramona (aprobado 2 de 5, tope 1) y Mi Cocina Sin Gluten (1 de 5, tope 0); los otros 13 casos
+  pasan, incluida la parrilla compartida (revisión 5 de 5). Sin séptima redacción por decisión del admin; la medición completa no se
+  corrió. Abierto: cómo seguir (ver el reporte).
+
+**Decisión final (admin, 2026-10-14): el alcance se resuelve en código y la `RUBRIC` vuelve al texto medido.**
+
+- **Por qué.** El alcance dentro del prompt se probó en seis redacciones contra el modelo real. Todas excluían bien lo que no
+  aplica, pero ninguna dejó quietos los veredictos de seguridad de los lugares que sí aplican: cada una subió las aprobaciones de
+  Ramona o de Mi Cocina Sin Gluten (con una sola fuente no verificada) o pasó la parrilla compartida de revisión a rechazado. Con
+  la `RUBRIC` anterior: Ramona `approved` 1 de 6, Mi Cocina Sin Gluten 0 de 6, parrilla compartida `needs_review` 6 de 6. Se
+  descartó con datos. Reportes: `db/checks/2026-10-13-validator-scope-ab-run-iter1.md`,
+  `db/checks/2026-10-13-scope-ab-run-iter2-iter3.md`, `db/checks/2026-10-13-scope-ab-run-iter4-iter5.md`,
+  `db/checks/2026-10-14-scope-ab-run-iter6.md`; tabla resumen en prompts.md §42.1.
+- **La `RUBRIC`** es byte a byte la del PR #22: sin apartado de alcance ni veredicto `not_applicable` en el prompt (tampoco quedó
+  el cambio de la categoría `shop`, que sacaba «supermercados»). `test_the_safety_rubric_is_the_measured_text` compara su hash con el del
+  texto medido; cambiarlo exige un A/B con el modelo real. Si el modelo respondiera `not_applicable`, es un veredicto desconocido y
+  va a revisión, no a descartado.
+- **`agents/map_scope.py`, solo reglas deterministas, sin modelo:** cadenas listadas por nombre o por dominio (UY: Tata, Devoto,
+  Disco, Géant, Tienda Inglesa…; AR: Carrefour, Coto, Jumbo, Día, Vea…), con la excepción de las cadenas gastronómicas o
+  especializadas; **regla nueva del autoservicio independiente:** un nombre que empieza con «Autoservicio», «Minimercado» o
+  «Supermercado» y no tiene ninguna palabra de rubro especializado (dietética, natural, saludable, sin gluten, celíaco, panadería…)
+  queda afuera. «Minimarket» no está en la lista: Minimarket La Isla sigue dentro. Las escuelas, blogs o recetas cuyo nombre lo
+  dice siguen excluidas por nombre, y las páginas que no venden las descarta el agente Social (`sells_to_public`) y las páginas de
+  tema, el #22. El Validator la consulta antes de llamar al modelo; Search, Social y Web, antes de crear el candidato.
+- **Tests sin llamadas** con los 15 lugares del A/B más Géant y Carrefour como fixtures (`tests/scope_fixtures.py`): fuera, Géant,
+  Tienda Inglesa, Carrefour Market, Devoto Express y el autoservicio independiente; dentro, Minimarket La Isla, EntreSano, La
+  Molienda, Zero Helados, Ramona, Mi Cocina Sin Gluten, la dietética, la panadería exclusiva, la fábrica con venta directa, el
+  restaurante con opciones, el almacén natural y la panadería que da talleres.
+
+**Limitaciones (aceptadas por el admin).**
+
+- Un lugar que no vende cuyo nombre no lo delata (By Gessi Cocina Inclusiva) y una cadena que no está en la lista con una reseña de
+  góndola ya no se excluyen solos: pasan por el Validator, que los deja en revisión o rechazados según la evidencia de seguridad, y
+  los decide el admin. Con la `RUBRIC` medida, By Gessi salía rechazado 3 de 3 y un autoservicio con góndola, revisión 0,62; Devoto
+  Express con una reseña de góndola salía aprobado 3 de 3, pero lo excluye la lista por nombre.
+- Cualquier cadena nueva se agrega a mano a las listas de `agents/map_scope.py` (`_DISTINCTIVE_BRANDS`, `_AMBIGUOUS_BRANDS`,
+  `_CHAIN_DOMAINS`), con su test.
+- Un autoservicio independiente cuyo nombre no empieza con esas palabras («Super El Trébol», «El Autoservicio de la Esquina») no
+  se excluye solo.
+
+**Costo de las mediciones con el modelo real** (estimado a ~US$0,011 por llamada a Sonnet y ~US$0,001 a Haiku; el número exacto
+está en la consola de facturación):
+
+| Corrida | Llamadas | Estimado |
+|---|---|---|
+| Validator, iteración 1 (n=3) | 138 | US$1,52 |
+| Validator, iteración 2 (n=3, completa) | 162 | US$1,78 |
+| Validator, iteración 3 (prueba corta 35 + completa cortada en el caso 7, ~39) | ~74 | US$0,81 |
+| Validator, iteraciones 4, 5 y 6 (pruebas cortas, 75 cada una, con tope) | 225 | US$2,48 |
+| Social, `PARSE_RUBRIC` (Haiku, n=3) | 114 | US$0,11 |
+| Web con Haiku (rechazadas con 400 antes de procesarse) | 8 | ~US$0 |
+| Web con Sonnet y búsqueda web (4 turnos, detenidos sin resultado) | 4 | sin medir: probablemente lo que agotó el saldo de la segunda recarga |
+| **Total estimado** | **~725** | **~US$6,70 más los 4 turnos de Web** |
+
+La última etapa (sacar el alcance del prompt, la regla del autoservicio y sus tests) no hizo ninguna llamada paga.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

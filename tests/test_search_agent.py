@@ -767,3 +767,64 @@ def test_place_details_never_replace_a_social_url_the_row_already_has():
     agent._apply_place_details("row-1", "gid-1", store_reviews=False)
 
     db.update_place.assert_called_once_with("row-1", {"rating": 4.5})
+
+
+# --- Map scope rules (2026-10-13): no candidate for a general retail chain or a school ---
+
+
+@pytest.mark.parametrize(
+    "name, types",
+    [
+        ("Géant Fresh Market", ["supermarket", "store"]),
+        ("Tienda Inglesa", ["grocery_or_supermarket"]),
+        ("Carrefour Market", ["store"]),
+        ("Vea Palermo", ["supermarket"]),
+        ("Farmashop 12", ["pharmacy"]),
+        ("Escuela de Cocina Sin Gluten", ["point_of_interest"]),
+        ("By Gessi", ["school", "point_of_interest"]),
+    ],
+)
+def test_a_result_outside_the_maps_scope_creates_no_candidate(name, types):
+    agent, db, places = make_agent()
+    places.text_search.return_value = {"results": [make_result("OUT", name=name, types=types)]}
+
+    summary = agent.run()
+
+    db.insert_place_candidate.assert_not_called()
+    assert summary["not_for_map"] == 1 and summary["inserted"] == 0 and summary["skipped"] == 1
+    logged = [c for c in db.insert_agent_log.call_args_list if c.args[1] == "candidate_not_for_map"]
+    assert logged and logged[0].args[2]["name"] == name
+
+
+@pytest.mark.parametrize("name", ["Zero Helados Pocitos", "Ramona", "Mi Cocina Sin Gluten", "Dietética Día Verde"])
+def test_a_food_or_specialised_chain_is_still_a_candidate(name):
+    agent, db, places = make_agent()
+    places.text_search.return_value = {"results": [make_result("IN", name=name, types=["store", "food"])]}
+
+    summary = agent.run()
+
+    assert summary["inserted"] == 1 and summary["not_for_map"] == 0
+    assert db.insert_place_candidate.call_args.args[0]["name"] == name
+
+
+def test_an_independent_self_service_shop_is_not_a_candidate():
+    agent, db, places = make_agent()
+    places.text_search.return_value = {"results": [make_result("OUT", name="Autoservicio El Trébol", types=["store", "food"])]}
+
+    summary = agent.run()
+
+    assert summary["not_for_map"] == 1 and summary["inserted"] == 0
+    db.insert_place_candidate.assert_not_called()
+
+
+@pytest.mark.parametrize("name", ["EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"])
+def test_a_place_the_admin_kept_on_the_map_is_still_a_candidate_even_with_retail_types(name):
+    agent, db, places = make_agent()
+    places.text_search.return_value = {
+        "results": [make_result("IN", name=name, types=["supermarket", "grocery_or_supermarket", "store", "food"])]
+    }
+
+    summary = agent.run()
+
+    assert summary["inserted"] == 1 and summary["not_for_map"] == 0
+    assert db.insert_place_candidate.call_args.args[0]["name"] == name

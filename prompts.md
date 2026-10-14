@@ -2486,3 +2486,53 @@ re-evalúan; `validation_confidence` y `verified` no se modifican; todo write va
 
 **Seguimiento (PR aparte, pedido tras la auditoría):** el agente Social deja de guardar un reel o un post como perfil del lugar,
 marca su texto como no atribuible (el Validator no lo pesa) y no toma una página de tema como lead.
+
+## 42. Reglas de alcance del mapa — veredicto `not_applicable` (2026-10-13)
+
+**Pedido de desarrollo, resumido:** tarea separada de los PR #21 y #22, con plan previo, rama y PR nuevos. Géant Fresh Market (cadena
+de supermercados) y By Gessi (escuela de cocina) habían entrado al mapa porque el Validator no tenía regla de alcance. (1) No entran:
+(a) cadenas de comercio general — supermercados, hipermercados, autoservicios y farmacias de cadena, en Uruguay y Argentina —, aunque
+tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar; (b) lugares que enseñan o informan sin vender
+ni servir al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema. (2) Sí entran:
+dietéticas y tiendas especializadas, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa. (3) No sobreexcluir:
+el criterio es el rubro, no la cantidad de sucursales; las listas de nombres son ejemplos. (4) Para lo excluido el Validator responde
+«no aplica al mapa» con el motivo, nunca ámbar ni `needs_review`, con los estados y campos que ya existen. (5) Los agentes de
+descubrimiento no crean candidatos de 1a o 1b. Fase 1: código y tests que fallen antes y pasen después. Fase 2: auditoría en solo
+lectura de `places` y frenar hasta el OK.
+
+### 42.1 Validator `RUBRIC` — sin cambios: el alcance se probó en el prompt y se sacó (2026-10-14)
+
+**Resultado final: la `RUBRIC` quedó exactamente como estaba antes de esta tarea** (la de la sección de arriba, PR #22). El alcance
+se decide solo en código (`agents/map_scope.py`), antes de llamar al modelo, y un test fija el hash del texto
+(`test_the_safety_rubric_is_the_measured_text`).
+
+Se probaron seis redacciones de un apartado «Alcance del mapa» dentro del prompt, con el veredicto `not_applicable`, contra el
+modelo real (`db/checks/validator_scope_ab.py`). Todas excluían bien lo que no aplica, pero cada una movió el veredicto de
+seguridad de algún lugar que sí aplica:
+
+| Iteración | Qué cambiaba | Resultado | Reporte |
+|---|---|---|---|
+| 1 | apartado al principio, nombraba cadenas que sí aplican | Ramona y Mi Cocina Sin Gluten `approved` 1 de 3 (antes 0 de 3) | `db/checks/2026-10-13-validator-scope-ab-run-iter1.md` |
+| 2 | sin esos nombres; «no es evidencia de seguridad» | EntreSano excluido 1 de 3; parrilla compartida `rejected` 3 de 3 | `db/checks/2026-10-13-scope-ab-run-iter2-iter3.md` |
+| 3 | «comercio especializado aplica aunque se llame supermercado» | parrilla compartida `rejected` 2 de 5 | ídem |
+| 4 | sin «nunca es needs_review»; regla del autoservicio independiente | parrilla `rejected` 3 de 5; Ramona `approved` 5 de 5 | `db/checks/2026-10-13-scope-ab-run-iter4-iter5.md` |
+| 5 | el mismo texto al final del prompt | parrilla bien; Mi Cocina `approved` 4 de 5, Ramona 3 de 5 | ídem |
+| 6 | al final, sin vocabulario de seguridad | Ramona `approved` 2 de 5 (tope 1), Mi Cocina 1 de 5 (tope 0) | `db/checks/2026-10-14-scope-ab-run-iter6.md` |
+
+Referencia de la `RUBRIC` anterior: Ramona `approved` 1 de 6, Mi Cocina Sin Gluten 0 de 6, parrilla compartida `needs_review` 6 de 6.
+
+### 42.2 Agente Social — `PARSE_RUBRIC` (Haiku)
+
+Campo nuevo `"sells_to_public": true | false | null`: `false` cuando la página enseña o informa y no vende ni sirve al público (blog,
+cuenta de recetas, escuela o taller de cocina, asociación, página informativa). Solo un `false` explícito descarta el lead; `true` o
+`null` siguen al Validator. La categoría `shop` deja de mencionar supermercados. Medido (`db/checks/discovery_scope_ab.py social`,
+n=3, 19 casos): `false` en 18 de 18 muestras de páginas que no venden y en 0 de 33 de negocios; nombre y categoría sin cambios.
+
+### 42.3 Agente Web — `RESEARCH_RUBRIC`
+
+Dos reglas nuevas (dejar afuera las cadenas de comercio general, aun con góndola sin gluten, y las páginas que enseñan o informan sin
+vender) y la lista de comercios deja de incluir «supermarkets with GF products». El agente sigue deshabilitado en el pipeline. Sin medir:
+con `WEB_SEARCH_MODEL` por defecto la llamada da 400 (Haiku no admite las versiones de `web_search` / `web_fetch` que usa el cliente).
+
+**Resultado:** `agents/map_scope.py` (capa determinista compartida), veredicto `not_applicable` en el Validator, filtro en Search,
+Social y Web, `"no aplica al mapa"` en `DATA_CORRECTION_PHRASES`, y la auditoría `db/checks/2026-10-13-map-scope-audit.md`.

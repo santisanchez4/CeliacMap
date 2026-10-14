@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from agents.clients.google_places import ResolvedLocation
 from agents.web_agent import DEFAULT_CATEGORY, WebAgent
 
@@ -303,3 +305,49 @@ def test_inserted_candidate_keeps_the_evidence_sentence_and_url():
     db.add_place_evidence.assert_called_once_with(
         "row-1", "web", "Reseña local lo recomienda como 100% sin TACC.", "https://blog.example/sin-tacc-mvd"
     )
+
+
+# --- Map scope rules (2026-10-13) ---
+
+
+def test_a_chain_or_a_school_lead_is_not_resolved_or_inserted():
+    for name in ("Carrefour", "Supermercado Disco", "Escuela de Cocina Sin Gluten"):
+        agent, db, places, llm = make_agent(max_cities=1)
+        llm.research_with_web_search.return_value = {"places": [make_lead(name=name)]}
+        summary = agent.run()
+        assert summary["not_for_map"] == 1 and summary["inserted"] == 0, name
+        places.resolve_location.assert_not_called()
+        db.insert_place_candidate.assert_not_called()
+
+
+def test_a_lead_that_resolves_to_a_chain_branch_is_not_inserted():
+    agent, db, places, _ = make_agent(max_cities=1)
+    places.resolve_location.return_value = make_match(name="Tienda Inglesa")
+    summary = agent.run()
+    assert summary["not_for_map"] == 1 and summary["inserted"] == 0
+    db.insert_place_candidate.assert_not_called()
+
+
+def test_a_food_chain_lead_is_still_inserted():
+    agent, db, places, llm = make_agent(max_cities=1)
+    llm.research_with_web_search.return_value = {"places": [make_lead(name="Zero Helados")]}
+    places.resolve_location.return_value = make_match(name="Zero Helados")
+    summary = agent.run()
+    assert summary["inserted"] == 1 and summary["not_for_map"] == 0
+
+
+@pytest.mark.parametrize("name", ["EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"])
+def test_a_place_the_admin_kept_on_the_map_is_still_inserted(name):
+    agent, db, places, llm = make_agent(max_cities=1)
+    llm.research_with_web_search.return_value = {"places": [make_lead(name=name)]}
+    places.resolve_location.return_value = make_match(name=name)
+    summary = agent.run()
+    assert summary["inserted"] == 1 and summary["not_for_map"] == 0
+
+
+def test_research_rubric_leaves_general_retail_and_non_sellers_out():
+    from agents.web_agent import RESEARCH_RUBRIC
+
+    assert "supermarket" not in RESEARCH_RUBRIC.replace("supermarket, hypermarket", "")
+    assert "general retail chain" in RESEARCH_RUBRIC
+    assert "do not sell or serve" in RESEARCH_RUBRIC

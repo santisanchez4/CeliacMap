@@ -125,6 +125,11 @@ to `validation_notes`, and `flags` / `recommendation` to their own columns.
 `category` + `safety_level` are retained in the output (the schema requires them and
 the map renders safety badges).
 
+**Map scope is decided in code, not in this prompt (2026-10-14).** General retail and places that do not sell to the public do
+not apply to the map. `agents/map_scope.py` decides it before the model is called and the Validator records verdict
+`not_applicable` → `discarded` (note `No aplica al mapa:`, no confidence). The RUBRIC has no scope text: six wordings measured
+against the real model all moved safety verdicts of places that do apply, and a test pins its hash.
+
 **Full rubric (Spanish — as it exists in code):**
 
 ```text
@@ -188,7 +193,9 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdo
 > kitchen change — `gluten_free_100` defined as "only celiac-safe products are
 > cooked and sold" plus the `declaraciones_comunidad` paragraph, measured in four
 > real-model A/B iterations — is recorded under **Kitchen information as review
-> evidence** there, in ADR-007 and in prompts.md §31.)
+> evidence** there, in ADR-007 and in prompts.md §31. The map scope
+> work of 2026-10-13/14 left this text unchanged — scope went to code after six measured wordings — and is recorded under **Map
+> scope rules** there and in prompts.md §42.)
 
 ## The Chatbot System Prompts — Router + Redactor
 
@@ -222,7 +229,7 @@ text: [Technical Scope (texto anterior)](docs/DECISIONS.md#technical-scope-texto
 │               (Form B) · ranking.js · opinions.js · chat.js (widget -> the `chat` function) · pwa.js · geo.js
 ├── agents/     base.py · {search,social,web,validator,updater,suggestion,outreach}_agent.py · outreach_reply_handler.py ·
 │               review_handler.py · manual_overrides.py · admin_notify.py · evidence_finder.py · evidence_freeze.py ·
-│               clients/ (supabase, google_places, tavily,
+│               map_scope.py · clients/ (supabase, google_places, tavily,
 │               llm, resend, website_scraper)
 ├── apps/mobile/ Capacitor Android shell: capacitor.config.json · scripts/ (sync-web, web-bundle, icons) · native/native.js · android/
 ├── mcp_server/ server.py (6 tools over Supabase + the RUBRIC) · skills/validator-rubric/SKILL.md (academic deliverable)
@@ -341,12 +348,20 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   had said. Never inflate or deflate `validation_confidence`; leave `verified` alone unless a human vouches for it.
 - **`DATA_CORRECTION_PHRASES`** (`agents/manual_overrides.py`): a `CORRECCIÓN MANUAL` header that only corrects data
   ("país/ciudad corregidos", "ciudad corregida", "dirección corregida", "duplicado de", "lugar de ejemplo del seed", "no es un comercio",
-  "fuera del alcance geográfico") does not protect a place; each header line is judged on its own; `OVERRIDE` / `APROBACIÓN MANUAL` always
+  "fuera del alcance geográfico", "no aplica al mapa") does not protect a place; each header line is judged on its own; `OVERRIDE` / `APROBACIÓN MANUAL` always
   protect. In fix scripts, a data-only note uses one of those phrases and a safety decision goes on its own line.
 - **100% label** [Manual Validator overrides; Kitchen information]: `gluten_free_100` means only celiac-safe products are
   cooked and sold. Cooking everything but offering a celiac menu, separate prep or a separate kitchen is
   `options_available`; one shared kitchen is not 100% by default. Only the admin upgrades to 100%. Kitchen declarations
   are unverified and live only on `suggestions` / `place_reports` (never `places`).
+- **Map scope** [Map scope rules]: general retail (supermarket, hypermarket, self-service and pharmacy chains; an independent shop whose name
+  starts with «Autoservicio», «Minimercado» or «Supermercado» and has no specialised word) and places that teach or inform without selling
+  to the public do not go on the map. Decided only in code (`agents/map_scope.py`, no model call): the Validator discards them as
+  `not_applicable`, Search / Social / Web create no candidate. **Never put scope back in the RUBRIC** (six measured wordings moved safety
+  verdicts; `test_the_safety_rubric_is_the_measured_text`). A food or specialised chain is evaluated branch by branch; «minimarket» is not a
+  retail word (Minimarket La Isla stays). A new chain is added to the lists by hand. Not caught by code (a school whose name does not say
+  so, an unlisted chain) goes through the Validator and the admin. An existing row is discarded only by the admin, with
+  `CORRECCIÓN MANUAL: no aplica al mapa`.
 - **No third-party health data is collected** [Privacy phase 1]: whether an owner is celiac is no longer asked, stored,
   shown to the admin or sent to the model (`owner_celiac` columns dropped from 2026-10-07; the chat stops asking in the
   next prompt batch). Never add a question about a person's health. A free-text claim about one is evidence for human
@@ -407,6 +422,9 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   `SECURITY DEFINER`.
 
 **Prompts and chatbot**
+- **No paid API call without the admin asking** [Map scope rules]: no web search and no model call is launched without an estimate (calls and
+  cost) and the admin's OK first, **also to investigate or verify data**; the script carries a hard cap (`--max-calls`, with `--dry-run`); a
+  failed call is reported, never retried with another model.
 - **The `RUBRIC` and the chatbot prompts are health gates.** Source of truth in code (`agents/validator_agent.py`,
   `supabase/functions/chat/prompts.ts`); copies guarded by `test_rubric_docs_sync.py` / `test_chat_prompts_sync.py`. Any
   change is deliberate, measured (real-model A/B, jailbreak battery) and recorded in `docs/DECISIONS.md` + `prompts.md`.
@@ -435,7 +453,7 @@ lives ("s/f" = no date stated).
 
 - **Mobile, PWA and location (2026-10-01 → 10-05)** — PWA first, Capacitor Android for demos (device test pending), location only on tap, branch + PR workflow, runners on `ubuntu-24.04` (debt: move to 26). [pilot](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02) · [ADR-010](docs/architecture/ADR-010-mobile-strategy.md) · [plan](docs/plans/PLAN-mobile-app.md) · [Android](docs/DECISIONS.md#android-demo-app-with-capacitor-2026-10-03) · [«Cerca mío»](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02) · [PWA](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02) · [icons](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02) · [polish](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01) · [runners](docs/DECISIONS.md#ci-runners-pinned-to-ubuntu-2404-2026-10-05)
 - **Privacy and legal texts (2026-09-29 → 10-06)** — `places` read by column grant, `owner_celiac` out (column drop 2026-10-07), retention windows, deletion requests, policy + terms v1.1 (edit the `.md` first). [grant](docs/DECISIONS.md#places-public-read-by-column-grant--privacy-phase-1-2026-09-29) · [phase 1](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29) · [phase 2](docs/DECISIONS.md#privacy-phase-2--retention-windows-and-providers-2026-09-30) · [v1.0](docs/DECISIONS.md#privacy-policy-and-terms-of-use-published-v10-2026-10-05) · [v1.1](docs/DECISIONS.md#legal-texts-v11--minors-clause-2026-10-06) · [Google reviews ToS](docs/DECISIONS.md#google-places-reviews--tos-driven-access-restriction--30-day-expiration-2026-09-05)
-- **Validator, evidence and overrides (2026-09-01 → 10-13)** — overrides never silent, the 100% labeling rule, `place_evidence`, the evidence finder, contact frozen only by the registry; two audit signals and the `needs_review` queue stay open. [overrides](docs/DECISIONS.md#manual-validator-overrides--allowed-but-never-silent) · [audit](docs/DECISIONS.md#audit-2026-09-24--evidence-for-the-validator--100-only-with-explicit-evidence) · [evidence finder](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27) · [re-validation](docs/DECISIONS.md#retroactive-re-validation-of-pre-three-tier-rubric-approvals-2026-09-06) · [own knowledge](docs/DECISIONS.md#validator--parametric-knowledge-vs-provided-evidence-2026-09-06) · [name substring](docs/DECISIONS.md#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07) · [queue](docs/DECISIONS.md#cola-de-needs_review-sin-salida-automática--71-lugares-huérfanos-de-contacto-2026-09-06) · [Updater + Google risk](docs/DECISIONS.md#updater-manual-contact-protection-and-google-risk-2026-10-02) · [contact registry](docs/DECISIONS.md#contact-data-frozen-only-by-the-registry-2026-10-06) · [social author](docs/DECISIONS.md#evidence-finder--a-social-quote-needs-a-verified-author-2026-10-13) · [post ≠ profile](docs/DECISIONS.md#social-agent--a-post-is-not-a-profile-2026-10-13)
+- **Validator, evidence and overrides (2026-09-01 → 10-13)** — overrides never silent, the 100% labeling rule, `place_evidence`, the evidence finder, contact frozen only by the registry; two audit signals and the `needs_review` queue stay open. [overrides](docs/DECISIONS.md#manual-validator-overrides--allowed-but-never-silent) · [audit](docs/DECISIONS.md#audit-2026-09-24--evidence-for-the-validator--100-only-with-explicit-evidence) · [evidence finder](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27) · [re-validation](docs/DECISIONS.md#retroactive-re-validation-of-pre-three-tier-rubric-approvals-2026-09-06) · [own knowledge](docs/DECISIONS.md#validator--parametric-knowledge-vs-provided-evidence-2026-09-06) · [name substring](docs/DECISIONS.md#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07) · [queue](docs/DECISIONS.md#cola-de-needs_review-sin-salida-automática--71-lugares-huérfanos-de-contacto-2026-09-06) · [Updater + Google risk](docs/DECISIONS.md#updater-manual-contact-protection-and-google-risk-2026-10-02) · [contact registry](docs/DECISIONS.md#contact-data-frozen-only-by-the-registry-2026-10-06) · [social author](docs/DECISIONS.md#evidence-finder--a-social-quote-needs-a-verified-author-2026-10-13) · [post ≠ profile](docs/DECISIONS.md#social-agent--a-post-is-not-a-profile-2026-10-13) · [map scope](docs/DECISIONS.md#map-scope-rules-2026-10-13)
 - **Data quality, dedup and scope (2026-09-01 → 10-13)** — IM Montevideo's licensed-premises layer as evidence (never an approval), one Google place one row, a social profile is not a website, UY+AR bounding box, Brazil / Chile rows discarded, address geocode fallback. [dedup](docs/DECISIONS.md#one-google-place-one-row--dedup-across-sources-2026-09-27) · [social profile](docs/DECISIONS.md#a-social-profile-is-not-a-website-2026-10-01) · [monthly review](docs/DECISIONS.md#monthly-run-review-and-admin-decisions-2026-10-01) · [data pass](docs/DECISIONS.md#audit-data-quality-pass-2026-09-25--fictional-seed-places-wrong-countrycity-non-business-rows) · [Brazil](docs/DECISIONS.md#brazil-out-of-scope-places--curitiba-cluster-2026-09-01) · [scope guard](docs/DECISIONS.md#geographic-scope-guard--insert_place_candidate-bounding-box-2026-09-01) · [geocode-gate](docs/DECISIONS.md#geocode-gate--address-fallback-resolve_location) · [ranking seed](docs/DECISIONS.md#community-ranking-seed--data-quality-findings-adr-005-fase-d-2026-09-02) · [IM Montevideo](docs/DECISIONS.md#im-montevideo-as-an-evidence-source-2026-10-13)
 - **Forms, kitchen and community (Jun 2026 → 09-24)** — anon INSERT-only suggestions, unverified kitchen questions (ADR-007), reports as evidence, opinions through a public view (ADR-008). [suggest form](docs/DECISIONS.md#suggest-a-place-public-form-design-decisions) · [kitchen](docs/DECISIONS.md#kitchen-information-as-review-evidence-2026-09-24) · [Form B](docs/DECISIONS.md#form-b-collects-reviews-not-kitchen-data-2026-09-24) · [opinions](docs/DECISIONS.md#community-opinions-on-the-public-site-2026-09-24) · [reports](docs/DECISIONS.md#community-reports-place_reports-design-decisions)
 - **Chatbot (2026-09-19 → 09-27)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [C](docs/DECISIONS.md#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](docs/DECISIONS.md#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](docs/DECISIONS.md#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía) · [by name](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23) · [battery](docs/DECISIONS.md#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25) · [region](docs/DECISIONS.md#department--province-search--placesregion-2026-09-26) · [`category_zero`](docs/DECISIONS.md#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)

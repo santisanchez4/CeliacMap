@@ -457,3 +457,55 @@ def test_social_page_kind():
     assert social_page_kind("https://www.instagram.com/explore/tags/singluten") == "topic"
     assert social_page_kind("https://www.instagram.com/") == "topic"
     assert social_page_kind("https://cafex.example/instagram") is None
+
+
+# --- Map scope rules (2026-10-13): no candidate for a chain, a blog, a recipe account or a school ---
+
+
+def _scope_run(parsed, resolved_name="Cafe X"):
+    agent, db, search, places, llm = make_agent(max_queries=1)
+    llm.complete_json.return_value = {"name": "Cafe X", "city": "Montevideo", "category": "cafe", "address": None, **parsed}
+    places.resolve_location.return_value = make_match(name=resolved_name)
+    search.search.return_value = [{"title": "t", "link": "https://www.instagram.com/cuenta", "snippet": "sin TACC"}]
+    return agent.run(), db, places
+
+
+def test_a_page_that_does_not_sell_to_the_public_is_not_a_lead():
+    summary, db, places = _scope_run({"name": "Celíaca y Feliz", "sells_to_public": False})
+    assert summary["inserted"] == 0 and summary["not_for_map"] == 1
+    db.insert_place_candidate.assert_not_called()
+    places.resolve_location.assert_not_called()  # no geocoding spent on it
+    assert any(c.args[1] == "social_not_for_map" for c in db.insert_agent_log.call_args_list)
+
+
+def test_a_chain_or_a_blog_by_its_name_is_not_a_lead():
+    for name in ("Tienda Inglesa", "Supermercados Disco", "Blog Celíaco Feliz", "Recetas Sin Gluten Uruguay"):
+        summary, db, places = _scope_run({"name": name, "sells_to_public": True})
+        assert summary["not_for_map"] == 1, name
+        db.insert_place_candidate.assert_not_called()
+        places.resolve_location.assert_not_called()
+
+
+def test_a_lead_that_resolves_to_a_chain_branch_is_not_inserted():
+    summary, db, _ = _scope_run({"name": "Fresh Market"}, resolved_name="Géant Fresh Market")
+    assert summary["not_for_map"] == 1 and summary["inserted"] == 0
+    db.insert_place_candidate.assert_not_called()
+
+
+def test_a_food_chain_or_an_unknown_answer_is_still_a_lead():
+    for parsed in ({"name": "Zero Helados", "sells_to_public": True}, {"name": "Ramona"}, {"name": "Mi Cocina Sin Gluten", "sells_to_public": None}):
+        summary, db, _ = _scope_run(parsed, resolved_name=parsed["name"])
+        assert summary["inserted"] == 1 and summary["not_for_map"] == 0, parsed
+
+
+def test_a_place_the_admin_kept_on_the_map_is_still_a_lead():
+    for name in ("EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"):
+        summary, db, _ = _scope_run({"name": name, "category": "shop", "sells_to_public": True}, resolved_name=name)
+        assert summary["inserted"] == 1 and summary["not_for_map"] == 0, name
+
+
+def test_parse_rubric_asks_whether_the_page_sells_to_the_public():
+    from agents.social_agent import PARSE_RUBRIC
+
+    assert '"sells_to_public"' in PARSE_RUBRIC
+    assert "supermarket" not in PARSE_RUBRIC
