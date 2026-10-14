@@ -869,9 +869,22 @@ def test_rubric_names_no_in_scope_business_and_scope_is_not_safety_evidence():
 
     for name in FOOD_CHAINS:
         assert name not in RUBRIC
-    assert "El alcance no cambia el criterio de seguridad" in RUBRIC
+    assert "nunca si es seguro, y no cambia el criterio de seguridad" in RUBRIC
     # iterations 1-3 said a place out of scope is "never needs_review": a restaurant with a shared grill went from review to rejected
     assert 'nunca es "needs_review"' not in RUBRIC
+
+
+def test_the_scope_section_comes_last_and_uses_no_safety_vocabulary():
+    """A/B iterations 4 and 5 (2026-10-13): before the safety rubric, the section moved a shared-grill restaurant from review to
+    rejected; describing scope with "dedicada / elaboración propia / curada" raised approvals on two in-scope controls."""
+    from agents.validator_agent import RUBRIC
+
+    start = RUBRIC.index("Alcance del mapa.")
+    end = RUBRIC.index("Responde ÚNICAMENTE con un objeto JSON válido")
+    assert RUBRIC.index("Rubric de validación (veredicto):") < RUBRIC.index("Basá el veredicto y el safety_level SOLO") < start < end
+    scope = RUBRIC[start:end].lower()
+    for word in ("dedicad", "curad", "elaboración propia", "cocina sin gluten", "cocina propia", "exclusiv", "certific"):
+        assert word not in scope, word
 
 
 def test_rubric_keeps_a_specialised_shop_in_scope_whatever_its_name_says():
@@ -879,6 +892,6 @@ def test_rubric_keeps_a_specialised_shop_in_scope_whatever_its_name_says():
     from agents.validator_agent import RUBRIC
 
     assert "lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre" in RUBRIC
-    assert "oferta sin gluten dedicada" in RUBRIC
+    assert "una parte central y amplia de lo que vende, no una góndola" in RUBRIC
     for name in ("EntreSano", "La Isla", "La Molienda"):
         assert name not in RUBRIC

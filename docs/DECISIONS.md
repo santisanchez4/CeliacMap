@@ -4265,6 +4265,18 @@ obligatorio, con `--dry-run` para ver el plan sin llamar) que corta la corrida a
 modelo. Motivo: el reintento del A/B del agente Web con Sonnet, sin consultar, agotó el crédito recién recargado y cortó la
 medición que sí se había pedido. La prueba corta de la iteración 4 y la corrida completa quedan pendientes del pedido del admin.
 
+**Iteraciones 4 a 6, pruebas cortas (2026-10-13/14; `db/checks/2026-10-13-scope-ab-run-iter4-iter5.md`,
+`db/checks/2026-10-14-scope-ab-run-iter6.md`; 75 llamadas cada una, ~US$0,82, todas dentro del tope).**
+
+- Iteración 4 (apartado al principio): falla; parrilla compartida rechazada 3 de 5.
+- Iteración 5 (el mismo texto al final del prompt): parrilla en revisión 5 de 5, pero Mi Cocina Sin Gluten aprobado 4 de 5 y Ramona
+  3 de 5 (antes 0 de 6 y 1 de 6). No se aplicó.
+- Iteración 6 (al final, la frase de la regla 5 sin vocabulario de seguridad: «cuya oferta sin gluten es una parte central y amplia
+  de lo que vende, no una góndola»; y «El alcance responde qué tipo de lugar es, nunca si es seguro»), la que está en el código:
+  **falla** los criterios del admin en Ramona (aprobado 2 de 5, tope 1) y Mi Cocina Sin Gluten (1 de 5, tope 0); los otros 13 casos
+  pasan, incluida la parrilla compartida (revisión 5 de 5). Sin séptima redacción por decisión del admin; la medición completa no se
+  corrió. Abierto: cómo seguir (ver el reporte).
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

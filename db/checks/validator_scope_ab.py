@@ -15,7 +15,8 @@ before the call that would exceed the cap. A failed call stops the run; nothing 
 
 Acceptance (NEW arm, after _normalize):
   out        every sample is "not_applicable" (status discarded): never approved, never needs_review
-  same       a case of EXPECT_STATUS keeps the status the previous RUBRIC gave it in every sample (scope must not move safety)
+  same       a case of EXPECT_STATUS has that status in EVERY sample (scope must not move the safety verdict)
+  ceiling    a case of MAX_APPROVED is not approved more often than with the previous RUBRIC
   in         no sample is "not_applicable"
 
 No production reads or writes: synthetic places, no DB. Uses ANTHROPIC_API_KEY from .env (never printed).
@@ -44,8 +45,18 @@ UY = {"address": "Av. Italia 3456, Montevideo", "city": "Montevideo", "country":
 AR = {"address": "Av. Corrientes 1234, CABA", "city": "Buenos Aires", "country": "Argentina", "geocode_method": "find_place",
       "source": "google_places"}
 COST_PER_CALL_USD = 0.011
-# Decided by safety, not by scope: the status the previous RUBRIC gave (6 of 6 samples on 2026-10-13) must not move.
-EXPECT_STATUS = {"restaurante_con_opciones": "needs_review"}
+# Acceptance criteria set by the admin on 2026-10-14. These cases are decided by safety, not by scope: the scope section must
+# leave them where the previous RUBRIC had them.
+EXPECT_STATUS = {
+    "restaurante_con_opciones": "needs_review",          # shared grill: review, never rejected
+    "zero_helados_cadena": "needs_review",
+    "minimarket_la_isla": "needs_review",
+    "la_molienda_tienda_natural": "needs_review",
+    "entresano_supermercado_saludable": "approved",
+    "panaderia_que_tambien_da_talleres": "approved",
+}
+# Approved samples allowed per run: the previous RUBRIC approved Ramona in 1 of 6 samples and Mi Cocina Sin Gluten in 0 of 6.
+MAX_APPROVED = {"ramona_cadena": 1, "mi_cocina_sin_gluten": 0}
 SHELF = [{"text": "Tienen una góndola de productos sin TACC muy completa, encuentro todo para celíacos"}]
 
 
@@ -193,6 +204,10 @@ def main() -> int:
             if expected and statuses.get(expected, 0) < args.n:
                 failures += 1
                 print(f"  !! FAIL: expected status {expected} in every sample (scope must not move the safety verdict)")
+            ceiling = MAX_APPROVED.get(label)
+            if ceiling is not None and statuses.get("approved", 0) > ceiling:
+                failures += 1
+                print(f"  !! FAIL: approved in {statuses['approved']}/{args.n}, more than with the previous RUBRIC (at most {ceiling})")
     print(f"\ncalls made: {cap.used} of a cap of {cap.limit}")
     print("RESULT:", "FAIL" if failures else "PASS", f"({failures} failing case(s))")
     return 1 if failures else 0
