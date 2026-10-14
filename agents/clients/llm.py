@@ -27,6 +27,9 @@ _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
 # blog, community post). Used by the Web discovery agent (v3).
 WEB_SEARCH_TOOL_TYPE = "web_search_20260209"
 WEB_FETCH_TOOL_TYPE = "web_fetch_20260209"
+# These tool versions default to a caller that needs programmatic tool calling, which claude-haiku-4-5 (the default
+# WEB_SEARCH_MODEL) does not support: the API answers 400. The agent only needs the model to call them directly.
+WEB_TOOL_CALLERS = ["direct"]
 
 
 def _parse_json(text: str) -> dict[str, Any]:
@@ -97,8 +100,9 @@ class LLMClient:
         assistant text is parsed as JSON (tolerating prose / code fences).
         """
         tools = [
-            {"type": WEB_SEARCH_TOOL_TYPE, "name": "web_search", "max_uses": max_searches},
-            {"type": WEB_FETCH_TOOL_TYPE, "name": "web_fetch"},
+            {"type": WEB_SEARCH_TOOL_TYPE, "name": "web_search", "max_uses": max_searches,
+             "allowed_callers": WEB_TOOL_CALLERS},
+            {"type": WEB_FETCH_TOOL_TYPE, "name": "web_fetch", "allowed_callers": WEB_TOOL_CALLERS},
         ]
         messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
         resp = None

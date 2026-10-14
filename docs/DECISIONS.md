@@ -4069,6 +4069,25 @@ cambian nombre, dirección, categoría ni el tratamiento de cierres; el parche d
 `flags`, `verified`, `validation_confidence` ni `validation_notes` (un test lo fija). Tests primero: seis fallaron antes del cambio.
 [Runbook](runbooks/manual-contact-fields.md).
 
+### Web agent — the web tools are declared as direct calls (2026-10-13)
+
+**Qué pasaba.** Con el modelo por defecto (`WEB_SEARCH_MODEL=claude-haiku-4-5`) cada turno de investigación del agente Web recibía
+400 de la API: «'claude-haiku-4-5-20251001' does not support programmatic tool calling. The following tools have `allowed_callers`
+that require it: web_search, web_fetch. Explicitly set `allowed_callers=["direct"]` on these tools, or use a model that supports
+programmatic tool calling». Las versiones `web_search_20260209` / `web_fetch_20260209` que usa `agents/clients/llm.py` piden por
+defecto un modo de llamada que Haiku no admite. Se vio el 2026-10-13 al medir el prompt del agente (8 llamadas, 8 errores).
+
+**Desde cuándo.** No se puede fechar con los logs. El agente no llama a la API desde el 2026-06-22: ese día se sacó `web: true` de
+todas las ciudades (timeout del CI) y desde entonces `agent_log` registra 44 corridas con 0 ciudades, 0 búsquedas y estado
+`success`; la última, la del pipeline mensual del 2026-10-01. Antes, entre el 2026-06-09 y el 2026-06-10, hubo tres corridas con
+ciudades: terminaron en error por otras causas (respuesta que no era JSON, `places_source_check`) y no insertaron ningún lugar.
+**En producción no hubo ninguna falla por este motivo**, porque no hubo ninguna llamada; el defecto habría aparecido al reactivar
+una ciudad.
+
+**Arreglo.** Las dos herramientas se declaran con `allowed_callers: ["direct"]` (`WEB_TOOL_CALLERS`), que es lo que el agente
+necesita: que el modelo las llame directamente. `tests/test_llm_web_tools.py` lo fija. **No se verificó contra la API real**: es
+una llamada paga y queda para cuando el admin la pida. El agente sigue deshabilitado en el pipeline.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
