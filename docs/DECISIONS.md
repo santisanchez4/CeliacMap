@@ -4195,7 +4195,7 @@ condición para el merge; `PARSE_RUBRIC` y `RESEARCH_RUBRIC` tampoco se midieron
 
 **Auditoría de lo existente** (solo lectura, `db/checks/map_scope_audit.py` → `db/checks/2026-10-13-map-scope-audit.md`): 1 387
 filas leídas; 9 caen seguras en la regla, de las cuales 1 está aprobada (Tienda Inglesa, Montevideo), 2 en `needs_review` y 6 ya
-descartadas; 69 dudosas, 14 de ellas aprobadas, entre ellas las 10 sucursales de La Molienda, todas con decisión manual. No se
+descartadas; 69 dudosas, 14 de ellas aprobadas, entre ellas las 9 sucursales de La Molienda, todas con decisión manual. No se
 cambió ningún estado: las decisiones quedan para el admin.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)

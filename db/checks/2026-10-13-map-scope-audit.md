@@ -13,7 +13,7 @@ Filas leídas: 1387 (approved 417, discarded 472, needs_review 497, outreach_con
 - **Un solo aprobado cae seguro en la regla: Tienda Inglesa (Montevideo, `1aab916e`)**, en ámbar con 0,72 y sin decisión manual.
   Otras dos filas de cadenas están en la cola de revisión (Carrefour Market de La Plata, Tienda Inglesa de Punta del Este) y cuatro
   ya estaban descartadas (Géant, Carrefour Market de Mendoza, Vea, Supermercados El Dorado).
-- **La Molienda (10 sucursales aprobadas) queda en dudosos y tiene decisión manual en todas:** la nota del override la describe como
+- **La Molienda (9 sucursales aprobadas) queda en dudosos y tiene decisión manual en todas:** la nota del override la describe como
   supermercado / mercado general. No se toca: es una aprobación manual. Es la decisión de fondo que deja esta auditoría: si La
   Molienda es comercio general (1a) o tienda especializada.
 - **Supermercados y autoservicios independientes** (el supuesto del plan: 1a habla de cadenas): aprobados aparecen EntreSano Healthy
