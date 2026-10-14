@@ -74,6 +74,24 @@ def test_a_food_or_specialised_business_is_never_excluded_by_the_name_list(name)
     assert out_of_scope_reason(name) is None, name
 
 
+# Admin decision 2026-10-13: three real places the audit listed as doubtful stay on the map. A name with "supermarket" or
+# "minimarket", a Google type of general retail or a brand with several branches does not make a specialised shop a chain.
+ADMIN_IN_SCOPE = [
+    ("EntreSano Healthy Supermarket", "https://entresano.com/"),
+    ("EntreSano Av. Colon", "http://www.entresano.com/"),
+    ("Minimarket La Isla 24 hours.", "https://www.laisla247.com/"),
+    ("La Molienda - Carrasco", "https://www.lamolienda.uy/tiendas"),
+    ("La Molienda - ACJ (Colonia)", None),
+    ("La Molienda - Costa Urbana", None),
+]
+
+
+@pytest.mark.parametrize("name, website", ADMIN_IN_SCOPE)
+@pytest.mark.parametrize("types", [(), ("supermarket", "grocery_or_supermarket", "store"), ("convenience_store", "food", "store")])
+def test_the_places_the_admin_kept_on_the_map_are_never_excluded(name, website, types):
+    assert out_of_scope_reason(name, types=types, website=website) is None, name
+
+
 @pytest.mark.parametrize(
     "website",
     ["https://www.geant.com.uy/", "http://tata.com.uy/sucursales", "https://www.carrefour.com.ar", "https://diaonline.supermercadosdia.com.ar/"],

@@ -498,6 +498,12 @@ def test_a_food_chain_or_an_unknown_answer_is_still_a_lead():
         assert summary["inserted"] == 1 and summary["not_for_map"] == 0, parsed
 
 
+def test_a_place_the_admin_kept_on_the_map_is_still_a_lead():
+    for name in ("EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"):
+        summary, db, _ = _scope_run({"name": name, "category": "shop", "sells_to_public": True}, resolved_name=name)
+        assert summary["inserted"] == 1 and summary["not_for_map"] == 0, name
+
+
 def test_parse_rubric_asks_whether_the_page_sells_to_the_public():
     from agents.social_agent import PARSE_RUBRIC
 

@@ -805,3 +805,16 @@ def test_a_food_or_specialised_chain_is_still_a_candidate(name):
 
     assert summary["inserted"] == 1 and summary["not_for_map"] == 0
     assert db.insert_place_candidate.call_args.args[0]["name"] == name
+
+
+@pytest.mark.parametrize("name", ["EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"])
+def test_a_place_the_admin_kept_on_the_map_is_still_a_candidate_even_with_retail_types(name):
+    agent, db, places = make_agent()
+    places.text_search.return_value = {
+        "results": [make_result("IN", name=name, types=["supermarket", "grocery_or_supermarket", "store", "food"])]
+    }
+
+    summary = agent.run()
+
+    assert summary["inserted"] == 1 and summary["not_for_map"] == 0
+    assert db.insert_place_candidate.call_args.args[0]["name"] == name

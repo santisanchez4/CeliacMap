@@ -461,7 +461,7 @@ Alcance del mapa (decidilo antes que el veredicto de seguridad). Hay dos tipos d
 - Cadenas de comercio general: supermercados, hipermercados, autoservicios y farmacias de cadena (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
 - Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
 Para esos casos respondé "verdict": "not_applicable", explicá el motivo en reasoning y poné en flags exactamente "cadena de comercio general" o "no vende ni sirve al público". Un lugar fuera de alcance nunca es "needs_review" ni "approved".
-SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia de seguridad: no sube la confianza ni cambia el veredicto.
+SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Un comercio especializado en alimentación saludable, natural o sin gluten aplica aunque su nombre diga "supermercado", "market" o "minimarket", aunque también venda otros productos y aunque tenga varias sucursales: lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia a favor ni en contra de su seguridad: para un lugar que aplica, decidí el veredicto y la confianza exactamente igual que si este párrafo no existiera.
 
 Rubric de validación (veredicto):
 - "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
@@ -2470,7 +2470,7 @@ Alcance del mapa (decidilo antes que el veredicto de seguridad). Hay dos tipos d
 - Cadenas de comercio general: supermercados, hipermercados, autoservicios y farmacias de cadena (ejemplos de Uruguay: Tata, Devoto, Disco, Géant, Tienda Inglesa; de Argentina: Carrefour, Coto, Jumbo, Día, Vea). Quedan afuera aunque tengan góndola sin gluten, porque la oferta varía por sucursal y no se puede verificar.
 - Lugares que enseñan o informan sin vender ni servir comida o productos al público: escuelas de cocina, talleres, blogs, cuentas de recetas, páginas informativas y páginas de tema de redes sociales.
 Para esos casos respondé "verdict": "not_applicable", explicá el motivo en reasoning y poné en flags exactamente "cadena de comercio general" o "no vende ni sirve al público". Un lugar fuera de alcance nunca es "needs_review" ni "approved".
-SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia de seguridad: no sube la confianza ni cambia el veredicto.
+SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en productos sin gluten, panaderías, heladerías, restaurantes, cafés y fábricas con venta directa o punto de venta. El criterio es el rubro (comercio general frente a gastronomía o tienda especializada), no la cantidad de sucursales: una cadena gastronómica o especializada (de heladerías, de panaderías sin gluten, de tiendas especializadas) se evalúa por sucursal como cualquier otro lugar. Un comercio especializado en alimentación saludable, natural o sin gluten aplica aunque su nombre diga "supermercado", "market" o "minimarket", aunque también venda otros productos y aunque tenga varias sucursales: lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre. Los nombres son ejemplos de ayuda; la regla es el criterio. Si no está claro que el lugar esté fuera de alcance, NO uses "not_applicable": evaluá normalmente. Que un lugar aplique al mapa no es evidencia a favor ni en contra de su seguridad: para un lugar que aplica, decidí el veredicto y la confianza exactamente igual que si este párrafo no existiera.
 ```
 
 2. Categoría `shop`: «almacenes, supermercados, dietéticas / comercios de alimentos saludables» pasa a «almacenes, dietéticas /
@@ -2481,20 +2481,26 @@ SÍ aplican, y se evalúan normalmente: dietéticas y tiendas especializadas en 
 
 **Medición:** `db/checks/validator_scope_ab.py`. Iteración 1 (`db/checks/2026-10-13-validator-scope-ab-run-iter1.md`, n=3): 42 de 42
 muestras `not_applicable` en los 14 casos fuera de alcance y 0 de 27 en los 9 casos dentro. Esa redacción nombraba a Zero Helados,
-Ramona y Mi Cocina Sin Gluten como ejemplos de cadenas que sí aplican, y en esos tres casos la confianza subió (dos dieron `approved`
-1 de 3). El texto de arriba es la iteración 2: sin nombres de negocios que sí aplican y con la última oración. **La iteración 2 no
-está medida**: la API respondió «credit balance is too low». Queda como condición antes del merge.
+Ramona y Mi Cocina Sin Gluten, y en esos tres casos la confianza subió (dos dieron `approved` 1 de 3). Iteración 2 (sin esos
+nombres, con «no es evidencia de seguridad»; `db/checks/2026-10-13-scope-ab-run-iter2-iter3.md`, n=3, 27 casos): falló: EntreSano
+Healthy Supermarket, control dentro de alcance, salió `not_applicable` en 1 de 3, y un restaurante con parrilla compartida pasó de
+`needs_review` a `rejected` en 3 de 3. El texto de arriba es la iteración 3: suma la oración del comercio especializado y cambia la
+última. Prueba corta (brazo nuevo, n=5, 7 casos): pasa, con EntreSano `approved` 5 de 5 como antes del cambio; el restaurante con
+parrilla compartida sigue en `rejected` 2 de 5. **La corrida completa de la iteración 3 se cortó en el caso 7 de 27** por falta de
+crédito; completarla es condición antes del merge.
 
 ### 42.2 Agente Social — `PARSE_RUBRIC` (Haiku)
 
 Campo nuevo `"sells_to_public": true | false | null`: `false` cuando la página enseña o informa y no vende ni sirve al público (blog,
 cuenta de recetas, escuela o taller de cocina, asociación, página informativa). Solo un `false` explícito descarta el lead; `true` o
-`null` siguen al Validator. La categoría `shop` deja de mencionar supermercados. Sin medir con el modelo real.
+`null` siguen al Validator. La categoría `shop` deja de mencionar supermercados. Medido (`db/checks/discovery_scope_ab.py social`,
+n=3, 19 casos): `false` en 18 de 18 muestras de páginas que no venden y en 0 de 33 de negocios; nombre y categoría sin cambios.
 
 ### 42.3 Agente Web — `RESEARCH_RUBRIC`
 
 Dos reglas nuevas (dejar afuera las cadenas de comercio general, aun con góndola sin gluten, y las páginas que enseñan o informan sin
-vender) y la lista de comercios deja de incluir «supermarkets with GF products». El agente sigue deshabilitado en el pipeline.
+vender) y la lista de comercios deja de incluir «supermarkets with GF products». El agente sigue deshabilitado en el pipeline. Sin medir:
+con `WEB_SEARCH_MODEL` por defecto la llamada da 400 (Haiku no admite las versiones de `web_search` / `web_fetch` que usa el cliente).
 
 **Resultado:** `agents/map_scope.py` (capa determinista compartida), veredicto `not_applicable` en el Validator, filtro en Search,
 Social y Web, `"no aplica al mapa"` en `DATA_CORRECTION_PHRASES`, y la auditoría `db/checks/2026-10-13-map-scope-audit.md`.

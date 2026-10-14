@@ -15,7 +15,7 @@ Acceptance (NEW arm, after _normalize):
   report     no pass/fail: printed for the admin (the open case of an independent self-service shop)
 
 No production reads or writes: synthetic places, no DB. Uses ANTHROPIC_API_KEY from .env (never printed).
-Cost: ~US$0.01 per call (claude-sonnet-4-6); 24 cases x 2 arms x n=3 = 144 calls.
+Cost: ~US$0.01 per call (claude-sonnet-4-6); 27 cases x 2 arms x n=3 = 162 calls.
 """
 from __future__ import annotations
 
@@ -88,6 +88,22 @@ CASES = [
                                                  [{"source": "social", "text": "Panadería sin TACC. Vendemos panes y facturas en el local. También dictamos talleres de panificación sin gluten.",
                                                    "url": "https://www.instagram.com/sintrigo.panaderia"}])),
     ("in", "almacen_natural", shop(UY, "Almacén Natural Don Pepe", [{"text": "Buen surtido de harinas y galletitas sin gluten"}])),
+    # Admin decision 2026-10-13: these three real places stay on the map. A name with "supermarket" / "minimarket" or a brand with
+    # several branches does not make a specialised shop general retail.
+    ("in", "entresano_supermercado_saludable", shop(
+        {**AR, "city": "Córdoba", "address": "Blvd. San Juan 85, Córdoba"}, "EntreSano Healthy Supermarket",
+        [{"text": "Mucha variedad de productos sin TACC, ideal para celíacas"}],
+        [{"source": "web", "text": "Entresano - Supermercado Saludable. Categorías: Sin Tacc (671), Sin Harina y sin Azúcar (75), Semillas (70).",
+          "url": "https://entresano.com/"}])),
+    ("in", "minimarket_la_isla", shop(
+        {**UY, "city": "Maldonado", "address": "Av. José Batlle y Ordoñez, Maldonado"}, "Minimarket La Isla 24 hours.",
+        [{"text": "Tienen de todo sin TACC: empanadas, pizzas, panificados y dulces. Muy recomendable para celíacos"}],
+        [{"source": "web", "text": "La Isla es un minimarket abierto las 24 horas en Maldonado: almacén, bebidas, cientos de vinos, más de 1.500 "
+                                   "productos sin gluten y cocina propia.", "url": "https://www.laisla247.com/"}])),
+    ("in", "la_molienda_tienda_natural", shop(
+        {**UY, "source": "manual", "address": "Av. Alfredo Arocena 2014, Montevideo"}, "La Molienda - Carrasco", [],
+        [{"source": "web", "text": "La Molienda - Tienda natural online. Frutos secos, sin gluten, sin azúcar, vegano, keto. Productos Sin Gluten en "
+                                   "Uruguay: harinas, pastas, snacks, galletitas. 444 artículos.", "url": "https://www.lamolienda.uy/celiaco"}])),
     ("report", "autoservicio_independiente", shop(UY, "Autoservicio El Trébol", SHELF)),
 ]
 
@@ -97,6 +113,7 @@ def main() -> int:
     ap.add_argument("--old-rev", default="main", help="git rev with the previous RUBRIC (default: main)")
     ap.add_argument("--n", type=int, default=3, help="samples per case and arm")
     ap.add_argument("--only-new", action="store_true", help="skip the OLD arm (cheaper)")
+    ap.add_argument("--cases", help="comma-separated labels: run only these cases")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -108,7 +125,10 @@ def main() -> int:
         arms.insert(0, ("OLD", rubric_at(args.old_rev)))
 
     failures = 0
+    wanted = set(args.cases.split(",")) if args.cases else None
     for kind, label, (place, reviews, evidence) in CASES:
+        if wanted and label not in wanted:
+            continue
         prompt = ValidatorAgent._build_user_prompt(place, reviews, None, evidence)
         print(f"\n[{kind}] {label} — {place['name']}")
         for tag, rubric in arms:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from agents.clients.google_places import ResolvedLocation
 from agents.web_agent import DEFAULT_CATEGORY, WebAgent
 
@@ -330,6 +332,15 @@ def test_a_food_chain_lead_is_still_inserted():
     agent, db, places, llm = make_agent(max_cities=1)
     llm.research_with_web_search.return_value = {"places": [make_lead(name="Zero Helados")]}
     places.resolve_location.return_value = make_match(name="Zero Helados")
+    summary = agent.run()
+    assert summary["inserted"] == 1 and summary["not_for_map"] == 0
+
+
+@pytest.mark.parametrize("name", ["EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"])
+def test_a_place_the_admin_kept_on_the_map_is_still_inserted(name):
+    agent, db, places, llm = make_agent(max_cities=1)
+    llm.research_with_web_search.return_value = {"places": [make_lead(name=name)]}
+    places.resolve_location.return_value = make_match(name=name)
     summary = agent.run()
     assert summary["inserted"] == 1 and summary["not_for_map"] == 0
 

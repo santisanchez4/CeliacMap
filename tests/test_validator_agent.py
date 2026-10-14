@@ -735,6 +735,8 @@ def test_an_unattributed_social_row_cannot_sustain_a_100_nor_raise_the_pending_f
 
 SCOPE_CHAINS = ["Géant Fresh Market", "Tata", "Devoto", "Disco", "Tienda Inglesa", "Carrefour", "Coto", "Jumbo", "Día"]
 FOOD_CHAINS = ["Zero Helados", "Ramona", "Mi Cocina Sin Gluten"]
+# Kept on the map by the admin (2026-10-13): specialised shops whose name or size could read as general retail.
+ADMIN_IN_SCOPE = ["EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"]
 
 
 @pytest.mark.parametrize("name", SCOPE_CHAINS)
@@ -813,7 +815,7 @@ def test_not_applicable_is_code_enforced_in_the_gates():
         assert ValidatorAgent._decide_status("not_applicable", conf) == "discarded"
 
 
-@pytest.mark.parametrize("name", FOOD_CHAINS)
+@pytest.mark.parametrize("name", FOOD_CHAINS + ADMIN_IN_SCOPE)
 def test_a_food_or_specialised_chain_is_still_evaluated_by_the_model_and_the_gates(name):
     llm = MagicMock()
     llm.complete_json.return_value = {
@@ -867,4 +869,13 @@ def test_rubric_names_no_in_scope_business_and_scope_is_not_safety_evidence():
 
     for name in FOOD_CHAINS:
         assert name not in RUBRIC
-    assert "no es evidencia de seguridad" in RUBRIC
+    assert "no es evidencia a favor ni en contra de su seguridad" in RUBRIC
+
+
+def test_rubric_keeps_a_specialised_shop_in_scope_whatever_its_name_says():
+    """A/B iteration 2 (2026-10-13): a health-food shop called "supermarket" was excluded in 1 of 3 samples."""
+    from agents.validator_agent import RUBRIC
+
+    assert "lo que deja afuera a un lugar es ser comercio general, no una palabra del nombre" in RUBRIC
+    for name in ("EntreSano", "La Isla", "La Molienda"):
+        assert name not in RUBRIC

@@ -4189,14 +4189,46 @@ Iteración 1, n=3 (`db/checks/2026-10-13-validator-scope-ab-run-iter1.md`): los 
 dentro de alcance, 0 de 27, incluida una panadería que también dicta talleres. Esa redacción nombraba a Zero Helados, Ramona y Mi
 Cocina Sin Gluten como ejemplos de cadenas que sí aplican, y justo en esos tres casos la confianza subió (Zero Helados de 0,50 a
 0,65 citando su «reputación»; Ramona y Mi Cocina Sin Gluten `approved` 0,87 en 1 de 3, antes 0 de 3). Iteración 2, la que está en
-el código: la `RUBRIC` no nombra ningún negocio que sí aplica y agrega «Que un lugar aplique al mapa no es evidencia de seguridad».
-**La iteración 2 no se pudo medir** (la API de Anthropic respondió «credit balance is too low» a mitad de la corrida). Medirla es
-condición para el merge; `PARSE_RUBRIC` y `RESEARCH_RUBRIC` tampoco se midieron.
+no nombra ningún negocio que sí aplica y agrega «Que un lugar aplique al mapa no es evidencia de seguridad». Medida completa
+(n=3, 27 casos, `db/checks/2026-10-13-scope-ab-run-iter2-iter3.md`): **falló**. Fuera de alcance, 42 de 42; pero EntreSano Healthy
+Supermarket —uno de los tres controles que el admin dejó en el mapa— salió `not_applicable` en 1 de 3 y bajó de `approved` 0,87 a
+`needs_review` 0,62 en las otras dos, y un restaurante con parrilla compartida pasó de `needs_review` (3 de 3) a `rejected` (3 de 3).
+Iteración 3, la que está en el código: agrega que un comercio especializado en alimentación saludable, natural o sin gluten aplica
+aunque su nombre diga «supermercado», «market» o «minimarket», venda también otros productos o tenga varias sucursales, y cambia la
+última oración por «no es evidencia a favor ni en contra de su seguridad: […] decidí el veredicto y la confianza exactamente igual
+que si este párrafo no existiera». Prueba corta (brazo nuevo, n=5, 7 casos): pasa; EntreSano vuelve a `approved` 0,87 en 5 de 5,
+La Isla y La Molienda `needs_review` en 5 de 5, Mi Cocina Sin Gluten `needs_review` en 5 de 5. **Queda un efecto lateral:** el
+restaurante con parrilla compartida sale `rejected` en 2 de 5 (antes 0 de 6); va en la dirección conservadora, pero es un cambio de
+conducta fuera del alcance. **La corrida completa de la iteración 3 se cortó en el caso 7 de 27** (otra vez «credit balance is too
+low»; los seis medidos, fuera de alcance, 18 de 18). Completarla es condición para el merge.
+
+`PARSE_RUBRIC` (Social, Haiku, `db/checks/discovery_scope_ab.py social`, n=3, 19 casos): pasa. `sells_to_public` es `false` en 18
+de 18 muestras de las seis páginas que no venden y en 0 de 33 de los once negocios, con nombre y categoría iguales a los de antes.
+`RESEARCH_RUBRIC` (Web): **sin medir**. Con el modelo por defecto la llamada da 400 («claude-haiku-4-5 does not support programmatic
+tool calling» con `web_search_20260209` / `web_fetch_20260209`): el agente Web no puede correr hoy con `WEB_SEARCH_MODEL` por defecto,
+un defecto previo de `agents/clients/llm.py` que queda anotado y sin arreglar (el agente está deshabilitado desde la Fase 11). El
+reintento con Sonnet no devolvió resultados antes de agotarse el crédito.
 
 **Auditoría de lo existente** (solo lectura, `db/checks/map_scope_audit.py` → `db/checks/2026-10-13-map-scope-audit.md`): 1 387
 filas leídas; 9 caen seguras en la regla, de las cuales 1 está aprobada (Tienda Inglesa, Montevideo), 2 en `needs_review` y 6 ya
 descartadas; 69 dudosas, 14 de ellas aprobadas, entre ellas las 9 sucursales de La Molienda, todas con decisión manual. No se
 cambió ningún estado: las decisiones quedan para el admin.
+
+**Decisiones del admin sobre la auditoría (2026-10-13).**
+
+- Tienda Inglesa (Montevideo, aprobada), Tienda Inglesa (Punta del Este) y Carrefour Market (La Plata) pasan a `discarded` con
+  `CORRECCIÓN MANUAL 2026-10-13: no aplica al mapa: cadena de supermercados, comercio general`
+  (`db/fixes/2026-10-13-map-scope-chain-discards.sql`, aplicado; aprobados 417 → 416, `place_evidence` sin cambios).
+- **EntreSano Healthy Supermarket, Minimarket La Isla y La Molienda se quedan**, sin cambio de estado ni de nivel: son tiendas
+  especializadas o con oferta sin gluten dedicada, no comercio general. Quedan como casos de control «dentro de alcance» en los
+  tests y en los A/B: no deben excluirse nunca. Esto acota el supuesto abierto: la palabra «supermarket» o «minimarket» en el nombre
+  no excluye. Sigue sin decidir el autoservicio independiente que solo tiene una góndola: el modelo lo excluye (5 de 5 en la prueba
+  corta), la capa determinista no.
+- La Molienda: el `OVERRIDE MANUAL` del 2026-09-07 la llama «supermercado/mercado general»; por su propio sitio es una tienda
+  natural. Se agrega una línea `ACLARACIÓN 2026-10-13 (admin)` arriba de la nota de las 9 sucursales
+  (`db/fixes/2026-10-13-la-molienda-scope-note.sql`), con el override debajo sin tocar.
+- Las 21 filas con una página de tema en `social_url` quedan listadas como datos a corregir en
+  `db/checks/2026-10-13-official-accounts-survey.md` (sección 3).
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
