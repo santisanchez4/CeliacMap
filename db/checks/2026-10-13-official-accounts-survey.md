@@ -88,3 +88,46 @@ No hay de dónde verificarla sin intervención humana: hay que buscar el perfil 
 **Uruguay — con sitio propio que no enlaza redes (13):** Rikuras Sin Gluten El Pinar (Ciudad de la Costa); Treat - Minas Shopping (Minas); Girasoles Almacén Natural (Montevideo); Graviola tienda natural (Montevideo); La Granola - Tienda Natural (Montevideo); Milena Gluten Free (Montevideo); Rikuras Sin Gluten (Montevideo); Selkkis Gluten Free (Montevideo); Tienda Inglesa (Montevideo); Tu rincón de dulces gluten free 🍪 by Flo Scalone (Montevideo); Beula Cafetería Gluten Free (Rivera); Celisano Take Away (Salto); La Casona del Celiaco (Salto).
 
 **Uruguay — sin sitio propio (54):** Gianna SIN GLUTEN (Artigas); Celilife (Ciudad de la Costa); La Molienda - Costa Urbana (Ciudad de la Costa); Café & Restó Club Colonia (Colonia del Sacramento); Irene's Restaurante (Colonia del Sacramento); Sin Gluten Colonia (Colonia del Sacramento); Mi espacio sin TACC (Dolores); Ecotienda Madreselva-productos Naturales (Durazno); EMPATIA GLUTEN FREE (Melo); Gluten Free | Sandra | Productos (Melo); Alimentos sin tacc (Mercedes); Almacen Gelpi Gluten free (Mercedes); Felices Celíacos (Mercedes); Rico Rico Gluten Free (Mercedes); Gluten Out (Minas); A la Pala Gluten Free (Montevideo); Alárabi Cocina Inclusiva (Montevideo); Buena Vida Almacén Natural (Montevideo); By Gessi Cocina Inclusiva (Montevideo); Cooperativa de Trabajo Helix Uruguay (Montevideo); GLUTEN FREE Y JUGOS NATURALES (Montevideo); Géant Fresh Market (Montevideo); La Molienda - 18 de Julio (Montevideo); La Molienda - ACJ (Colonia) (Montevideo); La Molienda - Carrasco (Montevideo); La Molienda - Ejido (Montevideo); La Molienda - Parque Rodó (Montevideo); La Molienda - Punta Carretas (Montevideo); La Molienda - Sarandí (Montevideo); La Molienda - Tres Cruces (Montevideo); Local Celíacos (Montevideo); Me Gusta (Montevideo); Mi Cocina Sin Gluten (Montevideo); Mi cocina sin gluten (Montevideo); De la Casa sin gluten (Paysandú); Heladeria Premium Paysandu (Paysandú); SIN GLUTEN DELUNA (Paysandú); 0%Gluten ( alimentos para celiacos por pedido) (Punta del Este); Brote Mercado Saludable (Punta del Este); La Casita by Cari (Punta del Este); Lemuria - Sin Gluten (Punta del Este); Lo de Cecilia (Punta del Este); Loco Suelto (Punta del Este); Rey de la Pizza (Punta del Este); Amores Sin Gluten (Rocha); Crisálida Alimentos sin gluten Veganos & Vegetariano (Rocha); Doña Rosa (Rocha); Gluten Free (Rocha); Oliva y Romero (Salto); G y S Alimentos Sin Gluten (Tacuarembó); La Juana cafetería gluten free (Tacuarembó); Vida Sana Productos Naturales (Tacuarembó); Celiacos "33" (Treinta y Tres); LUMIRO SIN GLUTEN (Trinidad).
+
+## 3. Datos a corregir — `social_url` que es una página de tema (21)
+
+Agregado el 2026-10-13 desde la auditoría de alcance (`db/checks/2026-10-13-map-scope-audit.md`). A diferencia de las secciones 1 y
+2, acá entran **todos los estados**, no solo los aprobados. **No se cambió nada**: es la lista para corregir después.
+
+Estas filas tienen en `social_url` una página de tema de Instagram (`/popular/...`) o una publicación de un grupo de Facebook. No
+es la cuenta de nadie: es de dónde salió el lead. El agente Social ya no las guarda (PR #22), pero estas filas son anteriores. La
+corrección es de dato, no de estado: vaciar `social_url` o reemplazarlo por la cuenta oficial cuando se pueda verificar. Mientras
+tanto, el buscador de evidencia no les atribuye ninguna cita de redes.
+
+| País | Lugar | Ciudad | Estado | `social_url` actual | Corrección propuesta |
+|---|---|---|---|---|---|
+| AR | La Union gluten Free Triunvirato (`b45a13a0`) | Buenos Aires | approved · 100% | `instagram.com/popular/la-unión-gluten-free-caballito` | reemplazar: las otras sucursales de la marca enlazan `instagram:launionglutenfree` desde su sitio (sección 1); confirmar que esta sucursal es de la misma marca |
+| AR | CRAIG Bistró (`5ddb5c85`) | Buenos Aires | needs_review | `instagram.com/popular/restaurantes-sin-gluten-montevideo` | vaciar; buscar la cuenta a mano |
+| AR | Punto Sano (`92f88609`) | Jardín América | needs_review | `instagram.com/popular/harina-para-celiacos-uruguay` | vaciar; buscar la cuenta a mano |
+| UY | Doña Marta (`170a149f`) | Montevideo | needs_review | `facebook.com/groups/270371291453054/posts/1377484284075077` | vaciar; buscar la cuenta a mano |
+| UY | La Cabrona MVD (`f704a851`) | Montevideo | needs_review | `instagram.com/popular/la-carloteña-pechuga-de-pollo` | vaciar; buscar la cuenta a mano |
+| UY | La Carola (`6cca9681`) | Montevideo | needs_review | `instagram.com/popular/la-carloteña-pechuga-de-pollo` | vaciar; buscar la cuenta a mano |
+| UY | Norimōto (`13c7eb38`) | Montevideo | needs_review | `instagram.com/popular/naccato-sushi` | vaciar; buscar la cuenta a mano |
+| UY | Panadería Ramona Gluten Free (`f2d1034d`) | Montevideo | needs_review | `instagram.com/popular/panadería-ramona-gluten-free-montevideo` | vaciar; buscar la cuenta a mano |
+| UY | Café Brasilero (`ef8d57b5`) | Montevideo | discarded | `instagram.com/popular/cafe-brasilero-montevideo` | vaciar |
+| UY | El Imperio (`0eedb863`) | Montevideo | discarded | `instagram.com/popular/el-imperio-montevideo` | vaciar |
+| UY | KFC (`a54bf924`) | Montevideo | discarded | `instagram.com/popular/kfc-montevideo` | vaciar |
+| UY | KFC (`87e2272e`) | Montevideo | discarded | `instagram.com/popular/kfc-montevideo` | vaciar |
+| UY | La Carloteña (`efa8b719`) | Tucumán | discarded | `instagram.com/popular/la-carloteña-pechuga-de-pollo` | vaciar |
+| UY | Maleza Beach Club (`cc81abbf`) | Punta Del Este | discarded | `instagram.com/popular/maleza-beach-punta-del-este` | vaciar |
+| UY | Montevideo al Sur Bar (`32910475`) | Montevideo | discarded | `instagram.com/popular/montevideo-al-sur-bar` | vaciar |
+| UY | Nippon "Authentic Asian food" (`b6806c71`) | Montevideo | discarded | `instagram.com/popular/naccato-sushi` | vaciar |
+| UY | Own Montevideo Hotel (`057bea97`) | Montevideo | discarded | `instagram.com/popular/hotel-own-montevideo` | vaciar |
+| UY | Pan Sin Gluten En Panetera (`9e6b2dd5`) | Montevideo | discarded | `instagram.com/popular/pan-sin-gluten-en-panetera` | vaciar |
+| UY | Panadería Palmar (`5cb452cf`) | Montevideo | discarded | `instagram.com/popular/panaderia-palmar` | vaciar |
+| UY | San Francisco C.I.S.A. (`be6d68f1`) | Uruguay | discarded | `instagram.com/popular/harina-para-celiacos-uruguay` | vaciar |
+| UY | Sattva Uniformes (`c412985c`) | Montevideo | discarded | `facebook.com/groups/1040492759367133/posts/1458275460922192` | vaciar |
+
+Otros datos que la misma lista deja a la vista, también para corregir aparte:
+
+- **País o ciudad que no coinciden:** CRAIG Bistró figura en Buenos Aires con un lead de una página de Montevideo; Punto Sano
+  (Jardín América, Argentina) salió de una página de Uruguay; La Carloteña figura como «Tucumán, Uruguay»; San Francisco C.I.S.A.
+  tiene «Uruguay» como ciudad.
+- **Un lead, varias filas:** `la-carloteña-pechuga-de-pollo` dio tres filas (La Cabrona MVD, La Carola, La Carloteña) y
+  `naccato-sushi` dio dos (Norimōto, Nippon). El negocio que resolvió Google puede no ser el del lead.
+- **Dos filas de KFC** con el mismo lead; las dos descartadas.

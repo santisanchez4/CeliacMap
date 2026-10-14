@@ -178,6 +178,10 @@ the gates regardless of the model's stated verdict: auto-approval requires
 `confidence_score >= 0.85`; `< 0.5` (or `rejected`) discards; everything between —
 and the `< 0.7` safety floor — becomes `needs_review`.
 
+**Map scope is decided in code, not in this prompt (2026-10-14).** General retail and places that do not sell to the public do
+not apply to the map. `agents/map_scope.py` decides it before the model is called and the Validator records verdict
+`not_applicable` → `discarded` (note `No aplica al mapa:`, no confidence). The RUBRIC has no scope text.
+
 **Full rubric (Spanish — as it exists in code):**
 
 ```text

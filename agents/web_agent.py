@@ -36,6 +36,7 @@ from agents.base import BaseAgent
 from agents.clients.google_places import GooglePlacesClient
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.map_scope import out_of_scope_reason
 
 logger = logging.getLogger("celiacmap.agent")
 
@@ -51,7 +52,8 @@ You are the Web Researcher for CeliacMap, a curated directory of gluten-free / \
 "sin TACC" (celiac-safe) places in Latin America. Given one city and country, use \
 web search to find real, currently-operating places that serve or sell \
 gluten-free / celiac-safe food: restaurants, cafes/bakeries, and shops \
-(dietéticas, health-food stores, supermarkets with GF products).
+(dietéticas, health-food stores, specialised gluten-free shops, factories with a \
+point of sale).
 
 Reason freely about how to find them. Do not rely on a single query — search the \
 way a celiac local would: community blogs and forums, Facebook groups, Instagram \
@@ -64,8 +66,8 @@ For every place you are reasonably confident is real and gluten-free relevant, \
 collect:
 - "name": the business name, cleaned (drop handles, emojis, "| Instagram", etc.).
 - "category": exactly one of "restaurant" (somewhere to eat), "cafe" (cafe, \
-coffee shop, bakery, pastry shop) or "shop" (grocery, supermarket, health-food / \
-dietetica). If unclear, use your best single guess.
+coffee shop, bakery, pastry shop) or "shop" (grocery, health-food / dietetica, \
+specialised gluten-free shop). If unclear, use your best single guess.
 - "address": a street address if you find one, else null.
 - "evidence": one short sentence on why this place is gluten-free relevant \
 (what the source actually says).
@@ -73,6 +75,12 @@ dietetica). If unclear, use your best single guess.
 
 Rules:
 - Only include places physically in the requested city/country.
+- Leave out any general retail chain (supermarket, hypermarket, self-service \
+store or pharmacy chain, e.g. Tienda Inglesa, Disco, Carrefour, Coto), even if it \
+has a gluten-free shelf: its offer changes from branch to branch. A food or \
+specialised chain (an ice-cream or gluten-free bakery chain) is fine.
+- Leave out pages that teach or inform but do not sell or serve food to the \
+public: cooking schools, workshops, blogs, recipe accounts, information pages.
 - Do NOT invent places. If you cannot find a real source, leave it out.
 - Prefer fewer, well-supported places over many weak guesses.
 - A later validator and a geocoding step will verify each place, so it is fine if \
@@ -163,6 +171,7 @@ class WebAgent(BaseAgent):
         geocoded = 0
         inserted = 0
         skipped = 0
+        not_for_map = 0
         errors = 0
 
         for entry in cities:
@@ -196,6 +205,18 @@ class WebAgent(BaseAgent):
                     continue
                 leads_found += 1
 
+                # Map scope rules: never a candidate (no geocoding spent on it).
+                excluded = out_of_scope_reason(lead["name"])
+                if excluded:
+                    skipped += 1
+                    not_for_map += 1
+                    self.log(
+                        "web_not_for_map",
+                        {"name": lead["name"], "city": city, "reason": excluded.detail},
+                        status="success",
+                    )
+                    continue
+
                 try:
                     resolved = self.places.resolve_location(
                         lead["name"], lead["address"], city, country, location=location
@@ -222,6 +243,18 @@ class WebAgent(BaseAgent):
 
                 if resolved.business_status == "CLOSED_PERMANENTLY":
                     skipped += 1
+                    continue
+
+                # The lead can resolve to a branch of a general retail chain.
+                excluded = out_of_scope_reason(resolved.name)
+                if excluded:
+                    skipped += 1
+                    not_for_map += 1
+                    self.log(
+                        "web_not_for_map",
+                        {"name": resolved.name, "city": city, "reason": excluded.detail},
+                        status="success",
+                    )
                     continue
 
                 external_id = resolved.place_id
@@ -301,6 +334,7 @@ class WebAgent(BaseAgent):
             "geocoded": geocoded,
             "inserted": inserted,
             "skipped": skipped,
+            "not_for_map": not_for_map,
             "errors": errors,
         }
         self.log(

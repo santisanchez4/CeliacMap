@@ -5,8 +5,9 @@ every search term, it runs a Google Places text search, maps each result onto ou
 ``places`` schema, assigns a provisional category from the Google place types,
 deduplicates by ``external_id`` (within the run, and via the DB's unique
 ``(source, external_id)`` index across runs), and inserts new candidates as
-``status='pending'`` for the Validator to judge. Each run is summarized to
-``agent_log``.
+``status='pending'`` for the Validator to judge. A result outside the map's scope
+(a general retail chain, a school: ``agents/map_scope.py``) is never inserted. Each
+run is summarized to ``agent_log``.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import logging
 from agents.base import BaseAgent
 from agents.clients.google_places import GooglePlacesClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.map_scope import out_of_scope_reason
 
 logger = logging.getLogger("celiacmap.agent")
 
@@ -168,6 +170,7 @@ class SearchAgent(BaseAgent):
         inserted = 0
         skipped = 0
         out_of_scope = 0
+        not_for_map = 0
         errors = 0
         details_fetched = 0
         rich_updated = 0
@@ -240,6 +243,18 @@ class SearchAgent(BaseAgent):
                     skipped += 1
                     continue
 
+                # Map scope rules: a general retail chain, or a place that does not sell to the public, is never a candidate.
+                excluded = out_of_scope_reason(candidate["name"], types=result.get("types"))
+                if excluded:
+                    skipped += 1
+                    not_for_map += 1
+                    self.log(
+                        "candidate_not_for_map",
+                        {"name": candidate["name"], "external_id": external_id, "reason": excluded.detail},
+                        status="success",
+                    )
+                    continue
+
                 candidate["category"] = self._category_for(result)
                 candidate["safety_level"] = DEFAULT_SAFETY_LEVEL
                 candidates_found += 1
@@ -284,6 +299,7 @@ class SearchAgent(BaseAgent):
             "inserted": inserted,
             "skipped": skipped,
             "out_of_scope": out_of_scope,
+            "not_for_map": not_for_map,
             "errors": errors,
             "details_fetched": details_fetched,
             "rich_updated": rich_updated,

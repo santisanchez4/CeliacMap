@@ -91,6 +91,8 @@ DATA_HEADERS = [
     'CORRECCIÓN MANUAL 2026-09-27: dirección corregida a "Luis Franzini 970" según el Instagram del local (antes "Luis Franzini", sin número).',
     # 2026-09-27: the same Google place twice; the row that is discarded says which one stays. It says nothing about how safe the place is.
     "CORRECCIÓN MANUAL: duplicado de 6797f10b-dbe4-4c67-a5d2-1b8f0e3a7c11",
+    # 2026-10-13 (literal, Géant Fresh Market): a map scope decision. It says what kind of business it is, not how safe it is.
+    "CORRECCIÓN MANUAL 2026-10-13: no aplica al mapa: cadena de supermercados, comercio general; descartado por decisión del admin.",
 ]
 
 
@@ -103,6 +105,7 @@ def test_the_data_correction_phrases_are_an_explicit_reviewed_list():
         "fuera del alcance geográfico",
         "dirección corregida",
         "duplicado de",
+        "no aplica al mapa",
     )
 
 

@@ -6,7 +6,9 @@ verdict ``{verdict, confidence_score, category, safety_level, reasoning, flags,
 recommendation}``. A three-tier verdict (``approved`` / ``needs_review`` /
 ``rejected``) maps to the candidate's ``status``: ``approved`` → ``approved``,
 ``rejected`` → ``discarded``, ``needs_review`` → ``needs_review`` (the human-review
-queue, held back from the map). Confidence, reasoning, flags and the suggested
+queue, held back from the map). A fourth verdict, ``not_applicable`` (map scope
+rules), is set by code only (``agents/map_scope.py``, no model call) and is
+always ``discarded``, with a "No aplica al mapa" note. Confidence, reasoning, flags and the suggested
 operator action are persisted for auditing. Each validation — and a final run
 summary — is written to ``agent_log``.
 
@@ -25,12 +27,20 @@ import unicodedata
 from agents.base import BaseAgent
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
+from agents.map_scope import out_of_scope_reason, scope_flag, scope_note
 
 logger = logging.getLogger("celiacmap.agent")
 
 ALLOWED_CATEGORIES = {"restaurant", "cafe", "shop"}
 ALLOWED_SAFETY = {"gluten_free_100", "celiac_friendly", "options_available"}
 ALLOWED_VERDICTS = {"approved", "rejected", "needs_review"}
+# Map scope rules (2026-10-13): general retail, or a place that teaches or informs without selling to the public, does not apply to
+# the map. Decided only in code, by agents/map_scope.py, before the model is called; the RUBRIC knows nothing about scope (six
+# wordings measured against the real model all moved safety verdicts). The verdict is discarded at any confidence.
+NOT_APPLICABLE = "not_applicable"
+NOT_APPLICABLE_RECOMMENDATION = (
+    "No publicar: fuera del alcance del mapa. Si es un error, el administrador puede aprobarlo con una APROBACIÓN MANUAL."
+)
 DEFAULT_SAFETY_LEVEL = "options_available"
 
 # Community kitchen declarations (docs/superpowers/specs/2026-09-24-kitchen-info-design.md).
@@ -51,6 +61,11 @@ _EVIDENCE_LABELS = {
     "user": "aporte de una persona (formulario)",
     "admin": "administrador de CeliacMap",
 }
+
+# A social post whose author could not be verified as the business (a reel or a post: the address does not say who published it,
+# and a post that names a place proves nothing about who is speaking). The Social agent stores it with this prefix so the admin still
+# sees where the lead came from, and the Validator leaves it out: it is neither shown to the model nor counted by Tope C.
+UNATTRIBUTED_ROW_PREFIX = "(no atribuible: publicación de redes sin autor verificado) "
 
 # Tope C (audit plan step 2): an automatic "gluten_free_100" needs an explicit exclusivity
 # phrase in the evidence the model was given (reviews + place_evidence). The place's NAME
@@ -80,6 +95,7 @@ VERDICT_TO_STATUS = {
     "approved": "approved",
     "rejected": "discarded",
     "needs_review": "needs_review",
+    "not_applicable": "discarded",
 }
 
 # Fixed across every candidate in a run, so it is sent as a cached system block.
@@ -223,7 +239,7 @@ class ValidatorAgent(BaseAgent):
         nothing, so a place without evidence gets exactly the prompt it got before.
         """
         lines = []
-        for e in list(evidence or [])[:MAX_EVIDENCE]:
+        for e in ValidatorAgent._attributable(evidence)[:MAX_EVIDENCE]:
             if not isinstance(e, dict):
                 continue
             text = " ".join(str(e.get("text") or "").split())[:MAX_EVIDENCE_CHARS]
@@ -305,10 +321,20 @@ class ValidatorAgent(BaseAgent):
         (``scripts/revalidate_low_confidence.py``) reuses it so batch and one-off
         re-evaluation share one code path.
         """
+        excluded = out_of_scope_reason(place.get("name"), website=place.get("website"))
+        if excluded:
+            # Deterministic layer of the map scope rules: no model call, no safety judgement.
+            return self._not_applicable(place, excluded.kind, excluded.detail)
         raw = self.llm.complete_json(
             RUBRIC, self._build_user_prompt(place, reviews, claims, evidence), model=self.model
         )
         return self._normalize(raw, place, claims, reviews=reviews, evidence=evidence)
+
+    @staticmethod
+    def _attributable(evidence) -> list:
+        """The evidence rows the Validator weighs: everything except the ones marked as not attributable to the business."""
+        return [e for e in list(evidence or [])
+                if not (isinstance(e, dict) and str(e.get("text") or "").startswith(UNATTRIBUTED_ROW_PREFIX))]
 
     @staticmethod
     def _decide_status(verdict: str, confidence: float | None) -> str:
@@ -317,8 +343,11 @@ class ValidatorAgent(BaseAgent):
         Defense in depth: regardless of the model's stated verdict, auto-approval
         requires confidence >= 0.85; confidence < 0.5 (or an explicit 'rejected')
         rejects; everything in between (and the < 0.7 safety floor) is held for a
-        human as 'needs_review'.
+        human as 'needs_review'. 'not_applicable' (map scope rules) is discarded
+        whatever the confidence.
         """
+        if verdict == NOT_APPLICABLE:
+            return "discarded"  # out of the map's scope at any confidence: never amber, never needs_review
         conf = confidence if confidence is not None else 0.0
         if verdict == "rejected" or conf < REJECT_THRESHOLD:
             return "discarded"
@@ -373,6 +402,22 @@ class ValidatorAgent(BaseAgent):
                 str(verdict.get("recommendation", "")).strip()
             )
             or None,
+        }
+
+    @staticmethod
+    def _not_applicable(place: dict, kind: str | None, detail: str | None) -> dict:
+        """The verdict of a place outside the map's scope: discarded, with a fixed note header and flag.
+
+        Safety was not judged, so no confidence is written and the row's category and safety level stay as they were."""
+        return {
+            "verdict": NOT_APPLICABLE,
+            "status": "discarded",
+            "category": place.get("category"),
+            "safety_level": place.get("safety_level") or DEFAULT_SAFETY_LEVEL,
+            "confidence": None,
+            "reason": scope_note(kind, detail),
+            "flags": [scope_flag(kind)],
+            "recommendation": NOT_APPLICABLE_RECOMMENDATION,
         }
 
     @staticmethod
@@ -432,7 +477,7 @@ class ValidatorAgent(BaseAgent):
         The level is not raised here; the flag puts the place in the admin's 100% queue with its
         evidence, so the 100% comes from a person, as the labeling rule requires."""
         texts = [r.get("text") for r in list(reviews or []) if isinstance(r, dict)]
-        texts += [e.get("text") for e in list(evidence or []) if isinstance(e, dict)]
+        texts += [e.get("text") for e in cls._attributable(evidence) if isinstance(e, dict)]
         signal = cls.has_exclusive_signal(texts)
         if safety != "gluten_free_100":
             return safety, ([PENDING_ADMIN_FLAG] if signal else [])
@@ -454,6 +499,7 @@ class ValidatorAgent(BaseAgent):
         approved = 0
         needs_review = 0
         discarded = 0
+        not_applicable = 0
         errors = 0
 
         for place in pending:
@@ -513,7 +559,9 @@ class ValidatorAgent(BaseAgent):
                 )
                 continue
 
-            if status == "approved":
+            if v["verdict"] == NOT_APPLICABLE:
+                not_applicable += 1
+            elif status == "approved":
                 approved += 1
             elif status == "needs_review":
                 needs_review += 1
@@ -542,6 +590,7 @@ class ValidatorAgent(BaseAgent):
             "approved": approved,
             "needs_review": needs_review,
             "discarded": discarded,
+            "not_applicable": not_applicable,
             "errors": errors,
         }
         self.log(

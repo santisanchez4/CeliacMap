@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from agents.clients.llm import _parse_json
+from scope_fixtures import IN_SCOPE, OUT_OF_SCOPE, label
 from agents.validator_agent import DEFAULT_SAFETY_LEVEL, ValidatorAgent
 
 
@@ -707,3 +708,183 @@ def test_tope_c_no_flag_for_options_evidence():
     out = _norm({"safety_level": "options_available"}, place={"source": "social"},
                 evidence=[{"source": "social", "text": "Tenemos opciones sin TACC"}])
     assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
+# --- Evidence the Social agent could not attribute to the business is not weighed (2026-10-13) ------------------------------------
+
+def test_an_unattributed_social_row_is_left_out_of_the_prompt():
+    from agents.validator_agent import UNATTRIBUTED_ROW_PREFIX
+
+    evidence = [{"source": "social", "text": UNATTRIBUTED_ROW_PREFIX + "Todo es 100% libre de gluten", "url": "https://www.instagram.com/reel/X"},
+                {"source": "web", "text": "Tenemos opciones sin gluten", "url": "https://cafex.example"}]
+    block = ValidatorAgent._evidence_block(evidence)
+    assert "Tenemos opciones sin gluten" in block and "100% libre de gluten" not in block and "instagram.com/reel/X" not in block
+    assert ValidatorAgent._evidence_block(evidence[:1]) == ""
+
+
+def test_an_unattributed_social_row_cannot_sustain_a_100_nor_raise_the_pending_flag():
+    from agents.validator_agent import PENDING_ADMIN_FLAG, UNATTRIBUTED_ROW_PREFIX
+
+    marked = [{"source": "social", "text": UNATTRIBUTED_ROW_PREFIX + "Todo es 100% libre de gluten", "url": None}]
+    assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], marked) == ("celiac_friendly", [PENDING_ADMIN_FLAG])
+    assert ValidatorAgent._apply_exclusive_signal_cap("celiac_friendly", [], marked) == ("celiac_friendly", [])
+    plain = [{"source": "social", "text": "Todo es 100% libre de gluten", "url": None}]
+    assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], plain) == ("gluten_free_100", [])
+
+
+# --- Map scope rules (2026-10-13): "no aplica al mapa" is never amber and never needs_review ---
+
+SCOPE_CHAINS = ["Géant Fresh Market", "Tata", "Devoto", "Disco", "Tienda Inglesa", "Carrefour", "Coto", "Jumbo", "Día"]
+FOOD_CHAINS = ["Zero Helados", "Ramona", "Mi Cocina Sin Gluten"]
+# Kept on the map by the admin (2026-10-13): specialised shops whose name or size could read as general retail.
+ADMIN_IN_SCOPE = ["EntreSano Healthy Supermarket", "Minimarket La Isla 24 hours.", "La Molienda - Carrasco"]
+
+
+@pytest.mark.parametrize("name", SCOPE_CHAINS)
+def test_a_general_retail_chain_does_not_apply_and_costs_no_model_call(name):
+    llm = MagicMock()
+    out = ValidatorAgent(MagicMock(), llm).evaluate({"name": name, "category": "shop", "safety_level": "options_available"})
+
+    llm.complete_json.assert_not_called()
+    assert out["verdict"] == "not_applicable"
+    assert out["status"] == "discarded"
+    assert out["reason"].startswith("No aplica al mapa: cadena de comercio general")
+    assert out["flags"] == ["no aplica al mapa: comercio general"]
+    assert out["confidence"] is None  # safety evidence was not judged
+    assert out["category"] == "shop" and out["safety_level"] == "options_available"
+
+
+@pytest.mark.parametrize(
+    "place",
+    [
+        {"name": "Blog Celíaco Feliz"},
+        {"name": "Escuela de Cocina Sin Gluten"},
+        {"name": "Recetas Sin Gluten Uruguay"},
+    ],
+)
+def test_a_blog_a_school_or_a_recipe_account_does_not_apply(place):
+    llm = MagicMock()
+    out = ValidatorAgent(MagicMock(), llm).evaluate(place)
+
+    llm.complete_json.assert_not_called()
+    assert out["status"] == "discarded" and out["verdict"] == "not_applicable"
+    assert out["flags"] == ["no aplica al mapa: no vende ni sirve al público"]
+    assert out["safety_level"] == DEFAULT_SAFETY_LEVEL
+
+
+def test_the_model_cannot_answer_not_applicable():
+    """Scope is decided in code only. The RUBRIC does not offer the verdict; if the model ever says it, it is an unknown verdict
+    and goes to human review like any other, never straight to discarded."""
+    llm = MagicMock()
+    llm.complete_json.return_value = {
+        "verdict": "not_applicable", "confidence_score": 0.6, "category": "restaurant", "safety_level": "celiac_friendly",
+        "reasoning": "Es una escuela de cocina.", "flags": ["no vende ni sirve al público"],
+    }
+    out = ValidatorAgent(MagicMock(), llm).evaluate({"name": "By Gessi Cocina Inclusiva", "category": "restaurant"})
+
+    llm.complete_json.assert_called_once()
+    assert out["verdict"] == "needs_review" and out["status"] == "needs_review"
+
+
+def test_a_topic_page_in_social_url_does_not_exclude_a_real_business():
+    """Where a lead came from is not what the place is (audit of 2026-10-13). The Social agent drops topic pages as leads."""
+    llm = MagicMock()
+    llm.complete_json.return_value = {"verdict": "needs_review", "confidence_score": 0.6, "category": "cafe",
+                                      "safety_level": "options_available"}
+    out = ValidatorAgent(MagicMock(), llm).evaluate(
+        {"name": "Panadería Ramona Gluten Free", "social_url": "https://www.instagram.com/popular/panaderia-sin-gluten"}
+    )
+    llm.complete_json.assert_called_once()
+    assert out["status"] == "needs_review"
+
+
+def test_not_applicable_is_code_enforced_in_the_gates():
+    for conf in (0.0, 0.5, 0.7, 0.85, 1.0, None):
+        assert ValidatorAgent._decide_status("not_applicable", conf) == "discarded"
+
+
+@pytest.mark.parametrize("name", FOOD_CHAINS + ADMIN_IN_SCOPE)
+def test_a_food_or_specialised_chain_is_still_evaluated_by_the_model_and_the_gates(name):
+    llm = MagicMock()
+    llm.complete_json.return_value = {
+        "verdict": "approved", "confidence_score": 0.9, "category": "cafe", "safety_level": "celiac_friendly",
+        "reasoning": "Evidencia explícita de sin TACC.",
+    }
+    agent = ValidatorAgent(MagicMock(), llm)
+
+    out = agent.evaluate({"name": name, "category": "cafe"})
+    assert llm.complete_json.call_count == 1
+    assert out["status"] == "approved" and out["verdict"] == "approved"
+    assert not any("no aplica" in f for f in out["flags"])
+
+    llm.complete_json.return_value = {**llm.complete_json.return_value, "verdict": "needs_review", "confidence_score": 0.6}
+    assert agent.evaluate({"name": name, "category": "cafe"})["status"] == "needs_review"
+
+
+def test_run_persists_not_applicable_as_discarded_with_its_note_and_counts_it():
+    db = MagicMock()
+    db.fetch_places_by_status.return_value = [{"id": "p1", "name": "Carrefour Market", "category": "shop"}]
+    db.fetch_reviews_for_place.return_value = []
+    llm = MagicMock()
+
+    summary = ValidatorAgent(db, llm).run()
+
+    llm.complete_json.assert_not_called()
+    assert summary["not_applicable"] == 1
+    assert summary["discarded"] == 0 and summary["needs_review"] == 0 and summary["approved"] == 0 and summary["errors"] == 0
+    _, kwargs = db.update_place_validation.call_args
+    assert kwargs["status"] == "discarded"
+    assert kwargs["confidence"] is None
+    assert kwargs["notes"].startswith("No aplica al mapa: ")
+    assert kwargs["flags"] == ["no aplica al mapa: comercio general"]
+    logged = [c for c in db.insert_agent_log.call_args_list if c.args[1] == "validate"]
+    assert logged[0].args[2]["verdict"] == "not_applicable"
+
+
+# The safety RUBRIC as measured before the map scope work (PR #22; the OLD arm of every scope A/B: Ramona approved 1 of 6, Mi Cocina
+# Sin Gluten 0 of 6, the shared-grill restaurant needs_review 6 of 6). Six scope wordings inside it all moved those verdicts, so
+# scope lives in agents/map_scope.py. Changing this text needs a real-model A/B recorded in docs/DECISIONS.md and prompts.md; only
+# then update the hash.
+MEASURED_RUBRIC_SHA256 = "aa89e29a330b8d27b1987b565a863ab2b2e0b1502b6ba8a70b04710a6b287e82"
+
+
+def test_the_safety_rubric_is_the_measured_text():
+    import hashlib
+
+    from agents.validator_agent import RUBRIC
+
+    assert hashlib.sha256(RUBRIC.encode("utf-8")).hexdigest() == MEASURED_RUBRIC_SHA256, (
+        "The Validator RUBRIC changed. It is a health gate: measure the change with a real-model A/B, record it, then update the hash."
+    )
+
+
+def test_the_rubric_knows_nothing_about_map_scope():
+    from agents.validator_agent import RUBRIC
+
+    assert "not_applicable" not in RUBRIC
+    assert "Alcance del mapa" not in RUBRIC
+
+
+@pytest.mark.parametrize("place", OUT_OF_SCOPE, ids=label)
+def test_the_ab_places_out_of_scope_are_discarded_with_no_model_call(place):
+    llm = MagicMock()
+    out = ValidatorAgent(MagicMock(), llm).evaluate(dict(place))
+
+    llm.complete_json.assert_not_called()
+    assert out["verdict"] == "not_applicable" and out["status"] == "discarded"
+    assert out["flags"] == ["no aplica al mapa: comercio general"]
+    assert out["confidence"] is None
+
+
+@pytest.mark.parametrize("place", IN_SCOPE, ids=label)
+def test_the_ab_places_in_scope_are_judged_by_the_model_and_the_gates_only(place):
+    llm = MagicMock()
+    llm.complete_json.return_value = {
+        "verdict": "needs_review", "confidence_score": 0.62, "category": place["category"], "safety_level": "options_available",
+        "reasoning": "Evidencia parcial.",
+    }
+    out = ValidatorAgent(MagicMock(), llm).evaluate(dict(place))
+
+    llm.complete_json.assert_called_once()
+    assert out["verdict"] == "needs_review" and out["status"] == "needs_review"
+    assert not any("no aplica" in f for f in out["flags"])
