@@ -2423,6 +2423,51 @@ explicar protección de main. Rama nueva y PR, mostrando cada punto antes del si
 
 **Resultado:** `apps/mobile/` empaqueta los archivos de la web; geolocalización por la WebView (sin plugin), permisos mínimos, botón Atrás, APK firmado y [runbook](docs/runbooks/apk-demo.md). No cambia ningún prompt del modelo.
 
+## 40. Fuente IM Montevideo — Locales_Gluten_Free (2026-10-13)
+
+**Prompt de desarrollo (textual):**
+
+```text
+Contexto
+Tengo en ~/Downloads/imm_locales_libres_de_gluten.csv los 35 locales "libre de gluten" habilitados por la Intendencia de Montevideo (Servicio de Regulación Alimentaria). Columnas: nombre, direccion, rubro, giros, habilitado_desde, habilitado_hasta, vigente_hoy, lat, lon. Fuente: capa pública Locales_Gluten_Free (última edición de la capa: 25/01/2024). Quiero cotejarlos con la base de CeliacMap y sumar los que correspondan.
+
+Antes de empezar: entrá en Plan Mode, leé CLAUDE.md y los ADRs, y mostrame el plan. No escribas nada en la base hasta que yo apruebe el reporte de la Fase 1.
+
+Fase 1 — Cotejo (solo lectura)
+1. Inspeccioná el esquema real de Supabase para ver cómo se guardan los lugares y cómo se codifica el estado verde (100% libre de gluten / sin TACC) vs ámbar (con opciones). No asumas nombres de columnas.
+2. Para cada fila del CSV, buscá coincidencia en la base por: coordenadas (radio ~100 m), nombre normalizado (sin tildes, mayúsculas ni sufijos como S.A.) y dirección normalizada. Los nombres se repiten entre sucursales (RAMONA, ZERO, MI COCINA SIN GLUTEN), así que la coincidencia debe ser por sucursal, no solo por nombre.
+3. Para cada lugar que ya está en la base, decime: nombre, estado en el mapa (verde o ámbar), status de aprobación y fecha de última validación.
+4. Entregame un reporte en tabla con tres grupos: YA ESTÁ (con su color), NO ESTÁ y DUDOSO (coincidencia parcial). Guardalo como reporte_cotejo_imm.md. Frená ahí y esperá mi OK.
+
+Fase 2 — Validación de los que NO están (después de mi OK)
+1. Pasá cada lugar nuevo por el pipeline existente (discovery, extracción y Validator), sin saltearte los gates de confianza de tres niveles. No inserten directo en la base por fuera del pipeline.
+2. Evidencia por lugar: web, redes sociales y Google Places para confirmar que sigue activo, y que comunica propuesta sin gluten / sin TACC.
+3. Importante: el Validator debe decidir solo con la evidencia encontrada, no con conocimiento propio sobre negocios conocidos (riesgo ya documentado en CLAUDE.md). Si no hay evidencia, el resultado es "no verificable".
+4. Clasificación: verde si es 100% libre de gluten / sin TACC, ámbar si ofrece opciones sin gluten. Un lugar que solo distribuye o elabora para otros (por ejemplo, Conaprole) no es un lugar para visitar: marcalo como "no aplica al mapa" y listalo aparte.
+5. La habilitación de la IM vencida no descarta un lugar: es una señal a pesar de todo. Si el lugar está activo y con evidencia, se valida y se anota que la habilitación figura vencida en la fuente. Si hay indicios de cierre, queda como rechazado.
+6. Guardá la fuente de cada lugar nuevo: "IM Montevideo - Locales_Gluten_Free", fecha de captura y fecha de vencimiento de la habilitación.
+
+Fase 3 — Alta en el mapa
+- Solo se agregan los lugares que el Validator apruebe: activo, con presencia online verificable y clasificación clara (verde o ámbar).
+- Los rechazados o no verificables NO se agregan: van a un reporte con el motivo.
+- Seguí las reglas actuales de la base (RLS, status de aprobación, triggers). Si el flujo normal exige aprobación manual, dejalos en pendiente de aprobación.
+
+Entrega final
+Un resumen con: cuántos ya estaban (verdes/ámbar), cuántos se agregaron (verdes/ámbar), cuántos se rechazaron o quedaron sin verificar, con el motivo de cada uno. Actualizá CLAUDE.md con la decisión de usar esta fuente y agregá este prompt a prompts.md.
+
+Commits: mensajes claros y descriptivos.
+```
+
+**Decisiones del responsable durante el trabajo, resumidas:** (1) OK al cotejo; las filas que ya existían fuera del mapa se re-evalúan en
+su lugar y los elaboradores reciben una verificación liviana de venta al público. (2) Tras el dry-run, decisión manual: Cooperativa Helix,
+Ferniland y Me Gusta se aprueban en verde con `APROBACIÓN MANUAL` y sus citas en `place_evidence`; antes, una búsqueda en solo lectura de
+aprobaciones anteriores (no había). (3) Goût Gluten Free es Casa & Dispensa: solo se le suma la habilitación como evidencia. (4) Por el
+pipeline entran solo las dos sucursales de Zero; Artesanía Pastelera, Encanto y Juana La Loca quedan sin cambios. (5) Cada escritura en
+producción se mostró literal y esperó un «dale».
+
+**Resultado:** `scripts/import_imm_source.py`, `db/checks/2026-10-13-imm/` (CSV, plan, cotejo y reporte final) y la entrada «IM Montevideo
+as an evidence source» en `docs/DECISIONS.md`. No cambia ningún prompt del modelo: la `RUBRIC` y los gates quedan como estaban.
+
 ## 41. Atribución de citas sociales en el buscador de evidencia (2026-10-13)
 
 **Pedido de desarrollo, resumido:** tarea separada del PR #20, en rama nueva y con plan previo. (1) Reproducir con un test que falle

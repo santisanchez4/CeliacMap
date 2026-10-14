@@ -1,0 +1,184 @@
+[
+ {
+  "n": 3,
+  "mode": "reevaluate",
+  "place_id": "861899db-1abe-4a8b-8d09-b52393df02a9",
+  "action": "sin_cambios",
+  "motivo": "Por decisión del admin (2026-10-13) queda como está (needs_review); el dry-run del Validator daba approved 0,88 en ámbar."
+ },
+ {
+  "n": 6,
+  "mode": "reevaluate",
+  "place_id": "61fa7e8b-3366-4724-b09c-fb7150e35653",
+  "action": "aprobacion_manual",
+  "nota": "Parece una planta/empresa (Google no la clasifica como comercio de alimentos; giros IM: elaboración, fraccionamiento, importador, depósito). Se re-evalúa por decisión del admin.",
+  "motivo": "Decisión manual del admin (Santiago Sánchez, 2026-10-13): aprobado en verde con APROBACIÓN MANUAL (db/checks/2026-10-13-imm/aprobaciones_manuales.sh); evidencia en db/fixes/2026-10-13-imm-admin-evidence.sql. Reemplaza la re-evaluación del Validator."
+ },
+ {
+  "n": 9,
+  "mode": "reevaluate",
+  "place_id": "dbc2db5e-3078-44a3-9e03-f0cbcf19d07d",
+  "action": "aprobacion_manual",
+  "exclude": [
+   "soy celíaca"
+  ],
+  "nota": "Se excluye un testimonio que menciona la salud de una persona.",
+  "motivo": "Decisión manual del admin (Santiago Sánchez, 2026-10-13): aprobado en verde con APROBACIÓN MANUAL (db/checks/2026-10-13-imm/aprobaciones_manuales.sh); evidencia en db/fixes/2026-10-13-imm-admin-evidence.sql. Reemplaza la re-evaluación del Validator."
+ },
+ {
+  "n": 23,
+  "mode": "reevaluate",
+  "place_id": "4f865c2a-afd7-4d95-b3fb-853f50f406fa",
+  "action": "sin_cambios",
+  "motivo": "Por decisión del admin (2026-10-13) queda como está (needs_review); el dry-run del Validator daba needs_review 0,62."
+ },
+ {
+  "n": 28,
+  "mode": "reevaluate",
+  "place_id": "7362c23b-b02d-4930-9dba-8e00a9fc6bf6",
+  "action": "aprobacion_manual",
+  "motivo": "Decisión manual del admin (Santiago Sánchez, 2026-10-13): aprobado en verde con APROBACIÓN MANUAL (db/checks/2026-10-13-imm/aprobaciones_manuales.sh); evidencia en db/fixes/2026-10-13-imm-admin-evidence.sql. Reemplaza la re-evaluación del Validator."
+ },
+ {
+  "n": 26,
+  "mode": "reevaluate",
+  "place_id": "698389ce-b609-43a2-9298-312a46233aa2",
+  "action": "ya_esta",
+  "motivo": "La habilitación IM de GOÛT GLUTEN FREE (Solano García 2496, vencida 30/11/2025) corresponde a Casa & Dispensa (1e21c93a…, verde, override manual 2026-09-07; «formerly Goût Gluten Free»). La fila «Goût» de Paraguay 1962 (698389ce…) no se toca: nada la vincula con la habilitación."
+ },
+ {
+  "n": 34,
+  "mode": "new",
+  "name": "Zero Helados - Pocitos",
+  "search_name": "Zero Helados",
+  "category": "cafe",
+  "action": "insert",
+  "extra_quotes": [
+   {
+    "text": "La composición de nuestros sabores se caracteriza por cumplir con las siguientes características: es sin azúcar, sin lácteos y no contiene gluten ni T.A.C.C.!",
+    "url": "http://www.zerohelados.com.uy/"
+   }
+  ]
+ },
+ {
+  "n": 35,
+  "mode": "new",
+  "search_name": "Zero Helados",
+  "name": "Zero Helados - Carrasco",
+  "category": "cafe",
+  "website": "http://www.zerohelados.com.uy/",
+  "action": "insert",
+  "extra_quotes": [
+   {
+    "text": "La composición de nuestros sabores se caracteriza por cumplir con las siguientes características: es sin azúcar, sin lácteos y no contiene gluten ni T.A.C.C.!",
+    "url": "http://www.zerohelados.com.uy/"
+   }
+  ],
+  "nota": "Google no tiene ficha de Zero en Arocena 1997 (solo se geocodificó la dirección). El sitio propio lista dos tiendas: «Zero Carrasco» y «Zero Pocitos»."
+ },
+ {
+  "n": 5,
+  "mode": "new",
+  "action": "rechazado",
+  "motivo": "Indicios de cierre: Google lo marca CLOSED_PERMANENTLY (Sta. Mónica 2533) y su sitio celicatessen.uy no responde."
+ },
+ {
+  "n": 12,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Google no tiene ficha de Milena en El Greco 5994 (devuelve la de Bv. Artigas 2748, ya en el mapa). El sitio propio lista una sola «TIENDA-CAFÉ» (Bulevar 2748) y, aparte, una «PLANTA» sin dirección: El Greco sería la planta de elaboración, no un local para visitar. Comparte nombre con la fila existente."
+ },
+ {
+  "n": 32,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Elaborador y distribuidor (giros IM). Google no tiene ningún comercio «Ricca» en Cuaró 3139; lo único cercano es Ríccoli (Cuaró 3151), que es otro negocio."
+ },
+ {
+  "n": 1,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Giros de la IM de elaboración/distribución; Google no tiene ningún comercio con ese nombre en la dirección ni cerca: sin local o punto de venta al público verificable."
+ },
+ {
+  "n": 2,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Giros de la IM de elaboración/distribución; Google no tiene ningún comercio con ese nombre en la dirección ni cerca: sin local o punto de venta al público verificable."
+ },
+ {
+  "n": 4,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Giros de la IM de elaboración/distribución; Google no tiene ningún comercio con ese nombre en la dirección ni cerca: sin local o punto de venta al público verificable."
+ },
+ {
+  "n": 7,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Giros de la IM de elaboración/distribución; Google no tiene ningún comercio con ese nombre en la dirección ni cerca: sin local o punto de venta al público verificable."
+ },
+ {
+  "n": 8,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Giros de la IM de elaboración/distribución; Google no tiene ningún comercio con ese nombre en la dirección ni cerca: sin local o punto de venta al público verificable."
+ },
+ {
+  "n": 14,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Elaborador con tienda online (envíos). Su página de contacto da dirección y horario de oficina, sin local de venta al público. Además la búsqueda no encontró ninguna cita sobre gluten: no verificable."
+ },
+ {
+  "n": 17,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Giros de la IM de elaboración/distribución; Google no tiene ningún comercio con ese nombre en la dirección ni cerca: sin local o punto de venta al público verificable."
+ },
+ {
+  "n": 19,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Giros de la IM de elaboración/distribución; Google no tiene ningún comercio con ese nombre en la dirección ni cerca: sin local o punto de venta al público verificable."
+ },
+ {
+  "n": 20,
+  "mode": "new",
+  "action": "sin_cambios",
+  "name": "Alfajores Juana La Loca",
+  "category": "shop",
+  "nota": "Elaborador con tienda online; su sitio ofrece «pick up» en Marcelino Sosa 2433 y Google muestra horario. Caso límite de venta al público.",
+  "motivo": "Por decisión del admin (2026-10-13) no se inserta por ahora; el dry-run del Validator daba needs_review 0,72."
+ },
+ {
+  "n": 21,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Planta procesadora de lácteos y distribuidor (giros IM); no es un lugar para visitar."
+ },
+ {
+  "n": 22,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Procesado de frutas y hortalizas, importador y distribuidor (giros IM); el sitio propio no menciona venta al público ni gluten."
+ },
+ {
+  "n": 24,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Fábrica de conservas, importador y distribuidor (giros IM); el sitio propio no menciona venta al público ni gluten."
+ },
+ {
+  "n": 29,
+  "mode": "new",
+  "action": "no_aplica",
+  "motivo": "Molino harinero con tienda online y «puntos de venta» de terceros; sin local propio al público. Su sitio también vende harina de trigo."
+ },
+ {
+  "n": 27,
+  "mode": "report_only",
+  "action": "solo_reporte",
+  "motivo": "Habilitación IM vencida el 09/03/2026; dirección ocupada por otro negocio (Piu Helados Prado, ya en el mapa). No se agrega ni se mezcla con Piu."
+ }
+]
