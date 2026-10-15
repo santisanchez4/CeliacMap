@@ -782,7 +782,10 @@ revoke all on public.agent_log from anon, authenticated;
 -- uses the service_role key and bypasses RLS. Explicit revoke (not just
 -- omitting the old grant line) so re-running this file against the
 -- already-migrated production database actually removes the prior access.
-revoke select on public.reviews from anon, authenticated;
+-- revoke ALL, not only SELECT (2026-10-15, db/migrations/2026-10-15-public-grants-revoke-all.sql): Supabase's
+-- default grants had left anon/authenticated with INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES and TRIGGER, and
+-- TRUNCATE is not stopped by RLS.
+revoke all on public.reviews from anon, authenticated;
 -- outreach_messages is server-only (Outreach Agent), same as agent_log: make
 -- sure public roles cannot touch it.
 revoke all on public.outreach_messages from anon, authenticated;
