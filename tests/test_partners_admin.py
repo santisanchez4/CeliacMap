@@ -398,3 +398,15 @@ def test_script_never_touches_the_evaluation_tables_nor_stores_the_payer_email()
 def test_production_is_not_enabled_yet(capsys):
     assert pa.main(["--env", "production"]) == 2
     assert "Fase 3" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("approved, expected", [
+    ("2026-01-31T10:00:00.000-04:00", "2026-02-28"),
+    ("2028-01-31T10:00:00.000-04:00", "2028-02-29"),
+    ("2026-03-31T10:00:00.000-04:00", "2026-04-30"),
+])
+def test_first_payment_at_month_end_pays_through_the_last_day_of_next_month(approved, expected):
+    """A first payment approved on January 31 pays through February 28 (29 in a leap year), never March 3."""
+    values = pa.link_values(payment(date_approved=approved), preapproval())
+    assert values["paid_through"] == expected
+    assert not values["paid_through"].startswith(approved[:4] + "-03-0")
