@@ -2,7 +2,7 @@
 
 > **BORRADOR, no publicado (2026-10-14).** Fase 0 de `docs/plans/PLAN-partner-program.md` (ADR-011). Se publica recién en la
 > Fase 3, junto con la política de privacidad y los términos v1.2, cuando estén resueltos los puntos marcados
-> **PENDIENTE (Fase 3)** (moneda y facturación, con un contador) y un abogado haya revisado este texto. Hasta entonces no se
+> **PENDIENTE (Fase 3)** (facturación e IVA, con un contador) y un abogado haya revisado este texto. Hasta entonces no se
 > cobra ni se contacta a ningún comercio.
 
 **Versión 1.0 (borrador) · Última actualización: A CONFIRMAR**
@@ -66,15 +66,17 @@ Cada solicitud la revisa una persona. CeliacMap puede aceptarla o no, y no tiene
 
 ## 6. Precio y pago
 
-- **Precio:** USD 20 por mes (**PENDIENTE, Fase 3:** la moneda. Si Mercado Pago Uruguay no permite cobrar suscripciones en
-  dólares, el precio se fija en pesos uruguayos y se informa antes del pago).
+- **Precio:** **$U 790 por mes**, en pesos uruguayos. **PENDIENTE, Fase 3:** si el precio incluye IVA, a confirmar con un
+  contador.
+- **Plan Fundador:** los aliados que se sumen en esta etapa mantienen el precio durante 12 meses desde su primer pago.
 - El pago es **mensual y recurrente**, con Mercado Pago, y se cobra solo cada mes desde el primer pago. La comisión de Mercado
   Pago la paga CeliacMap.
 - CeliacMap no ve ni guarda los datos de la tarjeta: los procesa Mercado Pago, con sus propias condiciones.
 - **Factura:** PENDIENTE, Fase 3 (inscripción en DGI/BPS y facturación electrónica, a definir con un contador antes de
   cobrar).
-- **Cambios de precio:** se avisan por email con al menos 30 días de anticipación. Si el comercio no está de acuerdo, puede
-  cancelar antes de que se aplique el nuevo precio.
+- **Cambios de precio:** el precio puede ajustarse avisando por email con al menos 30 días de anticipación. Si el aliado no
+  está de acuerdo, puede cancelar antes de que se aplique el nuevo precio, sin ningún costo. Un ajuste no se aplica a un
+  aliado del Plan Fundador antes de que se cumplan sus 12 meses.
 
 ## 7. Sin permanencia: cancelación
 

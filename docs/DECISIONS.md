@@ -4446,8 +4446,8 @@ tocar producción.
   Si CeliacMap termina el acuerdo sin incumplimiento del aliado, devuelve los días no usados en proporción; si es por
   incumplir el punto 9 de las condiciones, no devuelve nada. Por eso la vista `partners_public` muestra también una fila
   `cancelled` hasta su `paid_through`.
-- **Pendiente de la Fase 3** (marcado en los borradores): la moneda (la documentación oficial de suscripciones de Uruguay no
-  confirma USD; es la primera prueba en el sandbox), la facturación (DGI/BPS), la base legal y el plazo de la retención fiscal
+- **Pendiente de la Fase 3** (marcado en los borradores): la moneda (resuelta el 2026-10-15: UYU, ver "price in pesos"
+  abajo), la facturación (DGI/BPS), la base legal y el plazo de la retención fiscal
   ("a confirmar con contador; en Uruguay suele ser de 5 años") y la ubicación y el plazo de Mercado Pago como proveedor. La
   Fase 3 incluye una consulta con un contador y la revisión de un abogado de las condiciones y de la privacidad y los términos
   v1.2.
@@ -4552,6 +4552,22 @@ de `places` y `SELECT` en `community_opinions`; con la anon key, mapa, ranking, 
 **Nota operativa.** `supabase db query --linked` lee el proyecto vinculado de `supabase/.temp/` de la carpeta actual: desde
 un worktree falla con "Cannot find project ref" sin conectarse. Los comandos contra producción se corren desde la carpeta
 principal del repo, con la ruta al archivo. Las tres primeras corridas del ensayo fallaron así y no llegaron a la base.
+
+### Partner program — price in pesos: Mercado Pago rejects USD in Uruguay (2026-10-15)
+
+**Prueba.** Con el token de prueba de la cuenta vendedora (usuario de prueba, sitio MLU), `POST /preapproval_plan` con
+`currency_id: "USD"`, 20 por mes, respondió **HTTP 400 `Cannot operate with currency id USD in MLU`** y no creó nada (una
+búsqueda de planes, en solo lectura, siguió en 0). La documentación oficial no lo decía: era el primer punto abierto de la
+Fase 1.
+
+**Decisión del responsable.** El precio es **$U 790 por mes (UYU)**. En las condiciones para aliados (§6):
+- **Plan Fundador:** quien se sume en esta etapa mantiene el precio durante 12 meses desde su primer pago.
+- Un ajuste de precio se avisa por email con 30 días de anticipación y el aliado puede cancelar sin costo si no está de
+  acuerdo; no se aplica a un aliado fundador antes de sus 12 meses.
+- **Pendiente, Fase 3:** si los $U 790 incluyen IVA, a confirmar con un contador.
+
+Actualizados: `docs/legal/condiciones-aliados.md` §6, ADR-011 (consecuencias) y el plan. La comisión de Mercado Pago sobre
+$U 790 es de unos $U 57,73 (al instante) o $U 48,09 (a 21 días) por mes, IVA de la comisión incluido.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
