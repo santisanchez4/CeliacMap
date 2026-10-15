@@ -4411,6 +4411,51 @@ persona. Estaba previsto desde el 2026-10-07 (una semana después de que el form
   el sitio responde 200.
 - `db/schema.sql` ya no las crea y `tests/test_schema_kitchen_checks.py` falla si una sentencia del esquema vuelve a usarlas.
 
+### Partner program (CeliacMap Aliado) — phase 0 documents (2026-10-14)
+
+**Contexto.** La sección `#aliados` (ADR-009) pasa a ofrecer un patrocinio mensual pago, el **Plan Fundador**, cobrado con
+Mercado Pago Uruguay. La decisión completa está en `docs/architecture/ADR-011-partner-program-payments.md` y el plan por fases en
+`docs/plans/PLAN-partner-program.md`. Esta entrada registra la **Fase 0**: solo documentos, sin código, sin migraciones y sin
+tocar producción.
+
+**Decisiones del admin (2026-10-14).**
+- **Opción A, el mapa neutral.** Un aliado aprobado en el mapa se ve igual que cualquier otro lugar: no hay chip, pin,
+  orden ni filtro. Se descartó la Opción B (un chip "Aliado · publicidad" en la ficha) porque exigía reemplazar el punto 5
+  de ADR-009 y publicar términos v1.2, y porque en una herramienta de salud cualquier distinción junto a la etiqueta de
+  seguridad se lee como respaldo.
+- **Elegibilidad:** un lugar `approved` del mapa, o un comercio de productos o servicios sin gluten relevantes aunque no esté en
+  el mapa. Siempre con aprobación manual. Quedan afuera el comercio general de `map_scope.py`, un lugar descartado por seguridad
+  o con un reporte negativo abierto y quien hace promesas médicas.
+- **Revisar antes de cobrar:** el link de pago se manda solo a solicitudes elegibles. La publicación es un paso aparte,
+  después de comprobar el pago en el servidor de Mercado Pago. Un aliado es visible solo con el pago `active` y la aprobación
+  del admin. Volver del checkout no activa nada.
+- **Requisito de la Fase 3:** sacar de `supabase/functions/chat/prompts.ts` el ejemplo few-shot de Bienestar (la deuda de ADR-009),
+  con la batería de jailbreak y el A/B real. El chat no puede nombrar aliados.
+- **`ref_code`:** si choca con un código existente, el formulario genera otro y reintenta. "Ya tenemos tu solicitud" es solo
+  para el duplicado email + comercio.
+
+**Documentos de la Fase 0.**
+- `docs/legal/condiciones-aliados.md`: borrador de las condiciones comerciales (qué incluye y qué nunca incluye, elegibilidad,
+  contratación, precio, cancelación sin permanencia, impago, contenido de la tarjeta, baja).
+- `docs/legal/politica-de-privacidad-v1.2-borrador.md` y `docs/legal/terminos-de-uso-v1.2-borrador.md`: el texto completo
+  de la v1.2. Son **archivos aparte** porque `tests/frontend_legal.test.js` exige que los `.md` publicados coincidan palabra
+  por palabra con `privacidad.html` / `terminos.html` y no digan "BORRADOR". Los `.html` y los `.md` vigentes (v1.1) no
+  cambian. En la Fase 3 los borradores los reemplazan en un solo cambio, con aviso previo en el sitio.
+- **Decidido al aprobar los textos:** al cancelar, la tarjeta sigue visible hasta el final del período ya pagado. Con un
+  impago se oculta mientras el pago no esté al día y vuelve si se regulariza; a los 30 días sin pago el patrocinio termina.
+  Si CeliacMap termina el acuerdo sin incumplimiento del aliado, devuelve los días no usados en proporción; si es por
+  incumplir el punto 9 de las condiciones, no devuelve nada. Por eso la vista `partners_public` muestra también una fila
+  `cancelled` hasta su `paid_through`.
+- **Pendiente de la Fase 3** (marcado en los borradores): la moneda (la documentación oficial de suscripciones de Uruguay no
+  confirma USD; es la primera prueba en el sandbox), la facturación (DGI/BPS), la base legal y el plazo de la retención fiscal
+  ("a confirmar con contador; en Uruguay suele ser de 5 años") y la ubicación y el plazo de Mercado Pago como proveedor. La
+  Fase 3 incluye una consulta con un contador y la revisión de un abogado de las condiciones y de la privacidad y los términos
+  v1.2.
+
+**Lo que no cambia.** `places`, el Validator, el `RUBRIC`, el ranking, el chat, el mapa, `index.html` y las páginas legales
+publicadas. La regla de CLAUDE.md "Partners are frontend only" sigue vigente hasta la Fase 1. Ahí se amplía para cubrir las
+tablas del programa, sin aflojar la separación de la evaluación.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
