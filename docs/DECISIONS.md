@@ -4479,7 +4479,17 @@ lecturas del sitio (mapa, ranking, autocompletar, opiniones) siguieron en 200 y 
 `db/checks/2026-10-15-public-grants-rehearsal.sql` es la migración más esas comprobaciones en una transacción que no
 hace commit, para producción.
 
-**Producción:** pendiente del «dale» del responsable (primero el ensayo con rollback, después la migración).
+**Producción (2026-10-15, con el «dale» del responsable).** Línea base en solo lectura: 2 sugerencias, 132 votos, 2
+reportes, 83 reseñas, 12 permisos de anon/authenticated en `reviews` (10 de escritura de más en todo `public`). El ensayo
+dio `PUBLIC-GRANTS PASSED (rolled back)` y una nueva lectura mostró la base idéntica a la línea base. Después se aplicó la
+migración. Verificado en solo lectura: `reviews` sin ningún permiso público y 0 permisos de `UPDATE/DELETE/TRUNCATE/
+REFERENCES/TRIGGER` en `public`; quedan solo `INSERT` en las tres tablas de formularios (con sus 3 policies), las 20 columnas
+de `places` y `SELECT` en `community_opinions`; con la anon key, mapa, ranking, autocompletar y opiniones responden 200,
+416 lugares visibles y `reviews` da 401. Los inserts de anon se comprobaron dentro del ensayo, no con filas reales.
+
+**Nota operativa.** `supabase db query --linked` lee el proyecto vinculado de `supabase/.temp/` de la carpeta actual: desde
+un worktree falla con "Cannot find project ref" sin conectarse. Los comandos contra producción se corren desde la carpeta
+principal del repo, con la ruta al archivo. Las dos primeras corridas del ensayo fallaron así y no llegaron a la base.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
