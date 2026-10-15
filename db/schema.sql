@@ -952,8 +952,10 @@ create table if not exists public.partner_applications (
                          ('requested', 'eligible', 'approved', 'suspended', 'ended', 'rejected')),
   mp_preapproval_id  text
                        check (mp_preapproval_id is null or char_length(mp_preapproval_id) <= 100),
-  payer_email        text
-                       check (payer_email is null or char_length(payer_email) <= 254),
+  -- The first approved payment of the subscription (Mercado Pago payment id). The payer's email is never stored: the
+  -- admin script compares it in memory only, as a suggestion (scripts/partners_admin.py).
+  mp_first_payment_id text
+                       check (mp_first_payment_id is null or char_length(mp_first_payment_id) <= 40),
   paid_through       date,
   approved_at        timestamptz,
   admin_notes        text
@@ -971,7 +973,8 @@ create table if not exists public.partner_applications (
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now(),
   constraint partner_applications_ref_code_key unique (ref_code),
-  constraint partner_applications_mp_preapproval_id_key unique (mp_preapproval_id)
+  constraint partner_applications_mp_preapproval_id_key unique (mp_preapproval_id),
+  constraint partner_applications_mp_first_payment_id_key unique (mp_first_payment_id)
 );
 
 -- One open request per email + business: the form shows "ya tenemos tu solicitud" on this violation, and
@@ -1007,7 +1010,7 @@ create policy "public can request a partnership"
     and publication_status = 'requested'
     and place_id is null
     and mp_preapproval_id is null
-    and payer_email is null
+    and mp_first_payment_id is null
     and paid_through is null
     and approved_at is null
     and admin_notes is null

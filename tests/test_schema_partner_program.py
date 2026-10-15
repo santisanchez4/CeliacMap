@@ -19,7 +19,7 @@ REQUEST_COLUMNS = {
     "description", "on_map_claim", "consent_version",
 }
 SERVER_ONLY = {
-    "id", "place_id", "payment_status", "publication_status", "mp_preapproval_id", "payer_email", "paid_through",
+    "id", "place_id", "payment_status", "publication_status", "mp_preapproval_id", "mp_first_payment_id", "paid_through",
     "approved_at", "admin_notes", "public_name", "public_text_es", "public_text_en", "logo_path", "public_links",
     "created_at", "updated_at",
 }
@@ -143,3 +143,14 @@ def test_partner_sql_never_touches_the_evaluation_tables():
         for table in ("places", "place_votes", "reviews", "place_evidence", "place_reports", "suggestions"):
             assert not re.search(rf"(alter table|update|insert into|delete from|drop table)( if exists)? public\.{table}\b", flat), table
         assert "references public.places(id) on delete set null" in flat or "drop" in flat
+
+
+def test_staging_delta_matches_the_current_block():
+    """db/staging/2026-10-15-partner-payment-columns.sql brings staging (created from the first version) to this shape."""
+    delta = (ROOT / "db" / "staging" / "2026-10-15-partner-payment-columns.sql").read_text(encoding="utf-8")
+    policy = re.search(r'create policy "public can request a partnership".*?\n  \);', BLOCK, re.S).group(0)
+    assert policy in delta
+    assert "drop column if exists payer_email" in delta
+    assert "partner_applications_mp_first_payment_id_key unique (mp_first_payment_id)" in delta
+    assert "payer_email" not in BLOCK, "the payer's email is never stored"
+    assert "STAGING ONLY" in delta.splitlines()[0]

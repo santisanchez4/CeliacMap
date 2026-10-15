@@ -4569,6 +4569,78 @@ Fase 1.
 Actualizados: `docs/legal/condiciones-aliados.md` §6, ADR-011 (consecuencias) y el plan. La comisión de Mercado Pago sobre
 $U 790 es de unos $U 57,73 (al instante) o $U 48,09 (a 21 días) por mes, IVA de la comisión incluido.
 
+### Partner program — test subscription paid, and how a payment is linked (2026-10-15)
+
+**Prueba en el entorno de prueba de Mercado Pago.** Plan `9171c89ed1a346438763c53cb8ed58bb` ($U 790 por mes, UYU). La
+cuenta compradora de prueba lo pagó con la tarjeta de prueba Mastercard terminada en 0604. Lectura con GET: suscripción
+`6d8f041212884c8790dc0d6b13b9fa4f` `authorized`, próximo cobro 2026-11-15; primer cobro, el pago `184244837074`,
+`approved (accredited)`, 790 UYU. El cobro de validación de tarjeta no aparece entre los pagos de la cuenta vendedora.
+
+**Lo que mostró.** Con un plan compartido, la suscripción no trae `external_reference` propio. El del pago es el del plan,
+igual para todos. La suscripción tampoco trae el email del pagador (`payer_email` vacío): solo el pago lo trae, y es el de
+la cuenta de Mercado Pago de quien paga, no necesariamente el de la solicitud. Lo que sí identifica todo es el pago: su
+`point_of_interaction.transaction_data` trae `subscription_id`, `plan_id` y `subscription_sequence`, y la suscripción trae
+su plan y su `payer_id`.
+
+**Decisión del responsable (vinculación de la Fase 1).**
+- Se vincula a mano con el **número de operación** (el ID del pago) que el comercio manda con su código `CM-XXXXXX`:
+  `scripts/partners_admin.py --link CM-XXXXXX --mp-payment ID`.
+- El monto y la moneda se comparan con los del plan configurado, que se leen de Mercado Pago. Nunca con un número en el
+  código. El ID del plan sale de `.env.staging` (`MP_TEST_PLAN_ID`), separado del de producción.
+- El email del pagador se usa solo en memoria (`--suggest`, enmascarado). **No se guarda** y **nunca vincula solo**: el
+  vínculo se hace únicamente con `--link`. La columna `payer_email` sale de `partner_applications` y entra
+  `mp_first_payment_id` (único). Se guarda lo mínimo: `mp_preapproval_id`, `mp_first_payment_id`, `paid_through` (la fecha
+  del próximo cobro) y `payment_status`.
+- `--link` se niega si la solicitud no es `eligible`, si ya tiene un pago vinculado, si el pago no es el primer cobro
+  aprobado de una suscripción autorizada del plan cobrada por esta cuenta, si el monto o la moneda no son los del plan, si
+  el pagador no coincide, o si el pago o la suscripción ya están vinculados a otra solicitud. Escribe con un PATCH
+  condicionado al estado leído, así que una carrera no escribe nada. Nunca toca `publication_status`.
+- La suscripción de prueba no se cancela todavía: sirve para probar `--link` en vivo y después el escenario de cancelación.
+
+**Además en el script.** `--eligible`, `--reject` (solo antes de pagar), `--approve` (solo con pago `active`; los datos
+públicos de la tarjeta, con links `https`) y `--sync`.
+
+**`--sync` y `paid_through` salen solo de cobros aprobados (pedido del responsable, 2026-10-15).** La documentación
+oficial de Mercado Pago no dice cómo se mueve `next_payment_date` cuando un cobro falla. La referencia de
+[`GET /preapproval/{id}`](https://www.mercadopago.com.ar/developers/es/reference/online-payments/subscriptions/get-preapproval/get)
+y la de [`authorized_payments`](https://www.mercadopago.com.ar/developers/es/reference/online-payments/subscriptions/get-authorized-payment/get)
+muestran esos campos en los ejemplos, sin describirlos. La [página de Suscripciones](https://www.mercadopago.com.uy/herramientas-para-vender/suscripciones)
+dice solo "si algún pago es rechazado, hacemos nuevos intentos". Según el resumen de una búsqueda, el centro de ayuda
+([¿Cómo se realizan los cobros de las suscripciones?](https://www.mercadopago.com.ar/ayuda/25906)) hace hasta 3 nuevos
+intentos y después pausa la suscripción. La página respondió 403 y no se pudo leer directamente.
+
+Como una fecha en el futuro no prueba un pago, `next_payment_date` no se usa para nada:
+- `paid_through` = la fecha de un cobro aprobado más un período del plan. En `--link`, la fecha de aprobación del primer
+  pago. En `--sync`, el `debit_date` del último cobro ya vencido (`authorized_payment`) cuyo pago está `approved`.
+  Nunca retrocede.
+- Si el último cobro vencido no está aprobado (rechazado, en reintento o sin pago), queda `past_due` y `paid_through` no
+  cambia, aunque Mercado Pago haya corrido la fecha del próximo cobro. Así la tarjeta no queda visible sin pago (§8 de las
+  condiciones).
+- `paused` pasa a `past_due`; `cancelled` pasa a `cancelled`.
+- Pasan a `publication_status='ended'`: una solicitud `cancelled` cuyo `paid_through` ya pasó, y una `past_due` a más de
+  30 días de su `paid_through`. La vista ya las oculta antes; con `ended` también quedan bien el listado y la retención.
+
+Solo `--env staging` hasta la Fase 3. 60 tests offline (`tests/test_partners_admin.py`) con Mercado Pago y Supabase
+simulados, uno por cada negativa de `--link`. Pendiente: subir el logo a Storage, el resumen diario, la retención y el
+borrado a pedido.
+
+#### Prueba en vivo de `--link` y de la cancelación en staging (2026-10-15, cada escritura con «dale»)
+
+- **Solicitud y vínculo:** `CM-TEST10` (ficticia, dominio `.invalid`) entró como lo haría el formulario (201) y pasó a
+  `eligible`. `--suggest` no encontró coincidencia de email, como se esperaba (el email es ficticio). `--link` con el pago
+  `184244837074` escribió `active`, `paid_through 2026-11-15` y los dos IDs. Un segundo `--link` se negó: "ya tiene un pago
+  vinculado". anon recibe 401 en la tabla.
+- **Publicación:** `--approve` publicó la tarjeta, y `partners_public` devolvió esa fila con solo las 5 columnas públicas.
+- **Cancelación:** el comprador canceló desde su cuenta de prueba («Tu suscripción se canceló el 15/oct»). La suscripción
+  quedó `cancelled` y no hubo ningún cobro nuevo. `--sync` propuso y aplicó solo `payment_status: cancelled`;
+  `paid_through` siguió en 2026-11-15 y la tarjeta siguió visible. Un segundo `--sync` no propuso cambios. Queda pendiente
+  la comprobación del 2026-11-16 (`docs/runbooks/staging.md`).
+- **Volver del checkout sin pagar (primer dato):** antes de cancelar, el comprador abrió el checkout del plan una segunda vez
+  y salió sin pagar. Esa visita no creó ninguna suscripción: el plan y toda la cuenta vendedora siguen con una sola, ni
+  pendiente ni de otro tipo. Tampoco hubo ningún pago nuevo. Aunque hubiera quedado una suscripción sin pagar, `--sync` no
+  la vería, porque solo lee suscripciones ya vinculadas. `--suggest` tampoco, porque solo mira suscripciones `authorized` y
+  pagos aprobados.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

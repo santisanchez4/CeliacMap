@@ -58,3 +58,40 @@ python -m scripts.seed_staging --project-ref egqclfomloqmddvlpepx [--apply]
 2. `db/migrations/2026-10-14-partner-program.PENDING.sql` (staging only; production in phase 3).
 3. `python -m scripts.seed_staging ... --apply`.
 4. Read-only checks: the tables, RLS, grants, `partners_public` empty, the anon count of approved places.
+
+## Mercado Pago (test) and the partner admin script
+
+`.env.staging` also holds `MP_TEST_ACCESS_TOKEN` (a Mercado Pago **test** seller of Uruguay; the script refuses any
+other) and `MP_TEST_PLAN_ID` (the test plan, $U 790/month, UYU). Production credentials are separate and not wired
+until phase 3.
+
+```bash
+python -m scripts.partners_admin --env staging --project-ref egqclfomloqmddvlpepx                  # list (read-only)
+python -m scripts.partners_admin --env staging --project-ref egqclfomloqmddvlpepx --suggest CM-XXXXXX
+python -m scripts.partners_admin --env staging --project-ref egqclfomloqmddvlpepx --link CM-XXXXXX --mp-payment ID [--apply]
+```
+
+Every write is a dry run without `--apply`, and every staging write is shown first and waits for the owner's «dale».
+`db/staging/2026-10-15-partner-payment-columns.sql` (staging only) moved staging's table to the current shape
+(`payer_email` out, `mp_first_payment_id` in).
+
+## Pending live test: end of the paid period after a cancellation (on or after 2026-11-16)
+
+State on 2026-10-15: `CM-TEST10` (fictional request, `prueba-link@staging-test.invalid`) is linked to the test
+subscription `6d8f041212884c8790dc0d6b13b9fa4f` (first payment `184244837074`), `paid_through 2026-11-15`, card
+approved and visible in `partners_public`. The subscription is being cancelled from the test buyer account; after
+`--sync --apply` the row is `cancelled` and the card stays visible until 2026-11-15.
+
+On **2026-11-16 or later**, in this order, each write only with the owner's «dale»:
+
+1. Read-only: `partners_public` with the anon key must return `[]` (the view hides a cancelled row once
+   `paid_through` has passed).
+2. Read-only: `python -m scripts.partners_admin --env staging --project-ref egqclfomloqmddvlpepx --sync` (dry run)
+   must propose `CM-TEST10: {"publication_status": "ended"}` and nothing else.
+3. Write (dale): the same `--sync` with `--apply`.
+4. Write (dale): delete the test row:
+   ```sql
+   delete from public.partner_applications where ref_code = 'CM-TEST10' and contact_email = 'prueba-link@staging-test.invalid';
+   ```
+   through `python -m scripts.staging_db --project-ref egqclfomloqmddvlpepx --file <that SQL in a file> --apply`, then
+   a read-only count that must be 0.
