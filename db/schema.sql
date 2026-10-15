@@ -905,7 +905,9 @@ create policy "public can cast a vote"
   );
 
 -- ---------------------------------------------------------------------
--- Partner program «CeliacMap Aliado» (ADR-011). Mirrored in db/migrations/2026-10-14-partner-program.sql.
+-- Partner program «CeliacMap Aliado» (ADR-011). Mirrored in db/migrations/2026-10-14-partner-program.PENDING.sql.
+-- PENDING: aplicado solo en staging; producción en la Fase 3, con el «dale» del responsable. Do not apply this block
+-- (or this whole file) to production before then: partner_applications and partners_public must not exist there.
 -- ---------------------------------------------------------------------
 -- PARTNER-PROGRAM-BEGIN
 -- One row per partner request: the request, its payment state and its publication state. Contracting and

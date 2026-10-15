@@ -55,6 +55,6 @@ python -m scripts.seed_staging --project-ref egqclfomloqmddvlpepx [--apply]
 
 1. `db/schema.sql` as it is on `main` **before** the partner block (so the partner migration is tested exactly as it
    will run in production).
-2. `db/migrations/2026-10-14-partner-program.sql`.
+2. `db/migrations/2026-10-14-partner-program.PENDING.sql` (staging only; production in phase 3).
 3. `python -m scripts.seed_staging ... --apply`.
 4. Read-only checks: the tables, RLS, grants, `partners_public` empty, the anon count of approved places.

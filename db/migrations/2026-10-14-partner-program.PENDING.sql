@@ -1,6 +1,9 @@
+-- PENDING: aplicada solo en staging; producción en la Fase 3, con el «dale» del responsable.
+-- (Applied on staging only. NOT applied in production: partner_applications and partners_public must not exist there
+-- until phase 3. The .PENDING suffix stays until then; drop it in the phase 3 PR that applies it.)
 -- Partner program «CeliacMap Aliado», phase 1 (ADR-011, docs/plans/PLAN-partner-program.md §4).
 -- Copied from db/schema.sql (the PARTNER-PROGRAM block is the source of truth); idempotent, safe to run twice.
--- Staging first: python -m scripts.staging_db --project-ref <staging> --file db/migrations/2026-10-14-partner-program.sql --apply
+-- Staging first: python -m scripts.staging_db --project-ref <staging> --file db/migrations/2026-10-14-partner-program.PENDING.sql --apply
 -- Production only in phase 3, with the SQL shown and the owner's «dale». Revert: 2026-10-14-partner-program-revert.sql
 begin;
 

@@ -12,7 +12,7 @@ from pglast.ast import ViewStmt
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "db" / "schema.sql"
-MIGRATION = ROOT / "db" / "migrations" / "2026-10-14-partner-program.sql"
+MIGRATION = ROOT / "db" / "migrations" / "2026-10-14-partner-program.PENDING.sql"
 PUBLIC_COLUMNS = ["public_name", "public_text_es", "public_text_en", "logo_path", "public_links"]
 REQUEST_COLUMNS = {
     "ref_code", "business_name", "city", "country", "contact_name", "contact_email", "contact_phone", "links",
@@ -40,6 +40,16 @@ FLAT = _flat(BLOCK)
 
 def test_migration_carries_the_schema_block_verbatim():
     assert _block(MIGRATION.read_text(encoding="utf-8")) == BLOCK
+
+
+def test_migration_and_schema_block_are_marked_pending_for_production():
+    """partner_applications / partners_public must not exist in production before phase 3 (owner decision 2026-10-15)."""
+    assert not (ROOT / "db" / "migrations" / "2026-10-14-partner-program.sql").exists()
+    header = MIGRATION.read_text(encoding="utf-8").splitlines()[0]
+    assert header.startswith("-- PENDING: aplicada solo en staging; producción en la Fase 3")
+    schema = SCHEMA.read_text(encoding="utf-8")
+    marker = schema.index("-- PENDING: aplicado solo en staging; producción en la Fase 3")
+    assert marker < schema.index("-- PARTNER-PROGRAM-BEGIN")
 
 
 def test_block_and_whole_schema_parse():

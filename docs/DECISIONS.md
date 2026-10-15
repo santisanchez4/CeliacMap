@@ -4471,7 +4471,7 @@ programa de aliados antes de producción. Runbook: [`docs/runbooks/staging.md`](
   codificada.
 - `scripts/seed_staging.py`: lee producción solo con la anon key pública de `js/config.js` (filas `approved`, las 20
   columnas de PLACES-PUBLIC-COLUMNS), corta si llega otra fila u otra columna y escribe solo `public.places` de staging.
-- `db/migrations/2026-10-14-partner-program.sql` (+ `-revert.sql`) y el bloque PARTNER-PROGRAM de `db/schema.sql`:
+- `db/migrations/2026-10-14-partner-program.PENDING.sql` (+ `-revert.sql`; aplicada solo en staging, producción en la Fase 3) y el bloque PARTNER-PROGRAM de `db/schema.sql`:
   `partner_applications` con RLS, `revoke all` y un `grant insert` **por columna** (las 11 de la solicitud) a anon, una
   policy que obliga a que una fila nueva entre sin pagar, sin revisar y sin publicar, y la vista `partners_public` (5
   columnas; `approved` y pago `active`, o `cancelled` hasta `paid_through`). `tests/test_schema_partner_program.py` y
