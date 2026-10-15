@@ -4456,6 +4456,31 @@ tocar producción.
 publicadas. La regla de CLAUDE.md "Partners are frontend only" sigue vigente hasta la Fase 1. Ahí se amplía para cubrir las
 tablas del programa, sin aflojar la separación de la evaluación.
 
+### Public grants: `revoke all` on every table, `reviews` fixed (2026-10-15)
+
+**Hallazgo.** Al verificar el proyecto de staging aparecieron en `reviews` permisos de `INSERT, UPDATE, DELETE, TRUNCATE,
+REFERENCES, TRIGGER` para anon y authenticated. Se confirmó en producción, en solo lectura, revisando los permisos sobre
+todas las tablas y vistas de `public` (tabla, columna, función y secuencia): `reviews` era el único objeto con permisos de
+más. `db/schema.sql` le quitaba solo `SELECT` y Supabase da todos los privilegios por defecto. RLS (sin policies) frena las
+filas por la API, pero **no frena `TRUNCATE`**. Las dos funciones que anon puede ejecutar (`set_updated_at`,
+`sync_place_vote_count`) son de trigger y no se pueden llamar directo; quedaron igual.
+
+**Arreglo.** `db/schema.sql` pasa a `revoke all` en `reviews`, y `db/migrations/2026-10-15-public-grants-revoke-all.sql`
+reafirma en una transacción el `revoke all` + grant mínimo de cada tabla y vista: nada para las tablas solo-servidor,
+`INSERT` para `suggestions` / `place_reports` / `place_votes`, la lista de columnas de `places` y `SELECT` en
+`community_opinions`. `tests/test_schema_public_grants.py` exige `revoke all` en toda tabla y vista del esquema y prohíbe
+un `revoke` parcial.
+
+**Ensayo.** `db/checks/2026-10-15-public-grants-checks.sql` hace de anon (leer las columnas del mapa, insertar una
+sugerencia y un voto, intentar `TRUNCATE` en `reviews`) dentro de un bloque que siempre termina en `RAISE EXCEPTION`, así
+que todo vuelve atrás. `place_reports` se comprueba solo por privilegio: en producción tiene el webhook
+`place-report-created`. En staging dio **FAILED** antes del arreglo (`TRUNCATE` permitido) y **PASSED** después; las
+lecturas del sitio (mapa, ranking, autocompletar, opiniones) siguieron en 200 y no quedó ninguna fila de prueba.
+`db/checks/2026-10-15-public-grants-rehearsal.sql` es la migración más esas comprobaciones en una transacción que no
+hace commit, para producción.
+
+**Producción:** pendiente del «dale» del responsable (primero el ensayo con rollback, después la migración).
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
