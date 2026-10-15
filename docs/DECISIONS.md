@@ -4624,6 +4624,23 @@ Solo `--env staging` hasta la Fase 3. 60 tests offline (`tests/test_partners_adm
 simulados, uno por cada negativa de `--link`. Pendiente: subir el logo a Storage, el resumen diario, la retención y el
 borrado a pedido.
 
+#### Prueba en vivo de `--link` y de la cancelación en staging (2026-10-15, cada escritura con «dale»)
+
+- **Solicitud y vínculo:** `CM-TEST10` (ficticia, dominio `.invalid`) entró como lo haría el formulario (201) y pasó a
+  `eligible`. `--suggest` no encontró coincidencia de email, como se esperaba (el email es ficticio). `--link` con el pago
+  `184244837074` escribió `active`, `paid_through 2026-11-15` y los dos IDs. Un segundo `--link` se negó: "ya tiene un pago
+  vinculado". anon recibe 401 en la tabla.
+- **Publicación:** `--approve` publicó la tarjeta, y `partners_public` devolvió esa fila con solo las 5 columnas públicas.
+- **Cancelación:** el comprador canceló desde su cuenta de prueba («Tu suscripción se canceló el 15/oct»). La suscripción
+  quedó `cancelled` y no hubo ningún cobro nuevo. `--sync` propuso y aplicó solo `payment_status: cancelled`;
+  `paid_through` siguió en 2026-11-15 y la tarjeta siguió visible. Un segundo `--sync` no propuso cambios. Queda pendiente
+  la comprobación del 2026-11-16 (`docs/runbooks/staging.md`).
+- **Volver del checkout sin pagar (primer dato):** antes de cancelar, el comprador abrió el checkout del plan una segunda vez
+  y salió sin pagar. Esa visita no creó ninguna suscripción: el plan y toda la cuenta vendedora siguen con una sola, ni
+  pendiente ni de otro tipo. Tampoco hubo ningún pago nuevo. Aunque hubiera quedado una suscripción sin pagar, `--sync` no
+  la vería, porque solo lee suscripciones ya vinculadas. `--suggest` tampoco, porque solo mira suscripciones `authorized` y
+  pagos aprobados.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
