@@ -4490,7 +4490,7 @@ key; `contact_email` y las tablas solo-servidor responden 401.
 de vuelta (`return=representation`) da 401, así que **el formulario tiene que usar `return=minimal`**. La tabla sigue
 ilegible para anon y `partners_public` vacía. Limpieza con `scripts/staging_db.py`: 0 filas después.
 
-**Hallazgo (abierto, no es del programa de aliados).** En staging, anon y authenticated tienen `INSERT, UPDATE, DELETE,
+**Hallazgo (no es del programa de aliados; corregido en producción el 2026-10-15, ver "Public grants" abajo).** En staging, anon y authenticated tienen `INSERT, UPDATE, DELETE,
 TRUNCATE, REFERENCES, TRIGGER` sobre `reviews`, porque `db/schema.sql` hace `revoke select` y no `revoke all` en esa tabla.
 RLS sin policies bloquea las filas por la API, pero el permiso no debería existir. Falta comprobarlo en producción (solo
 lectura) y corregirlo con `revoke all` en el esquema y una migración, con el SQL mostrado y el «dale».
@@ -4517,6 +4517,41 @@ responsable (paso 1 de arriba).
   staging igual que en producción.
 - **`staging_db.py` y `seed_staging.py` nunca se usan contra producción.** El guard rechaza el ref de producción; para
   producción siguen las reglas de siempre (SQL mostrado, «dale», `--linked` solo para producción).
+
+### Public grants: `revoke all` on every table, `reviews` fixed (2026-10-15)
+
+**Hallazgo.** Al verificar el proyecto de staging aparecieron en `reviews` permisos de `INSERT, UPDATE, DELETE, TRUNCATE,
+REFERENCES, TRIGGER` para anon y authenticated. Se confirmó en producción, en solo lectura, revisando los permisos sobre
+todas las tablas y vistas de `public` (tabla, columna, función y secuencia): `reviews` era el único objeto con permisos de
+más. `db/schema.sql` le quitaba solo `SELECT` y Supabase da todos los privilegios por defecto. RLS (sin policies) frena las
+filas por la API, pero **no frena `TRUNCATE`**. Las dos funciones que anon puede ejecutar (`set_updated_at`,
+`sync_place_vote_count`) son de trigger y no se pueden llamar directo; quedaron igual.
+
+**Arreglo.** `db/schema.sql` pasa a `revoke all` en `reviews`, y `db/migrations/2026-10-15-public-grants-revoke-all.sql`
+reafirma en una transacción el `revoke all` + grant mínimo de cada tabla y vista: nada para las tablas solo-servidor,
+`INSERT` para `suggestions` / `place_reports` / `place_votes`, la lista de columnas de `places` y `SELECT` en
+`community_opinions`. `tests/test_schema_public_grants.py` exige `revoke all` en toda tabla y vista del esquema y prohíbe
+un `revoke` parcial.
+
+**Ensayo.** `db/checks/2026-10-15-public-grants-checks.sql` hace de anon (leer las columnas del mapa, insertar una
+sugerencia y un voto, intentar `TRUNCATE` en `reviews`) dentro de un bloque que siempre termina en `RAISE EXCEPTION`, así
+que todo vuelve atrás. `place_reports` se comprueba solo por privilegio: en producción tiene el webhook
+`place-report-created`. En staging dio **FAILED** antes del arreglo (`TRUNCATE` permitido) y **PASSED** después; las
+lecturas del sitio (mapa, ranking, autocompletar, opiniones) siguieron en 200 y no quedó ninguna fila de prueba.
+`db/checks/2026-10-15-public-grants-rehearsal.sql` es la migración más esas comprobaciones en una transacción que no
+hace commit, para producción.
+
+**Producción (2026-10-15, con el «dale» del responsable).** Línea base en solo lectura: 2 sugerencias, 132 votos, 2
+reportes, 83 reseñas, 12 permisos de anon/authenticated en `reviews` (10 de escritura de más en todo `public`). El ensayo
+dio `PUBLIC-GRANTS PASSED (rolled back)` y una nueva lectura mostró la base idéntica a la línea base. Después se aplicó la
+migración. Verificado en solo lectura: `reviews` sin ningún permiso público y 0 permisos de `UPDATE/DELETE/TRUNCATE/
+REFERENCES/TRIGGER` en `public`; quedan solo `INSERT` en las tres tablas de formularios (con sus 3 policies), las 20 columnas
+de `places` y `SELECT` en `community_opinions`; con la anon key, mapa, ranking, autocompletar y opiniones responden 200,
+416 lugares visibles y `reviews` da 401. Los inserts de anon se comprobaron dentro del ensayo, no con filas reales.
+
+**Nota operativa.** `supabase db query --linked` lee el proyecto vinculado de `supabase/.temp/` de la carpeta actual: desde
+un worktree falla con "Cannot find project ref" sin conectarse. Los comandos contra producción se corren desde la carpeta
+principal del repo, con la ruta al archivo. Las tres primeras corridas del ensayo fallaron así y no llegaron a la base.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
