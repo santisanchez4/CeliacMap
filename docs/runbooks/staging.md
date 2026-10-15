@@ -58,3 +58,19 @@ python -m scripts.seed_staging --project-ref egqclfomloqmddvlpepx [--apply]
 2. `db/migrations/2026-10-14-partner-program.PENDING.sql` (staging only; production in phase 3).
 3. `python -m scripts.seed_staging ... --apply`.
 4. Read-only checks: the tables, RLS, grants, `partners_public` empty, the anon count of approved places.
+
+## Mercado Pago (test) and the partner admin script
+
+`.env.staging` also holds `MP_TEST_ACCESS_TOKEN` (a Mercado Pago **test** seller of Uruguay; the script refuses any
+other) and `MP_TEST_PLAN_ID` (the test plan, $U 790/month, UYU). Production credentials are separate and not wired
+until phase 3.
+
+```bash
+python -m scripts.partners_admin --env staging --project-ref egqclfomloqmddvlpepx                  # list (read-only)
+python -m scripts.partners_admin --env staging --project-ref egqclfomloqmddvlpepx --suggest CM-XXXXXX
+python -m scripts.partners_admin --env staging --project-ref egqclfomloqmddvlpepx --link CM-XXXXXX --mp-payment ID [--apply]
+```
+
+Every write is a dry run without `--apply`, and every staging write is shown first and waits for the owner's «dale».
+`db/staging/2026-10-15-partner-payment-columns.sql` (staging only) moved staging's table to the current shape
+(`payer_email` out, `mp_first_payment_id` in).

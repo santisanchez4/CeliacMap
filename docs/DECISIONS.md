@@ -4569,6 +4569,45 @@ Fase 1.
 Actualizados: `docs/legal/condiciones-aliados.md` §6, ADR-011 (consecuencias) y el plan. La comisión de Mercado Pago sobre
 $U 790 es de unos $U 57,73 (al instante) o $U 48,09 (a 21 días) por mes, IVA de la comisión incluido.
 
+### Partner program — test subscription paid, and how a payment is linked (2026-10-15)
+
+**Prueba en el entorno de prueba de Mercado Pago.** Plan `9171c89ed1a346438763c53cb8ed58bb` ($U 790 por mes, UYU). La
+cuenta compradora de prueba lo pagó con la tarjeta de prueba Mastercard terminada en 0604. Lectura con GET: suscripción
+`6d8f041212884c8790dc0d6b13b9fa4f` `authorized`, próximo cobro 2026-11-15; primer cobro, el pago `184244837074`,
+`approved (accredited)`, 790 UYU. El cobro de validación de tarjeta no aparece entre los pagos de la cuenta vendedora.
+
+**Lo que mostró.** Con un plan compartido, la suscripción no trae `external_reference` propio. El del pago es el del plan,
+igual para todos. La suscripción tampoco trae el email del pagador (`payer_email` vacío): solo el pago lo trae, y es el de
+la cuenta de Mercado Pago de quien paga, no necesariamente el de la solicitud. Lo que sí identifica todo es el pago: su
+`point_of_interaction.transaction_data` trae `subscription_id`, `plan_id` y `subscription_sequence`, y la suscripción trae
+su plan y su `payer_id`.
+
+**Decisión del responsable (vinculación de la Fase 1).**
+- Se vincula a mano con el **número de operación** (el ID del pago) que el comercio manda con su código `CM-XXXXXX`:
+  `scripts/partners_admin.py --link CM-XXXXXX --mp-payment ID`.
+- El monto y la moneda se comparan con los del plan configurado, que se leen de Mercado Pago. Nunca con un número en el
+  código. El ID del plan sale de `.env.staging` (`MP_TEST_PLAN_ID`), separado del de producción.
+- El email del pagador se usa solo en memoria (`--suggest`, enmascarado). **No se guarda** y **nunca vincula solo**: el
+  vínculo se hace únicamente con `--link`. La columna `payer_email` sale de `partner_applications` y entra
+  `mp_first_payment_id` (único). Se guarda lo mínimo: `mp_preapproval_id`, `mp_first_payment_id`, `paid_through` (la fecha
+  del próximo cobro) y `payment_status`.
+- `--link` se niega si la solicitud no es `eligible`, si ya tiene un pago vinculado, si el pago no es el primer cobro
+  aprobado de una suscripción autorizada del plan cobrada por esta cuenta, si el monto o la moneda no son los del plan, si
+  el pagador no coincide, o si el pago o la suscripción ya están vinculados a otra solicitud. Escribe con un PATCH
+  condicionado al estado leído, así que una carrera no escribe nada. Nunca toca `publication_status`.
+- La suscripción de prueba no se cancela todavía: sirve para probar `--link` en vivo y después el escenario de cancelación.
+
+**Además en el script.** `--eligible`, `--reject` (solo antes de pagar), `--approve` (solo con pago `active`; los datos
+públicos de la tarjeta, con links `https`) y `--sync`, que pone el estado del pago según Mercado Pago:
+- `authorized` con el próximo cobro por delante: `active`, y adelanta `paid_through`;
+- un cobro vencido o `paused`: `past_due`;
+- `cancelled`: `cancelled`, sin tocar `paid_through`;
+- 30 días de `past_due` pasado `paid_through`: `publication_status='ended'`.
+
+Solo `--env staging` hasta la Fase 3. 48 tests offline (`tests/test_partners_admin.py`) con Mercado Pago y Supabase
+simulados, uno por cada negativa de `--link`. Pendiente: subir el logo a Storage, el resumen diario, la retención y el
+borrado a pedido.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
