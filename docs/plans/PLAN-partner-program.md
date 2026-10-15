@@ -13,6 +13,9 @@ publicados coincidan con los `.html` y no digan "BORRADOR". En la Fase 3 reempla
 - **`ref_code`:** si choca con uno existente (violación del unique de `ref_code`), el formulario genera otro y reintenta;
   "Ya tenemos tu solicitud" es solo para el duplicado email + comercio.
 - Ahora solo **Fase 0** (documentos), rama y PR propios.
+- **Precio (2026-10-15):** $U 790 por mes, en UYU, porque Mercado Pago rechazó USD en Uruguay (HTTP 400 `Cannot operate
+  with currency id USD in MLU`). Plan Fundador: quien se sume en esta etapa mantiene el precio 12 meses. Un ajuste se avisa
+  con 30 días y el aliado puede cancelar. Si el precio incluye IVA: pendiente, Fase 3 (contador).
 - **Condiciones (al aprobar los textos):** al cancelar, la tarjeta sigue visible hasta el final del período ya pagado. Con un
   impago se oculta mientras el pago no esté al día y vuelve si se regulariza; a los 30 días sin pago el patrocinio termina.
   Si CeliacMap termina el acuerdo sin incumplimiento del aliado, devuelve la parte proporcional de los días no usados; si es
@@ -80,7 +83,7 @@ es la oferta).
 
 **Estructura** (`article.partner-plan`, con `aria-labelledby`):
 - Un chip "Plan Fundador", un `h3` "CeliacMap Aliado" en Playfair y el subtítulo en DM Sans.
-- El precio grande en Playfair: "USD 20" + "/ mes" en gris, y debajo "Pago mensual recurrente · Cancelás cuando quieras ·
+- El precio grande en Playfair: "$U 790" + "/ mes" en gris, y debajo "Pago mensual recurrente · Cancelás cuando quieras ·
   Sin permanencia".
 - Una lista de beneficios con íconos SVG inline (`aria-hidden`, sin librerías): perfil destacado en Aliados; logo,
   imágenes y datos comerciales; enlace directo a WhatsApp, redes o web; difusión en publicaciones colectivas de aliados.
@@ -168,8 +171,8 @@ para la facturación queda en MP y en el sistema de facturación electrónica, n
 - El "link de suscripción" se crea desde la cuenta, sin sitio web, y el pagador **no necesita** cuenta de MP. Acepta
   Visa, Mastercard, OCA, Diners, Creditel y Líder.
   [Herramienta Suscripciones](https://www.mercadopago.com.uy/herramientas-para-vender/suscripciones)
-- Comisión: **5,99% + IVA** con el dinero al instante o **4,99% + IVA** a 21 días, sin costo fijo. Sobre USD 20 son unos
-  USD 1,46 o USD 1,22 por mes.
+- Comisión: **5,99% + IVA** con el dinero al instante o **4,99% + IVA** a 21 días, sin costo fijo. Sobre $U 790 son unos
+  $U 57,73 o $U 48,09 por mes (IVA de la comisión incluido).
   [Costos](https://www.mercadopago.com.uy/ayuda/recibir-pagos-costos_220)
 - `/preapproval` requiere `payer_email` y acepta `external_reference` (texto libre; es obligatorio en las suscripciones sin
   plan). [API create preapproval](https://www.mercadopago.com.uy/developers/es/reference/online-payments/subscriptions/create-preapproval/post)
@@ -184,9 +187,9 @@ para la facturación queda en MP y en el sistema de facturación electrónica, n
   [Compra de prueba](https://www.mercadopago.com.uy/developers/es/docs/subscriptions/integration-test/payment-approval)
 
 **No pude confirmarlo en la documentación oficial (queda como tarea de la Fase 1 en staging):**
-- **Moneda USD.** Los ejemplos oficiales usan `UYU` o `ARS`; ninguna página dice que se acepte `USD` en suscripciones de UY.
-  Es la primera prueba en sandbox: crear un plan con `currency_id: "USD"`. Si lo rechaza, el precio va en UYU (lo
-  decidís vos) y solo cambia `PROGRAM.currency/price`.
+- ~~**Moneda USD.**~~ **Resuelto el 2026-10-15:** Mercado Pago rechaza USD en suscripciones de Uruguay (HTTP 400
+  `Cannot operate with currency id USD in MLU`, con la cuenta vendedora de prueba MLU). El precio va en UYU: $U 790 por
+  mes, en `PROGRAM.currency/price`.
 - Los requisitos para cobrar como persona física: la página solo pide "tener cuenta". Hay que ver el alta como vendedor y
   los límites en tu cuenta real.
 - La plantilla exacta del manifiesto HMAC. La página UY no la detalla. La forma conocida de los SDK es
@@ -268,7 +271,7 @@ es una demo sin publicar en tiendas y no le aplica, pero queda fijado en un test
   términos v1.2 en `docs/legal/*.md` (primero se edita el `.md`). Una entrada en `docs/DECISIONS.md`.
 - **Fase 1, staging, manual:** proyecto de staging + `seed_staging`; la migración; `js/partners.js` (tarjeta + formulario +
   render de `partners_public`); el interruptor; `stage_site.mjs`; `scripts/partners_admin.py`; la sección en
-  `admin_digest`; las reglas de retención; el plan de prueba en MP y la prueba de moneda USD. *Depende de:* Fase 0
+  `admin_digest`; las reglas de retención; el plan de prueba en MP (en UYU; la prueba de USD dio 400). *Depende de:* Fase 0
   (texto de consentimiento) y del proyecto de staging creado por vos.
 - **Fase 2, staging, automática:** `mp-webhook` + `partner_payment_events`, preapproval por solicitud con
   `external_reference`, barrido diario y todos los escenarios de la tabla. *Depende de:* la Fase 1 y la plantilla HMAC
@@ -385,14 +388,14 @@ agrega un lugar al mapa ni lo saca de la cola del Validator. Si es un lugar `nee
 
 Lista de la Fase 3 (nada se cobra ni se contacta antes de cerrarla):
 
-- **Consulta con un contador:** inscripción en DGI/BPS, facturación electrónica, IVA y la moneda de la factura (USD o UYU),
+- **Consulta con un contador:** inscripción en DGI/BPS, facturación electrónica, IVA (si los $U 790 lo incluyen),
   y el plazo de retención de los datos de cobro (en Uruguay suele ser de 5 años).
 - **Revisión de un abogado** de las condiciones para aliados (`docs/legal/condiciones-aliados.md`) y de la privacidad y los
   términos v1.2 (`docs/legal/*-v1.2-borrador.md`), incluida la base legal de la retención fiscal.
-- **Moneda del cobro:** USD si Mercado Pago lo permite en suscripciones de Uruguay (prueba de la Fase 1); si no, UYU.
+- **Moneda del cobro:** resuelto, UYU ($U 790 por mes; Mercado Pago rechazó USD en Uruguay).
 - **Mercado Pago como proveedor:** dónde guarda los datos y por cuánto tiempo (§7 de la privacidad).
 
-Detalle de lo que sigue abierto: la inscripción en DGI/BPS y la facturación electrónica (y el IVA sobre USD o UYU), las condiciones comerciales para
+Detalle de lo que sigue abierto: la inscripción en DGI/BPS y la facturación electrónica (y si el precio en UYU incluye IVA), las condiciones comerciales para
 aliados (alcance, baja, contenidos prohibidos, que no hay garantía de visitas), privacidad v1.2 (datos de responsables
 de comercios, MP como proveedor nuevo en §7, plazos nuevos en §6, una §3.11 nueva, el aviso previo en el sitio), la
 auditoría de Google Places, que pasa a ser más urgente con ingresos, y la confirmación de la cuenta de MP como vendedor

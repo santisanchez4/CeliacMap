@@ -103,5 +103,6 @@ proyecto tiene para ofrecer.
 - Antes de cobrar de verdad hay requisitos que no son técnicos: inscripción en DGI/BPS y facturación electrónica. El riesgo
   pendiente de los datos de Google Places (`docs/legal/auditoria-datos-google.md`) pesa más cuando hay ingresos.
 - Durante la transición conviven dos formas de mostrar aliados: la tarjeta estática de Bienestar y la lista que sale de la vista.
-- No está confirmado en la documentación oficial que las suscripciones de Uruguay acepten USD. Es la primera prueba en
-  staging y, si no los acepta, el precio va en pesos uruguayos.
+- **Moneda (resuelto 2026-10-15):** Mercado Pago no acepta USD en suscripciones de Uruguay. Crear un plan de prueba con
+  `currency_id: "USD"` respondió HTTP 400 `Cannot operate with currency id USD in MLU` y no creó nada. El precio es
+  **$U 790 por mes (UYU)**; el Plan Fundador lo mantiene 12 meses. Si incluye IVA queda pendiente para la Fase 3.
