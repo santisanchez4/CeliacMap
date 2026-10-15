@@ -4598,13 +4598,29 @@ su plan y su `payer_id`.
 - La suscripción de prueba no se cancela todavía: sirve para probar `--link` en vivo y después el escenario de cancelación.
 
 **Además en el script.** `--eligible`, `--reject` (solo antes de pagar), `--approve` (solo con pago `active`; los datos
-públicos de la tarjeta, con links `https`) y `--sync`, que pone el estado del pago según Mercado Pago:
-- `authorized` con el próximo cobro por delante: `active`, y adelanta `paid_through`;
-- un cobro vencido o `paused`: `past_due`;
-- `cancelled`: `cancelled`, sin tocar `paid_through`;
-- 30 días de `past_due` pasado `paid_through`: `publication_status='ended'`.
+públicos de la tarjeta, con links `https`) y `--sync`.
 
-Solo `--env staging` hasta la Fase 3. 48 tests offline (`tests/test_partners_admin.py`) con Mercado Pago y Supabase
+**`--sync` y `paid_through` salen solo de cobros aprobados (pedido del responsable, 2026-10-15).** La documentación
+oficial de Mercado Pago no dice cómo se mueve `next_payment_date` cuando un cobro falla. La referencia de
+[`GET /preapproval/{id}`](https://www.mercadopago.com.ar/developers/es/reference/online-payments/subscriptions/get-preapproval/get)
+y la de [`authorized_payments`](https://www.mercadopago.com.ar/developers/es/reference/online-payments/subscriptions/get-authorized-payment/get)
+muestran esos campos en los ejemplos, sin describirlos. La [página de Suscripciones](https://www.mercadopago.com.uy/herramientas-para-vender/suscripciones)
+dice solo "si algún pago es rechazado, hacemos nuevos intentos". Según el resumen de una búsqueda, el centro de ayuda
+([¿Cómo se realizan los cobros de las suscripciones?](https://www.mercadopago.com.ar/ayuda/25906)) hace hasta 3 nuevos
+intentos y después pausa la suscripción. La página respondió 403 y no se pudo leer directamente.
+
+Como una fecha en el futuro no prueba un pago, `next_payment_date` no se usa para nada:
+- `paid_through` = la fecha de un cobro aprobado más un período del plan. En `--link`, la fecha de aprobación del primer
+  pago. En `--sync`, el `debit_date` del último cobro ya vencido (`authorized_payment`) cuyo pago está `approved`.
+  Nunca retrocede.
+- Si el último cobro vencido no está aprobado (rechazado, en reintento o sin pago), queda `past_due` y `paid_through` no
+  cambia, aunque Mercado Pago haya corrido la fecha del próximo cobro. Así la tarjeta no queda visible sin pago (§8 de las
+  condiciones).
+- `paused` pasa a `past_due`; `cancelled` pasa a `cancelled`.
+- Pasan a `publication_status='ended'`: una solicitud `cancelled` cuyo `paid_through` ya pasó, y una `past_due` a más de
+  30 días de su `paid_through`. La vista ya las oculta antes; con `ended` también quedan bien el listado y la retención.
+
+Solo `--env staging` hasta la Fase 3. 60 tests offline (`tests/test_partners_admin.py`) con Mercado Pago y Supabase
 simulados, uno por cada negativa de `--link`. Pendiente: subir el logo a Storage, el resumen diario, la retención y el
 borrado a pedido.
 

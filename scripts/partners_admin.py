@@ -17,8 +17,10 @@ Only ``--env staging`` exists until phase 3. It never touches places, votes, rev
 payment is ``approved``, is the FIRST charge of a subscription of the configured plan, was collected by this account, and
 its amount and currency are the plan's (read from Mercado Pago, never written in code); the subscription is
 ``authorized``, belongs to the plan and to the same payer; neither the payment nor the subscription is linked to another
-request. It stores only ``mp_preapproval_id``, ``mp_first_payment_id``, ``paid_through`` (the subscription's next charge
-date) and ``payment_status = 'active'``. It never sets ``publication_status``: publishing is ``--approve``.
+request. It stores only ``mp_preapproval_id``, ``mp_first_payment_id``, ``paid_through`` (the approved first charge's
+date plus one billing period) and ``payment_status = 'active'``. ``--sync`` also decides from approved charges only, never
+from ``next_payment_date`` (see ``sync_values``). ``--link`` never sets ``publication_status``: publishing is
+``--approve``.
 
 The payer's email is only compared in memory by ``--suggest`` (case-insensitive, exact) and printed masked; it is never
 stored and never links by itself.
@@ -189,8 +191,10 @@ def link_problems(app: dict, payment: dict, preapproval: dict, plan: Plan, selle
         problems.append("el monto o la moneda de la suscripción no son los del plan")
     if str(preapproval.get("payer_id")) != str((payment.get("payer") or {}).get("id")):
         problems.append("el pagador del pago no es el de la suscripción")
-    if not mp_date(preapproval.get("next_payment_date")):
-        problems.append("la suscripción no tiene fecha del próximo cobro")
+    if period(preapproval) is None:
+        problems.append("la suscripción no tiene una frecuencia mensual o diaria")
+    if not mp_date(payment.get("date_approved")):
+        problems.append("el pago no tiene fecha de aprobación")
 
     for row in linked_rows:
         if row.get("ref_code") != ref:
@@ -198,38 +202,82 @@ def link_problems(app: dict, payment: dict, preapproval: dict, plan: Plan, selle
     return problems
 
 
+def period(preapproval: dict) -> tuple[int, str] | None:
+    rec = preapproval.get("auto_recurring") or {}
+    freq, unit = rec.get("frequency"), rec.get("frequency_type")
+    if isinstance(freq, int) and freq > 0 and unit in ("months", "days"):
+        return freq, unit
+    return None
+
+
+def add_period(start: date, preapproval: dict) -> date:
+    """One billing period after a charge (months clamp to the last day of a shorter month)."""
+    freq, unit = period(preapproval)
+    if unit == "days":
+        return start + timedelta(days=freq)
+    month = start.month - 1 + freq
+    year, month = start.year + month // 12, month % 12 + 1
+    for day in (start.day, 30, 29, 28):
+        try:
+            return date(year, month, day)
+        except ValueError:
+            continue
+    raise AssertionError("unreachable")
+
+
 def link_values(payment: dict, preapproval: dict) -> dict:
+    """paid_through comes from the approved first charge (its approval date + one period), never from next_payment_date."""
     return {
         "mp_preapproval_id": preapproval["id"],
         "mp_first_payment_id": str(payment["id"]),
-        "paid_through": mp_date(preapproval["next_payment_date"]).isoformat(),
+        "paid_through": add_period(mp_date(payment["date_approved"]), preapproval).isoformat(),
         "payment_status": "active",
     }
 
 
-def sync_values(app: dict, preapproval: dict, today: date) -> dict:
-    """The payment state Mercado Pago implies for a linked request. {} = nothing to change.
+def last_attempted_charge(charges: list[dict], today: date) -> dict | None:
+    """The most recent authorized_payment already due (debit_date <= today). Scheduled future charges do not count."""
+    due = [c for c in charges if mp_date(c.get("debit_date")) and mp_date(c.get("debit_date")) <= today]
+    return max(due, key=lambda c: c.get("debit_date")) if due else None
 
-    authorized + next charge not in the past -> active, paid_through = next charge date;
-    authorized with a next charge already past (a charge failed) or paused -> past_due (paid_through unchanged);
-    cancelled -> cancelled (paid_through unchanged: the card stays until then);
-    past_due for more than 30 days after paid_through -> publication_status ended (owner decision 2026-10-14).
+
+def sync_values(app: dict, preapproval: dict, charges: list[dict], today: date) -> dict:
+    """The payment state Mercado Pago's CHARGES imply for a linked request. {} = nothing to change.
+
+    next_payment_date is never trusted: Mercado Pago's docs do not say how it moves after a rejected charge, and a date in
+    the future does not prove a payment. So:
+    - cancelled -> cancelled (paid_through unchanged: the card stays until then); once paid_through has passed -> ended;
+    - paused -> past_due;
+    - authorized: the last charge already due decides. Its payment approved -> active, and paid_through = its debit date
+      + one period (never moved backwards). Anything else (rejected, in retry, no payment) -> past_due, paid_through
+      unchanged. No charge due yet -> no change.
+    - past_due for more than 30 days after paid_through -> publication_status ended (owner decision 2026-10-14).
     """
     status = preapproval.get("status")
-    nxt = mp_date(preapproval.get("next_payment_date"))
     paid = date.fromisoformat(app["paid_through"]) if app.get("paid_through") else None
     values: dict = {}
     if status == "cancelled":
         values["payment_status"] = "cancelled"
-    elif status == "authorized" and nxt and nxt >= today:
-        values["payment_status"] = "active"
-        values["paid_through"] = nxt.isoformat()
-    elif status in ("authorized", "paused"):
+    elif status == "paused":
         values["payment_status"] = "past_due"
+    elif status == "authorized":
+        charge = last_attempted_charge(charges, today)
+        if charge is not None:
+            pay = charge.get("payment") or {}
+            if pay.get("status") == "approved" and period(preapproval):
+                through = add_period(mp_date(charge["debit_date"]), preapproval)
+                values["payment_status"] = "active"
+                if paid is None or through > paid:
+                    values["paid_through"] = through.isoformat()
+            else:
+                values["payment_status"] = "past_due"
     new_status = values.get("payment_status", app.get("payment_status"))
-    if (new_status == "past_due" and paid and today > paid + timedelta(days=PAST_DUE_GRACE_DAYS)
-            and app.get("publication_status") not in ("ended", "rejected")):
-        values["publication_status"] = "ended"
+    closed = app.get("publication_status") in ("ended", "rejected")
+    if not closed and paid:
+        if new_status == "past_due" and today > paid + timedelta(days=PAST_DUE_GRACE_DAYS):
+            values["publication_status"] = "ended"
+        elif new_status == "cancelled" and today > paid:
+            values["publication_status"] = "ended"
     return {k: v for k, v in values.items() if app.get(k) != v}
 
 
@@ -368,7 +416,8 @@ def cmd_sync(ctx: Context) -> None:
     rows = ctx.db.select(mp_preapproval_id="not.is.null")
     changed = 0
     for app in rows:
-        values = sync_values(app, ctx.mp.preapproval(app["mp_preapproval_id"]), ctx.today)
+        sub = ctx.mp.preapproval(app["mp_preapproval_id"])
+        values = sync_values(app, sub, ctx.mp.authorized_payments(sub["id"]), ctx.today)
         if values:
             changed += 1
             write(ctx, app["ref_code"], {"payment_status": f"eq.{app['payment_status']}",
