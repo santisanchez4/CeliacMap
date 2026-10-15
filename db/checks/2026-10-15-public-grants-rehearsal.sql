@@ -1,7 +1,8 @@
 -- Production rehearsal of db/migrations/2026-10-15-public-grants-revoke-all.sql: the same statements, then the
 -- checks of db/checks/2026-10-15-public-grants-checks.sql, in ONE transaction that never commits. The checks end
 -- with RAISE EXCEPTION, which aborts the whole transaction; the final ROLLBACK is a second guard.
--- Run: node_modules/.bin/supabase db query --linked --file db/checks/2026-10-15-public-grants-rehearsal.sql
+-- Run from the MAIN checkout (--linked reads supabase/.temp there; a worktree has none):
+--   node_modules/.bin/supabase db query --linked --file <path to this file>
 begin;
 
 -- Server-only: no privilege at all for the public roles.
