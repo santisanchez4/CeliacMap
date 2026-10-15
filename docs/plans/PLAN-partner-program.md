@@ -1,6 +1,6 @@
 # Plan: "CeliacMap Aliado" (Plan Fundador) dentro de #aliados, con Mercado Pago Uruguay, primero en staging
 
-**Estado:** Fase 0 (documentos) en curso, 2026-10-14. Decisión: [ADR-011](../architecture/ADR-011-partner-program-payments.md).
+**Estado:** Fase 0 cerrada (PR #27). Fase 1 en curso desde 2026-10-14: staging y base de datos (runbook `docs/runbooks/staging.md`); Mercado Pago espera el token de prueba. Decisión: [ADR-011](../architecture/ADR-011-partner-program-payments.md).
 Borradores legales: `docs/legal/condiciones-aliados.md`, `docs/legal/politica-de-privacidad-v1.2-borrador.md` y
 `docs/legal/terminos-de-uso-v1.2-borrador.md`. Son archivos aparte porque `tests/frontend_legal.test.js` exige que los `.md`
 publicados coincidan con los `.html` y no digan "BORRADOR". En la Fase 3 reemplazan a los publicados.

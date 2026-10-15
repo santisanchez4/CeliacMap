@@ -4456,6 +4456,68 @@ tocar producción.
 publicadas. La regla de CLAUDE.md "Partners are frontend only" sigue vigente hasta la Fase 1. Ahí se amplía para cubrir las
 tablas del programa, sin aflojar la separación de la evaluación.
 
+### Partner program — phase 1: staging project and its database (2026-10-15)
+
+**Qué se hizo.** Segundo proyecto de Supabase (gratis), `egqclfomloqmddvlpepx` (São Paulo), para construir y probar el
+programa de aliados antes de producción. Runbook: [`docs/runbooks/staging.md`](runbooks/staging.md).
+
+- `scripts/staging_guard.py`: lee solo `.env.staging` (nunca `.env`) y se niega si la URL, las dos claves (por el `ref` y
+  el `role` de su JWT) o `STAGING_DB_URL` (el usuario `postgres.<ref>` del pooler o el host `db.<ref>`) no son del
+  `--project-ref` dado, o si ese ref es el de producción. Tacha los secretos enteros de todo lo que imprime.
+- `scripts/staging_db.py`: `--sql` corre una sola consulta como `select * from (<consulta>) as q`; `--file ... --apply`
+  usa `supabase migration up --db-url` (un archivo por transacción), porque `supabase db query --db-url` no acepta un
+  archivo con varios statements ("cannot insert multiple commands into a prepared statement"). Nunca `link` ni
+  `--linked`. Llama a `node supabase.js` y no al `.cmd` de npm, porque cmd.exe expandiría los `%` de la contraseña
+  codificada.
+- `scripts/seed_staging.py`: lee producción solo con la anon key pública de `js/config.js` (filas `approved`, las 20
+  columnas de PLACES-PUBLIC-COLUMNS), corta si llega otra fila u otra columna y escribe solo `public.places` de staging.
+- `db/migrations/2026-10-14-partner-program.sql` (+ `-revert.sql`) y el bloque PARTNER-PROGRAM de `db/schema.sql`:
+  `partner_applications` con RLS, `revoke all` y un `grant insert` **por columna** (las 11 de la solicitud) a anon, una
+  policy que obliga a que una fila nueva entre sin pagar, sin revisar y sin publicar, y la vista `partners_public` (5
+  columnas; `approved` y pago `active`, o `cancelled` hasta `paid_through`). `tests/test_schema_partner_program.py` y
+  `tests/test_staging_tools.py` lo fijan.
+
+**Aplicado en staging (2026-10-15, con el «dale» del responsable), en este orden:** borrar `zz_ro_probe`; `db/schema.sql`
+de `main` sin el bloque de aliados (para probar la migración tal como correrá en producción); la migración de aliados; el
+seed (416 lugares aprobados). Verificado en solo lectura: RLS activo en todas las tablas; anon solo inserta las 11
+columnas de `partner_applications`, no la lee (401); `partners_public` devuelve `[]`; 416 lugares visibles con la anon
+key; `contact_email` y las tablas solo-servidor responden 401.
+
+**Prueba en vivo del INSERT de anon (2026-10-15, con «dale»).** Siete envíos con la anon key: la solicitud válida entra
+(201); marcarse pagada o publicada da 401 (el grant por columna); un `ref_code` repetido da 409 con
+`partner_applications_ref_code_key` (el formulario genera otro y reintenta); el mismo email + comercio con otro código da
+409 con `partner_applications_open_request_idx` ("ya tenemos tu solicitud"); un código mal formado da 400; pedir la fila
+de vuelta (`return=representation`) da 401, así que **el formulario tiene que usar `return=minimal`**. La tabla sigue
+ilegible para anon y `partners_public` vacía. Limpieza con `scripts/staging_db.py`: 0 filas después.
+
+**Hallazgo (abierto, no es del programa de aliados).** En staging, anon y authenticated tienen `INSERT, UPDATE, DELETE,
+TRUNCATE, REFERENCES, TRIGGER` sobre `reviews`, porque `db/schema.sql` hace `revoke select` y no `revoke all` en esa tabla.
+RLS sin policies bloquea las filas por la API, pero el permiso no debería existir. Falta comprobarlo en producción (solo
+lectura) y corregirlo con `revoke all` en el esquema y una migración, con el SQL mostrado y el «dale».
+
+#### Incidente: `zz_ro_probe` (2026-10-14)
+
+**Qué pasó.** La primera versión de `staging_db.py --sql` intentaba volver la conexión de solo lectura con el parámetro
+de arranque `options=-c default_transaction_read_only=on` en la URL. Para comprobarlo se corrió, sin «dale», una
+escritura de prueba (`create table public.zz_ro_probe(x int)`) y **se ejecutó**: quedó en staging una tabla vacía, sin RLS.
+No tocó producción. La consulta anterior ya mostraba `transaction_read_only = off`, y la prueba se corrió igual.
+
+**Por qué.** El pooler de Supabase (Supavisor, la URL "Session pooler") no aplicó ese parámetro de arranque a la sesión
+de Postgres, así que la conexión siguió siendo de lectura y escritura. Un parámetro de conexión no es una protección que
+se pueda dar por buena sin verla funcionar.
+
+**Cómo quedó.** `--sql` ya no depende de la conexión: envuelve la consulta en `select * from (...) as q`, y Postgres
+rechaza DDL e INSERT / UPDATE / DELETE dentro de una subconsulta (comprobado: un `drop table` dentro del envoltorio da
+error de sintaxis y no escribe). Límite: una función con efectos llamada desde el SELECT igual corre, así que solo se
+llaman funciones de lectura. Las escrituras van solo por `--file ... --apply`. La tabla se borró con el «dale» del
+responsable (paso 1 de arriba).
+
+**Reglas que deja:**
+- **Una prueba de si algo puede escribir cuenta como escritura**: se muestra el comando literal y se espera el «dale», en
+  staging igual que en producción.
+- **`staging_db.py` y `seed_staging.py` nunca se usan contra producción.** El guard rechaza el ref de producción; para
+  producción siguen las reglas de siempre (SQL mostrado, «dale», `--linked` solo para producción).
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
