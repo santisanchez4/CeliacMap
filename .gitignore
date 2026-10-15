@@ -21,6 +21,9 @@ node_modules/
 supabase/.temp/
 supabase/.branches/
 
+# Staging tools (scripts/staging_db.py): local migration history copies, next to .env.staging
+.staging-db/
+
 # Env
 .env
 .env.*
