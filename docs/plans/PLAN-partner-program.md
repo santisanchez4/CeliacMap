@@ -413,6 +413,20 @@ persona física. Estadísticas: UTM (`?utm_source=celiacmap&utm_medium=aliados`)
 nada de nuestro lado. Medir clics cambiaría §3.8 ("solo páginas vistas, sin eventos") y la promesa de "sin tracking"
 de ADR-009.
 
+## Relación con CeliacMap Market (futuro)
+
+Decisión del responsable (2026-10-18), solo documentación:
+
+- El Market no existe ni se desarrolla ahora.
+- Va a ser un producto separado, con sus propias condiciones y su propio precio.
+- La suscripción de aliado no da acceso automático al Market. Cuando se diseñe, los aliados podrán tener un beneficio,
+  por ejemplo acceso anticipado o un descuento.
+- Sin acoplar tablas: el Market tendrá las suyas y, como mucho, una referencia opcional a `partner_applications`.
+- Vender en el Market nunca cambia el mapa, las etiquetas, el ranking ni el chat.
+- Cuando exista, va como página propia del mismo sitio (`celiacmap.org/market/`), en la misma ventana, no en un
+  subdominio.
+- **Pendiente, la decisión grande:** construirlo o usar una plataforma de tiendas existente.
+
 ## Verificación
 
 - `deno test` en los tests de frontend, `pytest` para Python y el CI completo en el PR (una rama por fase; nunca `main`).
