@@ -118,3 +118,43 @@ def test_digest_groups_everything_and_never_includes_chat_text():
     assert "social/social_query_failed: 1" in text
     assert "1 turnos · 1 marcados" in text
     assert "SECRETO" not in text
+
+
+def _pending(n_ar, n_uy):
+    rows = [{"name": f"AR{i}", "city": "Rosario", "country": "Argentina", "status": "approved", "created_at": f"2026-01-{i + 1:02d}"}
+            for i in range(n_ar)]
+    rows += [{"name": f"UY{i}", "city": "Salto", "country": "Uruguay", "status": "approved", "created_at": f"2026-02-{i + 1:02d}"}
+             for i in range(n_uy)]
+    return rows  # oldest first, as the query returns them
+
+
+def test_pending_100_heading_has_the_real_total_by_country_uruguay_first():
+    _, text = build_digest(DigestDB(pending_100=_pending(201, 34)))
+    assert "100% PENDIENTES DE TU CONFIRMACIÓN (235: 34 Uruguay, 201 Argentina)" in text
+    assert "50+" not in text
+
+
+def test_pending_100_lists_uruguay_first_then_the_rest_each_oldest_first():
+    _, text = build_digest(DigestDB(pending_100=_pending(12, 3)))
+    names = [line[2:].split(" (")[0] for line in text.splitlines() if line.startswith("- UY") or line.startswith("- AR")]
+    assert names == ["UY0", "UY1", "UY2", "AR0", "AR1", "AR2", "AR3", "AR4", "AR5", "AR6"]
+
+
+def test_pending_100_without_uruguay_lists_the_oldest_as_before():
+    _, text = build_digest(DigestDB(pending_100=_pending(12, 0)))
+    names = [line[2:].split(" (")[0] for line in text.splitlines() if line.startswith("- AR")]
+    assert names == [f"AR{i}" for i in range(10)]
+    assert "(12: 12 Argentina)" in text
+
+
+def test_pending_100_reads_past_the_old_cap_of_50():
+    seen = {}
+
+    class DB(DigestDB):
+        def fetch_places_for_admin(self, status=None, **kw):
+            if kw.get("flag") == PENDING_ADMIN_FLAG:
+                seen["limit"] = kw["limit"]
+            return super().fetch_places_for_admin(status, **kw)
+
+    build_digest(DB(pending_100=_pending(1, 0)))
+    assert seen["limit"] > 50

@@ -25,11 +25,27 @@ from scripts.moderate_opinions import from_the_form
 from scripts.partners_admin import PAST_DUE_GRACE_DAYS
 
 WINDOW_HOURS = 24
+PENDING_100_FETCH_LIMIT = 2000
+PENDING_100_LISTED = 10
+FIRST_COUNTRY = "Uruguay"
 _TRI = {True: "sí", False: "no", None: "sin dato"}
 
 
 def _since(hours: int = WINDOW_HOURS) -> str:
     return (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+
+
+def pending_100_lines(rows: list[dict]) -> list[str]:
+    """The «100% pendientes» section: the real total by country (Uruguay first) and the oldest Uruguayan places
+    before the rest. ``rows`` come oldest first."""
+    by_country = Counter(r.get("country") or "sin país" for r in rows)
+    order = sorted(by_country, key=lambda c: (c != FIRST_COUNTRY, -by_country[c], c))
+    breakdown = ", ".join(f"{by_country[c]} {c}" for c in order)
+    listed = sorted(rows, key=lambda r: r.get("country") != FIRST_COUNTRY)[:PENDING_100_LISTED]
+    lines = [f"100% PENDIENTES DE TU CONFIRMACIÓN ({len(rows)}: {breakdown})"]
+    lines += [f"- {p.get('name')} ({p.get('city')}) · {p.get('status')}" for p in listed]
+    lines.append("  python -m scripts.review_queue --pending-100")
+    return lines
 
 
 def _place_label(r: dict) -> str:
@@ -173,13 +189,10 @@ def build_digest(db, since: str | None = None, today: date | None = None) -> tup
         lines += [f"- {p.get('name')} ({p.get('city')}) · desde {p.get('community_warning_at')}" for p in warned]
         sections.append(lines)
 
-    pending_100 = db.fetch_places_for_admin(None, flag=PENDING_ADMIN_FLAG, limit=50)
+    pending_100 = db.fetch_places_for_admin(None, flag=PENDING_ADMIN_FLAG, limit=PENDING_100_FETCH_LIMIT)
     if pending_100:
         counts["100% pendientes"] = len(pending_100)
-        lines = [f"100% PENDIENTES DE TU CONFIRMACIÓN ({len(pending_100)}{'+' if len(pending_100) == 50 else ''})"]
-        lines += [f"- {p.get('name')} ({p.get('city')}) · {p.get('status')}" for p in pending_100[:10]]
-        lines.append("  python -m scripts.review_queue --pending-100")
-        sections.append(lines)
+        sections.append(pending_100_lines(pending_100))
 
     log = db.fetch_agent_log_since(since)
     validated = Counter(
