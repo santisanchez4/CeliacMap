@@ -43,8 +43,10 @@ Notes:
   because the charge was **rejected**, nothing is written: the business opens the same link again with another card
   and sends the new operation number.
 - **4:** `--approve` needs `eligible` + payment `active`. The card shows in Aliados right away (view `partners_public`).
-  **Pending:** the logo upload to the `partner-logos` bucket is not in the script yet (plan, «Logos»); until it is, the
-  card goes out without a logo.
+  **The logo is uploaded by hand until there is a real partner** (owner decision 2026-10-18; the script upload of the
+  plan, «Logos», comes then): check it is PNG or WEBP, under 40 KB, 192×192 or 384×384; upload it to the
+  `partner-logos` bucket in the Supabase dashboard; set `logo_path` with an `update` on that `ref_code`, shown first
+  and run only after the owner's «dale».
 - **5:** `--sync` reads the charges from Mercado Pago. `cancelled` keeps the card until `paid_through` and then ends it;
   a missed charge (`past_due`) hides the card, and 30 days after `paid_through` ends it. **The purge only deletes
   `ended` partners**: a partner left open keeps its data longer than the privacy policy says, which is why the digest
