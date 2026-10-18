@@ -4749,6 +4749,24 @@ Con el interruptor apagado, `index.html` lleva solo `<div id="partner-program" h
 
 **CLAUDE.md** no cambia en este PR (49,5 de 50 mil caracteres). La línea de retención se completa cuando se achique el índice.
 
+### CeliacMap Market, futuro (2026-10-18)
+
+**Qué se decidió (solo documentación, sin código ni nada publicado).**
+- El Market no existe ni se desarrolla ahora. Va a ser un producto separado, con sus propias condiciones y su propio precio.
+- La suscripción de aliado no da acceso automático al Market. Cuando se diseñe, los aliados podrán tener un beneficio,
+  por ejemplo acceso anticipado o un descuento.
+- Sin tablas acopladas: el Market tendrá las suyas y, como mucho, una referencia opcional a `partner_applications`.
+- Vender en el Market nunca cambia el mapa, las etiquetas, el ranking ni el chat: la misma independencia que los aliados
+  (ADR-009, ADR-011).
+- Cuando exista, va como página propia del mismo sitio (`celiacmap.org/market/`), en la misma ventana, no en un subdominio.
+- **Pendiente:** construirlo o usar una plataforma de tiendas existente.
+
+**Dónde quedó.**
+- La sección «Relación con CeliacMap Market (futuro)» de `docs/plans/PLAN-partner-program.md`.
+- En `docs/legal/condiciones-aliados.md` §2: «La suscripción incluye solo lo que figura en esta sección. Si CeliacMap lanza
+  otros servicios, tendrán sus propias condiciones.» Queda pendiente de la revisión del abogado (Fase 3).
+- El resumen de las condiciones en el sitio (`PROGRAM` en `js/partners.js`) no cambia.
+
 ### Ejemplo de la landing: Los Leños en vez de un lugar inventado (2026-10-18)
 
 La tarjeta de ejemplo de «Funcionalidades» (`index.html`, `.features-preview`) mostraba «Panadería Trigo Cero», un lugar
