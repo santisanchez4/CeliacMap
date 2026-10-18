@@ -44,6 +44,15 @@ Deno.test("the build stops if the beacon or the manifest link are no longer wher
   assert.throws(() => appIndexHtml(html.replace('rel="manifest"', 'rel="x-manifest"')), /web manifest link/);
 });
 
+Deno.test("the app ships js/config.js as the site does: the partner program stays off in the APK", async () => {
+  const browser = {};
+  vm.runInNewContext(await Deno.readTextFile("js/config.js"), { window: browser });
+  assert.equal(browser.CELIACMAP_CONFIG.PARTNER_PROGRAM, false);
+  assert.ok(SITE_DIRS.includes("js"), "js/ is copied verbatim");
+  const sync = await Deno.readTextFile(`${MOBILE}/scripts/sync-web.mjs`);
+  assert.ok(!/config\.js|PARTNER_PROGRAM|staging/i.test(sync), "sync-web.mjs never rewrites the config");
+});
+
 Deno.test("Capacitor serves the local copy: fixed app id, no remote URL, no bridge logging", () => {
   assert.equal(config.appId, "org.celiacmap.app");
   assert.equal(config.webDir, "www");

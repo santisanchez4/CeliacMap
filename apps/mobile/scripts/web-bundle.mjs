@@ -7,21 +7,31 @@ export const SITE_DIRS = ["css", "js", "assets"];
 export const WEB_ONLY_FILES = ["manifest.webmanifest", "service-worker.js"];
 export const NATIVE_SCRIPT = "native.js";
 
-const REMOVALS = [
+const ANALYTICS = [
   ["the Cloudflare beacon", /[ \t]*<!-- Cloudflare Web Analytics[^>]*-->\s*<script\b[^>]*cloudflareinsights\.com[^>]*><\/script>[ \t]*\r?\n/],
   ["the Cloudflare preconnect", /[ \t]*<link rel="preconnect" href="https:\/\/static\.cloudflareinsights\.com"[^>]*>[ \t]*\r?\n/],
-  ["the web manifest link", /[ \t]*<link rel="manifest"[^>]*>[ \t]*\r?\n/],
 ];
+const REMOVALS = [...ANALYTICS, ["the web manifest link", /[ \t]*<link rel="manifest"[^>]*>[ \t]*\r?\n/]];
 
-export function appIndexHtml(html) {
+function removeEach(html, removals) {
   let out = html;
-  for (const [label, pattern] of REMOVALS) {
+  for (const [label, pattern] of removals) {
     const global = new RegExp(pattern.source, "g");
     const found = (out.match(global) || []).length;
     if (found !== 1) throw new Error(`index.html: expected ${label} exactly once, found ${found}`);
     out = out.replace(pattern, "");
   }
   if (/cloudflareinsights/i.test(out)) throw new Error("index.html: a Cloudflare analytics reference survived");
+  return out;
+}
+
+// The site's page without the analytics beacon: scripts/stage_site.mjs, so a local staging copy is never counted.
+export function withoutAnalytics(html) {
+  return removeEach(html, ANALYTICS);
+}
+
+export function appIndexHtml(html) {
+  const out = removeEach(html, REMOVALS);
   if ((out.match(/<\/body>/g) || []).length !== 1) throw new Error("index.html: expected one </body>");
   return out.replace("</body>", `  <script src="${NATIVE_SCRIPT}"></script>\n</body>`);
 }

@@ -98,7 +98,11 @@ es la oferta).
 
 **Formulario** (dentro de la tarjeta): el nombre del comercio, la ciudad y el país (UY/AR), la persona responsable, el email
 (obligatorio), el teléfono/WhatsApp (opcional), el link de la web o las redes, una descripción corta (≤ 300) y "¿Ya está en el
-mapa de CeliacMap?" (sí/no/no sé). Antes de enviar, se muestran de nuevo el precio y las condiciones y una casilla
+mapa de CeliacMap?" (sí/no/no sé). **Fase 3 (2026-10-17):** en staging la casilla enlaza a `privacidad.html` y el
+resumen de las condiciones va en un `<details>` dentro del formulario, con `consent_version`
+`condiciones-aliados-1.0-borrador`; antes de encender el interruptor en producción la casilla tiene que enlazar a las
+condiciones publicadas y a la privacidad v1.2, con una versión final (lo exige un test de `frontend_partners.test.js`).
+Antes de enviar, se muestran de nuevo el precio y las condiciones y una casilla
 obligatoria de aceptación (que enlaza a la política y a las condiciones para aliados). Tiene honeypot, tiempo mínimo y
 cooldown. Si el INSERT choca con el unique de `ref_code`, genera otro código y reintenta (hasta 3 veces), sin mostrar
 nada. Solo el choque con el índice email + comercio muestra "Ya tenemos una solicitud tuya". Al enviar se ve: "Recibimos tu solicitud. Tu código es **CM-7F3K2Q**. Te escribimos en 5 días hábiles; si

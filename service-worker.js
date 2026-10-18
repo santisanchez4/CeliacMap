@@ -25,6 +25,7 @@ var SHELL = [
   "js/report.js",
   "js/ranking.js",
   "js/opinions.js",
+  "js/partners.js",
   "js/chat.js",
   "js/pwa.js",
   "assets/icons/favicon.svg",
