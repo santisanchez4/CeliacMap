@@ -75,6 +75,24 @@ Every write is a dry run without `--apply`, and every staging write is shown fir
 `db/staging/2026-10-15-partner-payment-columns.sql` (staging only) moved staging's table to the current shape
 (`payer_email` out, `mp_first_payment_id` in).
 
+## The site against staging (partner program on)
+
+`node scripts/stage_site.mjs` copies the files GitHub Pages publishes into `_staging/` (gitignored) and changes only
+`_staging/js/config.js`: it appends the staging `STAGING_SUPABASE_URL` and `STAGING_SUPABASE_ANON_KEY` read from
+`.env.staging` (by default the main checkout's, `--env-file PATH` otherwise) plus `PARTNER_PROGRAM: true`. It also drops
+the analytics beacon, so local visits are never counted. Nothing of staging is committed: `js/config.js` keeps the
+production values and `PARTNER_PROGRAM: false`, and the APK copies it as is.
+
+```bash
+node scripts/stage_site.mjs
+python -m http.server 8080 --directory _staging      # http://localhost:8080/#aliados
+```
+
+It refuses the production project, a `service_role` or `sb_secret_` key, and an anon key of another project. Run it
+again after every frontend change. The form INSERTs into staging's `partner_applications`: while developing, intercept
+`fetch` in the page; a real submission is shown to the owner first and waits for «dale», and its row is deleted
+afterwards with its SQL and its own «dale».
+
 ## Pending live test: end of the paid period after a cancellation (on or after 2026-11-16)
 
 State on 2026-10-15: `CM-TEST10` (fictional request, `prueba-link@staging-test.invalid`) is linked to the test
@@ -95,3 +113,7 @@ On **2026-11-16 or later**, in this order, each write only with the owner's «da
    ```
    through `python -m scripts.staging_db --project-ref egqclfomloqmddvlpepx --file <that SQL in a file> --apply`, then
    a read-only count that must be 0.
+5. Read-only (GET to Mercado Pago): the subscription of the rejected checkout, `6ef109d6f41e4995becfdc80f46f4ec5`
+   (2026-10-17, cancelled by Mercado Pago itself), never produced an approved charge: every
+   `authorized_payments/search?preapproval_id=...` result and its payment must be non-approved (the only one on
+   2026-10-17 was payment `184789404324`, `rejected`).

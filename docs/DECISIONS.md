@@ -4658,6 +4658,45 @@ borrado a pedido.
     sugerencias. Una suscripción rechazada no está `authorized` y su pago no está aprobado, así que ninguno de los dos la ve.
     `CM-TEST10` sigue `approved`, pago `cancelled` hasta 2026-11-15. No se escribió nada.
 
+### Partner program — phase 1 frontend behind the switch (2026-10-17)
+
+**Qué se hizo.** `js/partners.js` muestra, solo con `PARTNER_PROGRAM: true`, los aliados publicados (la vista
+`partners_public`, 5 columnas, después de la tarjeta estática de Bienestar) y la tarjeta «Plan Fundador» con el
+formulario de solicitud dentro de `#aliados`. En `js/config.js` el interruptor queda en `false`, y el APK lo copia tal cual.
+Con el interruptor apagado, `index.html` lleva solo `<div id="partner-program" hidden>`, vacío, y no se hace ningún pedido.
+
+**Decisiones del responsable.**
+- **Sin claves de staging en el repo.** No existe `config/frontend.staging.js` (el plan lo proponía).
+  `scripts/stage_site.mjs` lee la URL y la anon key de `.env.staging`, el mismo archivo de `staging_guard`, y las escribe
+  solo en `_staging/js/config.js`, que está en gitignore, junto con `PARTNER_PROGRAM: true`. Se niega con el proyecto de
+  producción, con una clave `service_role` o `sb_secret_`, y con una anon key de otro proyecto. Saca el beacon de analítica.
+- **Consentimiento en staging.** `consent_version` es `condiciones-aliados-1.0-borrador`, el mismo de la fila de prueba,
+  definido una sola vez en `PROGRAM`. La casilla enlaza a `privacidad.html`. El resumen «Condiciones del Plan Fundador» va
+  en un `<details>` dentro del formulario, antes de la casilla y del botón: precio, cobro mensual, sin permanencia, visible
+  hasta el final del período pagado, que es publicidad, la respuesta en 5 días hábiles y que no se paga nada antes.
+- **Guarda de la Fase 3.** Un test falla si la configuración de producción tiene `PARTNER_PROGRAM: true` y el
+  `consent_version` dice «borrador», o si la casilla no enlaza a una página de condiciones publicada.
+
+**Cómo funciona el formulario.**
+- Usa una única fuente, `PROGRAM`: precio, moneda, los 4 beneficios de §2 de las condiciones, el aviso de publicidad, las
+  condiciones, las preguntas frecuentes y los textos ES/EN. Nada de estadísticas ni del Market.
+- Hace un POST con las 11 columnas de anon y `return=minimal`, sin `place_id` ni estados. El `ref_code` lo genera el navegador.
+- Si el 409 viene de `partner_applications_ref_code_key`, genera otro código y reintenta, hasta 3 veces. Si viene de
+  `partner_applications_open_request_idx`, muestra el mensaje de duplicado.
+- Tiene honeypot, 3 s mínimos y 60 s de cooldown, como `suggest.js`.
+- Al terminar muestra el código `CM-XXXXXX` y los próximos pasos. No hay ningún link de Mercado Pago en la página.
+
+**Verificación.**
+- Los tests son `frontend_partner_form.test.js` (nuevo), `frontend_partners.test.js` (ampliado), `frontend_stage_site.test.js`
+  (nuevo), `frontend_mobile.test.js` (el APK lleva el interruptor apagado), `frontend_pwa.test.js` (`js/partners.js` en el
+  `SHELL`) y `tests/test_partner_independence.py`. Este último fija que las migraciones `partner*` no escriben en `places`,
+  `place_votes` ni `reviews`, que `partners_admin.py` solo escribe en `partner_applications` y que `map.js`, `ranking.js`,
+  `chat.js`, `geo.js` y `chat/*.ts` no mencionan aliados.
+- En Chrome se probó contra staging, con clics reales en escritorio (1536 px) y a 390 px, en ES y EN, con 0 errores de
+  consola de la página. A 390 px se usó un iframe de 390 px dentro de `_staging/`, porque la ventana no bajaba de ancho.
+- Durante el desarrollo, el POST se interceptó en la página: no se escribió nada en staging. `partners_public` devolvió la
+  tarjeta real de `CM-TEST10`.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

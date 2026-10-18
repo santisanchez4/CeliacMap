@@ -12,5 +12,8 @@ window.CELIACMAP_CONFIG = {
   // it's a frontend key that CARTO restricts to the celiacmap.org / localhost
   // domains in their dashboard, not a secret to hide. Without it the map tiles
   // carry an "API KEY REQUIRED" watermark (free tier: 5M tile requests/month).
-  CARTO_BASEMAP_KEY: "cb1_2ehz_1_e4e0f2848c72d8bec76118bb"
+  CARTO_BASEMAP_KEY: "cb1_2ehz_1_e4e0f2848c72d8bec76118bb",
+  // Partner program (ADR-011). Off on the site and in the app until phase 3; scripts/stage_site.mjs turns it on
+  // only in its local _staging/ copy.
+  PARTNER_PROGRAM: false
 };
