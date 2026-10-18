@@ -5383,3 +5383,40 @@ _(the ```xml block that was here is byte-identical to `RESPONDER_PROMPT` in `sup
 > as the "Enharinate Mendoza" case). Any edit to the scope, the constraints, or
 > the sources list is a deliberate design decision — test it against the
 > jailbreak battery (ADR-006 Fase E) and record it here and in the Decisions Log.
+
+## Índice por tema — enlaces completos
+
+Moved verbatim from CLAUDE.md on 2026-10-18 to keep it under its size budget: the older themes of its index, with
+every link, and its one-line-per-phase list of the finished phases. CLAUDE.md keeps one line per theme with a link here.
+
+### Themes
+
+- **Forms, kitchen and community (Jun 2026 → 09-24)** — anon INSERT-only suggestions, unverified kitchen questions (ADR-007), reports as evidence, opinions through a public view (ADR-008). [suggest form](#suggest-a-place-public-form-design-decisions) · [kitchen](#kitchen-information-as-review-evidence-2026-09-24) · [Form B](#form-b-collects-reviews-not-kitchen-data-2026-09-24) · [opinions](#community-opinions-on-the-public-site-2026-09-24) · [reports](#community-reports-place_reports-design-decisions)
+- **Chatbot (2026-09-19 → 09-27)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [C](#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía) · [by name](#chatbot--named-place-retrieval-2026-09-23) · [battery](#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25) · [region](#department--province-search--placesregion-2026-09-26) · [`category_zero`](#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)
+- **Public site and design (s/f → 2026-09-28)** — green-first editorial redesign, Top 3 explorer with two safety labels, roadmap removed, one cookieless analytics beacon, partners labeled and separate from safety (ADR-009). [redesign](#editorial-redesign-visual--content) · [base landing](#chatbot--named-place-retrieval-2026-09-23) · [design audit](#frontend-design-audit-frontend-design--web-design-guidelines--ui-ux-pro-max) · [cursor](#map-drag-cursor-cm-mapleaflet-grab) · [explorer](#map-explorer--results-list-and-chat-prompts-removed-2026-09-20) · [roadmap](#public-site--roadmap-section--github-links-removed-2026-09-01) · [`#suggest` copy](#suggest-section--card-titles-and-copy-2026-09-24) · [analytics](#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28) · [sponsorships](#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)
+- **Agents and platform (Jan 2026 → 09-16)** — landing to product, Social and Web agents, three-tier rubric with code gates 0.85 / 0.7 / 0.5 + MCP server, outreach and its reply webhook, Pages deploy. [product](#product-evolution-landing--functional-product) · [social](#social-agent-design-decisions) · [web v3](#web-discovery-agent-v3-design-decisions) · [AI Toolkit](#ai-toolkit-prompts--skill--mcp-server-design-decisions) · [outreach](#outreach-agent-design-decisions) · [reply webhook](#outreach-reply-webhook-etapa-2-design-decisions) · [Pages](#github-pages-deploy-decision) · [build status](#build-status-phases)
+
+### Finished phases (✅)
+
+- ✅ 1–2 Landing page + editorial redesign
+- ✅ 3 Supabase backend (schema, RLS, seed)
+- ✅ 4 Leaflet map + agent foundation
+- ✅ 5 Search agent
+- ✅ 6 Validator agent
+- ✅ 7 Updater agent + pipeline orchestrator
+- ✅ 8 GitHub Actions cron (monthly)
+- ✅ 9 GitHub Pages deploy
+- ✅ 10 Social agent + Google review enrichment (Tavily)
+- ✅ 11 Web agent v3 — ⚠️ disabled in the pipeline (a live run timed out CI)
+- ✅ 12 AI Toolkit + three-tier rubric
+- ✅ 13 Suggest-a-Place form
+- ✅ 17 Outreach Etapa 2 reply webhook (verified live)
+- ✅ 19 Community reports (`place_reports`), live
+- ✅ 20 Geocode-gate address fallback
+- ✅ 21 Community ranking (ADR-005), live
+- ✅ 22 Chatbot Fase C: reportar / confirmar writes
+- ✅ 23 Chatbot Fase D: floating widget
+- ✅ 24 Chatbot Fase E: jailbreak battery, F3/F4, guard (chat v11)
+- ✅ 25 Kitchen information (2026-09-24)
+- ✅ 26 Community opinions (2026-09-24)
+- ✅ 27 Department / province search (2026-09-26): `places.region` in production (1 263 rows, all 422 approved), `chat` v20 deployed and verified live

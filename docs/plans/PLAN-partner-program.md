@@ -402,6 +402,8 @@ Lista de la Fase 3 (nada se cobra ni se contacta antes de cerrarla):
 - **Comercios de Argentina (2026-10-18):** verificar si un comercio de Argentina puede pagar la suscripción de Mercado
   Pago Uruguay en pesos uruguayos. Si no puede, al lanzar el formulario acepta solo Uruguay o avisa a los comercios de
   Argentina. El formulario de la Fase 1 no cambia.
+- **Condiciones publicadas en el email (2026-10-18):** publicar las condiciones para aliados y reemplazar
+  `<LINK_A_LAS_CONDICIONES>` en la plantilla «Solicitud elegible» de `docs/runbooks/partner-program.md` por su URL.
 
 Detalle de lo que sigue abierto: la inscripción en DGI/BPS y la facturación electrónica (y si el precio en UYU incluye IVA), las condiciones comerciales para
 aliados (alcance, baja, contenidos prohibidos, que no hay garantía de visitas), privacidad v1.2 (datos de responsables
