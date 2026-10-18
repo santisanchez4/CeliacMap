@@ -400,9 +400,11 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 - **Retention and deletion requests** [Privacy phases 1–2]: the weekly purge (`chat-log-purge.yml`) deletes chatbot logs at 30
   days, `chat_usage` at 7 and Google reviews at 30 (Search re-fetches them monthly), `agent_log` at 1 year (deletion-request
   records, `agent='privacy'`, at 5), suggestions / unpublished reports / user evidence at 2 years, contact email + outreach 2 years
-  after the last contact; votes and published opinions are never purged there; the chat's IP bucket is an HMAC with
-  `CHAT_IP_HASH_SECRET`, never a plain hash. A deletion request goes through `scripts/delete_personal_data.py` and
-  `docs/legal/runbook-pedidos-de-datos.md`, never an ad-hoc `DELETE`; a chat recommendation is never published.
+  after the last contact, a partner request never charged at 6 months and an `ended` partner 2 years after its last charge
+  (only `ended` rows are purged, so `partners_admin --sync` closes them first); votes and published opinions are never
+  purged there; the chat's IP bucket is an HMAC with `CHAT_IP_HASH_SECRET`, never a plain hash. A deletion request goes
+  through `scripts/delete_personal_data.py` and `docs/legal/runbook-pedidos-de-datos.md`, never an ad-hoc `DELETE`; a chat
+  recommendation is never published.
 - **A test of whether something can write is a write** [zz_ro_probe incident]: literal command and "dale" first, in staging too.
 - **Staging** (`egqclfomloqmddvlpepx`) only through `scripts/staging_db.py` / `seed_staging.py` with `--project-ref`: never
   `supabase link` or `--linked` for it, and those tools are never pointed at production. [Runbook](docs/runbooks/staging.md).
@@ -453,48 +455,31 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
 ## Decisions Log (índice)
 
 One line per theme: dates, one sentence, and one link per decision to its entry in `docs/DECISIONS.md`, where the full text
-lives ("s/f" = no date stated).
+lives ("s/f" = no date stated). Older themes keep one link (→) to their full list of links there.
 
 - **Mobile, PWA and location (2026-10-01 → 10-05)** — PWA first, Capacitor Android for demos (device test pending), location only on tap, branch + PR workflow, runners on `ubuntu-24.04` (debt: move to 26). [pilot](docs/DECISIONS.md#mobile-demo-pilot-and-pr-workflow-2026-10-02) · [ADR-010](docs/architecture/ADR-010-mobile-strategy.md) · [plan](docs/plans/PLAN-mobile-app.md) · [Android](docs/DECISIONS.md#android-demo-app-with-capacitor-2026-10-03) · [«Cerca mío»](docs/DECISIONS.md#cerca-mío--location-on-tap-in-memory-only-2026-10-02) · [PWA](docs/DECISIONS.md#pwa-shell-installable-app-network-first-2026-10-02) · [icons](docs/DECISIONS.md#favicon-and-app-icons-unified-with-the-header-logo-2026-10-02) · [polish](docs/DECISIONS.md#assistant-and-map-interaction-polish-2026-10-01) · [runners](docs/DECISIONS.md#ci-runners-pinned-to-ubuntu-2404-2026-10-05)
 - **Privacy and legal texts (2026-09-29 → 10-06)** — `places` read by column grant, `owner_celiac` out (columns dropped 2026-10-14), retention windows, deletion requests, policy + terms v1.1 (edit the `.md` first). [grant](docs/DECISIONS.md#places-public-read-by-column-grant--privacy-phase-1-2026-09-29) · [phase 1](docs/DECISIONS.md#privacy-phase-1--owner_celiac-out-retention-ip-hmac-deletion-requests-2026-09-29) · [phase 2](docs/DECISIONS.md#privacy-phase-2--retention-windows-and-providers-2026-09-30) · [v1.0](docs/DECISIONS.md#privacy-policy-and-terms-of-use-published-v10-2026-10-05) · [v1.1](docs/DECISIONS.md#legal-texts-v11--minors-clause-2026-10-06) · [Google reviews ToS](docs/DECISIONS.md#google-places-reviews--tos-driven-access-restriction--30-day-expiration-2026-09-05)
 - **Validator, evidence and overrides (2026-09-01 → 10-13)** — overrides never silent, the 100% labeling rule, `place_evidence`, the evidence finder, contact frozen only by the registry; two audit signals and the `needs_review` queue stay open. [overrides](docs/DECISIONS.md#manual-validator-overrides--allowed-but-never-silent) · [audit](docs/DECISIONS.md#audit-2026-09-24--evidence-for-the-validator--100-only-with-explicit-evidence) · [evidence finder](docs/DECISIONS.md#evidence-finder-for-the-admin-pending-100-queue-2026-09-27) · [re-validation](docs/DECISIONS.md#retroactive-re-validation-of-pre-three-tier-rubric-approvals-2026-09-06) · [own knowledge](docs/DECISIONS.md#validator--parametric-knowledge-vs-provided-evidence-2026-09-06) · [name substring](docs/DECISIONS.md#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07) · [queue](docs/DECISIONS.md#cola-de-needs_review-sin-salida-automática--71-lugares-huérfanos-de-contacto-2026-09-06) · [Updater + Google risk](docs/DECISIONS.md#updater-manual-contact-protection-and-google-risk-2026-10-02) · [contact registry](docs/DECISIONS.md#contact-data-frozen-only-by-the-registry-2026-10-06) · [social author](docs/DECISIONS.md#evidence-finder--a-social-quote-needs-a-verified-author-2026-10-13) · [post ≠ profile](docs/DECISIONS.md#social-agent--a-post-is-not-a-profile-2026-10-13) · [map scope](docs/DECISIONS.md#map-scope-rules-2026-10-13)
 - **Data quality, dedup and scope (2026-09-01 → 10-13)** — IM Montevideo's licensed-premises layer as evidence (never an approval), one Google place one row, a social profile is not a website, UY+AR bounding box, Brazil / Chile rows discarded, address geocode fallback. [dedup](docs/DECISIONS.md#one-google-place-one-row--dedup-across-sources-2026-09-27) · [social profile](docs/DECISIONS.md#a-social-profile-is-not-a-website-2026-10-01) · [monthly review](docs/DECISIONS.md#monthly-run-review-and-admin-decisions-2026-10-01) · [data pass](docs/DECISIONS.md#audit-data-quality-pass-2026-09-25--fictional-seed-places-wrong-countrycity-non-business-rows) · [Brazil](docs/DECISIONS.md#brazil-out-of-scope-places--curitiba-cluster-2026-09-01) · [scope guard](docs/DECISIONS.md#geographic-scope-guard--insert_place_candidate-bounding-box-2026-09-01) · [geocode-gate](docs/DECISIONS.md#geocode-gate--address-fallback-resolve_location) · [ranking seed](docs/DECISIONS.md#community-ranking-seed--data-quality-findings-adr-005-fase-d-2026-09-02) · [IM Montevideo](docs/DECISIONS.md#im-montevideo-as-an-evidence-source-2026-10-13)
-- **Forms, kitchen and community (Jun 2026 → 09-24)** — anon INSERT-only suggestions, unverified kitchen questions (ADR-007), reports as evidence, opinions through a public view (ADR-008). [suggest form](docs/DECISIONS.md#suggest-a-place-public-form-design-decisions) · [kitchen](docs/DECISIONS.md#kitchen-information-as-review-evidence-2026-09-24) · [Form B](docs/DECISIONS.md#form-b-collects-reviews-not-kitchen-data-2026-09-24) · [opinions](docs/DECISIONS.md#community-opinions-on-the-public-site-2026-09-24) · [reports](docs/DECISIONS.md#community-reports-place_reports-design-decisions)
-- **Chatbot (2026-09-19 → 09-27)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [C](docs/DECISIONS.md#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](docs/DECISIONS.md#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](docs/DECISIONS.md#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía) · [by name](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23) · [battery](docs/DECISIONS.md#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25) · [region](docs/DECISIONS.md#department--province-search--placesregion-2026-09-26) · [`category_zero`](docs/DECISIONS.md#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27)
-- **Public site and design (s/f → 2026-09-28)** — green-first editorial redesign, Top 3 explorer with two safety labels, roadmap removed, one cookieless analytics beacon, partners labeled and separate from safety (ADR-009). [redesign](docs/DECISIONS.md#editorial-redesign-visual--content) · [base landing](docs/DECISIONS.md#chatbot--named-place-retrieval-2026-09-23) · [design audit](docs/DECISIONS.md#frontend-design-audit-frontend-design--web-design-guidelines--ui-ux-pro-max) · [cursor](docs/DECISIONS.md#map-drag-cursor-cm-mapleaflet-grab) · [explorer](docs/DECISIONS.md#map-explorer--results-list-and-chat-prompts-removed-2026-09-20) · [roadmap](docs/DECISIONS.md#public-site--roadmap-section--github-links-removed-2026-09-01) · [`#suggest` copy](docs/DECISIONS.md#suggest-section--card-titles-and-copy-2026-09-24) · [analytics](docs/DECISIONS.md#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28) · [sponsorships](docs/DECISIONS.md#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)
+- **Forms, kitchen and community (Jun 2026 → 09-24)** — anon INSERT-only suggestions, unverified kitchen questions (ADR-007), reports as evidence, opinions through a public view (ADR-008). [→](docs/DECISIONS.md#índice-por-tema--enlaces-completos)
+- **Chatbot (2026-09-19 → 09-27)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [→](docs/DECISIONS.md#índice-por-tema--enlaces-completos)
+- **Public site and design (s/f → 2026-09-28)** — green-first editorial redesign, Top 3 explorer with two safety labels, roadmap removed, one cookieless analytics beacon, partners labeled and separate from safety (ADR-009). [→](docs/DECISIONS.md#índice-por-tema--enlaces-completos)
 - **Partner program «CeliacMap Aliado» (2026-10-14)** — paid monthly sponsorship via Mercado Pago, built in staging first; map stays neutral (Option A), review before charging, visible only if paid + admin-approved; phase 0 = docs only, legal v1.2 drafts in separate files. [phase 0](docs/DECISIONS.md#partner-program-celiacmap-aliado--phase-0-documents-2026-10-14) · [phase 1 staging](docs/DECISIONS.md#partner-program--phase-1-staging-project-and-its-database-2026-10-15) · [frontend](docs/DECISIONS.md#partner-program--phase-1-frontend-behind-the-switch-2026-10-17) · [ADR-011](docs/architecture/ADR-011-partner-program-payments.md) · [plan](docs/plans/PLAN-partner-program.md)
-- **Agents and platform (Jan 2026 → 09-16)** — landing to product, Social and Web agents, three-tier rubric with code gates 0.85 / 0.7 / 0.5 + MCP server, outreach and its reply webhook, Pages deploy. [product](docs/DECISIONS.md#product-evolution-landing--functional-product) · [social](docs/DECISIONS.md#social-agent-design-decisions) · [web v3](docs/DECISIONS.md#web-discovery-agent-v3-design-decisions) · [AI Toolkit](docs/DECISIONS.md#ai-toolkit-prompts--skill--mcp-server-design-decisions) · [outreach](docs/DECISIONS.md#outreach-agent-design-decisions) · [reply webhook](docs/DECISIONS.md#outreach-reply-webhook-etapa-2-design-decisions) · [Pages](docs/DECISIONS.md#github-pages-deploy-decision) · [build status](docs/DECISIONS.md#build-status-phases)
+- **Agents and platform (Jan 2026 → 09-16)** — landing to product, Social and Web agents, three-tier rubric with code gates 0.85 / 0.7 / 0.5 + MCP server, outreach and its reply webhook, Pages deploy. [→](docs/DECISIONS.md#índice-por-tema--enlaces-completos)
 
 ### Build status — one line per phase
 
 Detail of every phase, with its verification notes: [Build status (phases)](docs/DECISIONS.md#build-status-phases).
 
-- ✅ 1–2 Landing page + editorial redesign
-- ✅ 3 Supabase backend (schema, RLS, seed)
-- ✅ 4 Leaflet map + agent foundation
-- ✅ 5 Search agent
-- ✅ 6 Validator agent
-- ✅ 7 Updater agent + pipeline orchestrator
-- ✅ 8 GitHub Actions cron (monthly)
-- ✅ 9 GitHub Pages deploy
-- ✅ 10 Social agent + Google review enrichment (Tavily)
-- ✅ 11 Web agent v3 — ⚠️ disabled in the pipeline (a live run timed out CI)
-- ✅ 12 AI Toolkit + three-tier rubric
-- ✅ 13 Suggest-a-Place form
+- ✅ 1–13, 17, 19–27 (detail of each in [the full list](docs/DECISIONS.md#índice-por-tema--enlaces-completos)): landing +
+  redesign, Supabase backend, Leaflet map, Search / Validator / Updater agents + pipeline, monthly cron, Pages deploy,
+  Social agent, Web agent v3 (⚠️ disabled in the pipeline: a live run timed out CI), AI Toolkit + three-tier rubric,
+  Suggest form, outreach reply webhook, community reports, geocode-gate, ranking, chatbot Fases C–E, kitchen, opinions,
+  department / province search.
 - 🚧 14 Outreach agent: schema only
 - 🚧 15 Outreach agent: `outreach_send`
 - 🚧 16 Outreach agent: `contact_email` website scraper
-- ✅ 17 Outreach Etapa 2 reply webhook (verified live)
 - 🚧 18 ADR-003 opt-out + `OUTREACH_LIVE_MODE` (1 real send 2026-09-01; cron wiring fixed 09-16, not re-verified)
-- ✅ 19 Community reports (`place_reports`), live
-- ✅ 20 Geocode-gate address fallback
-- ✅ 21 Community ranking (ADR-005), live
-- ✅ 22 Chatbot Fase C: reportar / confirmar writes
-- ✅ 23 Chatbot Fase D: floating widget
-- ✅ 24 Chatbot Fase E: jailbreak battery, F3/F4, guard (chat v11)
-- ✅ 25 Kitchen information (2026-09-24)
-- ✅ 26 Community opinions (2026-09-24)
-- ✅ 27 Department / province search (2026-09-26): `places.region` in production (1 263 rows, all 422 approved), `chat` v20 deployed and verified live
 - **Open:** chatbot soft-launch with organic traffic (Fase F: ADR-006 closure, C4, README); F4 Option 1 prompt
   reformulation (non-blocking); live confirmation of a real outreach reply and opt-out.
 
