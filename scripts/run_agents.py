@@ -109,6 +109,9 @@ class DryRunSupabase:
     def fetch_place_reports_since(self, since: str, limit: int = 200) -> list[dict]:
         return self._inner.fetch_place_reports_since(since, limit=limit)
 
+    def fetch_partner_applications_for_digest(self, limit: int = 500) -> list[dict] | None:
+        return self._inner.fetch_partner_applications_for_digest(limit=limit)
+
     def fetch_latest_received_message(self, place_id: str) -> dict | None:
         return self._inner.fetch_latest_received_message(place_id)
 

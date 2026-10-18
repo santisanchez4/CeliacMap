@@ -4697,6 +4697,58 @@ Con el interruptor apagado, `index.html` lleva solo `<div id="partner-program" h
 - Durante el desarrollo, el POST se interceptó en la página: no se escribió nada en staging. `partners_public` devolvió la
   tarjeta real de `CM-TEST10`.
 
+### Partner program — phase 1 admin: digest, retention and runbook (2026-10-18)
+
+**Qué se hizo.**
+- `scripts/admin_digest.py` tiene una parte de aliados.
+- `scripts/purge_chat_logs.py` aplica los plazos de `partner_applications`.
+- `docs/runbooks/partner-program.md` tiene el paso a paso del admin con `partners_admin` y cuatro plantillas de email en
+  español, que se mandan a mano desde hola@celiacmap.org: elegible, no elegible, pago recibido y tarjeta publicada.
+- Nada de esto toca `places`, los votos, las reseñas ni el Validator. `test_partner_independence.py` fija que los dos
+  métodos nuevos de `SupabaseClient` solo nombran `partner_applications` y que esa tabla no entra en la lista de `purge_rows`.
+
+**La tabla no existe en producción, y el resumen y la purga corren ahí.**
+- Consulta de solo lectura del 2026-10-18: un GET a `partner_applications` en producción responde `404 PGRST205`, y el
+  cliente lanza `APIError` con ese código.
+- `missing_table()` reconoce solo `PGRST205` y `42P01`. Con esos códigos, el método devuelve `None` y se saltea la parte de
+  aliados. Cualquier otro error sigue fallando.
+- **Hallazgo:** el conteo del `--dry-run` usa HEAD, cuya respuesta no trae cuerpo, y el cliente lanzaba un 404 sin código.
+  Por eso la purga prueba antes con un GET.
+- Verificado en solo lectura:
+  - En producción, el resumen se arma sin la parte de aliados y la purga en seco termina con
+    `partner_applications: skipped (no table)`.
+  - En staging, los filtros nuevos cuentan bien: `CM-TEST10` tiene pago y no está `ended`, así que da 0 en las dos reglas.
+
+**Resumen (decisiones del responsable).**
+- Solo muestra el código CM, el nombre del comercio, los estados y `paid_through`. Las columnas de contacto no se leen.
+- **Disparan el envío:**
+  - las solicitudes nuevas, en la misma ventana de 24 h del resto;
+  - los `past_due`;
+  - «PARA CERRAR (correr --sync)»: `cancelled` con `paid_through` vencido, o `past_due` con más de 30 días desde
+    `paid_through`, que todavía no están en `ended`. Es la misma regla de `sync_values`. Hace falta porque la purga solo
+    borra los `ended`: si no se corre `--sync`, los datos quedan más tiempo del que dice la política.
+- **Solo se listan si el email sale por otro motivo:** las elegibles esperando pago y los aliados por estado de pago
+  (active, past_due, cancelled, con su `paid_through`).
+
+**Plazos (privacidad v1.2 borrador, §6).**
+- **Una solicitud que nunca se cobró** (sin `mp_first_payment_id`) se borra a los 6 meses de la solicitud, en cualquier estado.
+- **Un aliado `ended`** se borra a los 2 años del último cobro.
+  - La tabla no guarda la fecha del último cobro: se toma como **`paid_through` menos un mes, y eso supone un plan
+    mensual**, el único que hay ($U 790 por mes).
+  - `partners_admin` pone `paid_through` = fecha del último cobro aprobado + un período, así que la regla equivale a
+    `paid_through` de hace más de 23 meses.
+  - Si algún día hay un plan con otro período, `partner_cutoffs()` tiene que cambiar.
+- Los meses son de calendario, ajustados al último día si el mes es más corto.
+- **Pendientes, sin implementar:**
+  - Los datos de cobro por obligaciones tributarias: a confirmar con un contador; en Uruguay suele ser de 5 años. Si termina
+    siendo así, la regla de 2 años tiene que conservar esas columnas. Hoy no hay filas pagas en producción.
+  - Los avisos de pago de Mercado Pago (1 año): todavía no se guardan en ningún lado; los traerá el webhook de la Fase 2.
+  - Los logos del bucket `partner-logos`: no hay plazo definido y la purga no toca Storage. La subida del logo tampoco
+    está todavía en `partners_admin`.
+  - Los plazos salen de un borrador: en producción no tienen efecto hasta que exista la tabla (Fase 3).
+
+**CLAUDE.md** no cambia en este PR (49,5 de 50 mil caracteres). La línea de retención se completa cuando se achique el índice.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

@@ -12,11 +12,19 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from postgrest.exceptions import APIError
 from supabase import Client, create_client
 
 from agents.clients.google_places import GooglePlacesClient
 
 logger = logging.getLogger("celiacmap.agent")
+
+# PostgREST's "table not found" (schema cache) and Postgres's undefined_table.
+MISSING_TABLE_CODES = {"PGRST205", "42P01"}
+
+
+def missing_table(error: Exception) -> bool:
+    return getattr(error, "code", None) in MISSING_TABLE_CODES
 
 # Approximate bounding box for Uruguay + Argentina at full national extent,
 # with margin for cities not yet in config/targets.yaml. Used as a last-resort,
@@ -731,6 +739,59 @@ class SupabaseClient:
             query = getattr(query, method)(column, value)
         res = query.execute()
         return (res.count or 0) if dry_run else len(res.data or [])
+
+    # --- partner program (ADR-011) --------------------------------------------
+    # partner_applications exists only in staging until phase 3, and the digest and the purge run against
+    # production: there PostgREST answers PGRST205 ("Could not find the table", checked live 2026-10-18).
+    # A missing table returns None (skip the partner part); any other error still raises.
+    PARTNER_DIGEST_COLUMNS = "ref_code, business_name, publication_status, payment_status, paid_through, created_at"
+
+    def fetch_partner_applications_for_digest(self, limit: int = 500) -> list[dict] | None:
+        """The partner requests for the admin digest: codes, names and states only, never the contact columns."""
+        try:
+            res = (
+                self._db.table("partner_applications")
+                .select(self.PARTNER_DIGEST_COLUMNS)
+                .order("created_at")
+                .limit(limit)
+                .execute()
+            )
+        except APIError as error:
+            if missing_table(error):
+                return None
+            raise
+        return res.data or []
+
+    def purge_partner_applications(self, requested_before: str, paid_through_before: str,
+                                   dry_run: bool = False) -> dict | None:
+        """Delete the partner requests past their retention window (privacy v1.2 draft, section 6).
+
+        - never charged (no first payment): created before ``requested_before``;
+        - charged and ``ended``: ``paid_through`` before ``paid_through_before`` (the caller derives it from the
+          last charge). A partner that is not ended is never purged here, whatever its dates.
+        Returns {"unpaid": n, "ended": n}, or None when the table does not exist. ``dry_run`` only counts.
+        """
+        # Probe with a GET first: a dry run counts with HEAD, whose empty body loses the PGRST205 code (the client
+        # then raises a bare 404, seen live against production 2026-10-18).
+        try:
+            self._db.table("partner_applications").select("id").limit(1).execute()
+        except APIError as error:
+            if missing_table(error):
+                return None
+            raise
+
+        def query():
+            table = self._db.table("partner_applications")
+            return table.select("id", count="exact", head=True) if dry_run else table.delete()
+
+        unpaid = query().is_("mp_first_payment_id", "null").lt("created_at", requested_before).execute()
+        ended = (
+            query().not_.is_("mp_first_payment_id", "null").eq("publication_status", "ended")
+            .lt("paid_through", paid_through_before).execute()
+        )
+        if dry_run:
+            return {"unpaid": unpaid.count or 0, "ended": ended.count or 0}
+        return {"unpaid": len(unpaid.data or []), "ended": len(ended.data or [])}
 
     def expire_outreach_contacts(self, older_than_days: int = 730, dry_run: bool = False) -> dict:
         """Two years after the last contact, forget a business's contact email and its outreach thread.

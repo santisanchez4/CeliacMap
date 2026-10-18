@@ -84,6 +84,9 @@ class DigestDB:
     def fetch_agent_log_since(self, since):
         return self.kw.get("log", [])
 
+    def fetch_partner_applications_for_digest(self):
+        return self.kw.get("partners")  # None: the table does not exist (production until phase 3)
+
 
 def test_nothing_new_means_no_email():
     assert build_digest(DigestDB()) is None
