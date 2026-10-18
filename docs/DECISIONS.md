@@ -4749,6 +4749,13 @@ Con el interruptor apagado, `index.html` lleva solo `<div id="partner-program" h
 
 **CLAUDE.md** no cambia en este PR (49,5 de 50 mil caracteres). La línea de retención se completa cuando se achique el índice.
 
+### Filtro `--country` en la cola del admin (2026-10-18)
+
+`scripts/review_queue.py` y `scripts/find_evidence.py` aceptan `--country`, igual que `--city` (texto parcial, sin distinguir
+mayúsculas). Sirve para trabajar primero los lugares de Uruguay: de los 235 «100% pendientes», 201 son de Argentina y son los
+más viejos, así que una lista por antigüedad empieza siempre por Argentina. Solo cambia la lectura (`fetch_places_for_admin`);
+el resumen diario y el outreach no cambian.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

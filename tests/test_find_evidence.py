@@ -39,6 +39,7 @@ class ReadOnlyDB:
     def fetch_places_for_admin(self, status=None, **kw):
         self.reads.append((status, kw))
         rows = [p for p in self.places if not kw.get("city") or kw["city"].lower() in p["city"].lower()]
+        rows = [p for p in rows if not kw.get("country") or kw["country"].lower() in p["country"].lower()]
         if kw.get("flag"):
             rows = [p for p in rows if kw["flag"] in p["flags"]]
         return rows[kw.get("offset", 0): kw.get("offset", 0) + kw.get("limit", 15)]
@@ -228,6 +229,16 @@ def test_the_search_cap_is_respected_and_the_skipped_places_are_listed_not_label
 def test_a_small_selection_needs_no_cap(tmp_path):
     assert go(tmp_path, make_places(48), "--limit", "5")[0] == 0
     assert go(tmp_path, make_places(48), "--city", "Mendoza")[0] == 0
+
+
+def test_country_reaches_the_queue_read(tmp_path):
+    places = make_places(48)
+    for i, p in enumerate(places):
+        p["country"] = "Uruguay" if i < 3 else "Argentina"
+    code, _, db = go(tmp_path, places, "--country", "uruguay")
+    assert code == 0 and db.reads[-1][1]["country"] == "uruguay"
+    data = json.loads(reports(tmp_path)[0][0].read_text(encoding="utf-8"))
+    assert len(data["places"]) == 3
 
 
 def test_no_llm_never_calls_the_model_and_never_proposes_100(tmp_path):

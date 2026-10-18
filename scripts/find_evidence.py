@@ -8,6 +8,7 @@ Runbook (quota, order of operations, rules): docs/runbooks/evidence-finder.md.
     python -m scripts.find_evidence --pilot                       # 10 places of 10 cities, ~20 Tavily searches
     python -m scripts.find_evidence --ids ID1 ID2                 # specific places
     python -m scripts.find_evidence --city Mendoza --limit 5
+    python -m scripts.find_evidence --country Uruguay --limit 10
     python -m scripts.find_evidence --max-searches 560            # the whole queue, capped (required above 20 places)
     python -m scripts.find_evidence --pilot --replay REPORT.frozen.json   # the same run on frozen sources: no Tavily, no downloads
 
@@ -56,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     pick.add_argument("--pilot", action="store_true", help=f"a deterministic sample of {PILOT_SIZE} places in {PILOT_SIZE} cities")
     pick.add_argument("--ids", nargs="+", metavar="PLACE_ID", help="specific places (need not be in the queue)")
     parser.add_argument("--city", help="filter the queue by city")
+    parser.add_argument("--country", help="filter the queue by country (Uruguay, Argentina)")
     parser.add_argument("--limit", type=int, help="how many places of the queue")
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--queries", type=int, choices=(2, 3), default=2,
@@ -79,7 +81,7 @@ def _select(db, args, out) -> list[dict]:
             else:
                 out(f"No existe el lugar {pid}.")
         return found
-    queue = db.fetch_places_for_admin(None, flag=PENDING_ADMIN_FLAG, city=args.city, limit=QUEUE_FETCH_LIMIT)
+    queue = db.fetch_places_for_admin(None, flag=PENDING_ADMIN_FLAG, city=args.city, country=args.country, limit=QUEUE_FETCH_LIMIT)
     if args.pilot:
         return pick_pilot(queue, PILOT_SIZE)
     end = args.offset + args.limit if args.limit else None
