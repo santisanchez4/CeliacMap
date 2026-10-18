@@ -64,7 +64,8 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
 - 🚧 **Partner program «CeliacMap Aliado»** ([ADR-011](docs/architecture/ADR-011-partner-program-payments.md), staging only) —
   `js/partners.js` adds the «Plan Fundador» card ($U 790/month), a request form and the published partners, shown only
   with `PARTNER_PROGRAM: true`; off on the site and in the app until phase 3. `node scripts/stage_site.mjs` builds a local
-  copy against staging ([runbook](docs/runbooks/staging.md)).
+  copy against staging ([runbook](docs/runbooks/staging.md)). The admin's step by step and the email templates:
+  [partner-program runbook](docs/runbooks/partner-program.md).
 - 🚧 **Audit 2026-09-24** ([plan](docs/plans/PLAN-auditoria-2026-09-24.md), built, not deployed yet) —
   the Validator now reads the evidence the agents and people gave (post text, blog sentence,
   form note) and a place is "Espacio 100% sin gluten" only with an explicit exclusivity phrase

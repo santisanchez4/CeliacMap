@@ -275,7 +275,8 @@ es una demo sin publicar en tiendas y no le aplica, pero queda fijado en un test
   términos v1.2 en `docs/legal/*.md` (primero se edita el `.md`). Una entrada en `docs/DECISIONS.md`.
 - **Fase 1, staging, manual:** proyecto de staging + `seed_staging`; la migración; `js/partners.js` (tarjeta + formulario +
   render de `partners_public`); el interruptor; `stage_site.mjs`; `scripts/partners_admin.py`; la sección en
-  `admin_digest`; las reglas de retención; el plan de prueba en MP (en UYU; la prueba de USD dio 400). *Depende de:* Fase 0
+  `admin_digest` y las reglas de retención (las dos hechas el 2026-10-18; paso a paso del admin y plantillas en
+  `docs/runbooks/partner-program.md`); el plan de prueba en MP (en UYU; la prueba de USD dio 400). *Depende de:* Fase 0
   (texto de consentimiento) y del proyecto de staging creado por vos.
 - **Fase 2, staging, automática:** `mp-webhook` + `partner_payment_events`, preapproval por solicitud con
   `external_reference`, barrido diario y todos los escenarios de la tabla. *Depende de:* la Fase 1 y la plantilla HMAC

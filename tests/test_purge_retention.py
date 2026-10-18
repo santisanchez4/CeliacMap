@@ -5,18 +5,32 @@ emptied place ids are logged so the monthly Search run re-fetches them).
 Privacy phase 2 (2026-09-30), windows decided by the owner: agent_log 1 year; suggestions, unpublished
 place_reports and the suggestion notes copied to place_evidence (source 'user') 2 years; contact_email and
 outreach_messages 2 years after the last contact. place_votes and published opinions are never purged here.
+Partner program (2026-10-18, privacy v1.2 draft section 6): a request never charged 6 months after the request; an
+ended partner 2 years after its last charge (paid_through minus one month: monthly plan). Skipped while
+partner_applications does not exist (production until phase 3).
 --dry-run only counts.
 """
 from __future__ import annotations
 
-from scripts.purge_chat_logs import run
+from datetime import date
+
+import pytest
+
+from scripts.purge_chat_logs import add_months, partner_cutoffs, run
 
 
 class FakeDB:
-    def __init__(self, expired_places=None):
+    def __init__(self, expired_places=None, partner_table=True):
         self.calls = []
         self.logged = []
         self.expired_places = expired_places or []
+        self.partner_table = partner_table
+        self.partner_cutoffs = None
+
+    def purge_partner_applications(self, requested_before, paid_through_before, dry_run=False):
+        self.calls.append(("partner_applications", dry_run))
+        self.partner_cutoffs = (requested_before, paid_through_before)
+        return {"unpaid": 2, "ended": 1} if self.partner_table else None
 
     def delete_chatbot_logs(self, cutoff_days=30, dry_run=False):
         self.calls.append(("chatbot_logs", cutoff_days, dry_run))
@@ -58,6 +72,7 @@ EXPECTED_WINDOWS = [
     ("place_reports", 730, (("is_", "published_at", "null"),)),
     ("place_evidence", 730, (("eq", "source", "user"),)),
     ("outreach", 730),
+    ("partner_applications",),
 ]
 
 
@@ -74,6 +89,7 @@ def test_run_applies_every_retention_window():
         "chatbot_logs": 3, "chat_usage": 5, "google_reviews_places": 0, "agent_log": 7, "privacy_records": 0,
         "suggestions": 1,
         "place_reports_unpublished": 2, "place_evidence_user": 0, "contact_emails": 1, "outreach_messages": 4,
+        "partner_requests_unpaid": 2, "partners_ended": 1,
     }
 
 
@@ -116,3 +132,37 @@ def test_deletion_request_records_are_kept_five_years_not_one():
     agent_log = [c for c in db.calls if c[0] == "agent_log"]
     assert agent_log == [("agent_log", 365, (("neq", "agent", "privacy"),), False),
                          ("agent_log", 1825, (("eq", "agent", "privacy"),), False)]
+
+
+def test_partner_windows_come_from_privacy_v12_section_6():
+    db = FakeDB()
+    run(db, today=date(2026, 10, 18))
+    # Never charged: 6 months from the request. Ended: last charge (paid_through - 1 month) over 2 years ago,
+    # so paid_through before 2024-11-18 (23 months back).
+    assert db.partner_cutoffs == ("2026-04-18", "2024-11-18")
+
+
+@pytest.mark.parametrize("today, expected", [
+    (date(2026, 10, 18), ("2026-04-18", "2024-11-18")),
+    (date(2026, 8, 31), ("2026-02-28", "2024-09-30")),   # clamped to the shorter month
+    (date(2026, 1, 15), ("2025-07-15", "2024-02-15")),   # across the year
+])
+def test_partner_cutoffs(today, expected):
+    assert partner_cutoffs(today) == expected
+
+
+def test_last_charge_is_paid_through_minus_one_month():
+    # A partner whose last charge was 2024-10-18 has paid_through 2024-11-18 (monthly plan): on 2026-10-18 it is
+    # exactly 2 years, not yet over, so it is kept; a day later it goes.
+    last_charge = date(2024, 10, 18)
+    paid_through = add_months(last_charge, 1)
+    assert paid_through.isoformat() >= partner_cutoffs(date(2026, 10, 18))[1]
+    assert paid_through.isoformat() < partner_cutoffs(date(2026, 10, 19))[1]
+
+
+def test_a_missing_partner_table_is_skipped_without_failing():
+    db = FakeDB(partner_table=False)
+    summary = run(db)
+    assert summary["partner_applications"] == "skipped (no table)"
+    assert "partners_ended" not in summary
+    assert summary["suggestions"] == 1  # the rest of the purge ran

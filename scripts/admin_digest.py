@@ -9,18 +9,20 @@ away by ``agents/admin_notify.AdminNotifier``; they appear here again as part of
 
 Privacy: chatbot turns are only COUNTED (their text is purged after 30 days and must not live on
 in an inbox). Suggestion kitchen answers and report texts are for the admin's review and are
-included. Whether an owner is celiac (a third party's health data) is never emailed.
+included. Whether an owner is celiac (a third party's health data) is never emailed. Partner requests show only
+their CM code, the business name, their states and paid_through: never the contact's name, email or phone.
 """
 from __future__ import annotations
 
 import argparse
 import sys
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from agents.admin_notify import DEFAULT_SENDER, SUBJECT_PREFIX
 from agents.validator_agent import PENDING_ADMIN_FLAG
 from scripts.moderate_opinions import from_the_form
+from scripts.partners_admin import PAST_DUE_GRACE_DAYS
 
 WINDOW_HOURS = 24
 _TRI = {True: "sí", False: "no", None: "sin dato"}
@@ -37,9 +39,82 @@ def _place_label(r: dict) -> str:
     return f"{r.get('place_name_text') or '(sin lugar)'} (no está en el mapa)"
 
 
-def build_digest(db, since: str | None = None) -> tuple[str, str] | None:
+def _parse(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _partner(r: dict) -> str:
+    return f"- {r.get('ref_code')} · {r.get('business_name')}"
+
+
+def partners_to_close(rows: list[dict], today: date) -> list[dict]:
+    """Partners that partners_admin --sync would end (same rule as sync_values) but are not ended yet.
+
+    The purge only deletes ended partners, so one left open keeps its data longer than the privacy policy says."""
+    out = []
+    for r in rows:
+        if r.get("publication_status") in ("ended", "rejected") or not r.get("paid_through"):
+            continue
+        paid = date.fromisoformat(r["paid_through"])
+        if ((r.get("payment_status") == "cancelled" and today > paid)
+                or (r.get("payment_status") == "past_due" and today > paid + timedelta(days=PAST_DUE_GRACE_DAYS))):
+            out.append(r)
+    return out
+
+
+def partner_sections(rows: list[dict], since: str, today: date) -> tuple[list[list[str]], dict[str, int]]:
+    """The partner part of the digest. Only new requests, past_due partners and partners to close send the
+    email (they go into the counts); eligible requests waiting for payment and the partners by payment state
+    are listed only when the email goes out for another reason."""
+    sections: list[list[str]] = []
+    counts: dict[str, int] = {}
+    cutoff = _parse(since)
+    hint = "  python -m scripts.partners_admin --env <entorno> ... (docs/runbooks/partner-program.md)"
+
+    new = [r for r in rows if r.get("created_at") and _parse(r["created_at"]) >= cutoff]
+    if new:
+        counts["solicitudes de aliado"] = len(new)
+        lines = [f"SOLICITUDES DE ALIADO NUEVAS ({len(new)})"]
+        lines += [f"{_partner(r)} · {r.get('publication_status')}" for r in new]
+        lines.append(hint)
+        sections.append(lines)
+
+    to_close = partners_to_close(rows, today)
+    if to_close:
+        counts["aliados para cerrar"] = len(to_close)
+        lines = [f"PARA CERRAR (correr --sync) ({len(to_close)})"]
+        lines += [f"{_partner(r)} · pago {r.get('payment_status')} · {r.get('publication_status')}"
+                  f" · pagado hasta {r.get('paid_through')}" for r in to_close]
+        lines.append("  La purga solo borra los ended: sin --sync, sus datos quedan más de lo que dice la política.")
+        lines.append("  python -m scripts.partners_admin --env <entorno> ... --sync --apply")
+        sections.append(lines)
+
+    open_rows = [r for r in rows if r.get("publication_status") not in ("ended", "rejected")]
+    past_due = [r for r in open_rows if r.get("payment_status") == "past_due"]
+    if past_due:
+        counts["aliados con pago atrasado"] = len(past_due)
+
+    waiting = [r for r in open_rows if r.get("publication_status") == "eligible" and r.get("payment_status") == "pending"]
+    if waiting:
+        sections.append([f"ELEGIBLES ESPERANDO PAGO ({len(waiting)})"] + [_partner(r) for r in waiting])
+
+    by_payment = [r for r in open_rows if r.get("payment_status") in ("active", "past_due", "cancelled")]
+    if by_payment:
+        lines = ["ALIADOS POR ESTADO DE PAGO"]
+        for state in ("active", "past_due", "cancelled"):
+            group = [r for r in by_payment if r.get("payment_status") == state]
+            if group:
+                lines.append(f"{state} ({len(group)})")
+                lines += [f"  {_partner(r)} · {r.get('publication_status')} · pagado hasta {r.get('paid_through')}"
+                          for r in group]
+        sections.append(lines)
+    return sections, counts
+
+
+def build_digest(db, since: str | None = None, today: date | None = None) -> tuple[str, str] | None:
     """(subject, text) for the day, or None when there is nothing to tell."""
     since = since or _since()
+    today = today or datetime.now(timezone.utc).date()
     sections: list[list[str]] = []
     counts: dict[str, int] = {}
 
@@ -129,6 +204,12 @@ def build_digest(db, since: str | None = None) -> tuple[str, str] | None:
         guard = sum(1 for r in chat if (r.get("result") or {}).get("guard"))
         # Counts only: the text of the turns never goes by email.
         sections.append(["CHATBOT", f"- {len(chat)} turnos · {marked} marcados · {guard} respuestas reemplazadas por el guardián"])
+
+    partners = db.fetch_partner_applications_for_digest()
+    if partners:  # None: the table does not exist yet (production until phase 3)
+        partner_lines, partner_counts = partner_sections(partners, since, today)
+        sections += partner_lines
+        counts.update(partner_counts)
 
     if not counts:
         return None
