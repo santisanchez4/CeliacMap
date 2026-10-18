@@ -538,6 +538,7 @@ class SupabaseClient:
         status: str | None = None,
         *,
         city: str | None = None,
+        country: str | None = None,
         flag: str | None = None,
         warned_since: str | None = None,
         safety_level: str | None = None,
@@ -552,6 +553,8 @@ class SupabaseClient:
             q = q.eq("status", status)
         if city:
             q = q.ilike("city", f"%{city}%")
+        if country:
+            q = q.ilike("country", f"%{country}%")
         if flag:
             # `flags` is jsonb: a str goes through as `cs.["…"]`; a Python list would be sent as the Postgres
             # array literal `cs.{…}`, which a jsonb column rejects (22P02).

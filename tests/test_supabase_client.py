@@ -630,6 +630,17 @@ def test_fetch_places_for_admin_first_page_is_unchanged_without_an_offset():
     assert ("range", (0, 14)) in calls
 
 
+def test_fetch_places_for_admin_filters_by_country_only_when_given():
+    client = _client_with_mock_db()
+    q, calls = _chain()
+    client._db.table.return_value = q
+    client.fetch_places_for_admin(None, flag="x", country="Uruguay")
+    assert ("ilike", ("country", "%Uruguay%")) in calls
+    calls.clear()
+    client.fetch_places_for_admin(None, flag="x")
+    assert not [c for c in calls if c[0] == "ilike"]
+
+
 def test_the_flag_filter_reaches_postgrest_as_a_jsonb_array_not_a_postgres_array_literal(monkeypatch):
     """`flags` is jsonb: PostgREST needs `cs.["…"]`. supabase-py turns a Python list into `cs.{…}` (a Postgres array
     literal), which a jsonb column rejects with 22P02 — it broke `review_queue --pending-100` and the daily digest.
