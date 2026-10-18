@@ -27,6 +27,9 @@ Lo ofrece Santiago Sánchez, persona física con domicilio en Fray Bentos, Río 
 Los enlaces pueden llevar una marca (`utm_source=celiacmap`) para que el comercio cuente las visitas en sus propias
 herramientas. CeliacMap no mide los clics ni da estadísticas.
 
+La suscripción incluye solo lo que figura en esta sección. Si CeliacMap lanza otros servicios, tendrán sus propias
+condiciones. **PENDIENTE (Fase 3): revisión del abogado.**
+
 ## 3. Qué no incluye, nunca
 
 Ser aliado **es publicidad**. **No es una certificación** ni una garantía de seguridad alimentaria, y **no cambia nada de

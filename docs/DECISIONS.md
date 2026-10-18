@@ -4749,6 +4749,41 @@ Con el interruptor apagado, `index.html` lleva solo `<div id="partner-program" h
 
 **CLAUDE.md** no cambia en este PR (49,5 de 50 mil caracteres). La línea de retención se completa cuando se achique el índice.
 
+### CeliacMap Market, futuro (2026-10-18)
+
+**Qué se decidió (solo documentación, sin código ni nada publicado).**
+- El Market no existe ni se desarrolla ahora. Va a ser un producto separado, con sus propias condiciones y su propio precio.
+- La suscripción de aliado no da acceso automático al Market. Cuando se diseñe, los aliados podrán tener un beneficio,
+  por ejemplo acceso anticipado o un descuento.
+- Sin tablas acopladas: el Market tendrá las suyas y, como mucho, una referencia opcional a `partner_applications`.
+- Vender en el Market nunca cambia el mapa, las etiquetas, el ranking ni el chat: la misma independencia que los aliados
+  (ADR-009, ADR-011).
+- Cuando exista, va como página propia del mismo sitio (`celiacmap.org/market/`), en la misma ventana, no en un subdominio.
+- **Pendiente:** construirlo o usar una plataforma de tiendas existente.
+
+**Dónde quedó.**
+- La sección «Relación con CeliacMap Market (futuro)» de `docs/plans/PLAN-partner-program.md`.
+- En `docs/legal/condiciones-aliados.md` §2: «La suscripción incluye solo lo que figura en esta sección. Si CeliacMap lanza
+  otros servicios, tendrán sus propias condiciones.» Queda pendiente de la revisión del abogado (Fase 3).
+- El resumen de las condiciones en el sitio (`PROGRAM` en `js/partners.js`) no cambia.
+
+### Ejemplo de la landing: Los Leños en vez de un lugar inventado (2026-10-18)
+
+La tarjeta de ejemplo de «Funcionalidades» (`index.html`, `.features-preview`) mostraba «Panadería Trigo Cero», un lugar
+que no existe, con estrellas, reseñas y horario inventados. Contradecía la regla de no mostrar lugares sin un comercio real
+detrás.
+
+- **Ahora muestra Los Leños (Montevideo)**, un lugar real del mapa. Antes de cambiarlo se leyó su fila en producción
+  (solo lectura): `status = approved`, `safety_level = gluten_free_100`, categoría `restaurant`.
+- **Qué muestra:** el nombre, «Montevideo, Uruguay», la categoría («Restaurante» / «Restaurant», la misma etiqueta del
+  mapa), «Espacio 100% sin gluten» y la dirección «San José 909».
+- **La dirección la aporta el administrador**, que la confirma por conocimiento directo del lugar. No es una copia del
+  valor de Google: la fila guarda «S. José 909, 11100 Montevideo, …», que viene de Google Places según
+  `docs/legal/auditoria-datos-google.md`.
+- **Se sacaron las estrellas, las reseñas y el horario.** Son datos de Google y no pueden quedar fijos en el HTML. También
+  se borraron sus claves de traducción. El CSS (`.pp-rating`, `.pp-hours`) queda porque lo usa el panel real del mapa.
+- **Si Los Leños deja de estar aprobado o cambia de nivel**, la tarjeta se cambia a mano: el HTML no lee la base.
+
 ### Filtro `--country` en la cola del admin (2026-10-18)
 
 `scripts/review_queue.py` y `scripts/find_evidence.py` aceptan `--country`, igual que `--city` (texto parcial, sin distinguir
