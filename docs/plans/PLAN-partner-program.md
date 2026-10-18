@@ -398,6 +398,9 @@ Lista de la Fase 3 (nada se cobra ni se contacta antes de cerrarla):
   términos v1.2 (`docs/legal/*-v1.2-borrador.md`), incluida la base legal de la retención fiscal.
 - **Moneda del cobro:** resuelto, UYU ($U 790 por mes; Mercado Pago rechazó USD en Uruguay).
 - **Mercado Pago como proveedor:** dónde guarda los datos y por cuánto tiempo (§7 de la privacidad).
+- **Comercios de Argentina (2026-10-18):** verificar si un comercio de Argentina puede pagar la suscripción de Mercado
+  Pago Uruguay en pesos uruguayos. Si no puede, al lanzar el formulario acepta solo Uruguay o avisa a los comercios de
+  Argentina. El formulario de la Fase 1 no cambia.
 
 Detalle de lo que sigue abierto: la inscripción en DGI/BPS y la facturación electrónica (y si el precio en UYU incluye IVA), las condiciones comerciales para
 aliados (alcance, baja, contenidos prohibidos, que no hay garantía de visitas), privacidad v1.2 (datos de responsables
