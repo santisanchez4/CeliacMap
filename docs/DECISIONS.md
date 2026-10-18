@@ -4749,6 +4749,23 @@ Con el interruptor apagado, `index.html` lleva solo `<div id="partner-program" h
 
 **CLAUDE.md** no cambia en este PR (49,5 de 50 mil caracteres). La línea de retención se completa cuando se achique el índice.
 
+### Ejemplo de la landing: Los Leños en vez de un lugar inventado (2026-10-18)
+
+La tarjeta de ejemplo de «Funcionalidades» (`index.html`, `.features-preview`) mostraba «Panadería Trigo Cero», un lugar
+que no existe, con estrellas, reseñas y horario inventados. Contradecía la regla de no mostrar lugares sin un comercio real
+detrás.
+
+- **Ahora muestra Los Leños (Montevideo)**, un lugar real del mapa. Antes de cambiarlo se leyó su fila en producción
+  (solo lectura): `status = approved`, `safety_level = gluten_free_100`, categoría `restaurant`.
+- **Qué muestra:** el nombre, «Montevideo, Uruguay», la categoría («Restaurante» / «Restaurant», la misma etiqueta del
+  mapa), «Espacio 100% sin gluten» y la dirección «San José 909».
+- **La dirección la aporta el administrador**, que la confirma por conocimiento directo del lugar. No es una copia del
+  valor de Google: la fila guarda «S. José 909, 11100 Montevideo, …», que viene de Google Places según
+  `docs/legal/auditoria-datos-google.md`.
+- **Se sacaron las estrellas, las reseñas y el horario.** Son datos de Google y no pueden quedar fijos en el HTML. También
+  se borraron sus claves de traducción. El CSS (`.pp-rating`, `.pp-hours`) queda porque lo usa el panel real del mapa.
+- **Si Los Leños deja de estar aprobado o cambia de nivel**, la tarjeta se cambia a mano: el HTML no lee la base.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
