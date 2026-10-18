@@ -4640,6 +4640,23 @@ borrado a pedido.
   pendiente ni de otro tipo. Tampoco hubo ningún pago nuevo. Aunque hubiera quedado una suscripción sin pagar, `--sync` no
   la vería, porque solo lee suscripciones ya vinculadas. `--suggest` tampoco, porque solo mira suscripciones `authorized` y
   pagos aprobados.
+- **Cobro rechazado en el checkout (2026-10-17, solo lectura):** desde la cuenta compradora de prueba, con la Visa de prueba
+  terminada en 6176 y titular `OTHE`, Mercado Pago mostró «Tu tarjeta rechazó el pago. Operación #184789404324» y la opción
+  «Elegir otro medio de pago», que no se tocó. Comparado con la línea de base tomada antes (una suscripción `cancelled`, un
+  pago `approved`):
+  - **Sí quedó una suscripción nueva:** `6ef109d6f41e4995becfdc80f46f4ec5`, del plan y del mismo pagador, creada 21:18:40
+    y ya `cancelled` a las 21:18:59 (−04:00). Mercado Pago la canceló solo: el comprador no la canceló. Su único cobro
+    (`authorized_payment`) quedó `recycling`, `retry_attempt 1`, `cc_rejected_other_reason`.
+  - **Sí quedó un pago:** `184789404324`, `rejected` / `cc_rejected_other_reason`, $U 790 UYU, cobrado por la cuenta
+    vendedora. Es el primer cobro (`subscription_sequence 1`) de esa suscripción y no tiene fecha de aprobación. No hubo
+    ningún otro pago.
+  - **`--link CM-TEST10 --mp-payment 184789404324` (en seco) se negó** con cinco motivos: la solicitud no está elegible
+    (`approved`), ya tiene un pago vinculado, **el pago no está aprobado (`rejected`)**, la suscripción no está autorizada
+    (`cancelled`) y el pago no tiene fecha de aprobación. Como el pago trae `subscription_id`, `--link` llegó a armar la
+    lista completa.
+  - **`--sync` (en seco):** «1 solicitudes vinculadas revisadas, 0 con cambios». **`--suggest CM-TEST10`:** sin
+    sugerencias. Una suscripción rechazada no está `authorized` y su pago no está aprobado, así que ninguno de los dos la ve.
+    `CM-TEST10` sigue `approved`, pago `cancelled` hasta 2026-11-15. No se escribió nada.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
