@@ -4791,6 +4791,14 @@ mayúsculas). Sirve para trabajar primero los lugares de Uruguay: de los 235 «1
 más viejos, así que una lista por antigüedad empieza siempre por Argentina. Solo cambia la lectura (`fetch_places_for_admin`);
 el resumen diario y el outreach no cambian.
 
+### Resumen diario: «100% pendientes» con el total por país, Uruguay primero (2026-10-18)
+
+La sección leía los 50 lugares más viejos, decía «50+» y nombraba los 10 primeros: como 201 de los 235 son de Argentina y
+son los más viejos, nombraba solo lugares de Argentina. Ahora lee la cola entera (tope fijo de 2.000 en el código, no una
+variable de configuración), el título da el total real por país, con Uruguay primero («235: 34 Uruguay, 201 Argentina»), y
+los 10 que nombra son primero los de Uruguay y después el resto, cada grupo por antigüedad. El total del asunto también es
+el real. Las otras secciones y el outreach no cambian.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
