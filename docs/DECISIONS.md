@@ -4767,6 +4767,30 @@ Con el interruptor apagado, `index.html` lleva solo `<div id="partner-program" h
   otros servicios, tendrán sus propias condiciones.» Queda pendiente de la revisión del abogado (Fase 3).
 - El resumen de las condiciones en el sitio (`PROGRAM` en `js/partners.js`) no cambia.
 
+### Ejemplo de la landing: Los Leños en vez de un lugar inventado (2026-10-18)
+
+La tarjeta de ejemplo de «Funcionalidades» (`index.html`, `.features-preview`) mostraba «Panadería Trigo Cero», un lugar
+que no existe, con estrellas, reseñas y horario inventados. Contradecía la regla de no mostrar lugares sin un comercio real
+detrás.
+
+- **Ahora muestra Los Leños (Montevideo)**, un lugar real del mapa. Antes de cambiarlo se leyó su fila en producción
+  (solo lectura): `status = approved`, `safety_level = gluten_free_100`, categoría `restaurant`.
+- **Qué muestra:** el nombre, «Montevideo, Uruguay», la categoría («Restaurante» / «Restaurant», la misma etiqueta del
+  mapa), «Espacio 100% sin gluten» y la dirección «San José 909».
+- **La dirección la aporta el administrador**, que la confirma por conocimiento directo del lugar. No es una copia del
+  valor de Google: la fila guarda «S. José 909, 11100 Montevideo, …», que viene de Google Places según
+  `docs/legal/auditoria-datos-google.md`.
+- **Se sacaron las estrellas, las reseñas y el horario.** Son datos de Google y no pueden quedar fijos en el HTML. También
+  se borraron sus claves de traducción. El CSS (`.pp-rating`, `.pp-hours`) queda porque lo usa el panel real del mapa.
+- **Si Los Leños deja de estar aprobado o cambia de nivel**, la tarjeta se cambia a mano: el HTML no lee la base.
+
+### Filtro `--country` en la cola del admin (2026-10-18)
+
+`scripts/review_queue.py` y `scripts/find_evidence.py` aceptan `--country`, igual que `--city` (texto parcial, sin distinguir
+mayúsculas). Sirve para trabajar primero los lugares de Uruguay: de los 235 «100% pendientes», 201 son de Argentina y son los
+más viejos, así que una lista por antigüedad empieza siempre por Argentina. Solo cambia la lectura (`fetch_places_for_admin`);
+el resumen diario y el outreach no cambian.
+
 ### Resumen diario: «100% pendientes» con el total por país, Uruguay primero (2026-10-18)
 
 La sección leía los 50 lugares más viejos, decía «50+» y nombraba los 10 primeros: como 201 de los 235 son de Argentina y

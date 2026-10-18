@@ -148,6 +148,15 @@ def test_offset_pages_through_the_queue_and_defaults_to_the_first_page():
     assert kw["flag"] == PENDING_ADMIN_FLAG
 
 
+def test_country_filters_the_three_place_lists_and_is_off_by_default():
+    db = FakeDB()
+    go(db, "--pending-100")
+    assert db.queries[-1][1]["country"] is None
+    db.queries.clear()
+    go(db, "--country", "Uruguay")
+    assert len(db.queries) == 3 and all(kw["country"] == "Uruguay" for _, kw in db.queries)
+
+
 def test_locate_places_a_needs_location_suggestion_as_pending():
     sug = {"id": SID, "status": "needs_location", "name": "Pastas Lo de Flor", "address": "JC 23", "city": "Fray Bentos",
            "country": "Uruguay", "category": "shop", "notes": "pastas", "evidence_url": None}

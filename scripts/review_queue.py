@@ -6,6 +6,7 @@ dry run unless ``--apply`` is given. Same shape as ``scripts/moderate_opinions.p
     python -m scripts.review_queue                          # summary of every queue
     python -m scripts.review_queue --pending-100            # places the Validator left "100% pendiente"
     python -m scripts.review_queue --needs-review --city "Fray Bentos" --limit 15
+    python -m scripts.review_queue --pending-100 --country Uruguay   # one country (also --needs-review, --warnings)
     python -m scripts.review_queue --pending-100 --limit 20 --offset 20   # second page of 20 (places lists only)
     python -m scripts.review_queue --suggestions            # suggestions whose address could not be placed
     python -m scripts.review_queue --warnings               # places with a recent community report
@@ -121,13 +122,15 @@ def list_queues(db, args, out) -> int:
     show_all = not only
     if show_all or args.pending_100:
         rows = db.fetch_places_for_admin(
-            None, flag=PENDING_ADMIN_FLAG, city=args.city, limit=args.limit, offset=args.offset
+            None, flag=PENDING_ADMIN_FLAG, city=args.city, country=args.country, limit=args.limit, offset=args.offset
         )
         out(f"== 100% pendientes de tu confirmación: {len(rows)} ==")
         for p in rows:
             _print_place(db, p, out)
     if show_all or args.needs_review:
-        rows = db.fetch_places_for_admin("needs_review", city=args.city, limit=args.limit, offset=args.offset)
+        rows = db.fetch_places_for_admin(
+            "needs_review", city=args.city, country=args.country, limit=args.limit, offset=args.offset
+        )
         out(f"== En revisión humana (needs_review), los {len(rows)} más viejos ==")
         for p in rows:
             _print_place(db, p, out)
@@ -137,7 +140,7 @@ def list_queues(db, args, out) -> int:
         _print_suggestions(rows, out)
     if show_all or args.warnings:
         rows = db.fetch_places_for_admin(
-            None, warned_since=_warned_since(), city=args.city, limit=args.limit, offset=args.offset
+            None, warned_since=_warned_since(), city=args.city, country=args.country, limit=args.limit, offset=args.offset
         )
         out(f"== Lugares reportados por la comunidad (últimos {WARNING_DAYS} días): {len(rows)} ==")
         for p in rows:
@@ -451,6 +454,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--suggestions", action="store_true", help="suggestions whose address could not be placed")
     parser.add_argument("--warnings", action="store_true", help="places with a recent community report")
     parser.add_argument("--city", help="filter the lists by city")
+    parser.add_argument("--country", help="filter the lists by country (Uruguay, Argentina)")
     parser.add_argument("--limit", type=int, default=15)
     parser.add_argument("--offset", type=int, default=0, help="skip this many places (next page of a long list)")
     actions = parser.add_mutually_exclusive_group()

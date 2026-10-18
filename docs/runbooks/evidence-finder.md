@@ -56,7 +56,7 @@ Tavily's free plan gives 1000 searches a month and the Social agent uses the sam
 
 1. `python -m scripts.find_evidence --pilot` → `db/checks/evidence-proposals/evidence-pilot-*.md` (+ `.json`, `.frozen.json`). Read the citations and the URLs.
    (Done on 2026-09-27: `db/checks/2026-09-27-evidence-finder-pilot.md`.)
-2. After 2026-10-01 (pipeline done, usage re-read): `python -m scripts.find_evidence --max-searches N` (add `--limit` / `--offset` to chunk it).
+2. After 2026-10-01 (pipeline done, usage re-read): `python -m scripts.find_evidence --max-searches N` (add `--limit` / `--offset` to chunk it, `--city` or `--country Uruguay` to take one place first).
 3. `python -m scripts.review_queue --proposals REPORT.json [--only 100|options|insuficiente]` → the counts, the citations and the ids to copy.
 4. Dry run: `python -m scripts.review_queue --accept-proposals ID1 ID2 … --report REPORT.json` — shows, per place, the level change,
    the note that goes to the public `validation_notes` and how many `place_evidence` rows (source `web`) would be saved.
