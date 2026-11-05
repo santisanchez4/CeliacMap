@@ -93,6 +93,10 @@ DATA_HEADERS = [
     "CORRECCIÓN MANUAL: duplicado de 6797f10b-dbe4-4c67-a5d2-1b8f0e3a7c11",
     # 2026-10-13 (literal, Géant Fresh Market): a map scope decision. It says what kind of business it is, not how safe it is.
     "CORRECCIÓN MANUAL 2026-10-13: no aplica al mapa: cadena de supermercados, comercio general; descartado por decisión del admin.",
+    # 2026-11-05 (literal format): social_url set to the account the admin confirmed as the business's own. It says which
+    # account is the business's, not how safe the place is.
+    "CORRECCIÓN MANUAL (2026-11-05): cuenta oficial confirmada por el administrador: https://www.instagram.com/celiacos33. "
+    "social_url anterior: vacío.",
 ]
 
 
@@ -106,6 +110,7 @@ def test_the_data_correction_phrases_are_an_explicit_reviewed_list():
         "dirección corregida",
         "duplicado de",
         "no aplica al mapa",
+        "cuenta oficial confirmada",
     )
 
 
@@ -207,3 +212,11 @@ def test_the_kept_row_keeps_its_own_decisions_and_a_duplicate_header_on_top_of_a
 
 def test_a_look_alike_of_the_duplicate_header_still_protects():
     assert manual_override_marker("CORRECCIÓN MANUAL: repetido de 6797f10b-dbe4-4c67-a5d2-1b8f0e3a7c11") == "correccion manual"
+
+
+def test_a_confirmed_official_account_on_top_of_a_manual_approval_still_protects():
+    notes = (
+        "CORRECCIÓN MANUAL (2026-11-05): cuenta oficial confirmada por el administrador: https://www.instagram.com/celiacos33. "
+        "social_url anterior: vacío.\n\nAPROBACIÓN MANUAL (2026-11-05, review_queue): el administrador revisó su cuenta oficial."
+    )
+    assert manual_override_marker(notes) == "aprobacion manual"

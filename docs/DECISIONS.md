@@ -4799,6 +4799,19 @@ variable de configuración), el título da el total real por país, con Uruguay 
 los 10 que nombra son primero los de Uruguay y después el resto, cada grupo por antigüedad. El total del asunto también es
 el real. Las otras secciones y el outreach no cambian.
 
+### «Cuenta oficial confirmada» es una corrección de datos (2026-11-05)
+
+Cuando el administrador revisa la cuenta de Instagram o Facebook de un lugar y confirma que es la del propio negocio, se
+guarda en `social_url` con la nota `CORRECCIÓN MANUAL (fecha): cuenta oficial confirmada por el administrador: <url>.
+social_url anterior: <url | vacío>.` Esa línea dice cuál es la cuenta del negocio, no qué tan seguro es el lugar, así que
+la frase «cuenta oficial confirmada» se suma a `DATA_CORRECTION_PHRASES` y la línea sola no protege el lugar.
+
+- **Por qué importa:** sin la frase, la línea contaba como decisión manual. `review_queue --accept-proposals` rechazaba el
+  lugar y `review_handler` lo blindaba frente a los reportes de la comunidad, aunque nadie hubiera decidido su nivel.
+- **La decisión de nivel va aparte:** si el administrador además decide el nivel, lo hace con `--approve` y su encabezado
+  `APROBACIÓN MANUAL`, que sí protege (cada línea se juzga por separado). Un test fija ese caso.
+- **El Updater no pisa la corrección:** completa `social_url` solo cuando está vacío.
+- Primer uso: los lugares de Uruguay de la cola de 100% pendientes, revisados el 2026-11-05.
 ### Evidencia para la cola needs_review y cierre de la cola de Uruguay (2026-11-05)
 
 **Cierre de los «100% pendientes» de Uruguay.** Los 34 lugares de Uruguay que el mapa mostraba como «Espacio 100% sin gluten»

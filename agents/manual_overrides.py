@@ -49,6 +49,7 @@ DATA_CORRECTION_PHRASES = (
     "dirección corregida",
     "duplicado de",
     "no aplica al mapa",
+    "cuenta oficial confirmada",
 )
 
 
