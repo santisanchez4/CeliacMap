@@ -131,7 +131,8 @@ def test_accept_100_with_apply_writes_web_evidence_the_manual_header_and_removes
     db = DB()
     code, text = go(db, "--accept-proposals", P1, "--report", write_report(tmp_path, ROWS), "--apply")
     assert code == 0
-    assert [(e[1], e[3]) for e in db.evidence] == [("web", "https://tiempolibre.com.ar"), ("web", "https://blog.example/guia")]
+    assert [(e[1], e[3]) for e in db.evidence] == [("web", "https://tiempolibre.com.ar"), ("web", "https://blog.example/guia"),
+                                                    ("admin", "https://tiempolibre.com.ar")]
     (pid, patch), = db.updates
     assert pid == P1 and patch["status"] == "approved" and patch["safety_level"] == "gluten_free_100"
     assert patch["flags"] == ["sin ficha"]
@@ -242,8 +243,9 @@ def test_it_is_accepted_alone_with_verified_source_and_the_public_note_does_not_
     assert pid == P1 and patch["safety_level"] == "gluten_free_100"
     assert "evidencia en redes del local para 100% sin gluten (https://www.instagram.com/apto.libredegluten)" in notes
     assert "libre de gluten de San Nicolás" not in notes and "«" not in notes
-    (_, source, text, url), = db.evidence
+    (_, source, text, url), (_, admin_source, _, _) = db.evidence
     assert source == "web" and text.startswith("(sin verificar en la página) ") and url == "https://www.instagram.com/apto.libredegluten"
+    assert admin_source == "admin"
 
 
 def test_the_dry_run_of_a_source_check_place_tells_the_admin_to_open_the_link(tmp_path):
