@@ -379,3 +379,37 @@ def test_mark_reviewed_is_a_dry_run_by_default_and_skips_what_it_must_not_touch(
 def test_the_review_line_does_not_count_as_a_manual_decision():
     from agents.manual_overrides import manual_override_marker
     assert manual_override_marker("REVISIÓN SIN EVIDENCIA (2026-11-05, review_queue): sin evidencia pública.") is None
+
+
+# --- the dry run says what goes on the map --------------------------------------------------------------------------
+
+
+def test_accepting_a_needs_review_place_says_it_goes_on_the_map(tmp_path):
+    db = DB()
+    code, text = go(db, "--accept-proposals", PID, "--report", _report(tmp_path, "options"))
+    assert code == 0 and not db.updates
+    assert "needs_review → approved (entra al mapa)" in text
+    assert "1 se aceptarían (1 se publicarían en el mapa), 0 rechazados" in text
+
+
+def test_the_applied_run_counts_the_places_it_published(tmp_path):
+    db = DB()
+    _, text = go(db, "--accept-proposals", PID, "--report", _report(tmp_path, "options"), "--apply")
+    assert "Listo: 1 aceptados (1 publicados en el mapa), 0 rechazados." in text
+
+
+def test_a_pending_100_place_is_already_on_the_map_and_publishes_nothing(tmp_path):
+    db = DB(status="approved", flags=[PENDING_ADMIN_FLAG], safety_level="gluten_free_100")
+    _, text = go(db, "--accept-proposals", PID, "--report", _report(tmp_path, "options", queue="pending_100"))
+    assert "entra al mapa" not in text
+    assert "1 se aceptarían (0 se publicarían en el mapa)" in text
+
+
+def test_approve_and_discard_say_when_a_place_enters_or_leaves_the_map():
+    _, text = go(DB(), "--approve", PID, "--level", "options", "--note", "x")
+    assert "needs_review → approved (entra al mapa)" in text
+    _, text = go(DB(status="approved"), "--discard", PID, "--reason", "cerrado", "--note", "x")
+    assert "approved → discarded (sale del mapa)" in text
+    _, text = go(DB(status="approved"), "--approve", PID, "--level", "options", "--note", "x")
+    assert "mapa)" not in text
+
