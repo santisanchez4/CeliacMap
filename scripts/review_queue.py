@@ -25,7 +25,8 @@ dry run unless ``--apply`` is given. Same shape as ``scripts/moderate_opinions.p
     python -m scripts.review_queue --proposals REPORT.json [--only 100|options|insuficiente]   # read a scripts/find_evidence report
     python -m scripts.review_queue --accept-proposals ID1 ID2 --report REPORT.json [--apply]
 
-``--accept-proposals`` confirms the report's proposals in bulk: it saves the cited quotes as ``place_evidence`` (source ``web``) and
+``--accept-proposals`` confirms the report's proposals in bulk: it saves the cited quotes as ``place_evidence`` (source ``web``),
+one ``admin`` row with the note and the literal quotes (the manual-review rule), and
 applies the same APROBACIÓN MANUAL as ``--approve``, with an automatic note that cites the source and no health data (the note is public).
 The note quotes (at most 160 characters) only a quote verified on its page; otherwise it says "evidencia en redes del local (URL)" or
 "evidencia en la web (URL)" without the snippet. It refuses a place that changed since the report, is no longer in the queue or approved,
@@ -431,6 +432,9 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
                 refuse(pid, name, "la nota llevaría datos de salud de una persona" if health else "no tiene una cita utilizable")
                 continue
             note, store = built
+            cited = [c for c in entry.get("citations") or [] if isinstance(c, dict) and c.get("text") and c.get("url")]
+            store = [*store, {"source": "admin", "url": store[0]["url"] if store else None,
+                              "text": admin_evidence_text(f"aceptada desde el reporte de evidencia ({path}): {note}", citations=cited)}]
             level = "100" if entry["proposal"] == "100" else "options"
             current = place.get("safety_level")
             after = "gluten_free_100" if level == "100" else (current if current in ("celiac_friendly", "options_available") else "options_available")
@@ -441,7 +445,8 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
             out(f"    nota: {note}")
             if source_check:
                 out("    100 · verificar en la fuente: confirmaste que abriste el link (--verified-source); la nota cita solo la URL")
-            out(f"    evidencia a guardar: {len(store)} fila(s) (source web)")
+            web_rows = sum(1 for row in store if row["source"] == "web")
+            out(f"    evidencia a guardar: {web_rows} fila(s) (source web) y 1 fila admin con las citas")
             if not apply:
                 accepted.append(pid)
                 if status != "approved":

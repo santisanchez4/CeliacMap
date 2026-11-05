@@ -232,7 +232,7 @@ def test_a_needs_review_report_approves_its_options_with_the_quotes(tmp_path):
     patch = db.updates[-1][1]
     assert patch["status"] == "approved" and patch["safety_level"] == "options_available"
     assert patch["validation_notes"].startswith("APROBACIÓN MANUAL (")
-    assert [e[1] for e in db.evidence] == ["web"]
+    assert [e[1] for e in db.evidence] == ["web", "admin"]
     assert "validation_confidence" not in patch and "verified" not in patch
 
 
@@ -412,4 +412,29 @@ def test_approve_and_discard_say_when_a_place_enters_or_leaves_the_map():
     assert "approved → discarded (sale del mapa)" in text
     _, text = go(DB(status="approved"), "--approve", PID, "--level", "options", "--note", "x")
     assert "mapa)" not in text
+
+
+# --- an accepted proposal leaves the admin row too (CLAUDE.md: a manual review always leaves one) ---------------------
+
+
+def test_accepting_a_proposal_saves_the_web_quotes_and_one_admin_row(tmp_path):
+    db = DB()
+    code, text = go(db, "--accept-proposals", PID, "--report", _report(tmp_path, "options"), "--apply")
+    assert code == 0
+    assert [e[1] for e in db.evidence] == ["web", "admin"]
+    admin = db.evidence[-1]
+    assert admin[2].startswith("Revisión manual (") and "«Tenemos opciones sin TACC» (https://lugar.uy)" in admin[2]
+    assert admin[3] == "https://lugar.uy"
+    assert "1 fila admin" in text
+
+
+def test_the_admin_row_of_an_acceptance_never_carries_health_data(tmp_path):
+    db = DB()
+    path = _report(tmp_path, "options", citations=[
+        {"text": "Tenemos opciones sin TACC", "url": "https://lugar.uy", "source_kind": "propia", "verificacion": "verificada",
+         "has_signal": False, "alcance": "opciones", "contradice": False, "multi_negocio": False},
+        {"text": "La dueña es celíaca y cocina sin gluten", "url": "https://lugar.uy/nosotros", "source_kind": "propia",
+         "verificacion": "verificada", "has_signal": False, "alcance": "opciones", "contradice": False, "multi_negocio": False}])
+    go(db, "--accept-proposals", PID, "--report", path, "--apply")
+    assert all("celíaca" not in e[2] for e in db.evidence)
 
