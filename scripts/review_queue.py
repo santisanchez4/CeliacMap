@@ -202,6 +202,15 @@ def _save_evidence(db, place_id: str, rows: list[dict], out) -> bool:
     return True
 
 
+def map_change(before: str | None, after: str) -> str:
+    """What a status change does to the public map: only ``approved`` places are shown."""
+    if before != "approved" and after == "approved":
+        return " (entra al mapa)"
+    if before == "approved" and after != "approved":
+        return " (sale del mapa)"
+    return ""
+
+
 def _without_queue_flags(place: dict) -> list:
     return [f for f in (place.get("flags") or []) if f not in QUEUE_FLAGS]
 
@@ -230,7 +239,7 @@ def approve(db, place_id: str, level: str, note: str, apply: bool, out, evidence
         "flags": _without_queue_flags(place),
         "validation_notes": f"{header}\n\n{old_notes}" if old_notes else header,
     }
-    out(f"{place.get('name')}: {place.get('status')} → approved · {LEVEL_LABELS.get(safety)}")
+    out(f"{place.get('name')}: {place.get('status')} → approved{map_change(place.get('status'), 'approved')} · {LEVEL_LABELS.get(safety)}")
     out(f"  nota: {header}")
     _print_evidence(evidence, out)
     if not apply:
@@ -253,7 +262,7 @@ def discard(db, place_id: str, note: str, apply: bool, out, reason: str | None =
     why = f"{DISCARD_REASONS[reason].format(other=other)}: {note.strip()}" if reason else note
     header = _header("DESCARTE MANUAL", why, place)
     # --pending-100 has no status filter, so a discarded place would stay in that queue for good.
-    out(f"{place.get('name')}: {place.get('status')} → discarded")
+    out(f"{place.get('name')}: {place.get('status')} → discarded{map_change(place.get('status'), 'discarded')}")
     out(f"  nota: {header}")
     _print_evidence(evidence, out)
     if not apply:
@@ -378,6 +387,7 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
     from_needs_review = (data.get("meta") or {}).get("queue") == "needs_review"
     accepted: list[str] = []
     refused: list[str] = []
+    published: list[str] = []  # accepted places that were off the map (needs_review): accepting them publishes them
 
     def refuse(pid: str, name, why: str) -> None:
         refused.append(pid)
@@ -425,13 +435,17 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
             current = place.get("safety_level")
             after = "gluten_free_100" if level == "100" else (current if current in ("celiac_friendly", "options_available") else "options_available")
             label_from, label_to = LEVEL_LABELS.get(current, current), LEVEL_LABELS.get(after, after)
-            out(f"  {name}: {label_from} → {label_to}{' (sin cambio)' if label_from == label_to else ''}")
+            status = place.get("status")
+            moves = f"{status} → approved{map_change(status, 'approved')} · " if status != "approved" else ""
+            out(f"  {name}: {moves}{label_from} → {label_to}{' (sin cambio)' if label_from == label_to else ''}")
             out(f"    nota: {note}")
             if source_check:
                 out("    100 · verificar en la fuente: confirmaste que abriste el link (--verified-source); la nota cita solo la URL")
             out(f"    evidencia a guardar: {len(store)} fila(s) (source web)")
             if not apply:
                 accepted.append(pid)
+                if status != "approved":
+                    published.append(pid)
                 continue
             try:
                 for row in store:
@@ -441,13 +455,16 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
                 continue
             approve(db, pid, level, note, True, out)
             accepted.append(pid)
+            if status != "approved":
+                published.append(pid)
 
     if not apply:
-        out(f"DRY RUN — {len(accepted)} se aceptarían, {len(refused)} rechazados. Agregá --apply para escribir.")
+        out(f"DRY RUN — {len(accepted)} se aceptarían ({len(published)} se publicarían en el mapa), {len(refused)} rechazados. "
+            "Agregá --apply para escribir.")
     else:
         if accepted:
             db.insert_agent_log("validator", "accept_evidence_proposals", {"accepted": accepted, "refused": refused}, status="success")
-        out(f"Listo: {len(accepted)} aceptados, {len(refused)} rechazados.")
+        out(f"Listo: {len(accepted)} aceptados ({len(published)} publicados en el mapa), {len(refused)} rechazados.")
     return 1 if refused else 0
 
 

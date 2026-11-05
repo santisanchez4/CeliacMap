@@ -92,6 +92,9 @@ canonical name, so "Departamento de Montevideo", Carrasco and Montevideo all fal
      (`or=(flags.is.null,flags.not.cs.[…])`: a bare `not.cs` also drops the rows whose `flags` is NULL, measured live). The line is not a manual
      override header and protects nothing. If the place goes back through `pending`, the Validator rewrites its flags and the mark is lost.
 4. Approving or discarding a place removes both queue flags (`100% pendiente…` and `revisado sin evidencia`).
+5. Accepting or approving a needs_review place **publishes it**: the dry run says `needs_review → approved (entra al mapa)` per place and
+   closes with how many would be published («N se aceptarían (M se publicarían en el mapa)»); a discard of an approved place says
+   `(sale del mapa)`.
 
 PostgREST returns at most 1000 rows per request: filter a queue bigger than that by `--region`, `--city` or `--country`.
 
