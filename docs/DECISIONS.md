@@ -4812,6 +4812,48 @@ la frase «cuenta oficial confirmada» se suma a `DATA_CORRECTION_PHRASES` y la 
   `APROBACIÓN MANUAL`, que sí protege (cada línea se juzga por separado). Un test fija ese caso.
 - **El Updater no pisa la corrección:** completa `social_url` solo cuando está vacío.
 - Primer uso: los lugares de Uruguay de la cola de 100% pendientes, revisados el 2026-11-05.
+### Evidencia para la cola needs_review y cierre de la cola de Uruguay (2026-11-05)
+
+**Cierre de los «100% pendientes» de Uruguay.** Los 34 lugares de Uruguay que el mapa mostraba como «Espacio 100% sin gluten»
+con el flag «100% pendiente de confirmación del administrador» quedaron decididos por el administrador el 2026-11-05, en tres
+tandas de `find_evidence` (T1 15, T2 15, T3 4 lugares; 68 búsquedas de Tavily y US$0,01 de Haiku), una investigación de solo lectura
+(24 consultas de Google Places y unas 54 de Tavily) y sus decisiones directas:
+
+| Resultado | Lugares |
+|---|---|
+| 100% confirmado (cuenta oficial revisada o conocimiento directo) | 15 |
+| Opciones sin TACC (sin canal propio que diga que todo es sin gluten, o tienda de varias dietas) | 16 |
+| Descartados (Amores Sin Gluten: cerrado; Celilife: fábrica sin venta al público) | 2 |
+| Fuera del mapa, en needs_review (Monik: ficha de Google eliminada y sin actividad) | 1 |
+| Con el flag de pendiente | 0 |
+
+Cada uno tiene su encabezado manual (`APROBACIÓN MANUAL`, `DESCARTE MANUAL` o `RETIRADO DEL MAPA`) y una fila `admin` en
+`place_evidence` con la cita literal; donde se corrigió `social_url`, una línea `CORRECCIÓN MANUAL … cuenta oficial confirmada por
+el administrador` con la URL anterior. `validation_confidence` y `verified` no se tocaron. Ninguna nota ni cita lleva datos de salud
+de personas (dos bios que los tenían quedaron afuera). Una cuenta de Instagram con el mismo nombre pero otra dirección
+(`@glutenfree.mvd`, sin publicaciones desde 2021) se descartó como evidencia: era de otro negocio.
+
+**La cola needs_review con las mismas herramientas.** Uruguay tiene 211 lugares en needs_review (127 en el departamento de
+Montevideo, porque `city` varía: «Departamento de Montevideo», Carrasco, «Uruguay»). Para trabajarlos:
+
+- **Tandas por departamento:** `--region` (nombre canónico exacto de `places.region`) en `find_evidence`, `review_queue` y
+  `fetch_places_for_admin`; `find_evidence --status needs_review` lee esa cola. El reporte guarda `meta.queue`.
+- **Cómo lo dice cada cita:** «sin TACC», «apto celíacos» o «solo sin gluten» (regex, sin modelo), y la fecha de la fuente cuando hay
+  una escrita a menos de 300 caracteres de la cita. Se muestran; no cambian ninguna propuesta. `decide()` y la `RUBRIC` no cambian.
+- **Cuatro salidas:** aprobar en bloque solo como opciones (con `APROBACIÓN MANUAL` y las citas); 100% nunca en bloque, de a un lugar
+  con `--approve --level 100 --evidence-from REPORT` o `--evidence "cita" --evidence-url URL`, que escriben primero la fila `admin`
+  (si falla, el lugar no cambia; esto cierra el hueco de que `--approve` no la escribía); descartar solo con `--reason` (cerrado,
+  no_es_comercio, evidencia_contraria, duplicado con `--duplicate-of`); y `--mark-reviewed`.
+- **«Revisado sin evidencia»:** el flag fijo `revisado sin evidencia` (`REVIEWED_NO_EVIDENCE_FLAG`) y la fecha en una línea
+  `REVISIÓN SIN EVIDENCIA (fecha, review_queue)`; el lugar sigue en needs_review, fuera del mapa, y las tandas siguientes lo saltean
+  en el servidor. El filtro es `or=(flags.is.null,flags.not.cs.[…])`: medido en vivo, un `not.cs` solo dejaba afuera las 292 filas con
+  `flags` NULL. La línea no es un encabezado de decisión manual y no protege el lugar. Si el lugar vuelve a `pending`, pierde el flag.
+- Aprobar o descartar quita los dos flags de cola. PostgREST devuelve a lo sumo 1000 filas por pedido: una cola más grande se filtra
+  por región, ciudad o país.
+
+**Decisión pendiente del administrador (no ejecutada):** 199 lugares aprobados de Argentina siguen como `gluten_free_100` con el flag
+de pendiente (el `cap_unsupported_100 --flag-only` no bajó la etiqueta). La idea del administrador es bajarlos a `options_available`
+hasta confirmarlos, después de Uruguay, con dry-run y su «dale».
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
