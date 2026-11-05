@@ -46,6 +46,9 @@ DEFAULT_SAFETY_LEVEL = "options_available"
 # Community kitchen declarations (docs/superpowers/specs/2026-09-24-kitchen-info-design.md).
 MAX_CLAIMS = 5
 PENDING_ADMIN_FLAG = "100% pendiente de confirmación del administrador"
+# Set by review_queue --mark-reviewed on a needs_review place with no evidence to decide; the date goes in the notes, so the
+# flag is a fixed value and the jsonb filter that skips it is exact. A run through `pending` rewrites the flags and drops it.
+REVIEWED_NO_EVIDENCE_FLAG = "revisado sin evidencia"
 _PREP_LABELS = {
     "separate_kitchen": "cocina separada",
     "separate_prep": "preparación aparte",

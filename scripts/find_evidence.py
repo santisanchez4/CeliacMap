@@ -11,6 +11,11 @@ Runbook (quota, order of operations, rules): docs/runbooks/evidence-finder.md.
     python -m scripts.find_evidence --country Uruguay --limit 10
     python -m scripts.find_evidence --max-searches 560            # the whole queue, capped (required above 20 places)
     python -m scripts.find_evidence --pilot --replay REPORT.frozen.json   # the same run on frozen sources: no Tavily, no downloads
+    python -m scripts.find_evidence --status needs_review --region Montevideo --max-searches 260   # the needs_review queue, by department
+
+With ``--status needs_review`` it reads the needs_review queue instead, skipping the places marked "revisado sin evidencia"
+(``review_queue --mark-reviewed``) unless ``--include-reviewed``; review_queue accepts that report's "options" in bulk and a 100
+only alone (``--approve ID --level 100 --evidence-from REPORT``).
 
 Tavily's quota is shared with the Social agent: check the account's usage first (runbook) and keep --max-searches below what is left.
 """
@@ -43,12 +48,12 @@ from agents.evidence_finder import (
     summarize,
     verification_label,
 )
-from agents.validator_agent import PENDING_ADMIN_FLAG
+from agents.validator_agent import PENDING_ADMIN_FLAG, REVIEWED_NO_EVIDENCE_FLAG
 
 DEFAULT_OUT_DIR = "db/checks/evidence-proposals"
 PILOT_SIZE = 10
 CAP_REQUIRED_ABOVE = 20  # places: a bigger selection must say how many searches it may spend
-QUEUE_FETCH_LIMIT = 2000
+QUEUE_FETCH_LIMIT = 2000  # PostgREST returns at most 1000 rows per request: a bigger queue needs --region / --city / --country
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
     pick = parser.add_mutually_exclusive_group()
     pick.add_argument("--pilot", action="store_true", help=f"a deterministic sample of {PILOT_SIZE} places in {PILOT_SIZE} cities")
     pick.add_argument("--ids", nargs="+", metavar="PLACE_ID", help="specific places (need not be in the queue)")
+    parser.add_argument("--status", choices=["needs_review"],
+                        help="read the needs_review queue instead of the pending-100 one")
+    parser.add_argument("--region", help="filter the queue by department / province (exact canonical name, e.g. Montevideo)")
+    parser.add_argument("--include-reviewed", action="store_true",
+                        help="with --status needs_review: also the places marked 'revisado sin evidencia'")
     parser.add_argument("--city", help="filter the queue by city")
     parser.add_argument("--country", help="filter the queue by country (Uruguay, Argentina)")
     parser.add_argument("--limit", type=int, help="how many places of the queue")
@@ -81,7 +91,15 @@ def _select(db, args, out) -> list[dict]:
             else:
                 out(f"No existe el lugar {pid}.")
         return found
-    queue = db.fetch_places_for_admin(None, flag=PENDING_ADMIN_FLAG, city=args.city, country=args.country, limit=QUEUE_FETCH_LIMIT)
+    if args.status == "needs_review":
+        queue = db.fetch_places_for_admin(
+            "needs_review", exclude_flag=None if args.include_reviewed else REVIEWED_NO_EVIDENCE_FLAG,
+            region=args.region, city=args.city, country=args.country, limit=QUEUE_FETCH_LIMIT,
+        )
+    else:
+        queue = db.fetch_places_for_admin(
+            None, flag=PENDING_ADMIN_FLAG, region=args.region, city=args.city, country=args.country, limit=QUEUE_FETCH_LIMIT
+        )
     if args.pilot:
         return pick_pilot(queue, PILOT_SIZE)
     end = args.offset + args.limit if args.limit else None
@@ -94,6 +112,8 @@ def _cite_lines(cite: dict, number: int) -> list[str]:
     if cite.get("contradice"):
         flags += " · contradice exclusividad"
     lines = [f"{number}. «{cite.get('text')}»", f"   {cite.get('url')}  ({flags})"]
+    if cite.get("terminos"):
+        lines.append(f"   dice: {cite['terminos']} · fecha de la fuente: {cite.get('fecha_fuente') or 'sin fecha'}")
     if cite.get("motivo"):
         lines.append(f"   motivo del modelo: {cite['motivo']}")
     return lines
@@ -103,6 +123,8 @@ def render_markdown(results: list[dict], summary: dict, meta: dict) -> str:
     tokens = meta.get("haiku_tokens") or {"input": 0, "output": 0}
     lines = [
         f"# Propuestas de evidencia — {meta['created_at'][:10]}",
+        "",
+        f"Cola: {'needs_review' if meta.get('queue') == 'needs_review' else '100% pendientes'}.",
         "",
         "Solo lectura: nada de esto está en el mapa ni en la base. Cada cita es un fragmento literal de un texto recuperado, con su URL, y lleva",
         "su rótulo: verificada en la página, solo snippet (la página no la contiene o no se pudo bajar) o red social: no verificable.",
@@ -214,6 +236,8 @@ def run(db, search, llm, args, out=print, fetch_text=fetch_page_text, fetch_link
     misses = (search.misses + fetch_text.misses + fetch_links.misses) if args.replay else 0
     meta = {
         "created_at": datetime.now(timezone.utc).isoformat(), "mode": "pilot" if args.pilot else ("ids" if args.ids else "queue"),
+        "queue": "needs_review" if args.status == "needs_review" else "pending_100",
+        "region": args.region, "include_reviewed": bool(args.include_reviewed),
         "queries": args.queries, "llm": not args.no_llm, "selected": len(places),
         "searches_used": 0 if args.replay else finder.searches_used, "replay": bool(args.replay), "freeze_misses": misses,
         "max_searches": cap, "skipped_by_cap": len(skipped), "writes_to_database": False,

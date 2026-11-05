@@ -540,17 +540,27 @@ class SupabaseClient:
         city: str | None = None,
         country: str | None = None,
         flag: str | None = None,
+        exclude_flag: str | None = None,
+        region: str | None = None,
         warned_since: str | None = None,
         safety_level: str | None = None,
         limit: int = 15,
         offset: int = 0,
     ) -> list[dict]:
         """Places for the admin to review, oldest first. ``flag`` matches a value inside the
-        ``flags`` jsonb list; ``warned_since`` keeps only places with a community warning set
+        ``flags`` jsonb list and ``exclude_flag`` skips the places that carry one; ``region`` is the exact
+        canonical department / province; ``warned_since`` keeps only places with a community warning set
         at or after that ISO timestamp; ``offset`` skips that many rows (paging a long queue)."""
+        if exclude_flag and any(ch in exclude_flag for ch in ",()"):
+            raise ValueError(f"exclude_flag cannot contain ',', '(' or ')': {exclude_flag!r}")
         q = self._db.table("places").select(self.ADMIN_PLACE_COLUMNS)
         if status:
             q = q.eq("status", status)
+        if region:
+            q = q.eq("region", region)
+        if exclude_flag:
+            # A bare `not.cs` also drops the rows whose flags are NULL (measured live 2026-11-05: 292 of 1500), so keep them explicitly.
+            q = q.or_(f"flags.is.null,flags.not.cs.{json.dumps([exclude_flag], ensure_ascii=False)}")
         if city:
             q = q.ilike("city", f"%{city}%")
         if country:
