@@ -13,7 +13,12 @@ dry run unless ``--apply`` is given. Same shape as ``scripts/moderate_opinions.p
 
     python -m scripts.review_queue --approve ID --level 100 --note "conozco el local" --apply
     python -m scripts.review_queue --approve ID --level options --note "..." --apply
-    python -m scripts.review_queue --discard ID --note "cerró" --apply
+    python -m scripts.review_queue --discard ID --reason cerrado --note "su Facebook anunció el cierre" --apply
+    python -m scripts.review_queue --discard ID --reason duplicado --duplicate-of OTHER_ID --note "misma ficha" --apply
+    python -m scripts.review_queue --approve ID --level 100 --note "..." --evidence "cita literal" --evidence-url URL --apply
+    python -m scripts.review_queue --approve ID --level 100 --note "..." --evidence-from REPORT.json --apply
+    python -m scripts.review_queue --needs-review --region Montevideo        # skips "revisado sin evidencia" (--include-reviewed)
+    python -m scripts.review_queue --mark-reviewed ID1 ID2 --note "sin evidencia pública" --apply
     python -m scripts.review_queue --clear-warning ID --apply
     python -m scripts.review_queue --locate SUGGESTION_ID --lat -33.12 --lng -58.30 --apply
 
@@ -26,6 +31,12 @@ The note quotes (at most 160 characters) only a quote verified on its page; othe
 "evidencia en la web (URL)" without the snippet. It refuses a place that changed since the report, is no longer in the queue or approved,
 already carries a manual decision, or whose proposal is ``insuficiente``. A "100 · verificar en la fuente" (no quote verified on its
 page) is refused in bulk: open the link and accept it alone with ``--verified-source``. Accepting "options" lowers the public label.
+
+A report of the needs_review queue (``find_evidence --status needs_review``) is accepted only as "options": a 100 goes alone, with
+``--approve ID --level 100 --evidence-from REPORT``. ``--evidence`` / ``--evidence-from`` write the ``admin`` row in ``place_evidence``
+(the literal quotes) before the decision; if it cannot be saved, nothing changes. ``--discard`` needs a concrete ``--reason``
+(cerrado, no_es_comercio, evidencia_contraria, duplicado + ``--duplicate-of``). ``--mark-reviewed`` leaves a needs_review place where it
+is, with the flag "revisado sin evidencia" and a dated ``REVISIÓN SIN EVIDENCIA`` line; the needs_review lists and find_evidence skip it.
 
 Rules it applies (CLAUDE.md "Manual Validator overrides — allowed, but never silent"): an approval
 prepends an ``APROBACIÓN MANUAL`` header to ``validation_notes`` (the Validator's text is kept below),
@@ -49,7 +60,7 @@ from agents.evidence_finder import (
     verification_label,
 )
 from agents.manual_overrides import manual_override_marker
-from agents.validator_agent import _OWNER_HEALTH_RE, PENDING_ADMIN_FLAG
+from agents.validator_agent import _OWNER_HEALTH_RE, PENDING_ADMIN_FLAG, REVIEWED_NO_EVIDENCE_FLAG
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 WARNING_DAYS = 30
@@ -59,6 +70,15 @@ LEVEL_LABELS = {
     "options_available": "Tiene opciones sin TACC",
 }
 _TRI = {True: "sí", False: "no", None: "sin dato"}
+QUEUE_FLAGS = (PENDING_ADMIN_FLAG, REVIEWED_NO_EVIDENCE_FLAG)  # a decision takes the place out of both queues
+DISCARD_REASONS = {
+    "cerrado": "Cerrado",
+    "no_es_comercio": "No es un comercio",
+    "evidencia_contraria": "Evidencia contraria",
+    "duplicado": "Duplicado de {other}",
+}
+ADMIN_EVIDENCE_MAX = 1000
+DEFAULT_REVIEWED_NOTE = "sin evidencia pública suficiente para decidir"
 
 
 def _warned_since() -> str:
@@ -122,16 +142,19 @@ def list_queues(db, args, out) -> int:
     show_all = not only
     if show_all or args.pending_100:
         rows = db.fetch_places_for_admin(
-            None, flag=PENDING_ADMIN_FLAG, city=args.city, country=args.country, limit=args.limit, offset=args.offset
+            None, flag=PENDING_ADMIN_FLAG, region=args.region, city=args.city, country=args.country,
+            limit=args.limit, offset=args.offset,
         )
         out(f"== 100% pendientes de tu confirmación: {len(rows)} ==")
         for p in rows:
             _print_place(db, p, out)
     if show_all or args.needs_review:
         rows = db.fetch_places_for_admin(
-            "needs_review", city=args.city, country=args.country, limit=args.limit, offset=args.offset
+            "needs_review", exclude_flag=None if args.include_reviewed else REVIEWED_NO_EVIDENCE_FLAG,
+            region=args.region, city=args.city, country=args.country, limit=args.limit, offset=args.offset,
         )
-        out(f"== En revisión humana (needs_review), los {len(rows)} más viejos ==")
+        skipped = "" if args.include_reviewed else f" (sin los «{REVIEWED_NO_EVIDENCE_FLAG}»: --include-reviewed los muestra)"
+        out(f"== En revisión humana (needs_review), los {len(rows)} más viejos{skipped} ==")
         for p in rows:
             _print_place(db, p, out)
     if show_all or args.suggestions:
@@ -140,7 +163,8 @@ def list_queues(db, args, out) -> int:
         _print_suggestions(rows, out)
     if show_all or args.warnings:
         rows = db.fetch_places_for_admin(
-            None, warned_since=_warned_since(), city=args.city, country=args.country, limit=args.limit, offset=args.offset
+            None, warned_since=_warned_since(), region=args.region, city=args.city, country=args.country,
+            limit=args.limit, offset=args.offset,
         )
         out(f"== Lugares reportados por la comunidad (últimos {WARNING_DAYS} días): {len(rows)} ==")
         for p in rows:
@@ -157,7 +181,38 @@ def _header(kind: str, note: str, place: dict) -> str:
     )
 
 
-def approve(db, place_id: str, level: str, note: str, apply: bool, out) -> int:
+def admin_evidence_text(note: str, quote: str | None = None, citations=()) -> str:
+    """The text of the ``admin`` row a manual review leaves in ``place_evidence``: the decision and the literal quotes."""
+    text = f"Revisión manual ({date.today().isoformat()}, review_queue): {note.strip()}."
+    if quote:
+        text = text[:-1] + f". Cita: «{quote.strip()}»"
+    cited = [c for c in citations if c.get("text") and not _OWNER_HEALTH_RE.search(c["text"])]
+    if cited:
+        text += " Citas del reporte: " + "; ".join(f"«{c['text']}» ({c.get('url')})" for c in cited)
+    return text[:ADMIN_EVIDENCE_MAX]
+
+
+def _save_evidence(db, place_id: str, rows: list[dict], out) -> bool:
+    try:
+        for row in rows:
+            db.add_place_evidence(place_id, row["source"], row["text"], row.get("url"))
+    except Exception:  # noqa: BLE001 - a manual decision without its evidence is not made
+        out("No se pudo guardar la evidencia; el lugar no se cambió.")
+        return False
+    return True
+
+
+def _without_queue_flags(place: dict) -> list:
+    return [f for f in (place.get("flags") or []) if f not in QUEUE_FLAGS]
+
+
+def _print_evidence(rows, out) -> None:
+    for row in rows or []:
+        out(f"  evidencia [{row['source']}]: {row['text']} {row.get('url') or ''}".rstrip())
+
+
+def approve(db, place_id: str, level: str, note: str, apply: bool, out, evidence: list[dict] | None = None) -> int:
+    """APROBACIÓN MANUAL. ``evidence`` (place_evidence rows) is saved first; if it fails the place is not touched."""
     place = db.fetch_place_by_id(place_id)
     if not place:
         out(f"No existe el lugar {place_id}.")
@@ -167,48 +222,87 @@ def approve(db, place_id: str, level: str, note: str, apply: bool, out) -> int:
         safety = "gluten_free_100"
     else:  # "options": keep the finer internal level when it already is one of the two option levels
         safety = current if current in ("celiac_friendly", "options_available") else "options_available"
-    flags = [f for f in (place.get("flags") or []) if f != PENDING_ADMIN_FLAG]
     old_notes = (place.get("validation_notes") or "").strip()
     header = _header("APROBACIÓN MANUAL", note, place)
     patch = {
         "status": "approved",
         "safety_level": safety,
-        "flags": flags,
+        "flags": _without_queue_flags(place),
         "validation_notes": f"{header}\n\n{old_notes}" if old_notes else header,
     }
     out(f"{place.get('name')}: {place.get('status')} → approved · {LEVEL_LABELS.get(safety)}")
     out(f"  nota: {header}")
+    _print_evidence(evidence, out)
     if not apply:
         out("DRY RUN — agregá --apply para escribir.")
         return 0
+    if evidence and not _save_evidence(db, place_id, evidence, out):
+        return 1
     db.update_place(place_id, patch)
     out("Listo.")
     return 0
 
 
-def discard(db, place_id: str, note: str, apply: bool, out) -> int:
+def discard(db, place_id: str, note: str, apply: bool, out, reason: str | None = None, other: str | None = None,
+            evidence: list[dict] | None = None) -> int:
     place = db.fetch_place_by_id(place_id)
     if not place:
         out(f"No existe el lugar {place_id}.")
         return 1
     old_notes = (place.get("validation_notes") or "").strip()
-    header = _header("DESCARTE MANUAL", note, place)
+    why = f"{DISCARD_REASONS[reason].format(other=other)}: {note.strip()}" if reason else note
+    header = _header("DESCARTE MANUAL", why, place)
     # --pending-100 has no status filter, so a discarded place would stay in that queue for good.
-    flags = [f for f in (place.get("flags") or []) if f != PENDING_ADMIN_FLAG]
     out(f"{place.get('name')}: {place.get('status')} → discarded")
+    out(f"  nota: {header}")
+    _print_evidence(evidence, out)
     if not apply:
         out("DRY RUN — agregá --apply para escribir.")
         return 0
+    if evidence and not _save_evidence(db, place_id, evidence, out):
+        return 1
     db.update_place(
         place_id,
         {
             "status": "discarded",
-            "flags": flags,
+            "flags": _without_queue_flags(place),
             "validation_notes": f"{header}\n\n{old_notes}" if old_notes else header,
         },
     )
     out("Listo.")
     return 0
+
+
+def mark_reviewed(db, ids: list[str], note: str | None, apply: bool, out) -> int:
+    """«Revisado sin evidencia»: the place stays in needs_review, off the map, with a fixed flag and a dated line in its notes, so
+    the next batches skip it. It is not a decision on its level and protects nothing (it is not a manual-override header)."""
+    line = f"REVISIÓN SIN EVIDENCIA ({date.today().isoformat()}, review_queue): {(note or DEFAULT_REVIEWED_NOTE).strip()}."
+    marked = refused = 0
+    for pid in ids:
+        place = db.fetch_place_by_id(pid)
+        if not place:
+            out(f"  RECHAZADO {pid}: no existe el lugar")
+        elif place.get("status") != "needs_review":
+            out(f"  RECHAZADO {pid} ({place.get('name')}): no está en needs_review ({place.get('status')})")
+        elif REVIEWED_NO_EVIDENCE_FLAG in (place.get("flags") or []):
+            out(f"  RECHAZADO {pid} ({place.get('name')}): ya está marcado «{REVIEWED_NO_EVIDENCE_FLAG}»")
+        else:
+            old_notes = (place.get("validation_notes") or "").strip()
+            out(f"  {place.get('name')}: queda en needs_review con «{REVIEWED_NO_EVIDENCE_FLAG}»")
+            if apply:
+                db.update_place(pid, {
+                    "flags": [*(place.get("flags") or []), REVIEWED_NO_EVIDENCE_FLAG],
+                    "validation_notes": f"{line}\n\n{old_notes}" if old_notes else line,
+                })
+            marked += 1
+            continue
+        refused += 1
+    out(f"  nota: {line}")
+    if not apply:
+        out(f"DRY RUN — {marked} se marcarían, {refused} rechazados. Agregá --apply para escribir.")
+    else:
+        out(f"Listo: {marked} marcados, {refused} rechazados.")
+    return 1 if refused else 0
 
 
 def _load_report(path: str):
@@ -234,6 +328,8 @@ def _print_proposal(r: dict, out) -> None:
         out(f"  cita:      «{c.get('text')}»")
         out(f"             {c.get('url')} · {c.get('source_kind')} · {verification_label(c)} · señal de exclusividad: "
             f"{'sí' if c.get('has_signal') else 'no'} · alcance: {c.get('alcance')}")
+        if c.get("terminos"):
+            out(f"             dice: {c['terminos']} · fecha de la fuente: {c.get('fecha_fuente') or 'sin fecha'}")
     for v in r.get("vetoes") or []:
         out(f"  veto del modelo: cita {v.get('cita')} ({v.get('tipo')}) — {v.get('motivo_modelo') or 'sin motivo'}")
     if r.get("possible_100"):
@@ -279,6 +375,7 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
         out(err)
         return 2
     by_id = {r["place_id"]: r for r in data["places"]}
+    from_needs_review = (data.get("meta") or {}).get("queue") == "needs_review"
     accepted: list[str] = []
     refused: list[str] = []
 
@@ -295,6 +392,10 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
         if entry["proposal"] == "insuficiente":
             refuse(pid, name, "propuesta insuficiente: no hay evidencia que aceptar (decidilo a mano con --approve o --discard)")
             continue
+        if from_needs_review and entry["proposal"] == "100":
+            refuse(pid, name, "un 100 de la cola needs_review nunca se acepta en bloque: revisá la fuente y aprobalo solo, con "
+                              f"--approve {pid} --level 100 --note ... --evidence-from {path}")
+            continue
         source_check = needs_source_check(entry)
         if source_check and not verified_source:
             refuse(pid, name, "100 · verificar en la fuente: ninguna cita está verificada en la página; abrí el link y aceptalo "
@@ -303,9 +404,11 @@ def accept_proposals(db, ids: list[str], path: str, apply: bool, out, verified_s
         place = db.fetch_place_by_id(pid)
         if not place:
             refuse(pid, name, "No existe el lugar")
-        elif place.get("status") != "approved":
+        elif from_needs_review and place.get("status") != "needs_review":
+            refuse(pid, name, f"ya no está en needs_review ({place.get('status')})")
+        elif not from_needs_review and place.get("status") != "approved":
             refuse(pid, name, f"ya no está aprobado ({place.get('status')})")
-        elif PENDING_ADMIN_FLAG not in (place.get("flags") or []):
+        elif not from_needs_review and PENDING_ADMIN_FLAG not in (place.get("flags") or []):
             refuse(pid, name, "ya no está en la cola de 100% pendientes")
         elif manual_override_marker(place.get("validation_notes")):
             refuse(pid, name, "ya tiene una decisión manual: no la pisa una propuesta automática")
@@ -402,6 +505,33 @@ def locate(db, suggestion_id: str, lat: float, lng: float, address: str | None, 
     return 0
 
 
+def _admin_evidence(args, place_id: str, out) -> list[dict] | None:
+    """The place_evidence rows of a manual decision: the report's citations of that place (source web) and one admin row with the
+    note and the literal quotes. [] when none was asked for; None when --evidence-from cannot be used."""
+    citations: list[dict] = []
+    rows: list[dict] = []
+    if args.evidence_from:
+        data, err = _load_report(args.evidence_from)
+        if err:
+            out(err)
+            return None
+        entry = next((r for r in data["places"] if r["place_id"] == place_id), None)
+        if entry is None:
+            out(f"El lugar {place_id} no está en el reporte {args.evidence_from}.")
+            return None
+        citations = [c for c in entry.get("citations") or [] if isinstance(c, dict) and c.get("text") and c.get("url")]
+        if not citations:
+            out(f"El reporte no tiene citas de {place_id}: usá --evidence con la cita literal.")
+            return None
+        built = build_acceptance_note({**entry, "proposal": "options"})
+        rows = list(built[1]) if built else []
+    if not (args.evidence or citations):
+        return []
+    url = args.evidence_url or (citations[0]["url"] if citations else None)
+    rows.append({"source": "admin", "text": admin_evidence_text(args.note or "", args.evidence, citations), "url": url})
+    return rows
+
+
 def run(db, args, out=print) -> int:
     if args.accept_proposals:
         bad = next((i for i in args.accept_proposals if not _UUID.match(i)), None)
@@ -417,6 +547,15 @@ def run(db, args, out=print) -> int:
         return accept_proposals(db, args.accept_proposals, args.report, args.apply, out, verified_source=args.verified_source)
     if args.proposals:
         return list_proposals(args.proposals, args.only, out)
+    if args.mark_reviewed:
+        bad = next((i for i in args.mark_reviewed if not _UUID.match(i)), None)
+        if bad:
+            out(f"Id inválido (se espera un uuid): {bad}")
+            return 2
+        if args.note and _OWNER_HEALTH_RE.search(args.note):
+            out("La nota va a una columna pública: no escribas datos de salud de personas (p. ej. que el dueño es celíaco).")
+            return 2
+        return mark_reviewed(db, args.mark_reviewed, args.note, args.apply, out)
     target = args.approve or args.discard or args.clear_warning
     if target and not _UUID.match(target):
         out(f"Id inválido (se espera un uuid): {target}")
@@ -430,13 +569,44 @@ def run(db, args, out=print) -> int:
     if args.note and _OWNER_HEALTH_RE.search(args.note):
         out("La nota va a una columna pública: no escribas datos de salud de personas (p. ej. que el dueño es celíaco).")
         return 2
+    if (args.evidence or args.evidence_from or args.evidence_url) and not (args.approve or args.discard):
+        out("--evidence / --evidence-url / --evidence-from van con --approve o --discard.")
+        return 2
+    if args.evidence_url and not args.evidence:
+        out("--evidence-url acompaña a --evidence (la cita literal).")
+        return 2
+    if args.evidence and _OWNER_HEALTH_RE.search(args.evidence):
+        out("La cita va a place_evidence: no guardes datos de salud de personas.")
+        return 2
+    if args.approve or args.discard:
+        evidence = _admin_evidence(args, args.approve or args.discard, out)
+        if evidence is None:
+            return 2
     if args.approve:
         if args.level not in ("100", "options"):
             out("Falta --level 100 u --level options.")
             return 2
-        return approve(db, args.approve, args.level, args.note, args.apply, out)
+        if not evidence:
+            out("Aviso: sin --evidence ni --evidence-from no queda la fila admin en place_evidence que pide la regla de revisión "
+                "manual (CLAUDE.md).")
+        return approve(db, args.approve, args.level, args.note, args.apply, out, evidence=evidence)
     if args.discard:
-        return discard(db, args.discard, args.note, args.apply, out)
+        if args.duplicate_of and args.reason != "duplicado":
+            out("--duplicate-of va solo con --reason duplicado.")
+            return 2
+        if not args.reason:
+            out("Falta --reason (cerrado, no_es_comercio, evidencia_contraria o duplicado): un descarte lleva un motivo concreto.")
+            return 2
+        if args.reason == "duplicado":
+            other = args.duplicate_of or ""
+            if not _UUID.match(other) or other.lower() == args.discard.lower():
+                out("--reason duplicado necesita --duplicate-of con el id (uuid) de OTRO lugar: el que queda.")
+                return 2
+            if not db.fetch_place_by_id(other):
+                out(f"No existe el lugar {other} (--duplicate-of).")
+                return 1
+        return discard(db, args.discard, args.note, args.apply, out, reason=args.reason, other=args.duplicate_of,
+                       evidence=evidence)
     if args.clear_warning:
         return clear_warning(db, args.clear_warning, args.apply, out)
     if args.locate:
@@ -453,6 +623,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--needs-review", action="store_true", help="the needs_review queue, oldest first")
     parser.add_argument("--suggestions", action="store_true", help="suggestions whose address could not be placed")
     parser.add_argument("--warnings", action="store_true", help="places with a recent community report")
+    parser.add_argument("--region", help="filter the lists by department / province (exact canonical name, e.g. Montevideo)")
+    parser.add_argument("--include-reviewed", action="store_true",
+                        help="with --needs-review: also the places marked 'revisado sin evidencia'")
     parser.add_argument("--city", help="filter the lists by city")
     parser.add_argument("--country", help="filter the lists by country (Uruguay, Argentina)")
     parser.add_argument("--limit", type=int, default=15)
@@ -462,6 +635,8 @@ def build_parser() -> argparse.ArgumentParser:
     actions.add_argument("--discard", metavar="PLACE_ID")
     actions.add_argument("--clear-warning", metavar="PLACE_ID")
     actions.add_argument("--locate", metavar="SUGGESTION_ID")
+    actions.add_argument("--mark-reviewed", nargs="+", metavar="PLACE_ID",
+                         help="needs_review places with no evidence to decide: flag 'revisado sin evidencia' (they stay off the map)")
     actions.add_argument("--accept-proposals", nargs="+", metavar="PLACE_ID",
                          help="confirm evidence proposals from a find_evidence report (needs --report)")
     parser.add_argument("--proposals", metavar="REPORT", help="read a find_evidence report: counts, citations and the ids to accept")
@@ -471,6 +646,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="with --accept-proposals and ONE id: you opened the link of a '100 · verificar en la fuente' and confirm it")
     parser.add_argument("--level", choices=["100", "options"])
     parser.add_argument("--note", help="why (goes to the public validation_notes; no health data)")
+    parser.add_argument("--reason", choices=list(DISCARD_REASONS), help="with --discard: why (required)")
+    parser.add_argument("--duplicate-of", metavar="PLACE_ID", help="with --reason duplicado: the place that stays")
+    parser.add_argument("--evidence", help="with --approve / --discard: the literal quote for the admin row in place_evidence")
+    parser.add_argument("--evidence-url", help="with --evidence: where the quote is")
+    parser.add_argument("--evidence-from", metavar="REPORT",
+                        help="with --approve / --discard: save this place's citations of a find_evidence report as its evidence")
     parser.add_argument("--lat", type=float)
     parser.add_argument("--lng", type=float)
     parser.add_argument("--address")

@@ -67,6 +67,34 @@ Tavily's free plan gives 1000 searches a month and the Social agent uses the sam
 no longer exists / is no longer `approved` / left the queue, a place with a manual decision in `validation_notes`, a place that changed
 after the report (`updated_at`), and a note that would carry health data. The quote in the public note is at most 160 characters.
 
+## The needs_review queue (2026-11-05)
+
+The same tool works the needs_review queue (places held off the map), in batches by department / province (`places.region`, the exact
+canonical name, so "Departamento de Montevideo", Carrasco and Montevideo all fall in `--region Montevideo`):
+
+1. `python -m scripts.find_evidence --status needs_review --region Montevideo --max-searches N` — the report says `meta.queue: needs_review`.
+   Places marked "revisado sin evidencia" are skipped; `--include-reviewed` brings them back.
+2. `python -m scripts.review_queue --proposals REPORT.json` — each quote now says how it is worded (**sin TACC** / **apto celíacos** /
+   **solo sin gluten**) and the date of the source when one is written within 300 characters of it (a post date in a snippet; approximate,
+   shown, never used to decide). Same labels in the markdown report.
+3. The four exits, each a dry run until `--apply`:
+   - **Options, in bulk:** `--accept-proposals ID… --report REPORT.json` approves the report's `options` as `options_available`, with the
+     APROBACIÓN MANUAL header and the quotes in `place_evidence` (source `web`). The place must still be in `needs_review` and unchanged.
+   - **100, one place at a time:** never in bulk (refused, with the command to use). After checking the source:
+     `--approve ID --level 100 --note "…" --evidence-from REPORT.json` saves that place's citations plus an `admin` row with the note and the
+     literal quotes; `--evidence "cita literal" --evidence-url URL` does the same from what the admin knows. The evidence is saved first: if it
+     fails, the place is not changed. Without either, `--approve` still works and reminds the rule.
+   - **Discard, with a concrete reason:** `--discard ID --reason cerrado|no_es_comercio|evidencia_contraria|duplicado --note "…"`;
+     `duplicado` needs `--duplicate-of OTHER_ID` (another place that exists: the one that stays).
+   - **Revisado sin evidencia:** `--mark-reviewed ID… [--note "…"]` keeps the place in `needs_review` (off the map) with the flag
+     `revisado sin evidencia` and a dated line `REVISIÓN SIN EVIDENCIA (fecha, review_queue): …` on top of its notes. The flag has no date, so the
+     jsonb filter is exact; `review_queue --needs-review` and `find_evidence --status needs_review` skip it on the server
+     (`or=(flags.is.null,flags.not.cs.[…])`: a bare `not.cs` also drops the rows whose `flags` is NULL, measured live). The line is not a manual
+     override header and protects nothing. If the place goes back through `pending`, the Validator rewrites its flags and the mark is lost.
+4. Approving or discarding a place removes both queue flags (`100% pendiente…` and `revisado sin evidencia`).
+
+PostgREST returns at most 1000 rows per request: filter a queue bigger than that by `--region`, `--city` or `--country`.
+
 ## Verification labels and the "100 · verificar en la fuente" rule
 
 Every citation carries a label: **verificada en la página** (the quote is literal in the page the code downloaded, or the page is the place's own

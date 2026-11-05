@@ -116,14 +116,14 @@ def test_clear_warning_and_discard():
     db = FakeDB()
     go(db, "--clear-warning", PID, "--apply")
     assert db.warnings == [(PID, None)]
-    go(db, "--discard", PID, "--note", "cerró", "--apply")
+    go(db, "--discard", PID, "--reason", "cerrado", "--note", "cerró", "--apply")
     assert db.updates[-1][1]["status"] == "discarded"
 
 
 def test_discard_takes_the_place_out_of_the_pending_100_queue():
     """A discarded place must not stay in --pending-100 (that list has no status filter): the flag goes."""
     db = FakeDB()
-    go(db, "--discard", PID, "--note", "cerró", "--apply")
+    go(db, "--discard", PID, "--reason", "cerrado", "--note", "cerró", "--apply")
     patch = db.updates[-1][1]
     assert PENDING_ADMIN_FLAG not in patch["flags"] and "sin ficha" in patch["flags"]
     assert patch["validation_notes"].startswith("DESCARTE MANUAL")

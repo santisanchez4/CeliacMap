@@ -402,6 +402,57 @@ def _fold(text: str | None) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", text or "") if not unicodedata.combining(c)).lower()
 
 
+_TACC_RE = re.compile(r"(?<![a-z])(?:sin|libres?\s+de)\s+t\.?\s?a\.?\s?c\.?\s?c\b|sintacc", re.IGNORECASE)
+_APTO_CELIACO_RE = re.compile(r"\bapt[oa]s?\s+(?:para\s+)?celiac", re.IGNORECASE)
+TERM_LABELS = ("sin TACC", "apto celíacos", "solo sin gluten")
+
+
+def quote_terms(text: str | None) -> str:
+    """How a quote says it, strongest first: "sin TACC", "apto celíacos", or "solo sin gluten" (the Validator's flag: a plain
+    "sin gluten" can be marketing). A label for the admin; it changes no proposal."""
+    folded = _fold(text)
+    if _TACC_RE.search(folded):
+        return TERM_LABELS[0]
+    if _APTO_CELIACO_RE.search(folded):
+        return TERM_LABELS[1]
+    return TERM_LABELS[2]
+
+
+_MONTHS_EN = {m: i for i, m in enumerate(
+    "january february march april may june july august september october november december".split(), start=1)}
+_MONTHS_ES = {m: i for i, m in enumerate(
+    "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre".split(), start=1)}
+_DATE_RES = (
+    (re.compile(r"\b(20\d\d)-(\d\d)-(\d\d)\b"), lambda m: (int(m[1]), int(m[2]), int(m[3]))),
+    (re.compile(r"\b(" + "|".join(_MONTHS_EN) + r")\s+(\d{1,2}),\s+(20\d\d)\b", re.IGNORECASE),
+     lambda m: (int(m[3]), _MONTHS_EN[m[1].lower()], int(m[2]))),
+    (re.compile(r"\b(\d{1,2})\s+de\s+(" + "|".join(_MONTHS_ES) + r"|setiembre)\s+(?:de\s+|del\s+)?(20\d\d)\b", re.IGNORECASE),
+     lambda m: (int(m[3]), _MONTHS_ES.get(m[2].lower(), 9), int(m[1]))),
+)
+SOURCE_DATE_SPAN = 300  # characters: a date farther than this from the quote is about something else
+
+
+def source_date(text: str | None, quote: str | None) -> str | None:
+    """The ISO date written closest to ``quote`` in its source text (a post date in a snippet, a page date), or None when no
+    date is within SOURCE_DATE_SPAN characters. Approximate by nature: it is shown to the admin, never used to decide."""
+    text = text or ""
+    start = text.find(quote or "") if quote else -1
+    if start < 0:
+        return None
+    end = start + len(quote)
+    best: tuple[int, str] | None = None
+    for pattern, parts in _DATE_RES:
+        for m in pattern.finditer(text):
+            try:
+                iso = datetime(*parts(m)).date().isoformat()
+            except ValueError:
+                continue
+            distance = max(m.start() - end, start - m.end(), 0)
+            if distance <= SOURCE_DATE_SPAN and (best is None or distance < best[0]):
+                best = (distance, iso)
+    return best[1] if best else None
+
+
 def _name_spans(text: str, name: str | None) -> list[tuple[int, int]]:
     """Where the business name appears in ``text``: exact occurrences of its words (accent and case blind), as whole words."""
     tokens = re.findall(r"[a-z0-9]+", _fold(name))
@@ -706,7 +757,8 @@ class EvidenceFinder:
                 candidates.append({"text": text, "url": source["url"], "source_kind": kind, "matched_by": reason,
                                    "has_signal": ValidatorAgent.has_exclusive_signal([masked]),
                                    "has_extended": has_extended_signal(masked), "origin": source["origin"],
-                                   "title": source["title"], "before": item["before"], "after": item["after"]})
+                                   "title": source["title"], "before": item["before"], "after": item["after"],
+                                   "terminos": quote_terms(text), "fecha_fuente": source_date(source["text"], text)})
             if not found:
                 why = ("sobre el negocio por su texto, pero las frases sobre gluten están lejos del nombre (guía con varios negocios)"
                        if dropped_far else "sobre el negocio, pero sin frases sobre gluten o celíacos")
@@ -734,7 +786,8 @@ class EvidenceFinder:
                          "matched_by": candidate["matched_by"], "has_signal": candidate["has_signal"],
                          "has_extended": candidate["has_extended"], "verificacion": candidate["verificacion"],
                          "multi_negocio": candidate["multi_negocio"], "alcance": scope["alcance"],
-                         "contradice": scope["contradice"], "motivo": scope["motivo"]})
+                         "contradice": scope["contradice"], "motivo": scope["motivo"],
+                         "terminos": candidate["terminos"], "fecha_fuente": candidate["fecha_fuente"]})
 
         verdict = assess(kept)
         return {

@@ -76,6 +76,8 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   digest. Admin tool: `python -m scripts.review_queue`. For the 100% queue there is also an evidence finder
   (`python -m scripts.find_evidence`, read-only: it proposes 100 / options / insuficiente with literal, verified quotes;
   the admin confirms with `review_queue --proposals` / `--accept-proposals`; runbook in `docs/runbooks/evidence-finder.md`).
+  Since 2026-11-05 it also works the needs_review queue by department (`--status needs_review --region …`), with
+  `review_queue` exits for it: options in bulk, 100 one by one with its evidence, discard with a reason, `--mark-reviewed`.
 - ✅ **Validator agent** — Claude `claude-sonnet-4-6` approves or discards each
   pending candidate (structured verdict + confidence/notes), using stored review
   snippets as extra context.
@@ -313,7 +315,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── check_setup.py          # connectivity / config preflight
 │   ├── moderate_opinions.py    # list / approve / hide community opinions (dry-run unless --apply)
 │   ├── review_queue.py         # admin queue: 100% pending, needs_review, unplaceable suggestions, warnings, evidence proposals
-│   ├── find_evidence.py        # evidence finder CLI: reads the 100% queue, writes a local report (never writes to the database)
+│   ├── find_evidence.py        # evidence finder CLI: reads the 100% or needs_review queue, writes a local report (never writes to the database)
 │   ├── import_imm_source.py    # IM Montevideo licensed-premises layer -> evidence + Validator (dry-run unless --apply)
 │   ├── admin_digest.py         # daily email to the admin (admin-digest.yml)
 │   ├── delete_personal_data.py # answer a deletion request: find by text/date, dry-run unless --apply (docs/legal/runbook-pedidos-de-datos.md)
