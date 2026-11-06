@@ -50,8 +50,13 @@ GUIDE_ROW_PREFIX = "(guía con varios negocios: sin atribución confirmada) "
 # Words of a page title or address that say the page lists several businesses (a guide, a blog, a listicle).
 MULTI_BUSINESS_WORDS = frozenset(
     "guia guias mejores top ranking listado directorio recomendados lugares restaurantes cafeterias panaderias locales "
-    "dieteticas tiendas".split()
+    "dieteticas tiendas best restaurants bakeries cafes places".split()
 )
+# A page that is one business's own card on a directory: findmeglutenfree /biz/, GlutenGo /lugar/, Guía Comercial /ficha/.
+_SINGLE_CARD_PATH_RE = re.compile(r"/(?:biz|lugar|ficha)/", re.IGNORECASE)
+# Where a card of a guide ends: GlutenGo's "Ver ficha", the next entry of a numbered list ("49." on a line of its own), the next
+# markdown heading ("## Boom Gluten"), or Tavily's "[...]", which glues chunks of a page that are not next to each other.
+_CARD_END_RE = re.compile(r"ver ficha|^[ \t]*\d{1,3}[.)][ \t]*$|^[ \t]*#{1,6}[ \t]|\[\.\.\.\]", re.IGNORECASE | re.MULTILINE)
 
 RESULTS_PER_QUERY = 5
 QUOTE_MAX = 300  # characters of one stored quote
@@ -342,12 +347,16 @@ def why_not_about_place(place: dict, source: dict, accounts=None) -> str:
 
 # --- pages that list several businesses; distance to the name ---------------------------------------------------------------
 
-_NUMBERED_HEADING_RE = re.compile(r"(?m)^\s*(\d{1,2})[.)]?\s+\S[^\n]{0,70}$")
+# "3. Panadería X" or "3." with the name on the next line; a bare count followed by a word on the next line ("2" / "Cakes", the menu
+# counters of a findmeglutenfree card) is not an entry.
+_NUMBERED_HEADING_RE = re.compile(r"(?m)^[ \t]*(\d{1,2})(?:[.)][ \t]*\n?[ \t]*|[ \t]+)\S[^\n]{0,70}$")
 
 
 def looks_like_multi_business(title: str | None, url: str | None, text: str | None, name: str | None = None) -> bool:
     """A guide, blog or listicle: its title or address has a listing word ("guía", "mejores", "restaurantes"...), the address has a
     blog, or the page has a numbered list of at least three entries. The business's own name is masked out of the title first."""
+    if _SINGLE_CARD_PATH_RE.search(url or ""):
+        return False
     title_norm = normalize(mask_name(title, name) if name else title)
     url_words = set(normalize(url).split())
     if set(title_norm.split()) & MULTI_BUSINESS_WORDS or url_words & MULTI_BUSINESS_WORDS or "blog" in url_words:
@@ -367,7 +376,39 @@ def _near_name(source_text: str, quote: str, name: str | None, span: int = NEAR_
         return False
     for m in re.finditer(r"(?<![a-z0-9])" + re.escape(business) + r"(?![a-z0-9])", haystack):
         if m.start() < start + len(needle) and start - m.end() <= span:
-            return True
+            return _same_card(source_text, quote, name, span)
+    return False
+
+
+def _fold_char(c: str) -> str:
+    """One character, accent and case blind, always one character long (so positions in the folded text are positions in the text)."""
+    base = next((x for x in unicodedata.normalize("NFKD", c) if not unicodedata.combining(x)), c)
+    return (base.lower() or base)[:1] or c
+
+
+def _name_spans_any_text(text: str, name: str | None) -> list[tuple[int, int]]:
+    """Like ``_name_spans``, but also for a text with characters that change length when folded ("…", ligatures)."""
+    tokens = re.findall(r"[a-z0-9]+", _fold(name))
+    if not tokens:
+        return []
+    folded = "".join(_fold_char(c) for c in text)
+    pattern = r"(?<![a-z0-9])" + r"[^a-z0-9]+".join(re.escape(t) for t in tokens) + r"(?![a-z0-9])"
+    return [m.span() for m in re.finditer(pattern, folded)]
+
+
+def _same_card(source_text: str, quote: str, name: str | None, span: int = NEAR_NAME_MAX) -> bool:
+    """No card boundary of a guide (``_CARD_END_RE``) between an occurrence of the name and the quote. Read on the original text,
+    where the line breaks and numbers that mark a card still are; if the positions cannot be read, only the distance rule applies."""
+    q_start = source_text.find(quote)
+    spans = _name_spans_any_text(source_text, name)
+    if q_start < 0 or not spans:
+        return True
+    q_end = q_start + len(quote)
+    for start, end in spans:
+        if start < q_end and q_start - end <= span:
+            gap = source_text[end:q_start] if end <= q_start else ""
+            if not _CARD_END_RE.search(gap):
+                return True
     return False
 
 
