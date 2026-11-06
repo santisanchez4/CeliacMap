@@ -122,6 +122,9 @@ your own spend: every report records `searches_used`; add them up and check the 
 
 ## Limits to keep in mind
 
+- `findmeglutenfree.com` is never searched, downloaded or cited (`BLOCKED_DOMAINS`, 2026-11-06: its robots.txt and terms forbid
+  automated access). The admin may read it by hand as a lead to ask the business; nothing of it is stored.
+
 - `has_exclusive_signal` is a regex (it is the Validator's gate and this tool does not change it): it can miss real exclusivity phrases such as
   "exclusivamente para celíacos", which then land in `options` (the safe side), and it can match a product line, which the model's scope check vetoes.
 - A quote is literal in the snippet Tavily returned, which is not always literal on the page; verify with the URL. Instagram / Facebook pages

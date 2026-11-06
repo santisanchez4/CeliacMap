@@ -29,7 +29,7 @@ import unicodedata
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from agents.clients.website_scraper import fetch_page_text, is_social_url
+from agents.clients.website_scraper import fetch_page_text, is_blocked_url, is_social_url
 from agents.validator_agent import _OWNER_HEALTH_RE, ValidatorAgent
 
 logger = logging.getLogger("celiacmap.agent")
@@ -740,6 +740,8 @@ class EvidenceFinder:
                 continue
             for hit in hits or []:
                 url = (hit.get("link") or "").strip()
+                if is_blocked_url(url):  # a site whose terms forbid automated use (also in a frozen replay): never a source
+                    continue
                 if url and url not in sources:
                     sources[url] = {"url": url, "title": hit.get("title") or "", "text": hit.get("snippet") or "", "origin": "search"}
         site = (place.get("website") or "").strip()

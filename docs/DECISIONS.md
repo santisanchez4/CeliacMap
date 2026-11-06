@@ -4855,6 +4855,22 @@ Montevideo, porque `city` varía: «Departamento de Montevideo», Carrasco, «Ur
 de pendiente (el `cap_unsupported_100 --flag-only` no bajó la etiqueta). La idea del administrador es bajarlos a `options_available`
 hasta confirmarlos, después de Uruguay, con dry-run y su «dale».
 
+### findmeglutenfree.com fuera de las fuentes automáticas (2026-11-06)
+
+Se evaluó sumar findmeglutenfree.com como fuente de `find_evidence` (una búsqueda dedicada por lugar) y, más adelante, del Validator.
+**No se puede:** su `robots.txt` prohíbe `/biz` (las fichas de los locales) y las páginas por país (`/uy`, `/ar`…) a los agentes de IA
+(`ClaudeBot`, `anthropic-ai`, `ChatGPT-User`, `PerplexityBot`, `GPTBot` y otros), y sus condiciones de uso (`/terms`) prohíben «any
+robot, spider, site search/retrieval application, or other automated device, process or means to access, retrieve, scrape, or index
+any portion of the Site or any Site Content» y reproducir o explotar su contenido sin autorización expresa.
+
+- **En el código:** `BLOCKED_DOMAINS` (`agents/clients/website_scraper.py`) con `findmeglutenfree.com`. Ninguna búsqueda de Tavily lo
+  trae (`exclude_domains`, y se filtra lo que se cuele), el scraper no lo descarga y `find_evidence` no lo usa como fuente, tampoco en un
+  `--replay` de un congelado viejo. Afecta a todos los agentes que usan esos clientes (Social, evidencia, outreach).
+- **Uso manual:** el administrador puede leerlo a mano como pista para preguntarle al local; no se guarda texto suyo en
+  `place_evidence` ni en `validation_notes`.
+- **Antes de la decisión** se habían guardado citas suyas el 2026-11-05 (ine Boutique, Biga, La Cabrona); se corrigen aparte con SQL.
+- Si en el futuro se quisiera usar, hace falta una autorización escrita del sitio y una decisión nueva.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
