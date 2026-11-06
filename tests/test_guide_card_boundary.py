@@ -18,9 +18,9 @@ GLUTENGO = (
 )
 
 FMGF_LIST = (
-    "48.\nLa Cabrona\n(1)\nGral. Brito del Pino 1317 bis, 11300 Montevideo\nGF menu items: Nachos, Tacos\n"
-    "Featured review snippet \"Todos menos las quesadillas son aptas para celíacos, los tacos son buenisimos!\"\n"
-    "49.\nLa Mostaza\n(1)\nT 13, Bv. Gral. Artigas\nFeatured review snippet \"Todo es sin gluten, riquísimo\"\n"
+    "48.\nTaquería Ejemplo\n(1)\nCalle Inventada 100, 11300 Montevideo\nGF menu items: Nachos, Tacos\n"
+    "Featured review snippet \"Casi toda la carta es apta para celíacos, salvo los postres.\"\n"
+    "49.\nParrilla Ficticia\n(1)\nAv. Imaginaria 200\nFeatured review snippet \"Todo es sin gluten, muy rico\"\n"
 )
 
 
@@ -33,34 +33,35 @@ def test_the_business_s_own_card_still_counts():
 
 
 def test_a_numbered_list_ends_a_card_too():
-    assert _near_name(FMGF_LIST, "Todos menos las quesadillas son aptas para celíacos, los tacos son buenisimos!", "La Cabrona")
-    assert not _near_name(FMGF_LIST, "Todo es sin gluten, riquísimo", "La Cabrona")
+    assert _near_name(FMGF_LIST, "Casi toda la carta es apta para celíacos, salvo los postres.", "Taquería Ejemplo")
+    assert not _near_name(FMGF_LIST, "Todo es sin gluten, muy rico", "Taquería Ejemplo")
 
 
 def test_without_card_markers_the_distance_rule_is_unchanged():
-    text = "En Montevideo probamos La Cabrona. Nos encantó: todo sin gluten salvo las quesadillas."
-    assert _near_name(text, "Nos encantó: todo sin gluten salvo las quesadillas.", "La Cabrona")
-    assert not _near_name(text + " x" * 400 + " Todo sin TACC.", "Todo sin TACC.", "La Cabrona")
+    text = "En Montevideo probamos Taquería Ejemplo. Nos encantó: todo sin gluten salvo los postres."
+    assert _near_name(text, "Nos encantó: todo sin gluten salvo los postres.", "Taquería Ejemplo")
+    assert not _near_name(text + " x" * 400 + " Todo sin TACC.", "Todo sin TACC.", "Taquería Ejemplo")
 
 
-INE_PAGE = ("ine Boutique de cosas ricas\n2 recent ratings\nReported to be dedicated gluten-free\nPopular gluten-free menu items\n"
-            "Bread/Buns\n2\nCakes\n2\nCinnamon Rolls\n2\nCheesecake\n1\nCroissants\n1\nScones\n1\n"
-            "More Reviews\nTienen opciones de desayuno y merienda sin gluten muy ricas. Son aptos para celiacos\n")
+# The shape of a directory card of one business: menu counters ("Breads" / "2") that must not read as a numbered list.
+ONE_CARD_PAGE = ("Panadería Ficticia\n3 ratings\nListed as gluten-free\nMenu items\n"
+                 "Breads\n2\nCakes\n2\nCookies\n2\nPies\n1\nMuffins\n1\nTarts\n1\n"
+                 "Reviews\nBuenas opciones sin gluten para la merienda.\n")
 
 
 @pytest.mark.parametrize("url", [
-    "https://www.findmeglutenfree.com/biz/ine/6411141477171200",
-    "https://glutengo.com.uy/lugar/mi-espacio-sin-tacc",
-    "https://guiacomercial.uy/ficha/lumiro-sin-gluten-trinidad",
+    "https://www.findmeglutenfree.com/biz/panaderia-ficticia/1111111111111111",
+    "https://glutengo.com.uy/lugar/panaderia-ficticia",
+    "https://guiacomercial.uy/ficha/panaderia-ficticia-montevideo",
 ])
 def test_a_page_that_is_one_business_s_own_card_is_not_a_guide(url):
-    assert not looks_like_multi_business("ine Boutique de cosas ricas - Dedicated Gluten-Free Bakery in Montevideo", url, INE_PAGE,
-                                         "ine Boutique de cosas ricas")
+    assert not looks_like_multi_business("Panadería Ficticia - Gluten-Free Bakery in Montevideo", url, ONE_CARD_PAGE,
+                                         "Panadería Ficticia")
 
 
 def test_a_list_page_of_the_same_site_still_is_a_guide():
     assert looks_like_multi_business("The Best Gluten-Free Restaurants in Montevideo",
-                                     "https://www.findmeglutenfree.com/uy/montevideo/tacos", FMGF_LIST, "La Cabrona")
+                                     "https://www.findmeglutenfree.com/uy/montevideo/tacos", FMGF_LIST, "Taquería Ejemplo")
     assert looks_like_multi_business("Sin gluten en Montevideo | GlutenGo",
                                      "https://glutengo.com.uy/guias/sin-gluten-montevideo.html", GLUTENGO, "La Cabrona MVD")
 
