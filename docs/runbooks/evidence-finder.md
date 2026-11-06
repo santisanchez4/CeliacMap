@@ -129,3 +129,7 @@ your own spend: every report records `searches_used`; add them up and check the 
 - Chains and branches: a quote about the brand may not apply to that branch. The report shows the text; the admin decides.
 - Guides and listicles: the code cannot tell whose sentence it is on a page of several businesses; it keeps only what sits next to the name and never lets such a
   page support a plain 100 (found on 2026-09-27 with a Superprof guide: the sentence of the previous restaurant of the list).
+- Since 2026-11-05 a quote must also be inside the business's card: no "Ver ficha", numbered entry ("49."), markdown heading
+  ("## Otro local") or Tavily "[...]" between the name and the quote (GlutenGo's next card gave «El local se presenta como 100% sin
+  gluten» to La Carola, La Cabrona and Harta Café). A directory page of one business (findmeglutenfree `/biz/`, GlutenGo `/lugar/`,
+  Guía Comercial `/ficha/`) is not a guide; a findmeglutenfree list page with an English title ("Best … Restaurants") is.

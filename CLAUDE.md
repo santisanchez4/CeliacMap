@@ -375,7 +375,7 @@ Standing rules taken from the Decisions Log; the incident and reasoning behind e
   verified on its page (else "100 · verificar en la fuente": accepted only alone, with `--verified-source`); a source is about the business by the
   code's rule (own URL, name + city, or title words with an identity word + city/region), never by the name alone; an Instagram / Facebook source counts only when its author is the
   business's official account (the row's, or one its own site links to), else it is listed as "no atribuible" and never counts; on a page matched only by its text the quote must sit
-  next to the name, and a guide of several businesses never supports a plain 100; the public note quotes only
+  next to the name and inside its card (`_CARD_END_RE`), and a guide of several businesses never supports a plain 100; the public note quotes only
   verified text (≤ 160 characters, no health data); no Google reviews. Runbook: `docs/runbooks/evidence-finder.md`.
   **needs_review** [needs_review evidence]: batches by `--region`; a needs_review report is accepted only as options, a 100 only alone
   (`--approve --level 100 --evidence-from` / `--evidence`, which write the `admin` row first); `--discard` needs `--reason`;
