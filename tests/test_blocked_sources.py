@@ -11,7 +11,7 @@ from agents.clients.tavily_client import TavilySearchClient
 from agents.clients.website_scraper import BLOCKED_DOMAINS, WebsiteScraperClient, fetch_page_text, fetch_social_links, is_blocked_url
 from agents.evidence_finder import EvidenceFinder
 
-FMGF = "https://www.findmeglutenfree.com/biz/la-cabrona/6500337441964032"
+FMGF = "https://www.findmeglutenfree.com/biz/taqueria-ejemplo/2222222222222222"
 
 
 def test_findmeglutenfree_is_blocked_with_or_without_www():
@@ -44,9 +44,9 @@ def _tavily(results):
 
 
 def test_every_tavily_search_excludes_the_blocked_sites_and_drops_any_that_slips_through():
-    client = _tavily([{"url": FMGF, "title": "La Cabrona", "content": "Todos menos las quesadillas…"},
+    client = _tavily([{"url": FMGF, "title": "Taquería Ejemplo", "content": "Casi toda la carta es apta para celíacos…"},
                       {"url": "https://glutengo.com.uy/lugar/x", "title": "X", "content": "sin gluten"}])
-    hits = client.search("La Cabrona Montevideo", include_domains=["instagram.com"])
+    hits = client.search("Taquería Ejemplo Montevideo", include_domains=["instagram.com"])
     kwargs = client._client.search.call_args.kwargs
     assert set(BLOCKED_DOMAINS) <= set(kwargs["exclude_domains"])
     assert [h["link"] for h in hits] == ["https://glutengo.com.uy/lugar/x"]
@@ -55,10 +55,10 @@ def test_every_tavily_search_excludes_the_blocked_sites_and_drops_any_that_slips
 def test_the_evidence_finder_ignores_a_blocked_hit_even_from_a_frozen_replay():
     class Search:
         def search(self, query, num=10, include_domains=None):
-            return [{"title": "La Cabrona - Montevideo", "link": FMGF,
-                     "snippet": "La Cabrona, Montevideo. Todos menos las quesadillas son aptas para celíacos."}]
+            return [{"title": "Taquería Ejemplo - Montevideo", "link": FMGF,
+                     "snippet": "Taquería Ejemplo, Montevideo. Casi toda la carta es apta para celíacos."}]
 
     finder = EvidenceFinder(Search(), llm=None, fetch_text=lambda u: "")
-    result = finder.find({"id": "p", "name": "La Cabrona", "city": "Montevideo", "country": "Uruguay"})
+    result = finder.find({"id": "p", "name": "Taquería Ejemplo", "city": "Montevideo", "country": "Uruguay"})
     assert result["citations"] == [] and result["unattributed"] == []
     assert all(d["url"] != FMGF for d in result["discarded_sources"])
