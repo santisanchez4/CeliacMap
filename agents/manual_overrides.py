@@ -50,6 +50,7 @@ DATA_CORRECTION_PHRASES = (
     "duplicado de",
     "no aplica al mapa",
     "cuenta oficial confirmada",
+    "sin evidencia explícita de 100",
 )
 
 

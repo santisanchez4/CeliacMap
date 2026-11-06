@@ -97,6 +97,10 @@ DATA_HEADERS = [
     # account is the business's, not how safe the place is.
     "CORRECCIÓN MANUAL (2026-11-05): cuenta oficial confirmada por el administrador: https://www.instagram.com/celiacos33. "
     "social_url anterior: vacío.",
+    # 2026-11-06 (literal format): the 100% label lowered to options because there is no explicit evidence for it. It says the
+    # label had no support, not that the admin judged the place; the place must stay open to evidence and community reports.
+    "CORRECCIÓN MANUAL (2026-11-06): la etiqueta baja de «Espacio 100% sin gluten» a «Tiene opciones sin TACC»: sin evidencia "
+    "explícita de 100% sin gluten, no por evidencia en contra; conserva el flag de 100% pendiente y sube de a uno cuando aparezca evidencia.",
 ]
 
 
@@ -111,6 +115,7 @@ def test_the_data_correction_phrases_are_an_explicit_reviewed_list():
         "duplicado de",
         "no aplica al mapa",
         "cuenta oficial confirmada",
+        "sin evidencia explícita de 100",
     )
 
 
@@ -220,3 +225,16 @@ def test_a_confirmed_official_account_on_top_of_a_manual_approval_still_protects
         "social_url anterior: vacío.\n\nAPROBACIÓN MANUAL (2026-11-05, review_queue): el administrador revisó su cuenta oficial."
     )
     assert manual_override_marker(notes) == "aprobacion manual"
+
+
+def test_a_label_lowered_for_lack_of_evidence_on_top_of_a_manual_approval_still_protects():
+    notes = (
+        "CORRECCIÓN MANUAL (2026-11-06): la etiqueta baja a «Tiene opciones sin TACC»: sin evidencia explícita de 100% sin gluten.\n\n"
+        "APROBACIÓN MANUAL (2026-09-24): el administrador conoce el local."
+    )
+    assert manual_override_marker(notes) == "aprobacion manual"
+
+
+def test_a_label_correction_without_the_lack_of_evidence_phrase_still_protects():
+    assert manual_override_marker("CORRECCIÓN MANUAL (2026-11-06): la etiqueta baja a opciones; el local cocina con gluten.") == "correccion manual"
+    assert manual_override_marker("CORRECCIÓN MANUAL (2026-11-06): con evidencia explícita de 100 en contra.") == "correccion manual"
