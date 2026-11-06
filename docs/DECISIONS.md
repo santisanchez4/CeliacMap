@@ -4871,6 +4871,24 @@ any portion of the Site or any Site Content» y reproducir o explotar su conteni
 - **Antes de la decisión** se habían guardado citas suyas el 2026-11-05 (ine Boutique, Biga, La Cabrona); se corrigen aparte con SQL.
 - Si en el futuro se quisiera usar, hace falta una autorización escrita del sitio y una decisión nueva.
 
+### Una etiqueta 100% que baja por falta de evidencia no protege el lugar (2026-11-06)
+
+Argentina tiene 199 lugares aprobados que el mapa muestra como «Espacio 100% sin gluten» con el flag `100% pendiente de
+confirmación del administrador`: el Validator los dejó en 100% sin evidencia explícita (casi siempre por el nombre). La
+decisión del administrador es bajarlos a `options_available`, conservar el flag y subirlos de a uno cuando aparezca evidencia.
+Cada uno lleva la línea `CORRECCIÓN MANUAL (fecha): la etiqueta baja de «Espacio 100% sin gluten» a «Tiene opciones sin
+TACC»: sin evidencia explícita de 100% sin gluten, no por evidencia en contra; …`.
+
+- **La frase «sin evidencia explícita de 100» se suma a `DATA_CORRECTION_PHRASES`.** Sin ella, la línea contaba como una
+  decisión manual: `review_queue --accept-proposals` rechazaba el lugar y `review_handler` lo blindaba frente a los reportes
+  de la comunidad, aunque el administrador no hubiera juzgado el lugar, solo quitado una etiqueta sin respaldo.
+- **El nivel nunca sube solo:** bajar a opciones es el piso conservador. Subir a 100 sigue pidiendo `--approve --level 100`
+  con evidencia, de a uno, con su `APROBACIÓN MANUAL`, que sí protege (cada línea se juzga por separado; un test lo fija).
+- **Una corrección de etiqueta con otro motivo sigue protegiendo** (por ejemplo, «el local cocina con gluten»): la frase es
+  explícita y solo cubre la falta de evidencia. Antes de sumarla se comprobó que ninguna nota de `places` la tenía.
+- **El mapa público no muestra el flag** (`flags` no está en el grant de columnas): el lugar se ve como «Tiene opciones sin
+  TACC», igual que cualquier otro con opciones. El flag solo lo ven el administrador y la cola `--pending-100`.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
