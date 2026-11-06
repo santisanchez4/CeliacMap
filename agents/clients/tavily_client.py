@@ -18,6 +18,8 @@ from typing import Any
 
 from tavily import TavilyClient
 
+from agents.clients.website_scraper import BLOCKED_DOMAINS, is_blocked_url
+
 logger = logging.getLogger("celiacmap.agent")
 
 # Keep result counts modest: the Social agent only needs a handful of leads per
@@ -48,6 +50,7 @@ class TavilySearchClient:
                 search_depth="basic",
                 max_results=max(1, min(num, MAX_NUM)),
                 include_domains=include_domains or None,
+                exclude_domains=list(BLOCKED_DOMAINS),
             )
         except Exception as exc:  # noqa: BLE001 - normalize any SDK/transport error
             raise RuntimeError(f"Tavily search failed for {query!r}: {exc}") from exc
@@ -60,4 +63,5 @@ class TavilySearchClient:
                 "snippet": item.get("content"),
             }
             for item in items
+            if not is_blocked_url(item.get("url"))  # in case the exclusion is not honoured
         ]

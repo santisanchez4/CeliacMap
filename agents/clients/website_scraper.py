@@ -41,6 +41,16 @@ SOCIAL_DOMAINS = (
 MAILTO_RE = re.compile(r'mailto:([^\s"\'<>]+)', re.IGNORECASE)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 USER_AGENT = "CeliacMapBot/1.0 (+https://github.com/santisanchez4/CeliacMap)"
+# Sites whose terms forbid automated access: never searched (tavily_client), downloaded (here) or used as evidence (evidence_finder).
+# findmeglutenfree.com (2026-11-06): its robots.txt disallows /biz and the country pages (/uy...) for AI agents, and its terms forbid
+# "any robot, spider, site search/retrieval application, or other automated device" to access, retrieve, scrape or index the site.
+BLOCKED_DOMAINS = ("findmeglutenfree.com",)
+
+
+def is_blocked_url(url: str | None) -> bool:
+    """The address is on a site of ``BLOCKED_DOMAINS`` (the domain itself or any of its subdomains)."""
+    host = (urlparse(url if url and "//" in url else "//" + (url or "")).netloc or "").lower().split(":")[0]
+    return any(host == d or host.endswith("." + d) for d in BLOCKED_DOMAINS)
 
 # EMAIL_RE's own shape already requires a dot + 2+ alpha chars at the end —
 # which a 3-4 letter image extension satisfies just as well as a real TLD.
@@ -100,7 +110,7 @@ class WebsiteScraperClient:
         Returns None on a social URL, any transport/HTTP error, or when no
         email is found — never raises.
         """
-        if not url or is_social_url(url):
+        if not url or is_social_url(url) or is_blocked_url(url):
             return None
         try:
             response = requests.get(
@@ -146,7 +156,7 @@ def fetch_social_links(url: str | None) -> list[str]:
     The evidence finder reads the business's official accounts from them: a link on the business's own site is how an account is
     verified as its own when the row has none.
     """
-    if not url or is_social_url(url):
+    if not url or is_social_url(url) or is_blocked_url(url):
         return []
     try:
         response = requests.get(url, timeout=PAGE_TIMEOUT, headers={"User-Agent": USER_AGENT})
@@ -168,7 +178,7 @@ def fetch_page_text(url: str | None) -> str:
 
     Block-level tags become line breaks so the evidence finder can split sentences; inline tags vanish.
     """
-    if not url or is_social_url(url):
+    if not url or is_social_url(url) or is_blocked_url(url):
         return ""
     try:
         response = requests.get(url, timeout=PAGE_TIMEOUT, headers={"User-Agent": USER_AGENT})
