@@ -4889,6 +4889,63 @@ TACC»: sin evidencia explícita de 100% sin gluten, no por evidencia en contra;
 - **El mapa público no muestra el flag** (`flags` no está en el grant de columnas): el lugar se ve como «Tiene opciones sin
   TACC», igual que cualquier otro con opciones. El flag solo lo ven el administrador y la cola `--pending-100`.
 
+### Cierre de la cola needs_review de Uruguay (2026-11-06)
+
+El administrador terminó de revisar la cola `needs_review` de Uruguay el 2026-11-06, sin contactar a ningún comercio. Trabajó por
+departamento con `find_evidence --status needs_review` (tandas t8 Punta del Este, t9 resto de Maldonado + Colonia y t10 interior,
+además de las de Montevideo del 2026-11-05) y decidió cada propuesta con `review_queue`. En el mes se usaron unas 707 búsquedas de
+Tavily (cuenta propia del administrador, tope fijado en 800) y, el último día, 2 llamadas pagas a Google autorizadas una por una (una
+Place Details pidiendo solo el nombre y una Geocoding).
+
+| Resultado (Uruguay, al cierre del 2026-11-06) | Lugares |
+|---|---|
+| Aprobados en «Espacio 100% sin gluten» | 7 |
+| Aprobados en «Tiene opciones sin TACC» (10 `options_available` + 3 `celiac_friendly`) | 13 |
+| Descartados | 10 |
+| Marcados «revisado sin evidencia» (siguen en needs_review, fuera del mapa) | 184 |
+| En needs_review sin revisar | 0 |
+| En `outreach_confirmed` | 0 |
+
+- **En 100%:** Bicoque Gluten free, Deli for Life, Nona y Ríccoli (Montevideo); Chipa Way y Danu consciencia saludable (Punta del Este);
+  Las delicias de Paz sin gluten (Salto). Cada uno por la cuenta oficial que revisó el administrador o por su conocimiento directo.
+- **En opciones:** Artesanía Pastelera, Decreto Natural, HARTA CAFÉ, La Cabrona MVD, Moi almacén natural y Niter Alimentos Naturales
+  (Montevideo); Sweetly y los dos locales de Gelatería Il Porto (Punta del Este); Tiben Sin Gluten (Colonia); La Cocina de Pipa y Flor
+  (La Paloma); Puerta al Este Natural y Viandas La Cocina de Pitu (Salto). Il Porto quedó en `celiac_friendly` por la respuesta de la
+  marca al outreach (más de 35 sabores sin TACC, cucuruchos envasados, heladera exclusiva); la respuesta no nombra un local, así que
+  la fila del segundo local lo dice en su nota.
+- **Descartados, por motivo:** no aplica al mapa, comercio general, 4 (Mercado Agrícola de Montevideo, Mercadillo Orgánico, Martin
+  Pescador, Supermercado Betel); no aplica al mapa, no vende al público, 2 (Harina Pan Uruguay, Molino Cañuelas); no es un comercio,
+  2 (Celilife, Loco Suelto); cerrado, 1 (Amores Sin Gluten); evidencia contraria, 1 (Goût).
+- **Marcados:** los lugares sin evidencia pública atribuible al local. Entre ellos están ine Boutique y Biga, que volvieron a
+  needs_review cuando se quitó su evidencia de findmeglutenfree (el administrador los va a contactar), y Monik sin gluten, cuya
+  ficha de Google ya no existe. El flag no protege nada: una tanda o una evidencia nueva los puede volver a evaluar.
+
+**Reglas que salieron de esta revisión:**
+
+- **Una guía de terceros sola no alcanza para publicar.** Una línea en una guía o un directorio de varios negocios (GlutenGo,
+  lugaresingluten, guías de Instagram) es una pista para revisar, no evidencia para aprobar, ni siquiera como opciones. Por esta
+  regla salieron del mapa ine y Biga, y Keto Food, Punto Sano, Punto Dietético y Cafetería Terminal 24hs quedaron marcados.
+- **Una cita de Instagram o Facebook sostiene una etiqueta solo si el administrador revisó la cuenta.** `find_evidence` la marca
+  «no verificable» porque no descarga redes sociales. Sirve cuando el administrador abre la cuenta a mano, confirma que es la del
+  local (dirección, teléfono o ciudad) y guarda la frase de la bio como `--evidence`. Si `social_url` no era esa cuenta, se corrige
+  antes con `CORRECCIÓN MANUAL … cuenta oficial confirmada`. Namasté quedó marcado: su cita hablaba de una cerveza de otra marca, no de la oferta del local.
+  El análisis legal de esas fuentes está en [`docs/legal/fuentes-instagram-facebook.md`](legal/fuentes-instagram-facebook.md).
+- **findmeglutenfree.com queda fuera** de toda fuente automática y no se guarda texto suyo
+  ([entrada](#findmeglutenfreecom-fuera-de-las-fuentes-automáticas-2026-11-06)).
+- **Argentina: los 199 «100% pendientes» bajaron a opciones** el 2026-11-06, con el flag conservado
+  ([entrada](#una-etiqueta-100-que-baja-por-falta-de-evidencia-no-protege-el-lugar-2026-11-06)). Argentina quedó con 29 lugares en
+  100% y ninguno en 100% con el flag.
+
+**Posibles lugares nuevos (sin crear, sin verificar):**
+
+- **@glutenfree.23**, restaurante 100% sin gluten en Unión, Montevideo. La fila «Unión» (1aa3bb94) está descartada porque solo tenía
+  el centroide del barrio. El administrador les va a pedir la dirección donde se retira. La fila QUIOSCO DAIQUIRIS (Barra del Chuy),
+  que apunta a esa cuenta, quedó marcada hasta saber si el quiosco es de ellos.
+- **Café del Mer**, una cafetería dentro del Mercado Agrícola de Montevideo (maM). La única fuente es un comentario de un tercero en
+  Instagram. Si tiene oferta sin gluten propia, es un lugar aparte del mercado, que está descartado.
+
+Ninguno se crea sin un negocio real con atención al público, sus comprobaciones y el «dale» del administrador.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
