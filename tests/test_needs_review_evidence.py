@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from agents.clients.supabase_client import SupabaseClient
-from agents.evidence_finder import quote_terms, source_date
-from agents.validator_agent import PENDING_ADMIN_FLAG, REVIEWED_NO_EVIDENCE_FLAG
+from agents.evidence_finder import TERM_LABELS, quote_terms, source_date
+from agents.validator_agent import PENDING_ADMIN_FLAG, REVIEWED_NO_EVIDENCE_FLAG, ValidatorAgent
 from scripts import find_evidence
 from scripts.review_queue import build_parser, run
 
@@ -81,16 +81,37 @@ def test_the_reviewed_flag_has_no_date_so_the_filter_is_exact():
 
 
 @pytest.mark.parametrize("text, label", [
-    ("Todo nuestro menú es sin TACC", "sin TACC"),
-    ("Productos libres de T.A.C.C. y sin lactosa", "sin TACC"),
-    ("#sintacc #celiacos", "sin TACC"),
+    ("Todo nuestro menú es sin TACC", "sin TACC (rótulo anterior)"),
+    ("Productos libres de T.A.C.C. y sin lactosa", "sin TACC (rótulo anterior)"),
+    ("#sintacc #celiacos", "sin TACC (rótulo anterior)"),
     ("Productos 100% aptos para celíacos", "apto celíacos"),
     ("Apto celiacos, sin gluten", "apto celíacos"),
-    ("Cafetería Gluten Free", "solo sin gluten"),
-    ("Elaboración de comida sin gluten", "solo sin gluten"),
+    ("Cafetería Gluten Free", "sin gluten"),
+    ("Elaboración de comida sin gluten", "sin gluten"),
 ])
-def test_quote_terms_names_the_strongest_wording(text, label):
+def test_quote_terms_names_the_wording(text, label):
     assert quote_terms(text) == label
+
+
+def test_no_wording_is_labelled_weaker_since_sin_tacc_became_sin_gluten():
+    assert "solo" not in " ".join(TERM_LABELS)
+
+
+# "Sin TACC" is the old label: it can be a 100 (an exclusivity phrase) or options (a plain mention), exactly like "sin gluten".
+@pytest.mark.parametrize("text, exclusive", [
+    ("100% sin TACC", True),
+    ("Todo es sin TACC", True),
+    ("Cocina exclusiva, sin TACC", True),
+    ("100% sin gluten", True),
+    ("Todo es sin gluten", True),
+    ("Tenemos opciones sin TACC", False),
+    ("Menú sin TACC", False),
+    ("Productos sin TACC", False),
+    ("Tenemos opciones sin gluten", False),
+    ("No es todo sin TACC", False),
+])
+def test_sin_tacc_is_a_100_only_with_an_exclusivity_phrase(text, exclusive):
+    assert ValidatorAgent.has_exclusive_signal([text]) is exclusive
 
 
 def test_source_date_is_the_date_closest_to_the_quote():

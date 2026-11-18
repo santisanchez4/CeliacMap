@@ -123,7 +123,7 @@ def test_accept_is_a_dry_run_by_default_and_shows_the_note_the_level_and_the_evi
     assert db.updates == [] and db.evidence == [] and db.logs == []
     assert "Tiempo Libre" in text and "https://tiempolibre.com.ar" in text
     # An options acceptance changes what people see, and the dry run says so.
-    assert "Espacio 100% sin gluten" in text and "Tiene opciones sin TACC" in text
+    assert "Espacio 100% sin gluten" in text and "Tiene opciones sin gluten" in text
     assert "evidencia a guardar: 2 fila(s)" in text and "evidencia a guardar: 1 fila(s)" in text
 
 

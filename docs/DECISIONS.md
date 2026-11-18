@@ -4962,6 +4962,18 @@ no cambia: `safety_level` sigue con sus tres valores y el mapa sigue con dos eti
   usando); (3) el `RUBRIC`, cuya flag «Menciona "sin gluten" pero no "sin TACC"» queda invertida con la norma, con A/B
   medido; (4) los prompts del chatbot y sus respuestas fijas de `index.ts`, que todavía dicen «Tiene opciones sin TACC»,
   en el próximo lote con la batería de jailbreak. Hasta el paso 4, el chat puede nombrar la etiqueta vieja.
+- **Paso 2 (hecho, 2026-11-18, sin llamadas pagas):** cómo se lee la evidencia. La regla 100 / opciones ya era la correcta
+  y ahora la fija un test: «100% sin TACC», «todo es sin TACC» o «cocina exclusiva» proponen 100 (sigue pidiendo la
+  verificación del admin); «opciones / menú / productos sin TACC» o un «sin TACC» suelto son opciones, igual que «sin
+  gluten». Cambia lo que ve el admin: `quote_terms` ya no ordena por fuerza (`sin TACC (rótulo anterior)` / `apto
+  celíacos` / `sin gluten`, sin el «solo sin gluten» que copiaba la flag del RUBRIC), la nota de aceptación dice
+  «opciones sin gluten» y `review_queue`, `cap_unsupported_100` y `moderate_opinions` muestran la etiqueta nueva. Las
+  búsquedas no cambian: «sin gluten» ya estaba en los términos de Search, Social y en los hashtags, y sumar términos
+  agrega llamadas pagas por corrida. Las notas viejas de `validation_notes` con «Tiene opciones sin TACC» no se
+  reescriben (son historia; ninguna regla depende de ese texto).
+- **Hueco abierto:** la regex de exclusividad del Validator (`_EXCLUSIVE_SIGNAL_RE`, Tope C) no reconoce «100% sin
+  T.A.C.C.», «#100sintacc» ni «libre de TACC». Ampliarla relaja un tope de salud, así que queda para decidir con el
+  paso 3.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 

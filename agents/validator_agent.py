@@ -472,7 +472,7 @@ class ValidatorAgent(BaseAgent):
         """Tope C: "gluten_free_100" only survives with an explicit exclusivity phrase in the
         evidence the model saw (reviews + place_evidence) — never from the name, never from the
         model's own knowledge. Without it the level drops to "celiac_friendly" (public label
-        "Tiene opciones sin TACC") and the place is flagged for the admin, who confirms 100%.
+        "Tiene opciones sin gluten") and the place is flagged for the admin, who confirms 100%.
 
         The reverse case is flagged too: the evidence DOES state exclusivity but the model kept a
         lower level (measured 2026-09-25: a Los Leños-like place with "todo es sin gluten" on its

@@ -67,8 +67,8 @@ _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 WARNING_DAYS = 30
 LEVEL_LABELS = {
     "gluten_free_100": "Espacio 100% sin gluten",
-    "celiac_friendly": "Tiene opciones sin TACC",
-    "options_available": "Tiene opciones sin TACC",
+    "celiac_friendly": "Tiene opciones sin gluten",
+    "options_available": "Tiene opciones sin gluten",
 }
 _TRI = {True: "sí", False: "no", None: "sin dato"}
 QUEUE_FLAGS = (PENDING_ADMIN_FLAG, REVIEWED_NO_EVIDENCE_FLAG)  # a decision takes the place out of both queues

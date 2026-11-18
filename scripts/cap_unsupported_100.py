@@ -4,7 +4,7 @@ Tope C now keeps a Validator ``gluten_free_100`` only when the reviews / evidenc
 the place is exclusively gluten free. This script applies the same rule to the places approved
 before it existed: for each approved ``gluten_free_100`` place WITHOUT a manual-override marker, if
 neither its reviews nor its ``place_evidence`` contain an explicit exclusivity phrase, its level goes
-down to ``celiac_friendly`` (public label "Tiene opciones sin TACC") with the
+down to ``celiac_friendly`` (public label "Tiene opciones sin gluten") with the
 ``100% pendiente de confirmación del administrador`` flag, so the admin can confirm it with
 ``scripts/review_queue.py --pending-100``. Status, confidence and ``verified`` are not touched.
 
@@ -32,7 +32,7 @@ from agents.manual_overrides import manual_override_marker
 from agents.validator_agent import PENDING_ADMIN_FLAG, ValidatorAgent
 
 HEADER = "CORRECCIÓN RETROACTIVA DE NIVEL ({day}): el 100% no tenía evidencia explícita de cocina exclusiva " \
-         "(reseñas ni evidencia guardada); pasa a 'Tiene opciones sin TACC' hasta que el admin lo confirme."
+         "(reseñas ni evidencia guardada); pasa a 'Tiene opciones sin gluten' hasta que el admin lo confirme."
 
 
 def _flag_only(db, places: list[dict], keep_manual: int, keep_signal: int, to_cap: list[dict], apply: bool, out) -> int:
@@ -87,7 +87,7 @@ def run(db, apply: bool, limit: int = 2000, out=print, flag_only: bool = False) 
         return _flag_only(db, places, keep_manual, keep_signal, to_cap, apply, out)
 
     out(f"{len(places)} lugares 100% aprobados: {keep_manual} con decisión manual (no se tocan), "
-        f"{keep_signal} con evidencia explícita (se quedan), {len(to_cap)} pasarían a 'Tiene opciones sin TACC':")
+        f"{keep_signal} con evidencia explícita (se quedan), {len(to_cap)} pasarían a 'Tiene opciones sin gluten':")
     for p in to_cap:
         out(f"  {p['id']}  {p.get('name')} — {p.get('city')}, {p.get('country')} (fuente {p.get('source')})")
     if not to_cap:
