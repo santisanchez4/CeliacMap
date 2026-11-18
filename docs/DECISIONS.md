@@ -4948,9 +4948,31 @@ Ninguno se crea sin un negocio real con atención al público, sus comprobacione
 
 ### «Sin TACC» sale del sitio público: la etiqueta pasa a «Tiene opciones sin gluten» (2026-11-18)
 
-Según el administrador, una norma nueva en Argentina reemplaza el rótulo «sin TACC» por «sin gluten», porque trigo, avena,
-cebada y centeno pueden elaborarse ahora sin gluten (referencia de la norma: pendiente de registrar aquí). La clasificación
-no cambia: `safety_level` sigue con sus tres valores y el mapa sigue con dos etiquetas públicas.
+La norma es la **Resolución Conjunta 32/2023** (RESFC-2023-32-APN-SCS#MS) de la Secretaría de Agricultura, Ganadería y
+Pesca y la Secretaría de Calidad en Salud, publicada en el Boletín Oficial el 2023-12-01
+(<https://www.boletinoficial.gob.ar/detalleAviso/primera/299624/20231201>). Modifica los artículos 1383 y 1383 bis del
+Código Alimentario Argentino:
+- **Definición:** es «libre de gluten» un alimento que lo es por sus ingredientes **o por un proceso tecnológico adecuado
+  que quita el gluten**, con buenas prácticas que eviten la contaminación cruzada; no puede tener prolaminas ni glutelinas
+  de trigo, centeno, cebada, avena ni sus variedades cruzadas, y el gluten no puede superar **10 mg/kg**.
+- **Rótulo y logo:** el nombre del producto seguido de «libre de gluten» y el logo obligatorio con la leyenda **«SIN
+  GLUTEN»**. La norma ya no usa «sin TACC».
+- **Plazo:** rige desde el día siguiente a su publicación, y las empresas con productos ya aprobados tienen **3 años para
+  adecuarse**. El plazo vence alrededor del 2026-12-02; la fecha es una cuenta nuestra, el texto no la escribe.
+
+Esto se leyó del aviso del Boletín Oficial. El resumen de Scribd que aportó el administrador
+(<https://es.scribd.com/document/791569868/Alimentos-sin-TACC-Nueva-normativa>) es una fuente secundaria y no se leyó.
+
+**Aplica a los dos países por igual.** La norma es argentina; según el administrador, Uruguay no tiene una ley equivalente.
+CeliacMap usa el mismo criterio en Uruguay y en Argentina: las mismas etiquetas públicas, la misma lectura de la evidencia
+y el mismo RUBRIC, sin reglas por país. Razones del administrador: en Uruguay se venden muchos productos argentinos con
+el rótulo nuevo, y «tiene gluten o no tiene» es más simple de entender que «sin TACC», que hay que explicar. Un rótulo «sin TACC» sigue siendo evidencia válida en los dos países: es el
+rótulo anterior en Argentina y todavía es habitual en Uruguay.
+
+La clasificación no cambia: `safety_level` sigue con sus tres valores y el mapa sigue con dos etiquetas públicas.
+
+**Para el paso 3:** «libre de gluten» y el logo «SIN GLUTEN» pasan a ser el rótulo oficial argentino y tienen que pesar
+lo mismo que «sin TACC». Ningún rótulo, viejo o nuevo, dice por sí solo que la cocina del local sea exclusiva.
 
 - **Paso 1 (este cambio, solo frontend):** la etiqueta «Tiene opciones sin TACC» pasa a «Tiene opciones sin gluten» y
   todo el texto público (landing, chips, leyenda, ranking, widget del chat, manifest, términos y política) dice «sin
