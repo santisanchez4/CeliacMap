@@ -265,6 +265,7 @@ def main() -> int:
     ap.add_argument("--n", type=int, default=4, help="samples per case and arm")
     ap.add_argument("--arms", default="NEW", help="candidate arms: NEW (working tree) and/or the variants B, A (comma-separated)")
     ap.add_argument("--set", choices=sorted(SETS), default="base", help="base (iterations 1-2) or strong (iteration 3)")
+    ap.add_argument("--cases", help="comma-separated scenario names: run only these (iteration 6)")
     ap.add_argument("--schema", action="store_true", help="candidate arms ask for VERDICT_SCHEMA (structured outputs); OLD never does")
     ap.add_argument("--old-log", type=Path, action="append", default=[], help="reuse the OLD arm of a previous run's log; OLD runs only for the cases missing there")
     ap.add_argument("--max-calls", type=int, required=True, help="hard cap on paid calls; the run aborts when reached")
@@ -279,6 +280,13 @@ def main() -> int:
         if rubrics[arm] == old_rubric:
             raise SystemExit(f"arm {arm} is identical to the OLD RUBRIC: nothing to compare")
     scenarios, controls = SETS[args.set]
+    if args.cases:
+        wanted = set(args.cases.split(","))
+        unknown = wanted - set(scenarios) - set(controls)
+        if unknown:
+            raise SystemExit(f"unknown case(s) in set {args.set}: {sorted(unknown)}")
+        scenarios = {k: v for k, v in scenarios.items() if k in wanted}
+        controls = {k: v for k, v in controls.items() if k in wanted}
     cases = build_cases(scenarios, controls)
     old_known = {}
     for log in args.old_log:
