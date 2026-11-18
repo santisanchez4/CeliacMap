@@ -109,6 +109,15 @@ def test_no_wording_is_labelled_weaker_since_sin_tacc_became_sin_gluten():
     ("Productos sin TACC", False),
     ("Tenemos opciones sin gluten", False),
     ("No es todo sin TACC", False),
+    # The same claim spelled differently (2026-11-18).
+    ("100% sin T.A.C.C.", True),
+    ("100% libre de TACC", True),
+    ("#100sintacc #celiacos", True),
+    ("Todo libre de TACC", True),
+    ("Local libre de TACC", True),
+    ("Tenemos 100 productos sin TACC", False),
+    ("Más de 1100sintacc", False),
+    ("No es 100% sin T.A.C.C.", False),
 ])
 def test_sin_tacc_is_a_100_only_with_an_exclusivity_phrase(text, exclusive):
     assert ValidatorAgent.has_exclusive_signal([text]) is exclusive

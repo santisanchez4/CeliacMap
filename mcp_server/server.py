@@ -49,7 +49,7 @@ from agents.clients.google_places import GooglePlacesClient
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
 from agents.suggestion_agent import promote_suggestion
-from agents.validator_agent import RUBRIC, ValidatorAgent
+from agents.validator_agent import RUBRIC, VERDICT_SCHEMA, ValidatorAgent
 from config.settings import get_settings
 
 # ── Inicialización ──────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ def validate_place(
         f"Evidencia recopilada:\n{evidence}"
     )
 
-    raw = agent.llm.complete_json(RUBRIC, user_prompt)
+    raw = agent.llm.complete_json(RUBRIC, user_prompt, schema=VERDICT_SCHEMA)
     # The evidence text the caller pasted is what the model saw, so it is also what Tope C
     # (100% only with an explicit exclusivity phrase) checks.
     v = agent._normalize(raw, place, evidence=[{"source": "admin", "text": evidence}])

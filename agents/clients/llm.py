@@ -50,13 +50,18 @@ class LLMClient:
         self._client = anthropic.Anthropic(api_key=api_key)
         self.default_model = default_model
 
-    def _create(self, system: str, user: str, model: str | None, max_tokens: int):
+    def _create(self, system: str, user: str, model: str | None, max_tokens: int, schema: dict | None = None):
+        extra = {}
+        if schema is not None:
+            # Structured outputs (GA): the reply is constrained to this JSON schema, so it always parses.
+            extra["output_config"] = {"format": {"type": "json_schema", "schema": schema}}
         return self._client.messages.create(
             model=model or self.default_model,
             max_tokens=max_tokens,
             # System sent as a cacheable block — reused across a batch of candidates.
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user}],
+            **extra,
         )
 
     @staticmethod
@@ -66,9 +71,9 @@ class LLMClient:
         )
 
     def complete_text(
-        self, system: str, user: str, model: str | None = None, max_tokens: int = 1024
+        self, system: str, user: str, model: str | None = None, max_tokens: int = 1024, schema: dict | None = None
     ) -> str:
-        resp = self._create(system, user, model, max_tokens)
+        resp = self._create(system, user, model, max_tokens, schema)
         if getattr(resp, "usage", None):
             logger.debug("tokens in=%s out=%s", resp.usage.input_tokens, resp.usage.output_tokens)
             # Kept for callers that report spend (the evidence finder); the last call only.
@@ -76,10 +81,11 @@ class LLMClient:
         return self._text(resp)
 
     def complete_json(
-        self, system: str, user: str, model: str | None = None, max_tokens: int = 1024
+        self, system: str, user: str, model: str | None = None, max_tokens: int = 1024, schema: dict | None = None
     ) -> dict[str, Any]:
-        """Return a parsed JSON object from the model (for structured verdicts)."""
-        return _parse_json(self.complete_text(system, user, model=model, max_tokens=max_tokens))
+        """Return a parsed JSON object from the model (for structured verdicts). With ``schema``, the reply is
+        constrained to it (structured outputs), so a malformed reply cannot happen."""
+        return _parse_json(self.complete_text(system, user, model=model, max_tokens=max_tokens, schema=schema))
 
     def research_with_web_search(
         self,

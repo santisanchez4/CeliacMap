@@ -34,6 +34,22 @@ logger = logging.getLogger("celiacmap.agent")
 ALLOWED_CATEGORIES = {"restaurant", "cafe", "shop"}
 ALLOWED_SAFETY = {"gluten_free_100", "celiac_friendly", "options_available"}
 ALLOWED_VERDICTS = {"approved", "rejected", "needs_review"}
+# The verdict shape the RUBRIC asks for, sent as a structured output (2026-11-18): the reply always parses. It only constrains the
+# shape; _normalize still coerces every value and enforces the gates. No numeric bounds: structured outputs do not support them.
+VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {"type": "string", "enum": sorted(ALLOWED_VERDICTS)},
+        "confidence_score": {"type": "number"},
+        "category": {"type": "string", "enum": sorted(ALLOWED_CATEGORIES)},
+        "safety_level": {"type": "string", "enum": sorted(ALLOWED_SAFETY)},
+        "reasoning": {"type": "string"},
+        "flags": {"type": "array", "items": {"type": "string"}},
+        "recommendation": {"type": "string"},
+    },
+    "required": ["verdict", "confidence_score", "category", "safety_level", "reasoning", "flags", "recommendation"],
+    "additionalProperties": False,
+}
 # Map scope rules (2026-10-13): general retail, or a place that teaches or informs without selling to the public, does not apply to
 # the map. Decided only in code, by agents/map_scope.py, before the model is called; the RUBRIC knows nothing about scope (six
 # wordings measured against the real model all moved safety verdicts). The verdict is discarded at any confidence.
@@ -73,13 +89,16 @@ UNATTRIBUTED_ROW_PREFIX = "(no atribuible: publicación de redes sin autor verif
 # Tope C (audit plan step 2): an automatic "gluten_free_100" needs an explicit exclusivity
 # phrase in the evidence the model was given (reviews + place_evidence). The place's NAME
 # never counts: it is not in the texts searched here. Matched after lower-casing and
-# stripping accents.
+# stripping accents. "TACC" is also matched as "T.A.C.C." and after "libre de" (the same claim, spelled
+# differently); "#100sintacc" only as one word, so "100 productos sin TACC" is not a 100.
+_TACC = r"t\.?\s?a\.?\s?c\.?\s?c\b"
 _EXCLUSIVE_SIGNAL_RE = re.compile(
-    r"100\s*%\s*(?:sin (?:gluten|tacc)|libre de gluten|gluten[ -]?free|apto|celiac)"
+    rf"100\s*%\s*(?:sin (?:gluten|{_TACC})|libre de (?:gluten|{_TACC})|gluten[ -]?free|apto|celiac)"
+    r"|(?<![\w.])100sin(?:tacc|gluten)\b"
     r"|(?:todo|toda|totalmente|exclusivamente|solo|solamente|unicamente)\s+(?:es\s+|lo que \w+\s+es\s+)?"
-    r"(?:sin (?:gluten|tacc)|libre de gluten|gluten[ -]?free|apto para celiac)"
+    rf"(?:sin (?:gluten|{_TACC})|libres? de (?:gluten|{_TACC})|gluten[ -]?free|apto para celiac)"
     r"|cocina (?:exclusiva|dedicada|100\s*%)"
-    r"|(?:espacio|local|lugar|panaderia|restaurante|cafe) (?:100\s*% )?libre de gluten"
+    rf"|(?:espacio|local|lugar|panaderia|restaurante|cafe) (?:100\s*% )?libre de (?:gluten|{_TACC})"
 )
 _NEGATION_RE = re.compile(r"\bno\s+(?:es\s+|son\s+|tiene\s+)?$")
 # Sentences that tie a person (owner) to celiac disease: a third party's health condition,
@@ -329,7 +348,7 @@ class ValidatorAgent(BaseAgent):
             # Deterministic layer of the map scope rules: no model call, no safety judgement.
             return self._not_applicable(place, excluded.kind, excluded.detail)
         raw = self.llm.complete_json(
-            RUBRIC, self._build_user_prompt(place, reviews, claims, evidence), model=self.model
+            RUBRIC, self._build_user_prompt(place, reviews, claims, evidence), model=self.model, schema=VERDICT_SCHEMA
         )
         return self._normalize(raw, place, claims, reviews=reviews, evidence=evidence)
 
