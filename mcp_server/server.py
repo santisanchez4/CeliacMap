@@ -49,7 +49,7 @@ from agents.clients.google_places import GooglePlacesClient
 from agents.clients.llm import LLMClient
 from agents.clients.supabase_client import SupabaseClient
 from agents.suggestion_agent import promote_suggestion
-from agents.validator_agent import RUBRIC, VERDICT_SCHEMA, ValidatorAgent
+from agents.validator_agent import RUBRIC, VERDICT_SCHEMA, ValidatorAgent, canonical_wording
 from config.settings import get_settings
 
 # ── Inicialización ──────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ def validate_place(
         f"Nombre: {name}\n"
         f"Dirección: {address}\n"
         f"Ciudad: {city}\n\n"
-        f"Evidencia recopilada:\n{evidence}"
+        f"Evidencia recopilada:\n{canonical_wording(evidence)}"
     )
 
     raw = agent.llm.complete_json(RUBRIC, user_prompt, schema=VERDICT_SCHEMA)

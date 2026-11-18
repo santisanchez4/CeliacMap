@@ -101,6 +101,26 @@ _EXCLUSIVE_SIGNAL_RE = re.compile(
     rf"|(?:espacio|local|lugar|panaderia|restaurante|cafe) (?:100\s*% )?libre de (?:gluten|{_TACC})"
 )
 _NEGATION_RE = re.compile(r"\bno\s+(?:es\s+|son\s+|tiene\s+)?$")
+
+# One wording for the model (2026-11-18). Resolución Conjunta 32/2023 replaces the «sin TACC» label with «sin gluten», and
+# CeliacMap treats both the same in Uruguay and Argentina. Measured against the real model (db/checks/validator_wording_ab.py,
+# iterations 1-4), no RUBRIC wording made it weigh them equally: with the same evidence «sin TACC» was approved and «sin gluten»
+# was not. So the reviews and evidence the model reads say «sin gluten»; the stored texts, the place's name and Tope C
+# (has_exclusive_signal, which reads the original texts) are untouched.
+_TACC_WORDING_RE = re.compile(
+    r"(?<![\w.])(?:(sin|libres?\s+de)\s+(?:t\.\s?a\.\s?c\.\s?c\.?|tacc\b)|#?sintacc\b)", re.IGNORECASE)
+
+
+def canonical_wording(text: str) -> str:
+    """The text with every «sin TACC» spelling written as «sin gluten» («libre de TACC» as «libre de gluten»)."""
+    def repl(m: re.Match) -> str:
+        whole = m.group(0)
+        if whole.lower().lstrip("#") == "sintacc":
+            return ("#" if whole.startswith("#") else "") + "singluten"
+        lead = m.group(1)
+        return ("libre de gluten" if lead.lower().startswith("libre") and not lead.lower().startswith("libres")
+                else "libres de gluten" if lead.lower().startswith("libres") else "sin gluten")
+    return _TACC_WORDING_RE.sub(repl, text or "")
 # Sentences that tie a person (owner) to celiac disease: a third party's health condition,
 # never persisted to the publicly readable places columns (ADR-007).
 _OWNER_HEALTH_RE = re.compile(r"(?:due[nñ]|propietari|owner)\w*[^.;\n]{0,60}cel[ií]ac|cel[ií]ac\w*[^.;\n]{0,60}(?:due[nñ]|propietari|owner)", re.IGNORECASE)
@@ -237,7 +257,8 @@ class ValidatorAgent(BaseAgent):
             )
 
         snippets = [
-            (r.get("text") or "").strip() for r in (reviews or []) if (r.get("text") or "").strip()
+            canonical_wording((r.get("text") or "").strip())
+            for r in (reviews or []) if (r.get("text") or "").strip()
         ]
         if snippets:
             prompt += "\n\nCommunity review signals:\n" + "\n".join(
@@ -264,7 +285,7 @@ class ValidatorAgent(BaseAgent):
         for e in ValidatorAgent._attributable(evidence)[:MAX_EVIDENCE]:
             if not isinstance(e, dict):
                 continue
-            text = " ".join(str(e.get("text") or "").split())[:MAX_EVIDENCE_CHARS]
+            text = canonical_wording(" ".join(str(e.get("text") or "").split()))[:MAX_EVIDENCE_CHARS]
             url = str(e.get("url") or "").strip()
             if not text and not url:
                 continue

@@ -94,7 +94,13 @@ CONTROLS = {
                                web("Panes bajos en gluten y reducidos en gluten, ideales para una dieta liviana.", "https://sol.example")),
     "dietas_especiales": lambda: ({**UY, "name": "Restaurante Sabores", "category": "restaurant"},
                                   review("Apto para dietas especiales, muy buena atención"), []),
+    # Iteration 4 (admin, 2026-11-18): "bajo / reducido en gluten" does not exist, it has gluten. A place that also sells a real
+    # gluten-free line is not discarded for it, but it cooks with gluten: never 100.
+    "mixto_bajo_y_sin": lambda: ({**UY, "name": "Panadería Trigal", "category": "cafe"}, [],
+                                 web("Línea sin gluten certificada, elaborada en un sector aparte. También vendemos panes reducidos "
+                                     "en gluten.", "https://trigal.example")),
 }
+ALWAYS_DISCARDED = {"bajo_en_gluten"}  # iteration 4: the admin's rule, discarded in every sample
 NEVER_APPROVED = {"mencion_suelta", "cocina_compartida", "solo_geocode", "contradictorio", "bajo_en_gluten", "dietas_especiales"}
 NEVER_100 = set(SCENARIOS) - {"exclusivo_redes"} | set(CONTROLS)
 
@@ -135,6 +141,11 @@ APPROVED_TEXT = {
     "A2": ('Evidencia explícita y clara de que el lugar ofrece opciones sin gluten: mención directa de "sin gluten", '
            '"libre de gluten" o "sin TACC" acompañada de certificación, preparación dedicada o protocolo '
            'anti-contaminación cruzada. Los tres términos pesan igual: ninguno es más fuerte que otro.'),
+    # Iteration 5: no wording neutralised the model's own preference for «sin TACC» (iterations 1-4), so the code now shows the
+    # model «sin gluten» wherever a text says «sin TACC» (canonical_wording). A3 = A's criterion + the admin's flag.
+    "A3": ('Evidencia explícita y clara de que el lugar ofrece opciones sin gluten: mención directa de "sin gluten", '
+           '"libre de gluten" o "sin TACC" acompañada de certificación, preparación dedicada o protocolo '
+           'anti-contaminación cruzada.'),
 }
 COMMON_EDITS = (
     ('- Menciona "sin gluten" pero no "sin TACC" (puede ser marketing, no médico)',
@@ -144,9 +155,23 @@ COMMON_EDITS = (
 )
 
 
+_REDUCED_FLAG = (
+    '- Dice "bajo en gluten", "reducido en gluten" o algo similar: eso NO es sin gluten, el producto tiene gluten. '
+    'Si es la única oferta para celíacos, el veredicto es "rejected"')
+FLAG_TEXT = {
+    "A3": _REDUCED_FLAG,
+    # Iteration 4 (admin, 2026-11-18): "reducido en gluten" does not exist as a category; it has gluten, end of story.
+    "A2": ('- Dice "bajo en gluten", "reducido en gluten" o algo similar: eso NO es sin gluten, el producto tiene gluten. '
+           'Si es la única oferta para celíacos, el veredicto es "rejected"'),
+}
+
+
 def variant(old: str, name: str) -> str:
     text = old
-    for before, after in ((OLD_APPROVED, APPROVED_TEXT[name]),) + COMMON_EDITS:
+    edits = list(COMMON_EDITS)
+    if name in FLAG_TEXT:
+        edits[0] = (edits[0][0], FLAG_TEXT[name])
+    for before, after in [(OLD_APPROVED, APPROVED_TEXT[name])] + edits:
         if text.count(before) != 1:
             raise SystemExit(f"variant {name}: expected one {before[:50]!r} in the OLD RUBRIC")
         text = text.replace(before, after)
@@ -198,6 +223,7 @@ def counts(outs):
     ok = [o for o in outs if o is not None]
     return {"approved": sum(o["status"] == "approved" for o in ok),
             "100": sum(o["safety_level"] == "gluten_free_100" for o in ok),
+            "discarded": sum(o["status"] == "discarded" for o in ok),
             "malformed": len(outs) - len(ok)}
 
 
@@ -226,6 +252,8 @@ def check(results, n, arms, scenarios=SCENARIOS, strong=False):
                 fails[arm].append(f"malformed {scenario} ({key}): {c['malformed']}/{n} replies were not valid JSON")
             if scenario in NEVER_APPROVED and c["approved"]:
                 fails[arm].append(f"never {scenario} ({key}): approved in {c['approved']}/{n}")
+            if not strong and scenario in ALWAYS_DISCARDED and c.get("discarded", n) < n:
+                fails[arm].append(f"discard {scenario} ({key}): discarded in {c.get('discarded')}/{n}, not in every sample")
             if scenario in never_100 and c["100"]:
                 fails[arm].append(f"never {scenario} ({key}): gluten_free_100 in {c['100']}/{n}")
     return fails
@@ -256,8 +284,16 @@ def main() -> int:
     for log in args.old_log:
         old_known.update(old_counts_from_log(log))
     old_todo = [c for c in cases if (c[0], c[1]) not in old_known]
-    planned = (len(cases) * len(rubrics) + len(old_todo)) * args.n
-    print(f"PLAN: {len(cases)} case(s) x {len(rubrics)} candidate arm(s) {list(rubrics)} + OLD for {len(old_todo)} case(s) "
+    if old_todo:
+        raise SystemExit("OLD must come from the logs: the prompts are now built with canonical_wording, which production does not use")
+    # canonical_wording makes the «sin TACC» and «sin gluten» prompts of a scenario identical: each prompt is sampled once per arm.
+    same_as, seen = {}, {}
+    for scenario, key, (place, reviews, evidence) in cases:
+        prompt = ValidatorAgent._build_user_prompt(place, reviews, None, evidence)
+        same_as[(scenario, key)] = seen.setdefault((scenario, prompt), key)
+    unique = sum(1 for (s_, k_), first in same_as.items() if first == k_)
+    planned = (unique * len(rubrics) + len(old_todo)) * args.n
+    print(f"PLAN: {len(cases)} case(s), {unique} distinct prompt(s), x {len(rubrics)} candidate arm(s) {list(rubrics)} + OLD for {len(old_todo)} case(s) "
           f"(reused from the log: {len(old_known)}), n={args.n} = {planned} call(s) to {MODEL}, ~US${planned * COST_PER_CALL_USD:.2f}; "
           f"hard cap {args.max_calls} call(s) (~US${args.max_calls * COST_PER_CALL_USD:.2f})")
     if planned > args.max_calls:
@@ -281,6 +317,12 @@ def main() -> int:
         arms = [("OLD", old_rubric)] if (scenario, key) not in old_known else []
         if (scenario, key) in old_known:
             print(f"  OLD (from the log): {old_known[(scenario, key)]}")
+        first = same_as[(scenario, key)]
+        if first != key:
+            for arm in rubrics:
+                results[(scenario, key, arm)] = results[(scenario, first, arm)]
+            print(f"  same prompt as [{first}]: results reused, no call")
+            continue
         for arm, rubric in arms + list(rubrics.items()):
             def sample(_):
                 cap.spend()

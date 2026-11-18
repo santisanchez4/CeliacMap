@@ -245,7 +245,7 @@ def test_user_prompt_includes_review_snippets():
     reviews = [{"text": "Tienen opciones sin TACC"}, {"text": ""}]
     prompt = ValidatorAgent._build_user_prompt(place, reviews)
     assert "Community review signals:" in prompt
-    assert "Tienen opciones sin TACC" in prompt
+    assert "Tienen opciones sin gluten" in prompt  # canonical wording (2026-11-18)
 
 
 def test_user_prompt_without_reviews_has_no_signals_section():
@@ -563,7 +563,7 @@ def test_evidence_block_renders_source_text_and_url():
     )
     assert "evidencia_descubrimiento (NO verificada):" in prompt
     assert "- [redes sociales] Los Leños — todo es sin gluten (fuente: https://instagram.com/x)" in prompt
-    assert "- [aporte de una persona (formulario)] cocinan todo sin tacc" in prompt
+    assert "- [aporte de una persona (formulario)] cocinan todo sin gluten" in prompt
 
 
 def test_no_evidence_leaves_the_prompt_as_before():
@@ -591,7 +591,7 @@ def test_run_feeds_place_evidence_into_prompt():
     ValidatorAgent(db, llm).run()
 
     db.fetch_place_evidence.assert_called_once_with("p1")
-    assert "blog: todo sin TACC" in llm.complete_json.call_args.args[1]
+    assert "blog: todo sin gluten" in llm.complete_json.call_args.args[1]
     # the phrase is explicit, so the 100% survives Tope C
     assert db.update_place_validation.call_args.kwargs["safety_level"] == "gluten_free_100"
 
