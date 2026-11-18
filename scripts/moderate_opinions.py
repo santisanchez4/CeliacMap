@@ -58,7 +58,7 @@ def _print_pending(rows: list[dict], out) -> None:
         if place.get("safety_level") != "gluten_free_100" and ValidatorAgent.has_exclusive_signal([r.get("description")]):
             # Audit plan step 5: a public card must not contradict the map's label.
             out("  ⚠ AVISO: el texto dice que el lugar es 100% / exclusivo sin gluten, pero en el mapa figura como")
-            out("    'Tiene opciones sin TACC'. Si lo publicás, la tarjeta contradice la etiqueta. Revisá el nivel")
+            out("    'Tiene opciones sin gluten'. Si lo publicás, la tarjeta contradice la etiqueta. Revisá el nivel")
             out("    (scripts/review_queue.py --approve ID --level 100) o no la publiques así.")
 
 

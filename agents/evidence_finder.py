@@ -445,12 +445,14 @@ def _fold(text: str | None) -> str:
 
 _TACC_RE = re.compile(r"(?<![a-z])(?:sin|libres?\s+de)\s+t\.?\s?a\.?\s?c\.?\s?c\b|sintacc", re.IGNORECASE)
 _APTO_CELIACO_RE = re.compile(r"\bapt[oa]s?\s+(?:para\s+)?celiac", re.IGNORECASE)
-TERM_LABELS = ("sin TACC", "apto celíacos", "solo sin gluten")
+TERM_LABELS = ("sin TACC (rótulo anterior)", "apto celíacos", "sin gluten")
 
 
 def quote_terms(text: str | None) -> str:
-    """How a quote says it, strongest first: "sin TACC", "apto celíacos", or "solo sin gluten" (the Validator's flag: a plain
-    "sin gluten" can be marketing). A label for the admin; it changes no proposal."""
+    """How a quote says it: "sin TACC (rótulo anterior)", "apto celíacos" or "sin gluten". No wording is stronger than another:
+    the 2026 Argentine rule replaces the "sin TACC" label with "sin gluten". Whatever the wording, only an exclusivity phrase
+    ("100% sin TACC", "todo es sin gluten": has_signal) makes a quote a 100 candidate; a plain "sin TACC" is options.
+    A label for the admin; it changes no proposal."""
     folded = _fold(text)
     if _TACC_RE.search(folded):
         return TERM_LABELS[0]
@@ -1000,7 +1002,7 @@ def build_acceptance_note(entry) -> tuple[str, list[dict]] | None:
         pool = [c for c in cites if c.get("has_signal") and c.get("alcance") == "establecimiento" and not c.get("contradice")]
         label = "100% sin gluten"
     else:
-        pool, label = cites, "opciones sin TACC"
+        pool, label = cites, "opciones sin gluten"
     if not pool:
         return None
 

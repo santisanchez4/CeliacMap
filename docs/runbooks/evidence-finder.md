@@ -75,8 +75,8 @@ canonical name, so "Departamento de Montevideo", Carrasco and Montevideo all fal
 
 1. `python -m scripts.find_evidence --status needs_review --region Montevideo --max-searches N` — the report says `meta.queue: needs_review`.
    Places marked "revisado sin evidencia" are skipped; `--include-reviewed` brings them back.
-2. `python -m scripts.review_queue --proposals REPORT.json` — each quote now says how it is worded (**sin TACC** / **apto celíacos** /
-   **solo sin gluten**) and the date of the source when one is written within 300 characters of it (a post date in a snippet; approximate,
+2. `python -m scripts.review_queue --proposals REPORT.json` — each quote now says how it is worded (**sin TACC (rótulo anterior)** / **apto celíacos** /
+   **sin gluten**; since 2026-11-18 none is weaker: «sin TACC» is the old label and, like «sin gluten», is a 100 only with an exclusivity phrase) and the date of the source when one is written within 300 characters of it (a post date in a snippet; approximate,
    shown, never used to decide). Same labels in the markdown report.
 3. The four exits, each a dry run until `--apply`:
    - **Options, in bulk:** `--accept-proposals ID… --report REPORT.json` approves the report's `options` as `options_available`, with the

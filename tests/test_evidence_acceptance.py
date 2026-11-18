@@ -104,12 +104,12 @@ def test_a_citation_that_ties_a_person_to_celiac_disease_refuses_the_note_verifi
 
 def test_options_proposals_cite_a_verified_quote_and_have_no_signal_requirement():
     note, store = build_acceptance_note(entry("options", [OPT]))
-    assert note == "evidencia pública para opciones sin TACC: «Tenemos opciones sin TACC.» (https://x.example)" and len(store) == 1
+    assert note == "evidencia pública para opciones sin gluten: «Tenemos opciones sin TACC.» (https://x.example)" and len(store) == 1
 
 
 def test_an_unverified_options_citation_is_not_quoted():
     note, _ = build_acceptance_note(entry("options", [dict(OPT, verificacion="solo_snippet")]))
-    assert note == "evidencia en la web para opciones sin TACC (https://x.example)"
+    assert note == "evidencia en la web para opciones sin gluten (https://x.example)"
 
 
 def test_insuficiente_has_no_note():
