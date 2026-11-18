@@ -4965,7 +4965,8 @@ Esto se leyó del aviso del Boletín Oficial. El resumen de Scribd que aportó e
 
 **Aplica a los dos países por igual.** La norma es argentina; según el administrador, Uruguay no tiene una ley equivalente.
 CeliacMap usa el mismo criterio en Uruguay y en Argentina: las mismas etiquetas públicas, la misma lectura de la evidencia
-y el mismo RUBRIC, sin reglas por país. Un rótulo «sin TACC» sigue siendo evidencia válida en los dos países: es el
+y el mismo RUBRIC, sin reglas por país. Razones del administrador: en Uruguay se venden muchos productos argentinos con
+el rótulo nuevo, y «tiene gluten o no tiene» es más simple de entender que «sin TACC», que hay que explicar. Un rótulo «sin TACC» sigue siendo evidencia válida en los dos países: es el
 rótulo anterior en Argentina y todavía es habitual en Uruguay.
 
 La clasificación no cambia: `safety_level` sigue con sus tres valores y el mapa sigue con dos etiquetas públicas.
