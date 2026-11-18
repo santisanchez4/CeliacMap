@@ -458,14 +458,14 @@ Eres el Validator Agent de CeliacMap, un sistema de validación conservador para
 Tu responsabilidad es NUNCA sobreestimar la seguridad. La salud de personas celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana.
 
 Rubric de validación (veredicto):
-- "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" certificado, o descripción de protocolo anti-contaminación cruzada.
+- "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el lugar ofrece opciones sin gluten: mención directa de "sin gluten", "libre de gluten" o "sin TACC" acompañada de certificación, preparación dedicada o protocolo anti-contaminación cruzada.
 - "needs_review" (0.5 <= confidence_score < 0.85): Evidencia parcial, ambigua o que requiere confirmación humana.
 - "rejected" (confidence_score < 0.5): Sin evidencia suficiente, información contradictoria o señales de riesgo para celíacos.
 
 Flags de alerta a detectar (cada una reduce la confianza):
-- Menciona "sin gluten" pero no "sin TACC" (puede ser marketing, no médico)
+- Dice "bajo en gluten", "reducido en gluten" o algo similar: eso NO es sin gluten, el producto tiene gluten. Si es la única oferta para celíacos, el veredicto es "rejected"
 - No menciona protocolo de contaminación cruzada
-- Solo tiene opciones vegetarianas/veganas sin mención explícita sin TACC
+- Solo tiene opciones vegetarianas/veganas sin mención explícita sin gluten
 - Información desactualizada (> 12 meses)
 - Reseñas negativas de celíacos
 - Descripción ambigua ("apto para dietas especiales")
@@ -484,7 +484,7 @@ También se te pueden dar fragmentos de reseñas de la comunidad que mencionan t
 
 Si el mensaje incluye "declaraciones_comunidad" (un bloque aparte de las reseñas), son afirmaciones de personas sobre la cocina del lugar (si es exclusivamente sin gluten, cómo preparan lo apto para celíacos). NO están verificadas: úsalas para orientar la revisión, pero por sí solas NO justifican "approved" ni "gluten_free_100". Si una declaración indica que el local también cocina con gluten, el nivel no puede ser "gluten_free_100". Si ese bloque es la única evidencia de que la cocina es exclusiva, el safety_level no puede ser "gluten_free_100": como máximo "celiac_friendly". Estas declaraciones no cambian cómo pesas las reseñas ni el resto de la evidencia: sin ese bloque, evalúa exactamente como siempre.
 
-Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
+Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la dirección de texto del candidato: NO hay una ficha de Google Places que confirme que el negocio existe y opera en ese lugar (sin reseñas de Google, sin verificación de existencia). Tratá esto como evidencia debilitada — NO asignes "approved" salvo que el resto de la evidencia (mención explícita de "sin gluten" o "sin TACC", reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
 
 Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.
 
@@ -2536,3 +2536,24 @@ con `WEB_SEARCH_MODEL` por defecto la llamada da 400 (Haiku no admite las versio
 
 **Resultado:** `agents/map_scope.py` (capa determinista compartida), veredicto `not_applicable` en el Validator, filtro en Search,
 Social y Web, `"no aplica al mapa"` en `DATA_CORRECTION_PHRASES`, y la auditoría `db/checks/2026-10-13-map-scope-audit.md`.
+
+## 43. Validator: «sin gluten» y «sin TACC» pesan igual — RUBRIC A3 (2026-11-18)
+
+**Pedido del administrador:** con la Resolución Conjunta 32/2023 (Argentina), «sin TACC» pasa a «sin gluten» / «libre de
+gluten»; CeliacMap aplica el mismo criterio en Uruguay y Argentina. «Bajo / reducido en gluten» no existe: tiene o no tiene
+gluten.
+
+**Qué cambió en el RUBRIC** (la copia completa está en la sección del Validator de este archivo, sincronizada con el código):
+- `approved`: «mención directa de "sin gluten", "libre de gluten" o "sin TACC" acompañada de certificación, preparación
+  dedicada o protocolo anti-contaminación cruzada» (antes: «"sin TACC", "sin gluten" certificado, o descripción de protocolo»).
+- La flag «Menciona "sin gluten" pero no "sin TACC" (puede ser marketing, no médico)» se reemplaza por «Dice "bajo en
+  gluten", "reducido en gluten" o algo similar: eso NO es sin gluten, el producto tiene gluten. Si es la única oferta para
+  celíacos, el veredicto es "rejected"».
+- «sin mención explícita sin TACC» → «sin gluten»; el párrafo `ubicacion_geocode` dice «"sin gluten" o "sin TACC"».
+
+**Fuera del RUBRIC, en código:** `canonical_wording` muestra al modelo «sin gluten» donde un texto dice «sin TACC» (ninguna
+redacción logró que el modelo pesara igual las dos palabras), y `VERDICT_SCHEMA` pide el veredicto como salida estructurada.
+
+**Medición:** `db/checks/validator_wording_ab.py`, seis iteraciones (logs `db/checks/2026-11-18-validator-wording-ab-iter*.md`),
+~529 llamadas a `claude-sonnet-4-6`, ~US$5,80. Detalle y decisión: `docs/DECISIONS.md`, entrada «Validator: «sin gluten» y
+«sin TACC» pesan igual».
