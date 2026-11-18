@@ -1,6 +1,6 @@
 # Política de privacidad de CeliacMap
 
-**Versión 1.1 · Última actualización: 6 de octubre de 2026**
+**Versión 1.1.1 · Última actualización: 18 de noviembre de 2026**
 
 ## 1. Quién es responsable
 
@@ -65,7 +65,7 @@ mismo lugar. Solo se publica el total de votos de cada lugar.
 - **CeliacMap no guarda la conversación completa.** Guardamos un registro de cada turno sin el texto: qué tipo de
   consulta fue y, si buscaste, el lugar o la ciudad.
 - **Guardamos el texto de algunos turnos durante 30 días:** los que el sistema marca como fuera de lo esperado (por
-  ejemplo, un pedido que no es sobre lugares sin TACC ni sobre la celiaquía, un intento de cambiar las reglas del
+  ejemplo, un pedido que no es sobre lugares sin gluten ni sobre la celiaquía, un intento de cambiar las reglas del
   asistente, una consulta médica personal o un exceso de mensajes). Sirve para revisar la seguridad del servicio. El
   borrado es automático y corre una vez por semana, así que puede tardar hasta 7 días más.
 - Si por el chat sumás un lugar o dejás un comentario, ese texto se guarda como en los formularios (3.1 y 3.2). El chat

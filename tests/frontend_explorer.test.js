@@ -146,9 +146,9 @@ Deno.test("safety filters and legend expose two levels", async () => {
   assert.deepEqual(chips, ["all", "gluten_free_100", "options_available"]);
   const legend = Array.from(f.document.querySelectorAll(".map-legend li span:last-child")).map(s => s.textContent);
   assert.deepEqual(legend, [
-    "Espacio 100% sin gluten", "Tiene opciones sin TACC", "Reportado por la comunidad: consultá antes de ir",
+    "Espacio 100% sin gluten", "Tiene opciones sin gluten", "Reportado por la comunidad: consultá antes de ir",
   ]);
-  assert.equal(f.document.querySelector('[data-safety="options_available"]').textContent, "Tiene opciones sin TACC");
+  assert.equal(f.document.querySelector('[data-safety="options_available"]').textContent, "Tiene opciones sin gluten");
 });
 
 Deno.test("the map legend is followed by the 'levels are an estimate' note, in both languages", async () => {
@@ -324,7 +324,7 @@ Deno.test("Top 3 card lists the top three and its country tabs drive the full ra
 Deno.test("ranking rows label celiac_friendly as options, in both languages", async () => {
   const f = await rankingFixture({ votes: { Argentina: placesFor("AR", 1) } });
   const badge = () => f.document.querySelector("#ranking-list .pp-badge");
-  assert.equal(badge().textContent, "Tiene opciones sin TACC");
+  assert.equal(badge().textContent, "Tiene opciones sin gluten");
   assert.ok(badge().classList.contains("pp-badge--options"));
   f.document.documentElement.setAttribute("lang", "en");
   f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:lang"));

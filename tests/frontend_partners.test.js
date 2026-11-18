@@ -96,7 +96,7 @@ Deno.test("the header nav ends with Aliados / Partners pointing at #aliados", as
   assert.equal(text(last), "Partners");
 });
 
-const INVITE_ES = "¿Tenés un negocio sin gluten o sin TACC y querés sumarte como aliado? Escribinos a hola@celiacmap.org.";
+const INVITE_ES = "¿Tenés un negocio sin gluten y querés sumarte como aliado? Escribinos a hola@celiacmap.org.";
 const INVITE_EN = "Run a gluten-free business and want to become a partner? Write to hola@celiacmap.org.";
 const subject = (a) => new URL(a.getAttribute("href")).searchParams.get("subject");
 

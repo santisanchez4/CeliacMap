@@ -257,7 +257,7 @@ serif display headings over a clean sans body, and generous spacing.
 
 - 13 sections: Hero, Problem, Solution, Features, Interactive Map, Community Ranking,
   Suggest a Place, Reviews, AI & Agents, About, Call to Action, Partners, Footer.
-- Bilingual interface: Spanish (default, "sin TACC") with a client-side ES/EN
+- Bilingual interface: Spanish (default, "sin gluten") with a client-side ES/EN
   toggle (remembered via `localStorage`).
 - Floating assistant chat (bottom-right; a bottom sheet on mobile) for finding places,
   leaving a comment and general celiac-disease questions, in Spanish or English.

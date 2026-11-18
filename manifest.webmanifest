@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "CeliacMap — Lugares sin TACC",
+  "name": "CeliacMap — Lugares sin gluten",
   "short_name": "CeliacMap",
-  "description": "Mapa de lugares sin TACC en Uruguay y Argentina, validados con la comunidad.",
+  "description": "Mapa de lugares sin gluten en Uruguay y Argentina, validados con la comunidad.",
   "lang": "es",
   "dir": "ltr",
   "start_url": "./",

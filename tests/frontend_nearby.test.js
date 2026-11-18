@@ -195,11 +195,11 @@ Deno.test("results: the 10 nearest within 5 km, nearest first, each with its pub
   assert.deepEqual(items.map((b) => b.getAttribute("data-nearby-id")), Array.from({ length: 10 }, (_, i) => "near-" + i));
   for (const item of items) {
     const label = item.querySelector(".pp-badge").textContent;
-    assert.ok(["Espacio 100% sin gluten", "Tiene opciones sin TACC"].includes(label), label);
+    assert.ok(["Espacio 100% sin gluten", "Tiene opciones sin gluten"].includes(label), label);
     assert.match(item.querySelector(".nearby-distance").textContent, /^A .+ en línea recta$/);
   }
   assert.equal(items[0].querySelector(".pp-badge").textContent, "Espacio 100% sin gluten");
-  assert.equal(items[1].querySelector(".pp-badge").textContent, "Tiene opciones sin TACC");
+  assert.equal(items[1].querySelector(".pp-badge").textContent, "Tiene opciones sin gluten");
   assert.match(items[1].textContent, /Reportado por la comunidad/);
   assert.match(f.text(), /a menos de 5 km/);
   assert.equal(f.userLayer().size(), 2, "user marker + accuracy circle");

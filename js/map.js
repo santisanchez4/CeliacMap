@@ -35,8 +35,8 @@
       // products/sales) is "100% gluten-free"; celiac_friendly and
       // options_available both read "Has gluten-free options". The DB keeps 3.
       gluten_free_100: { es: "Espacio 100% sin gluten", en: "100% gluten-free venue" },
-      celiac_friendly: { es: "Tiene opciones sin TACC", en: "Has gluten-free options" },
-      options_available: { es: "Tiene opciones sin TACC", en: "Has gluten-free options" }
+      celiac_friendly: { es: "Tiene opciones sin gluten", en: "Has gluten-free options" },
+      options_available: { es: "Tiene opciones sin gluten", en: "Has gluten-free options" }
     },
     status: {
       loading: { es: "Cargando lugares…", en: "Loading places…" },
@@ -677,7 +677,7 @@
     });
     var texts = [
       [".map-legend li:first-child span:last-child", "Espacio 100% sin gluten", "100% gluten-free venue"],
-      [".map-legend li:nth-child(2) span:last-child", "Tiene opciones sin TACC", "Has gluten-free options"],
+      [".map-legend li:nth-child(2) span:last-child", "Tiene opciones sin gluten", "Has gluten-free options"],
       [".map-legend li:nth-child(3) span:last-child", "Reportado por la comunidad: consultá antes de ir", "Reported by the community: check before you go"]
     ];
     texts.forEach(function (item) { var node = document.querySelector(item[0]); if (node) node.textContent = tr(item[1], item[2]); });
@@ -685,7 +685,7 @@
       var level = button.getAttribute("data-safety");
       button.textContent = level === "all" ? tr("Todos los niveles", "All levels") : safetyText(level);
     });
-    document.querySelector(".map-safety-chips").setAttribute("aria-label", tr("Información sin TACC", "Gluten-free information"));
+    document.querySelector(".map-safety-chips").setAttribute("aria-label", tr("Información sin gluten", "Gluten-free information"));
     panelClose.setAttribute("aria-label", tr("Volver al mapa", "Back to map"));
     panelEl.setAttribute("aria-label", tr("Detalle del lugar", "Place details"));
     syncExpandButton();

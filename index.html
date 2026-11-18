@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description"
-    content="CeliacMap — plataforma para encontrar lugares seguros sin TACC: mapa interactivo, reseñas de la comunidad y validación con inteligencia artificial." />
+    content="CeliacMap — plataforma para encontrar lugares seguros sin gluten: mapa interactivo, reseñas de la comunidad y validación con inteligencia artificial." />
   <meta name="theme-color" content="#2d6a4f" />
-  <title>CeliacMap — Lugares seguros sin TACC</title>
+  <title>CeliacMap — Lugares seguros sin gluten</title>
   <!-- No eliminar: verificación de Google Search Console (Google la revalida de forma continua) -->
   <meta name="google-site-verification" content="Y-xfOgPqeCrEqipEx7Ymj0f5FhW11zkvcFItanOqIkA" />
   <link rel="icon" type="image/png" sizes="96x96" href="assets/icons/favicon-96.png" />
@@ -83,12 +83,12 @@
     <section class="hero" id="hero">
       <div class="container hero-inner">
         <div class="hero-content reveal">
-          <span class="eyebrow" data-i18n="hero.eyebrow">Comunidad sin TACC</span>
+          <span class="eyebrow" data-i18n="hero.eyebrow">Comunidad sin gluten</span>
           <h1 class="hero-title" data-i18n="hero.title">
             Comer afuera, sin miedo.
           </h1>
           <p class="hero-subtitle" data-i18n="hero.subtitle">
-            El mapa de lugares sin TACC que la comunidad celíaca valida, cuida y
+            El mapa de lugares sin gluten que la comunidad celíaca valida, cuida y
             hace crecer.
           </p>
           <div class="hero-cta">
@@ -157,7 +157,7 @@
                 <path d="M21 21l-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
               </svg>
               <input type="search" id="place-search" class="map-search-input" autocomplete="off"
-                placeholder="Buscar un lugar sin TACC…" data-i18n-placeholder="map.searchPlaceholder"
+                placeholder="Buscar un lugar sin gluten…" data-i18n-placeholder="map.searchPlaceholder"
                 aria-label="Buscar lugar por nombre" role="combobox" aria-expanded="false"
                 aria-controls="search-suggest" aria-autocomplete="list" />
               <button type="button" id="search-clear" class="map-search-clear"
@@ -180,10 +180,10 @@
               aria-pressed="false" data-i18n="map.chip4">Comercios</button>
           </div>
 
-          <div class="map-safety-chips" role="group" aria-label="Nivel de información sin TACC">
+          <div class="map-safety-chips" role="group" aria-label="Nivel de información sin gluten">
             <button type="button" class="safety-chip is-active" data-safety="all" aria-pressed="true">Todos los niveles</button>
             <button type="button" class="safety-chip safety-chip--dedicated" data-safety="gluten_free_100" aria-pressed="false">Espacio 100% sin gluten</button>
-            <button type="button" class="safety-chip safety-chip--options" data-safety="options_available" aria-pressed="false">Tiene opciones sin TACC</button>
+            <button type="button" class="safety-chip safety-chip--options" data-safety="options_available" aria-pressed="false">Tiene opciones sin gluten</button>
           </div>
 
           <div class="map-toolbar">
@@ -239,7 +239,7 @@
           <p class="map-result-count" id="map-result-count" role="status" aria-live="polite" hidden></p>
 
           <div class="map-wrap">
-            <div id="cm-map" role="application" aria-label="Mapa de lugares sin TACC"></div>
+            <div id="cm-map" role="application" aria-label="Mapa de lugares sin gluten"></div>
             <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
             <div class="map-explore-tools" hidden>
               <button type="button" id="map-expand" aria-expanded="false" aria-controls="map-workspace">Expandir mapa</button>
@@ -257,7 +257,7 @@
 
           <ul class="map-legend">
             <li><span class="dot dot-safe"></span><span>Espacio 100% sin gluten</span></li>
-            <li><span class="dot dot-options"></span><span data-i18n="map.legend2">Tiene opciones sin TACC</span></li>
+            <li><span class="dot dot-options"></span><span data-i18n="map.legend2">Tiene opciones sin gluten</span></li>
             <li><span class="dot dot-warning"></span><span>Reportado por la comunidad: consultá antes de ir</span></li>
           </ul>
           <p class="map-disclaimer" data-i18n="map.disclaimer">
@@ -344,7 +344,7 @@
             Un solo lugar confiable para encontrarlo todo
           </h2>
           <p class="section-lead" data-i18n="solution.lead">
-            Todo lo apto sin TACC, reunido en un mapa claro y cuidado por la comunidad.
+            Todo lo apto sin gluten, reunido en un mapa claro y cuidado por la comunidad.
           </p>
         </header>
 
@@ -542,7 +542,7 @@
         <form class="suggest-form reveal" id="suggest-form" novalidate>
           <h3 class="suggest-form-title" data-i18n="suggest.form.title">¿Conocés un lugar? Agregalo</h3>
           <p class="suggest-form-intro" data-i18n="suggest.form.intro">
-            Contanos de un lugar sin TACC que todavía no está en el mapa. Lo revisamos y, si se
+            Contanos de un lugar sin gluten que todavía no está en el mapa. Lo revisamos y, si se
             confirma, aparece para toda la comunidad.
           </p>
 
@@ -590,7 +590,7 @@
             </div>
             <fieldset class="kitchen-fieldset field-full" id="sg-kitchen" data-kitchen>
               <legend data-i18n="kitchen.legend">Sobre la cocina (opcional, pero ayuda mucho)</legend>
-              <p class="kitchen-intro" data-i18n="kitchen.intro">Sin gluten, sin TACC y apto para celíacos no son lo mismo. Contanos cómo trabajan; lo revisamos antes de decidir qué etiqueta lleva.</p>
+              <p class="kitchen-intro" data-i18n="kitchen.intro">Tener opciones sin gluten y ser un espacio 100% sin gluten no es lo mismo. Contanos cómo trabajan; lo revisamos antes de decidir qué etiqueta lleva.</p>
 
               <div class="kitchen-q">
                 <p class="kitchen-q-title" id="sg-kq1" data-i18n="kitchen.q1">¿La cocina es exclusivamente sin gluten?</p>
@@ -614,7 +614,7 @@
             <div class="field field-full">
               <label for="sg-notes" data-i18n="suggest.form.notes">Notas (opcional)</label>
               <textarea id="sg-notes" name="notes" rows="3" maxlength="1000"
-                placeholder="¿Por qué es apto? ¿Tiene menú sin TACC, certificación, protocolo?"
+                placeholder="¿Por qué es apto? ¿Tiene menú sin gluten, certificación, protocolo?"
                 data-i18n-placeholder="suggest.form.notesPh"></textarea>
             </div>
           </div>
@@ -817,7 +817,7 @@
       <div class="container cta-inner reveal">
         <h2 class="cta-title" data-i18n="cta.title">Sumate a una forma más segura de comer afuera</h2>
         <p class="cta-text" data-i18n="cta.text">
-          Explorá el mapa y sumate a la comunidad que hace simple comer sin TACC.
+          Explorá el mapa y sumate a la comunidad que hace simple comer sin gluten.
         </p>
         <div class="cta-actions">
           <a class="btn btn-accent" href="#map" data-i18n="cta.primary">Explorar el mapa</a>
@@ -850,7 +850,7 @@
         </article>
         <div id="partner-program" hidden></div>
         <div class="partner-invite reveal">
-          <p class="partner-invite-text"><span data-i18n="partners.invite.text">¿Tenés un negocio sin gluten o sin TACC y querés sumarte como aliado? Escribinos a</span>
+          <p class="partner-invite-text"><span data-i18n="partners.invite.text">¿Tenés un negocio sin gluten y querés sumarte como aliado? Escribinos a</span>
             <a href="mailto:hola@celiacmap.org?subject=Quiero%20ser%20aliado%20de%20CeliacMap"
               data-i18n-href="partners.invite.href">hola@celiacmap.org</a>.</p>
         </div>
@@ -874,7 +874,7 @@
           <span class="brand-name">Celiac<strong>Map</strong></span>
         </a>
         <p class="footer-tagline" data-i18n="footer.tagline">
-          Lugares seguros sin TACC, mapeados por la comunidad.
+          Lugares seguros sin gluten, mapeados por la comunidad.
         </p>
       </div>
 
