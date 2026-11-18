@@ -4995,7 +4995,48 @@ lo mismo que «sin TACC». Ningún rótulo, viejo o nuevo, dice por sí solo que
   reescriben (son historia; ninguna regla depende de ese texto).
 - **Hueco abierto:** la regex de exclusividad del Validator (`_EXCLUSIVE_SIGNAL_RE`, Tope C) no reconoce «100% sin
   T.A.C.C.», «#100sintacc» ni «libre de TACC». Ampliarla relaja un tope de salud, así que queda para decidir con el
-  paso 3.
+  paso 3. *(Cerrado en el paso 3: ver la entrada siguiente.)*
+
+### Validator: «sin gluten» y «sin TACC» pesan igual — RUBRIC A3, una sola palabra para el modelo y veredicto estructurado (2026-11-18)
+
+Paso 3 del cambio a «sin gluten». El RUBRIC tenía la flag «Menciona "sin gluten" pero no "sin TACC" (puede ser
+marketing, no médico)», que con la Resolución Conjunta 32/2023 quedó al revés: penaliza a los locales que adoptan el
+rótulo oficial. Se midió en seis iteraciones contra `claude-sonnet-4-6` (`db/checks/validator_wording_ab.py`, logs
+`db/checks/2026-11-18-validator-wording-ab-iter1.md` … `iter6.md`; ~529 llamadas, ~US$5,80, cada corrida con el «dale»
+del administrador y un tope de llamadas). Criterios: **paridad** (la misma evidencia con «sin TACC», «sin gluten» o
+«libre de gluten» recibe el mismo veredicto), **no subir** (nada se aprueba ni se etiqueta 100% más que con el RUBRIC
+anterior), **techo** («sin gluten» nunca más fuerte que el «sin TACC» de antes), **casos que nunca pasan** y, desde la
+iteración 3, **no bajar** las aprobaciones de evidencia fuerte.
+
+- **Ninguna redacción logró la paridad.** Iteración 1 (equivalencia explícita) y B (cambio mínimo) volvieron *más
+  fuerte* a «sin TACC»: una dietética con una sola reseña «sin TACC» se aprobó 4/4. A («mención … acompañada de
+  certificación, preparación dedicada o protocolo») y A2 (A + «los tres términos pesan igual») siguieron aprobando
+  «sin TACC» 4/4 y «sin gluten» 0-1/4 con la misma evidencia. El sesgo viene del propio modelo, no solo del RUBRIC.
+- **Decisión: la paridad va en código.** `canonical_wording` (en `agents/validator_agent.py`) le muestra al modelo
+  «sin gluten» donde una reseña o una evidencia dice «sin TACC» (también «T.A.C.C.», «libre de TACC», «#sintacc»), en el
+  Validator y en `validate_place` del MCP. La evidencia guardada, el nombre del lugar y el Tope C leen el texto
+  original. Mismo criterio que las reglas de alcance: lo que el modelo no aplica de forma fiable se decide en código.
+- **RUBRIC A3:** el criterio de `approved` de A y, por decisión del administrador, la flag «Dice "bajo en gluten",
+  "reducido en gluten" o algo similar: eso NO es sin gluten, el producto tiene gluten. Si es la única oferta para
+  celíacos, el veredicto es "rejected"» («reducido en gluten» no existe: tiene o no tiene gluten). Resultado (iteraciones
+  5-6): paridad por construcción; nada se aprueba ni se etiqueta 100% más que antes en 33 casos; «bajo en gluten» se
+  descarta 4/4; un local con línea sin gluten certificada que además vende panes «reducidos» va a revisión (8/8 en la
+  iteración 6; 3/4 descartado en la 5, que parece variación entre corridas).
+- **Costo aceptado:** un lugar con solo reseñas de celíacos, sin fuente del propio local, que antes se aprobaba en el
+  límite (confianza 0,86 contra 0,72), pasa a revisión humana (0/4 aprobado en las tres combinaciones de la iteración 6).
+  Es el lado conservador y coincide con el RUBRIC («nunca dejes que reseñas entusiastas te empujen por encima de la
+  evidencia»). Puede crecer la cola `needs_review`.
+- **Veredicto estructurado:** el Validator y `validate_place` piden la respuesta con `output_config.format` y
+  `VERDICT_SCHEMA` (GA, sin header beta, `claude-sonnet-4-6` en la lista oficial). Con el RUBRIC anterior, un texto «bajo
+  en gluten» rompió el JSON en 3 de 6 respuestas; en producción hubo 2 JSON rotos (junio de 2026) y ninguno después. Con
+  el esquema, 156/156 respuestas válidas. El esquema solo fija la forma: `_normalize` sigue aplicando 0,85 / 0,7 / 0,5 y
+  los topes.
+- **Tope C** reconoce también «100% sin T.A.C.C.», «100% libre de TACC», «#100sintacc», «todo / local libre de TACC»;
+  no cuenta «100 productos sin TACC» ni una frase negada. Es la misma afirmación escrita de otra forma.
+- **No cambian:** las tres etiquetas de `safety_level`, los umbrales, la definición de 100%, «ante la duda, el nivel más
+  bajo», los datos de `places`. Las copias del RUBRIC (CLAUDE.md, `prompts.md` §43, README) están sincronizadas y
+  `skills/validator-rubric/SKILL.md` describe el criterio nuevo.
+- **Pendiente:** paso 4 (prompts del chatbot y respuestas fijas de `index.ts`, con la batería de jailbreak).
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 

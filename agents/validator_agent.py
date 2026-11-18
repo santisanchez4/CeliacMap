@@ -153,17 +153,18 @@ celíacas depende de tu criterio. Ante la duda, siempre escala a revisión human
 
 Rubric de validación (veredicto):
 - "approved" (confidence_score >= 0.85): Evidencia explícita y clara de que el \
-lugar ofrece opciones sin TACC, con mención directa de "sin TACC", "sin gluten" \
-certificado, o descripción de protocolo anti-contaminación cruzada.
+lugar ofrece opciones sin gluten: mención directa de "sin gluten", "libre de \
+gluten" o "sin TACC" acompañada de certificación, preparación dedicada o \
+protocolo anti-contaminación cruzada.
 - "needs_review" (0.5 <= confidence_score < 0.85): Evidencia parcial, ambigua o \
 que requiere confirmación humana.
 - "rejected" (confidence_score < 0.5): Sin evidencia suficiente, información \
 contradictoria o señales de riesgo para celíacos.
 
 Flags de alerta a detectar (cada una reduce la confianza):
-- Menciona "sin gluten" pero no "sin TACC" (puede ser marketing, no médico)
+- Dice "bajo en gluten", "reducido en gluten" o algo similar: eso NO es sin gluten, el producto tiene gluten. Si es la única oferta para celíacos, el veredicto es "rejected"
 - No menciona protocolo de contaminación cruzada
-- Solo tiene opciones vegetarianas/veganas sin mención explícita sin TACC
+- Solo tiene opciones vegetarianas/veganas sin mención explícita sin gluten
 - Información desactualizada (> 12 meses)
 - Reseñas negativas de celíacos
 - Descripción ambigua ("apto para dietas especiales")
@@ -194,7 +195,7 @@ Si el mensaje incluye "ubicacion_geocode", significa que solo se geocodificó la
 dirección de texto del candidato: NO hay una ficha de Google Places que confirme \
 que el negocio existe y opera en ese lugar (sin reseñas de Google, sin \
 verificación de existencia). Tratá esto como evidencia debilitada — NO asignes \
-"approved" salvo que el resto de la evidencia (mención explícita de "sin TACC", \
+"approved" salvo que el resto de la evidencia (mención explícita de "sin gluten" o "sin TACC", \
 reseñas claras de la comunidad) sea fuerte por sí sola. Ante la duda, "needs_review".
 
 Si el mensaje incluye "evidencia_descubrimiento", son textos tomados de fuentes públicas (publicaciones o perfiles de redes sociales, páginas web) o aportados por personas o por el administrador, con su URL cuando existe. Son la evidencia principal para distinguir un espacio 100% sin gluten de un lugar con opciones: úsalos. No están verificados: una fuente aislada no alcanza para "approved" si el resto de la evidencia la contradice, y lo que aporta una persona pesa como las declaraciones_comunidad.

@@ -2,7 +2,7 @@
 name: validator-rubric
 description: >
   Aplicar el rubric conservador del Validator Agent de CeliacMap para evaluar
-  si un establecimiento puede clasificarse como gluten free / sin TACC.
+  si un establecimiento puede clasificarse como sin gluten (antes «sin TACC»).
   Usar siempre que se necesite evaluar evidencia sobre un lugar y decidir si
   aprobarlo, rechazarlo o escalarlo a revisión humana. La seguridad del
   usuario celíaco es la prioridad absoluta: nunca sobreestimar la seguridad.
@@ -52,14 +52,14 @@ seguridad de lugares que sí aplican.
 
 ## Criterios de aprobación (`confidence_score >= 0.85`)
 
-Para llegar a este umbral, la evidencia debe incluir **al menos uno** de:
+Para llegar a este umbral, la evidencia debe incluir una **mención directa de "sin gluten", "libre de gluten" o
+"sin TACC" acompañada de** al menos uno de:
 
-- ✅ Mención explícita de **"sin TACC"** (no solo "sin gluten", que puede ser marketing)
 - ✅ Certificación reconocida por ACELA u organismo equivalente
+- ✅ Preparación dedicada (sector, horno o utensilios propios para lo apto)
 - ✅ Descripción de protocolo anti-contaminación cruzada
-- ✅ Menú dedicado sin TACC con descripción de preparación segura
-- ✅ Múltiples reseñas positivas recientes de usuarios que se identifican como celíacos
-- ✅ Comunicación oficial del establecimiento confirmando opciones sin TACC
+
+Las reseñas de personas celíacas apoyan, pero no reemplazan una fuente del propio establecimiento.
 
 ---
 
@@ -69,9 +69,9 @@ Cada flag detectado reduce el score y puede bajar el veredicto:
 
 | Flag | Impacto |
 |------|---------|
-| Solo dice "sin gluten" sin "sin TACC" | Moderado — puede ser marketing sin respaldo médico |
+| Dice "bajo en gluten" / "reducido en gluten" | Alto — tiene gluten; si es su única oferta, `rejected` |
 | No menciona contaminación cruzada | Alto — riesgo real para celíacos severos |
-| Solo tiene opciones veganas/vegetarianas | Bajo — no implica sin TACC necesariamente |
+| Solo tiene opciones veganas/vegetarianas | Bajo — no implica sin gluten necesariamente |
 | Información con más de 12 meses de antigüedad | Moderado — puede haber cambiado |
 | Reseñas negativas de celíacos | Alto — prioridad inmediata |
 | Descripción ambigua ("apto para dietas especiales") | Moderado |
@@ -88,7 +88,7 @@ ficha de Google Places. No hay reseñas de Google ni confirmación de que el
 negocio exista y opere ahí — solo que la dirección es real y está en UY/AR.
 
 Tratar esto como **evidencia debilitada**: no asignar `approved` salvo que el
-resto de la evidencia (mención explícita de "sin TACC", reseñas claras de la
+resto de la evidencia (mención explícita de "sin gluten" o "sin TACC", reseñas claras de la
 comunidad) alcance el umbral por sí sola. Ante la duda, `needs_review`.
 
 ---
@@ -99,7 +99,7 @@ comunidad) alcance el umbral por sí sola. Ante la duda, `needs_review`.
 **únicamente** productos aptos para celíacos (cocina exclusiva / dedicada). Un
 local que cocina con gluten pero ofrece menú, preparación aparte o cocina
 separada para celíacos **no** es `gluten_free_100`: es `celiac_friendly` u
-`options_available` ("Tiene opciones sin TACC" en el mapa).
+`options_available` ("Tiene opciones sin gluten" en el mapa).
 
 Algunos candidatos llegan con un bloque `declaraciones_comunidad`: lo que
 personas de la comunidad dijeron sobre la cocina (¿es exclusivamente sin gluten?,
@@ -123,18 +123,25 @@ del 100% es del administrador.
 
 ---
 
-## Diferencia clave: "sin gluten" vs "sin TACC"
+## "Sin gluten" y "sin TACC" pesan igual (desde 2026-11-18)
 
-> **"Sin gluten"** puede referirse a cualquier preparación que no usa trigo como ingrediente principal.
-> **"Sin TACC"** (Sin Trigo, Avena, Cebada, Centeno) es el estándar médico para celíacos en Argentina y Uruguay e implica control de contaminación cruzada.
+> En Argentina, la **Resolución Conjunta 32/2023** reemplazó el rótulo "sin TACC" por "libre de gluten" y el logo
+> obligatorio "SIN GLUTEN" (máximo 10 mg/kg). CeliacMap aplica el mismo criterio en Uruguay y en Argentina: los tres
+> términos valen lo mismo, y ninguno, por sí solo, prueba que la cocina sea exclusiva.
 
-Un lugar que solo usa la etiqueta "sin gluten" **no debe aprobarse automáticamente**.
+Medido contra el modelo real, ninguna redacción del rubric logró que el modelo pesara igual "sin TACC" y "sin gluten":
+con la misma evidencia aprobaba una y no la otra. Por eso el **código** (`canonical_wording`) le muestra al modelo
+"sin gluten" donde una reseña o una evidencia dice "sin TACC"; la evidencia guardada, el nombre del lugar y el tope de
+exclusividad (Tope C) conservan el texto original.
+
+"Bajo en gluten" o "reducido en gluten" **no es** sin gluten: el producto tiene gluten.
 
 ---
 
 ## Salida estructurada
 
-El Validator responde ÚNICAMENTE con un objeto JSON (sin prosa, sin markdown).
+El Validator responde ÚNICAMENTE con un objeto JSON (sin prosa, sin markdown). Desde 2026-11-18 lo pide como
+**salida estructurada** de la API (`VERDICT_SCHEMA`), así que la respuesta siempre es un JSON válido con esta forma.
 Además del veredicto del rubric, CeliacMap conserva `category` y `safety_level`
 porque el esquema los requiere y el mapa los usa para los badges de seguridad:
 
@@ -171,7 +178,8 @@ idéntico en batch y on-demand:
 
 ```python
 # agents/validator_agent.py — esquema del flujo
-raw = llm.complete_json(RUBRIC, user_prompt, model="claude-sonnet-4-6")
+user_prompt = self._build_user_prompt(place, reviews, claims, evidence)  # textos con canonical_wording
+raw = llm.complete_json(RUBRIC, user_prompt, model="claude-sonnet-4-6", schema=VERDICT_SCHEMA)
 v = self._normalize(raw, place)        # parsea + clamp + flags + decide estado
 
 # _decide_status (defensa en profundidad, code-enforced):

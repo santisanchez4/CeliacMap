@@ -845,7 +845,9 @@ def test_run_persists_not_applicable_as_discarded_with_its_note_and_counts_it():
 # Sin Gluten 0 of 6, the shared-grill restaurant needs_review 6 of 6). Six scope wordings inside it all moved those verdicts, so
 # scope lives in agents/map_scope.py. Changing this text needs a real-model A/B recorded in docs/DECISIONS.md and prompts.md; only
 # then update the hash.
-MEASURED_RUBRIC_SHA256 = "aa89e29a330b8d27b1987b565a863ab2b2e0b1502b6ba8a70b04710a6b287e82"
+# 2026-11-18: variant A3 of db/checks/validator_wording_ab.py («sin gluten» wording, «reducido en gluten» flag), measured in
+# iterations 1-6 (db/checks/2026-11-18-validator-wording-ab-iter*.md) together with canonical_wording and VERDICT_SCHEMA.
+MEASURED_RUBRIC_SHA256 = "8bbf3d86ea4e2bff72ce8dad735c967f86d8063af97e631b1ce41129beea1c68"
 
 
 def test_the_safety_rubric_is_the_measured_text():
