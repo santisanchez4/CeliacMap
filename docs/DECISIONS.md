@@ -4946,6 +4946,23 @@ Place Details pidiendo solo el nombre y una Geocoding).
 
 Ninguno se crea sin un negocio real con atención al público, sus comprobaciones y el «dale» del administrador.
 
+### «Sin TACC» sale del sitio público: la etiqueta pasa a «Tiene opciones sin gluten» (2026-11-18)
+
+Según el administrador, una norma nueva en Argentina reemplaza el rótulo «sin TACC» por «sin gluten», porque trigo, avena,
+cebada y centeno pueden elaborarse ahora sin gluten (referencia de la norma: pendiente de registrar aquí). La clasificación
+no cambia: `safety_level` sigue con sus tres valores y el mapa sigue con dos etiquetas públicas.
+
+- **Paso 1 (este cambio, solo frontend):** la etiqueta «Tiene opciones sin TACC» pasa a «Tiene opciones sin gluten» y
+  todo el texto público (landing, chips, leyenda, ranking, widget del chat, manifest, términos y política) dice «sin
+  gluten». Los textos legales pasan a v1.1.1 (18 de noviembre de 2026), sin cambio de fondo; los borradores v1.2 llevan
+  el mismo texto. El buscador sigue aceptando «tacc» como palabra vacía. Ningún dato de `places` cambia.
+- **Pendiente, en pasos separados:** (2) el evidence finder y las búsquedas: «100% sin TACC» sigue siendo candidato a
+  100 (clasificación vieja), «opciones / menú sin TACC» o un «sin TACC» suelto es opciones, «sin gluten» deja de ser el
+  término débil, y las búsquedas *agregan* «sin gluten» sin quitar «sin TACC» (Uruguay y los rótulos viejos lo siguen
+  usando); (3) el `RUBRIC`, cuya flag «Menciona "sin gluten" pero no "sin TACC"» queda invertida con la norma, con A/B
+  medido; (4) los prompts del chatbot y sus respuestas fijas de `index.ts`, que todavía dicen «Tiene opciones sin TACC»,
+  en el próximo lote con la batería de jailbreak. Hasta el paso 4, el chat puede nombrar la etiqueta vieja.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

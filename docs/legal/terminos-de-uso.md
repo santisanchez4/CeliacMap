@@ -1,10 +1,10 @@
 # Términos de uso de CeliacMap
 
-**Versión 1.1 · Última actualización: 6 de octubre de 2026**
+**Versión 1.1.1 · Última actualización: 18 de noviembre de 2026**
 
 ## 1. Qué es CeliacMap
 
-CeliacMap es un mapa de lugares sin gluten / sin TACC en Uruguay y Argentina, hecho como proyecto personal por Santiago
+CeliacMap es un mapa de lugares sin gluten en Uruguay y Argentina, hecho como proyecto personal por Santiago
 Sánchez (Fray Bentos, Río Negro, Uruguay). Podés buscar lugares, votarlos, sugerir lugares nuevos, dejar comentarios y consultar a un
 asistente automático (el chat). Es gratis y no necesita una cuenta.
 
@@ -18,11 +18,11 @@ acompañamiento de una persona adulta responsable.
 
 **Esto es lo más importante.**
 
-- Cada lugar muestra una de dos etiquetas: **“Espacio 100% sin gluten”** o **“Tiene opciones sin TACC”**. Son una
+- Cada lugar muestra una de dos etiquetas: **“Espacio 100% sin gluten”** o **“Tiene opciones sin gluten”**. Son una
   **estimación** que sale de fuentes públicas, de los aportes de la comunidad y de un sistema de revisión automático
   con inteligencia artificial. En algunos casos una persona las revisa, pero **no inspeccionamos los lugares** ni
   verificamos sus procesos de cocina.
-- “Tiene opciones sin TACC” quiere decir que el lugar ofrece algo sin gluten, **no** que tenga una cocina dedicada.
+- “Tiene opciones sin gluten” quiere decir que el lugar ofrece algo sin gluten, **no** que tenga una cocina dedicada.
 - La información puede estar desactualizada o equivocada: un lugar puede cambiar el menú, el proveedor o la forma de
   cocinar, o cerrar.
 - **Antes de comer, confirmá siempre en el lugar** cómo preparan la comida y cómo evitan la contaminación cruzada. Si

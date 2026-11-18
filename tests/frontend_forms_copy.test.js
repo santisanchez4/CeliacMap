@@ -22,7 +22,7 @@ const CARDS = [
     titleEs: "¿Conocés un lugar? Agregalo",
     titleEn: "Know a place? Add it",
     introKey: "suggest.form.intro",
-    introEs: "Contanos de un lugar sin TACC que todavía no está en el mapa. Lo revisamos y, si se confirma, aparece para toda la comunidad.",
+    introEs: "Contanos de un lugar sin gluten que todavía no está en el mapa. Lo revisamos y, si se confirma, aparece para toda la comunidad.",
     introEn: "Tell us about a gluten-free place that isn't on the map yet. We review it and, if confirmed, it appears for the whole community.",
   },
   {

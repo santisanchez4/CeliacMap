@@ -195,7 +195,7 @@
     "suggest.form.disclaimer": "Your suggestion is validated before publishing. The safety level is a community estimate, not a medical guarantee.",
 
     "kitchen.legend": "About the kitchen (optional, but it helps a lot)",
-    "kitchen.intro": "Gluten-free, sin TACC and celiac-suitable are not the same thing. Tell us how they work; we review it before deciding which label it gets.",
+    "kitchen.intro": "Having gluten-free options and being a 100% gluten-free space are not the same thing. Tell us how they work; we review it before deciding which label it gets.",
     "kitchen.q1": "Is the kitchen exclusively gluten-free?",
     "kitchen.q1.yes": "Yes: only products for celiacs are cooked and sold",
     "kitchen.q1.no": "No: they also cook with gluten",
