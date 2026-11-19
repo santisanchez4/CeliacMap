@@ -5098,7 +5098,12 @@ desde el 2026-09-30, cuando el chat dejó de preguntar por la cocina; con v26 qu
 - **S2, lugar nuevo sin comentario (decisión del administrador).** Una recomendación positiva de un lugar que no está en el
   mapa ya no exige comentario: el borrador se arma con nombre y dirección y `notes` null (la columna lo admite). Un comentario
   sobre un lugar del mapa y un comentario negativo siguen exigiendo texto.
-- Tests primero (Deno 269 → 273). Verificación en vivo de S1 y S2 después del deploy, con su «dale».
+- Tests primero (Deno 269 → 273).
+- **Deploy y verificación en vivo (2026-11-19):** `chat` v27 desde `main` (`e12028b`, `verify_jwt=false`, código descargado =
+  `HEAD`). S1 y S2 pasan (`db/checks/2026-11-19-chat-kitchen-live-v27.md`): el dato contado después del borrador se suma al
+  mismo borrador con su dirección y se envía con `kitchen_exclusive=true` y sin el dueño; el lugar nuevo se envía con nombre
+  y dirección y `notes` null. Observación anotada para la próxima tanda de prompts: el redactor sumó el aviso «Anónimo» a una
+  sugerencia de lugar nuevo, cuyo texto no se publica como opinión. Las filas de prueba se borraron con el SQL aprobado.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 

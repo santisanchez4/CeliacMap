@@ -53,6 +53,11 @@
    sitios" (careful: "dónde comprar" does imply `shop`), "Cerca hay…" (a proximity the system does not verify), the
    medical queries (Fase E follow-ups) and the pure cancels (Fase D).
 
+10. **The "Anónimo" notice only for comments on a place on the map** (added 2026-11-19, live finding on chat v27 S1).
+   Rule 3 adds the notice when `<envio>` carries `report_type: "positive"`, but on a suggestion draft (a new place, no
+   `report_type`) the redactor added it anyway. A suggestion's text is never published as an opinion. Say in rule 3 that
+   the notice is only for a comment about a place already on the map; measure with `chat_kitchen_live.py` S1 / S2 / S4.
+
 ## Validator `RUBRIC` (not the chatbot) — added 2026-09-30
 
 This item edits `RUBRIC` in `agents/validator_agent.py`, not `prompts.ts`. It has its own gate (a real-model Validator
