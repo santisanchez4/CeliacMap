@@ -36,6 +36,7 @@ import {
   deriveCityFromAddress,
   detectCancelIntent,
   detectCeliaquiaGuard,
+  isBareConfirmation,
   filterPlaceFields,
   getClientIp,
   guardCeliaquiaReply,
@@ -810,14 +811,33 @@ function match() {
   return { id: "4300ad15-2f6f-4881-a902-b2ac5990464c", name: "La Panera", city: "Adrogué" };
 }
 
-Deno.test("decideReportarDraft - too-short texto asks for more detail", () => {
-  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "La Panera", ciudad: null, reporteTexto: "ok" });
-  assertEquals(r, { kind: "ask_more_detail" });
+// Admin decision 2026-11-19 (live finding, chat v26 S2): a NEW place may be recommended without a comment —
+// name + address are enough for the review. A comment stays required for a place on the map and for a negative.
+Deno.test("decideReportarDraft - new place without a comment starts the suggestion draft with notes null", () => {
+  for (const reporteTexto of [null, "ok"]) {
+    const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Rosario", reporteTexto });
+    assertEquals(r, {
+      kind: "needs_address",
+      pending: { kind: "suggestion", name: "La Panera", city: "Rosario", country: null, address: null, category: null, notes: null },
+    });
+  }
+  const noType = decideReportarDraft({ match: null, reporteTipo: null, lugarNombre: "La Panera", ciudad: null, reporteTexto: null });
+  assertEquals(noType.kind, "needs_address");
 });
 
-Deno.test("decideReportarDraft - null texto asks for more detail", () => {
-  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "La Panera", ciudad: null, reporteTexto: null });
-  assertEquals(r, { kind: "ask_more_detail" });
+Deno.test("decideReportarDraft - without a comment: a place on the map, a negative or no place still asks for more detail", () => {
+  assertEquals(decideReportarDraft({ match: match(), reporteTipo: "positive", lugarNombre: "La Panera", ciudad: null, reporteTexto: null }), { kind: "ask_more_detail" });
+  assertEquals(decideReportarDraft({ match: null, reporteTipo: "negative", lugarNombre: "La Panera", ciudad: null, reporteTexto: "ok" }), { kind: "ask_more_detail" });
+  assertEquals(decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: null, ciudad: null, reporteTexto: null }), { kind: "ask_more_detail" });
+});
+
+Deno.test("decideReportarDraft - the comment-less draft survives the client echo and becomes a valid insert", () => {
+  const r = decideReportarDraft({ match: null, reporteTipo: "positive", lugarNombre: "La Panera", ciudad: "Rosario", reporteTexto: null });
+  if (r.kind !== "needs_address") throw new Error(r.kind);
+  assertEquals(validatePendingSubmission(JSON.parse(JSON.stringify(r.pending))), r.pending);
+  const done = continueSuggestionCollection(r.pending, "Calle Inventada 1234, Rosario, Argentina");
+  assertEquals(done.kind, "draft_ready");
+  assertEquals(buildSuggestionInsertPayload(done.pending).notes, null);
 });
 
 Deno.test("decideReportarDraft - missing lugar_nombre asks which place", () => {
@@ -922,6 +942,18 @@ function partial(overrides: Partial<PendingSuggestionSubmission> = {}): PendingS
 Deno.test("continueSuggestionCollection - missing address and country, short reply asks again", () => {
   const r = continueSuggestionCollection(partial(), "sí");
   assertEquals(r, { kind: "still_collecting", pending: partial(), askFor: "address_and_country" });
+});
+
+// Live finding (chat v26 S1): "dale, mandalo" while the address was missing was stored AS the address.
+Deno.test("continueSuggestionCollection - a bare confirmation is never taken as the address", () => {
+  for (const reply of ["dale, mandalo", "sí, dale", "ok listo", "Dale!", "sí, envialo por favor", "yes, send it"]) {
+    assertEquals(isBareConfirmation(reply), true, reply);
+    const r = continueSuggestionCollection(partial(), reply);
+    assertEquals(r, { kind: "still_collecting", pending: partial(), askFor: "address_and_country" }, reply);
+  }
+  for (const reply of ["Rivera 1967", "frente a la plaza", "dale que es en Rivera 1967", "Calle Dale 100"]) {
+    assertEquals(isBareConfirmation(reply), false, reply);
+  }
 });
 
 Deno.test("continueSuggestionCollection - missing address and country, plausible reply fills both when parseable", () => {

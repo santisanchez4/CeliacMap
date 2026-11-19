@@ -662,7 +662,12 @@ export function decideReportarDraft(input: {
   reporteTexto: string | null;
 }): ReportarDraftResult {
   const texto = input.reporteTexto?.trim() ?? "";
-  if (texto.length < 5) return { kind: "ask_more_detail" };
+  // A NEW place may be recommended without a comment (admin decision 2026-11-19): name + address are
+  // enough for the review. A place on the map and a negative still need what the person wants to say.
+  const sinComentario = texto.length < 5;
+  if (sinComentario && (!input.lugarNombre || input.match || input.reporteTipo === "negative")) {
+    return { kind: "ask_more_detail" };
+  }
   if (!input.lugarNombre) return { kind: "ask_which_place" };
 
   const reporteTipo = input.reporteTipo ?? "positive";
@@ -711,7 +716,7 @@ export function decideReportarDraft(input: {
       country: null,
       address: null,
       category: null,
-      notes: description.slice(0, 1000),
+      notes: sinComentario ? null : description.slice(0, 1000),
     },
   };
 }
@@ -763,6 +768,19 @@ export function deriveCityFromAddress(address: string): string {
   return address.slice(0, 80);
 }
 
+const CONFIRMATION_WORDS = new Set([
+  "si", "dale", "ok", "okey", "okay", "listo", "mandalo", "mandala", "envialo", "enviala", "enviar", "de", "una",
+  "perfecto", "bueno", "va", "gracias", "porfa", "por", "favor", "yes", "sure", "send", "it", "please",
+]);
+
+/** A short reply made only of confirmation words ("dale, mandalo", "sí, envialo por favor"). While a draft still
+ * lacks its address it must never be stored AS the address (live finding, chat v26 S1, 2026-11-19). */
+export function isBareConfirmation(text: string): boolean {
+  const words = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 0);
+  return words.length > 0 && words.length <= 5 && words.every((w) => CONFIRMATION_WORDS.has(w));
+}
+
 export function continueSuggestionCollection(
   pending: PendingSuggestionSubmission,
   rawReply: string,
@@ -774,7 +792,7 @@ export function continueSuggestionCollection(
   let address = pending.address;
   let country = pending.country;
 
-  if (needsAddress && text.length >= 5) {
+  if (needsAddress && text.length >= 5 && !isBareConfirmation(text)) {
     address = text.slice(0, 200);
     if (!country && mentionedCountry) country = mentionedCountry;
   } else if (!needsAddress && !country) {
@@ -1137,6 +1155,32 @@ export function withConfirmFacts(confirm: ConfirmTurnResult, facts: KitchenFacts
   if (confirm.kind === "insert_report") return { kind: "insert_report", payload: mergeKitchenFacts(confirm.payload, facts) };
   if (confirm.kind === "insert_suggestion") return { kind: "insert_suggestion", payload: mergeKitchenFacts(confirm.payload, facts) };
   return confirm;
+}
+
+function placeNameKey(name: string): string {
+  return name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** A kitchen fact the person volunteers while a COMPLETE suggestion draft is open ("es todo sin gluten" after
+ * "¿Lo envío así?") amends that draft, which is shown again with the fact. Without this the turn started a new
+ * draft and dropped the address already given (live finding, chat v26 S1, 2026-11-19). Only a suggestion carries
+ * kitchen facts; a confirmation (withConfirmFacts handles it), a fact about another place, an out-of-scope or
+ * courtesy turn never amends. */
+export function decideDraftAmendment(
+  router: Pick<RouterOutput, "modulo" | "confirma_envio" | "lugar_nombre" | "cocina_exclusiva" | "preparacion_celiaca">,
+  pending: PendingSubmission | null,
+): PendingSuggestionSubmission | null {
+  if (pending?.kind !== "suggestion") return null;
+  if (!pending.address || !pending.country || !pending.city) return null;
+  if (router.confirma_envio) return null;
+  if (router.modulo !== "reportar" && router.modulo !== "confirmar") return null;
+  if (!hasKitchenFacts(kitchenFactsFromRouter(router))) return null;
+  if (router.lugar_nombre) {
+    const said = placeNameKey(router.lugar_nombre);
+    const draft = placeNameKey(pending.name);
+    if (!said || !(draft.includes(said) || said.includes(draft))) return null;
+  }
+  return pending;
 }
 
 export function cocinaContext(
@@ -1899,6 +1943,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     !collectingSuggestion && router.confirma_envio ? decideConfirmTurn(pendingIn) : { kind: "nothing_pending" },
     kitchenFactsFromRouter(router),
   );
+  const amendDraft = !collectingSuggestion && confirmTurn.kind === "nothing_pending"
+    ? decideDraftAmendment(router, pendingIn)
+    : null;
 
   // "" is never returned: every branch below either assigns `reply` directly
   // or sets `envio`, and the shared redactor call after the chain assigns
@@ -2011,6 +2058,11 @@ export async function handleRequest(req: Request): Promise<Response> {
           texto: confirmTurn.payload.notes,
         };
       }
+    } else if (amendDraft) {
+      envioModulo = "reportar";
+      const step = applyKitchenStep(amendDraft, router, { complete: true });
+      responsePending = step.pending;
+      envio = { estado: "borrador_listo", ...envioBaseForPending(step.pending), ...kitchenEnvioExtras(step.pending, false) };
     } else if (router.modulo === "reportar") {
       // Módulo 2 turn 1 — the lookup runs against APPROVED places with the
       // anon key, so the same "public read approved places" RLS that backs
