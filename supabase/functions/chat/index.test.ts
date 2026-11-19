@@ -1567,7 +1567,7 @@ Deno.test("ROUTER_PROMPT - examples pin both halves: pure thanks -> cortesia, th
 // ---------------------------------------------------------------------------
 // Public safety levels: the map, filters and ranking show TWO labels — only a
 // dedicated venue (gluten_free_100) is "Espacio 100% sin gluten"; celiac_friendly
-// and options_available are both "Tiene opciones sin TACC". The chat must name a
+// and options_available are both "Tiene opciones sin gluten" (since 2026-11-18; before, "sin TACC"). The chat must name a
 // place exactly as the map does, never more permissively (see CLAUDE.md, "Two
 // public safety labels").
 // ---------------------------------------------------------------------------
@@ -1575,7 +1575,7 @@ Deno.test("ROUTER_PROMPT - examples pin both halves: pure thanks -> cortesia, th
 Deno.test("RESPONDER_PROMPT - level labels match the map: only gluten_free_100 is the 100% label", () => {
   const responder = flat(RESPONDER_PROMPT);
   assertStringIncludes(responder, '"Espacio 100% sin gluten" para gluten_free_100');
-  assertStringIncludes(responder, '"Tiene opciones sin TACC" para celiac_friendly y options_available');
+  assertStringIncludes(responder, '"Tiene opciones sin gluten" para celiac_friendly y options_available');
   // English replies use the map's English labels, not the Spanish ones pasted into English text.
   assertStringIncludes(responder, 'si respondés en inglés, "100% gluten-free venue" y "Has gluten-free options"');
   assertStringIncludes(responder, "Usá siempre esas dos etiquetas, sin reformularlas ni sumar otras");
@@ -1592,7 +1592,7 @@ Deno.test("RESPONDER_PROMPT - no example presents a place with the retired bare 
   assertStringIncludes(search!, "• Sin Gluten Palermo — restaurante, Espacio 100% sin gluten");
   // The example teaches the contested mapping: a celiac_friendly place reads as "options".
   assertStringIncludes(search!, "La Spiga (nivel celiac_friendly)");
-  assertStringIncludes(search!, "• La Spiga — café/panadería, Tiene opciones sin TACC");
+  assertStringIncludes(search!, "• La Spiga — café/panadería, Tiene opciones sin gluten");
 });
 
 // ---------------------------------------------------------------------------
@@ -1769,7 +1769,7 @@ Deno.test("SCOPE_DECLINE_REPLIES - the fixed decline always carries the health r
   const es = getReply(SCOPE_DECLINE_REPLIES, "es");
   const en = getReply(SCOPE_DECLINE_REPLIES, "en");
   // The scope sentence stays first and unchanged.
-  assertStringIncludes(es, "Solo puedo ayudarte a buscar lugares sin TACC en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía.");
+  assertStringIncludes(es, "Solo puedo ayudarte a buscar lugares sin gluten en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía.");
   assertStringIncludes(en, "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease.");
   assertStringIncludes(es, "Si es una consulta de salud personal, consultala con un profesional de la salud");
   assertStringIncludes(en, "If it's a personal health question, talk to a health professional");

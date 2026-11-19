@@ -6,9 +6,14 @@
 > restart of the soft-launch count, recorded in `docs/DECISIONS.md` and `prompts.md` (CLAUDE.md, "Prompts and chatbot").
 > When an item is done, strike it here and name the entry that records it.
 
+> **Status 2026-11-18:** items 1–6 done in the chat batch (`docs/DECISIONS.md`, «Chatbot: «sin gluten», sin preguntas de
+> salud ni de cocina»); item 9 done in RUBRIC A3 («Validator: «sin gluten» y «sin TACC» pesan igual»), with a different
+> design than the draft below (parity in code, no Argentina-only rule, no oats flag). Still open: items 7 and 8, and from
+> item 2 the decision whether chat recommendations become publishable.
+
 ## Privacy (2026-09-29, privacy phase 1)
 
-1. **Stop asking whether the owner is celiac** (`docs/legal/owner-celiac-plan.md`, stage 2). The code already discards
+1. **[Done 2026-11-18]** **Stop asking whether the owner is celiac** (`docs/legal/owner-celiac-plan.md`, stage 2). The code already discards
    the answer (it never reaches a draft, a row or `<envio>`), but the prompts still ask for it: `ROUTER_PROMPT` rule 9
    (`dueno_celiaco`), rule 10, the `dueno_celiaco` field of `<output_format>` and of every example's `Salida:`, the "Pan
    Justo" example; `RESPONDER_PROMPT` rules 3 and 5 (the kitchen question and the invitation), the constraint "Preguntar
@@ -17,13 +22,13 @@
    text). Afterwards remove `dueno_celiaco` from `RouterOutput`, `parseRouterOutput` and `kitchenFactsFromRouter`.
    Measure: the redactor never asks about the owner (`db/checks/chat_kitchen_live.py`), kitchen extraction does not get
    worse (`db/checks/chat_kitchen_router_check.py`).
-2. **Tell the person a recommendation may be published as "Anónimo".** Módulo 4 (`decideConfirmarSubmission`) and
+2. **[Done 2026-11-18]** **Tell the person a recommendation may be published as "Anónimo".** Módulo 4 (`decideConfirmarSubmission`) and
    the report flow store a positive report the admin could publish, and the chat never says so (form B does, under the
    name field). Until the notice exists, `scripts/moderate_opinions.py` never offers a recommendation without
    `reporter_token` (the chat never sends one). With the notice live, decide whether chat recommendations become
    publishable (and how to tell them apart then: a `reporter_token` minted by the chat, or an `origin` column).
 
-3. **The chat no longer asks about the kitchen (code, 2026-09-30).** `preguntar_cocina` and `invitar_cocina` are never
+3. **[Done 2026-11-18]** **The chat no longer asks about the kitchen (code, 2026-09-30).** `preguntar_cocina` and `invitar_cocina` are never
    set and `kitchen_asked` is never kept, so the redactor's kitchen question (which still names the owner) never fires;
    facts a person volunteers are still kept, the owner's health still discarded. In this batch: **decide whether the chat
    asks about the kitchen again.** If not, remove the kitchen instructions from `RESPONDER_PROMPT` (rule 3's optional
@@ -38,10 +43,10 @@
 
 ## Earlier items (from `docs/DECISIONS.md`)
 
-4. **Replace the Bienestar Gluten Free example** in the prompts (a partner since 2026-09-28; see "Sponsorships",
+4. **[Done 2026-11-18]** **Replace the Bienestar Gluten Free example** in the prompts (a partner since 2026-09-28; see "Sponsorships",
    pre-existing finding, `prompts.ts` lines ~467–474).
-5. **Redactor glossary: Argentina's official term is now "sin gluten"** (Joint Resolution 32/2023; see "Sponsorships").
-6. **The 2c-vs-examples contradiction** ("Por ahora no tengo lugares confirmados en…"; see "Department / province
+5. **[Done 2026-11-18]** **Redactor glossary: Argentina's official term is now "sin gluten"** (Joint Resolution 32/2023; see "Sponsorships").
+6. **[Done 2026-11-18]** **The 2c-vs-examples contradiction** ("Por ahora no tengo lugares confirmados en…"; see "Department / province
    search" and "`category_zero` telemetry").
 7. **F4 Option 1: reformulate the `celiaquia` prompt** (in progress, non-blocking; see "Chatbot Fase E").
 8. Only if the `category_zero` telemetry shows it with real traffic: option C and a router rule for "locales / lugares /
@@ -56,7 +61,7 @@ so the "sin gluten" change reaches the Validator and the chat (item 5) together.
 `tests/test_rubric_docs_sync.py`: `CLAUDE.md`, `prompts.md`, `README.md`. The MCP `validate_place` tool reuses the same
 `RUBRIC`. **Not changed yet.**
 
-9. **The "sin gluten without sin TACC" flag is out of date for Argentina** (Joint Resolution 32/2023: "sin gluten" is
+9. **[Done 2026-11-18]** **The "sin gluten without sin TACC" flag is out of date for Argentina** (Joint Resolution 32/2023: "sin gluten" is
    now the official term in Argentina; certified gluten-free oats can be suitable. Checked 2026-09-30: the 10 mg/kg limit is in the
    official text; certified oats and the new symbol are **not** verified, and the methodology document asks the
    Asociación Celíaca Argentina to validate oats before the criteria change: do not write oats into the `RUBRIC` until

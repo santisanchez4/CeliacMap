@@ -84,9 +84,9 @@ LABEL_PLACES = [
 ]
 LABEL_MESSAGES = [("es", "quiero comer sin tacc en palermo hoy"), ("en", "gluten free places in Palermo?")]
 LABEL_RE = {
-    "es": {"is100": r"100\s*%\s*sin gluten", "options": r"tiene opciones sin tacc",
+    "es": {"is100": r"100\s*%\s*sin gluten", "options": r"tiene opciones sin (?:tacc|gluten)",
            "bare": r"\bsin tacc\b", "over": r"amig|apto|segur|confiab"},
-    "en": {"is100": r"100\s*%\s*(gluten[- ]free|sin gluten)", "options": r"gluten[- ]free options|tiene opciones sin tacc",
+    "en": {"is100": r"100\s*%\s*(gluten[- ]free|sin gluten)", "options": r"gluten[- ]free options|tiene opciones sin (?:tacc|gluten)",
            "bare": r"gluten[- ]free(?! options)", "over": r"celiac[- ]friendly|\bsafe\b|suitable"},
 }
 
@@ -129,8 +129,21 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=16, help="samples per cell for f4/router (default 16)")
     ap.add_argument("--legit-n", type=int, default=4, help="samples per question for legit (default 4)")
     ap.add_argument("--only-new", action="store_true", help="skip the OLD prompt (cheaper)")
+    ap.add_argument("--max-calls", type=int, required=True, help="hard cap on paid calls (the run aborts before exceeding it)")
+    ap.add_argument("--dry-run", action="store_true", help="print the plan and the estimated cost; make no call")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
+    arms = 1 if args.only_new else 2
+    plan = {"f4": len(F4_MESSAGES) * arms * args.n, "legit": len(LEGIT_QUESTIONS) * args.legit_n,
+            "labels": len(LABEL_MESSAGES) * arms * args.n, "router": len(ROUTER_THANKS) * arms * args.n}
+    planned = sum(plan[s] for s in args.suite)
+    print(f"PLAN: {', '.join(f'{s} {plan[s]}' for s in args.suite)} = {planned} call(s) to {MODEL}, "
+          f"~US${planned * 0.005:.2f}; hard cap {args.max_calls}")
+    if planned > args.max_calls:
+        raise SystemExit(f"the plan ({planned}) exceeds --max-calls ({args.max_calls}): nothing was called")
+    if args.dry_run:
+        print("dry run: no call made")
+        return
 
     import anthropic
     from dotenv import load_dotenv
@@ -220,14 +233,16 @@ def main() -> None:
                         stats[level]["bare label"] += bare
                         stats[level]["overclaim words"] += over
                         stats[level]["es label in en"] += lang == "en" and bool(
-                            re.search(r"tiene opciones sin tacc|espacio 100% sin gluten", line, re.I))
+                            re.search(r"tiene opciones sin (?:tacc|gluten)|espacio 100% sin gluten", line, re.I))
+                        # 2026-11-18: the map label is «Tiene opciones sin gluten»; the old one must not come back in NEW.
+                        stats[level]["old label"] += bool(re.search(r"tiene opciones sin tacc", line, re.I))
                         if not ok and level not in wrong:
                             wrong[level] = line.strip()[:170]
                 for level, _ in LABEL_PLACES:
                     c = stats[level]
                     print(f"[{lang} {tag} {level:18s}] correct {c['correct']}/{args.n} | says 100%: {c['says 100%']} | "
                           f"bare label: {c['bare label']} | overclaim words: {c['overclaim words']} | "
-                          f"not listed: {c['not listed']} | ES label in EN reply: {c['es label in en']}")
+                          f"not listed: {c['not listed']} | ES label in EN reply: {c['es label in en']} | old label: {c['old label']}")
                     if level in wrong and tag == "NEW":
                         print("     wrong:", wrong[level])
 

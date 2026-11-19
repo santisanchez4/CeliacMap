@@ -240,13 +240,11 @@ export interface RouterOutput {
   // allowed to say, since that boundary is already enforced in the
   // RESPONDER_PROMPT itself regardless of this field.
   limite_medico: boolean;
-  // Kitchen declarations the person states EXPLICITLY about the place they are contributing
-  // (never inferred). cocina_respuesta: this message answers the kitchen question the assistant
-  // put in its previous turn — even with "no sé". See the ROUTER prompt, instructions 9-10.
+  // Kitchen declarations the person states EXPLICITLY, on their own, about the place they are
+  // contributing (never inferred, never asked: the chat does not ask about the kitchen since the
+  // 2026-11-18 prompt batch). See the ROUTER prompt, instruction 9.
   cocina_exclusiva: (typeof SI_NO)[number] | null;
   preparacion_celiaca: (typeof PREPARACIONES)[number] | null;
-  dueno_celiaco: (typeof SI_NO)[number] | null;
-  cocina_respuesta: boolean;
   // "100" only when the person explicitly asks for 100% / dedicated / exclusive places (ROUTER
   // prompt instruction 11): the search then keeps only gluten_free_100 (audit plan step 4).
   nivel: (typeof NIVELES)[number] | null;
@@ -1046,8 +1044,8 @@ export type CeliacPrep = "separate_kitchen" | "separate_prep" | "shared_kitchen"
 const CELIAC_PREPS: readonly CeliacPrep[] = ["separate_kitchen", "separate_prep", "shared_kitchen"];
 
 // Whether the owner is celiac is a third party's health data (privacy phase 1, 2026-09-29): it is not a
-// kitchen fact. The router may still return dueno_celiaco until the next prompt batch removes the
-// question; kitchenFactsFromRouter discards it, so it never reaches a draft, a row or the redactor.
+// kitchen fact. The router stopped extracting it in the 2026-11-18 prompt batch; mergeKitchenFacts still
+// drops a stale owner_celiac from a client echo, so it never reaches a draft, a row or the redactor.
 export interface KitchenFacts {
   kitchen_exclusive: boolean | null;
   celiac_prep: CeliacPrep | null;
@@ -1086,7 +1084,6 @@ export function kitchenFactsFromRouter(
   r: {
     cocina_exclusiva: "si" | "no" | null;
     preparacion_celiaca: "cocina_separada" | "preparacion_aparte" | "misma_cocina" | null;
-    dueno_celiaco: "si" | "no" | null;
   },
 ): KitchenFacts {
   const yesNo = (v: "si" | "no" | null): boolean | null => (v === "si" ? true : v === "no" ? false : null);
@@ -1132,21 +1129,6 @@ export function applyKitchenStep<T extends PendingSubmission>(
   const merged = mergeKitchenFacts(pending, kitchenFactsFromRouter(router));
   const { kitchen_asked: _stale, ...rest } = merged as T & { kitchen_asked?: boolean };
   return { pending: rest as T, preguntarCocina: false };
-}
-
-/** A complete draft whose kitchen question was ALREADY asked owns the turn when the router says
- * this message answers it (even with "no sé"). A confirmation is excluded: the confirm branch
- * merges the facts and inserts. Same exclusions as decideCollectingSuggestion: out of scope and
- * courtesy never own a turn. */
-export function decideKitchenAnswer(
-  router: Pick<RouterOutput, "modulo" | "cocina_respuesta" | "confirma_envio">,
-  pending: PendingSubmission | null,
-): PendingSubmission | null {
-  if (!pending || pending.kitchen_asked !== true) return null;
-  if (!router.cocina_respuesta || router.confirma_envio) return null;
-  if (router.modulo === "fuera_de_alcance" || router.modulo === "cortesia") return null;
-  if (pending.kind === "report") return null; // a report is never asked, so it cannot own a kitchen answer
-  return pending.address && pending.country && pending.city ? pending : null;
 }
 
 /** In a confirmation turn, facts said in that same message ("dale, es todo sin gluten") are
@@ -1311,8 +1293,6 @@ export function parseRouterOutput(text: string): RouterOutput {
     limite_medico: obj.limite_medico === true,
     cocina_exclusiva: asEnum(obj.cocina_exclusiva, SI_NO),
     preparacion_celiaca: asEnum(obj.preparacion_celiaca, PREPARACIONES),
-    dueno_celiaco: asEnum(obj.dueno_celiaco, SI_NO),
-    cocina_respuesta: obj.cocina_respuesta === true,
     nivel: asEnum(obj.nivel, NIVELES),
   };
 }
@@ -1481,7 +1461,7 @@ export const RATE_LIMIT_REPLIES: Record<Idioma, string> = {
 // cannot misfire; it is the same referral the redactor's instruction 4 and CELIAQUIA_GUARD_REPLIES give.
 export const SCOPE_DECLINE_REPLIES: Record<Idioma, string> = {
   es:
-    "Solo puedo ayudarte a buscar lugares sin TACC en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía. Si es una consulta de salud personal, consultala con un profesional de la salud; también podés orientarte con ACELA (acela.org.ar) o ACA (celiaco.org.ar) en Argentina y ACELU (acelu.org) en Uruguay.",
+    "Solo puedo ayudarte a buscar lugares sin gluten en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía. Si es una consulta de salud personal, consultala con un profesional de la salud; también podés orientarte con ACELA (acela.org.ar) o ACA (celiaco.org.ar) en Argentina y ACELU (acelu.org) en Uruguay.",
   en:
     "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease. If it's a personal health question, talk to a health professional; you can also get guidance from ACELA (acela.org.ar) or ACA (celiaco.org.ar) in Argentina and ACELU (acelu.org) in Uruguay.",
 };
@@ -1501,7 +1481,7 @@ export const CANCEL_REPLIES: Record<Idioma, string> = {
 // if the router misclassified an attack as "cortesia", the worst outcome is this line.
 export const CORTESIA_REPLIES: Record<Idioma, string> = {
   es:
-    "¡De nada! Cuando quieras, puedo buscar lugares sin TACC en Argentina y Uruguay, ayudarte a dejar un comentario sobre un lugar o responder dudas generales sobre la celiaquía.",
+    "¡De nada! Cuando quieras, puedo buscar lugares sin gluten en Argentina y Uruguay, ayudarte a dejar un comentario sobre un lugar o responder dudas generales sobre la celiaquía.",
   en:
     "You're welcome! Whenever you like, I can look for gluten-free places in Argentina and Uruguay, help you leave a comment about a place, or answer general questions about celiac disease.",
 };
@@ -1920,10 +1900,6 @@ export async function handleRequest(req: Request): Promise<Response> {
     kitchenFactsFromRouter(router),
   );
 
-  // A complete draft whose kitchen question was already asked owns the turn when the router says
-  // this message answers it (decideKitchenAnswer); confirmations are handled above instead.
-  const kitchenAnswer = !collectingSuggestion ? decideKitchenAnswer(router, pendingIn) : null;
-
   // "" is never returned: every branch below either assigns `reply` directly
   // or sets `envio`, and the shared redactor call after the chain assigns
   // `reply` for every envio branch.
@@ -2035,13 +2011,6 @@ export async function handleRequest(req: Request): Promise<Response> {
           texto: confirmTurn.payload.notes,
         };
       }
-    } else if (kitchenAnswer) {
-      // The person answered the kitchen question that came with the draft: merge what they said
-      // and show the updated draft — never re-ask. A message that also confirms is the branch above.
-      envioModulo = "reportar";
-      const step = applyKitchenStep(kitchenAnswer, router, { complete: true });
-      responsePending = step.pending;
-      envio = { ...envioBaseForPending(step.pending), estado: "borrador_listo", ...kitchenEnvioExtras(step.pending, false) };
     } else if (router.modulo === "reportar") {
       // Módulo 2 turn 1 — the lookup runs against APPROVED places with the
       // anon key, so the same "public read approved places" RLS that backs
@@ -2220,8 +2189,6 @@ export async function handleRequest(req: Request): Promise<Response> {
         ciudad: router.ciudad,
         confirma_envio: router.confirma_envio,
         envio_estado: envio.estado,
-        cocina_preguntada: envio.preguntar_cocina === true,
-        cocina_respondida: router.cocina_respuesta,
       };
     }
   } catch (err) {
