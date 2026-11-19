@@ -1,0 +1,108 @@
+{
+  "started": "2026-11-19T03:22:58.371365+00:00",
+  "finished": "2026-11-19T03:23:45.883033+00:00",
+  "turns": [
+    {
+      "scenario": "S1",
+      "turn": 1,
+      "message": "quiero recomendar Panadería Zzqx Cocina en Rosario, muy buena atención",
+      "http": 200,
+      "reply": "Gracias por querer recomendar Panadería Zzqx Cocina. Para poder sugerirlo necesito la dirección o una referencia de ubicación (barrio, calle cercana, etc.). ¿Me pasás dónde queda exactamente?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S1",
+      "turn": 2,
+      "message": "Calle Inventada 1234, Rosario, Argentina",
+      "http": 200,
+      "reply": "Perfecto: Panadería Zzqx Cocina, Calle Inventada 1234, Rosario, Argentina, con tu comentario \"muy buena atención\". ¿Lo envío así?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S1",
+      "turn": 3,
+      "message": "es todo sin gluten y la dueña es celíaca",
+      "http": 200,
+      "reply": "Anotado: Panadería Zzqx Cocina, Calle Inventada 1234, Rosario, Argentina, con tu comentario \"muy buena atención\". Contás que la cocina es exclusivamente sin gluten. Es un aporte para revisión: el equipo lo confirma antes de definir la etiqueta del lugar. Después de revisarlo, el equipo puede publicar tu comentario en el sitio como opinión de \"Anónimo\". ¿Lo envío así?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {
+        "kitchen_exclusive": true
+      },
+      "flags": []
+    },
+    {
+      "scenario": "S1",
+      "turn": 4,
+      "message": "dale, mandalo",
+      "http": 200,
+      "reply": "Listo, lo envié. Gracias por contarlo — ayuda a mantener el mapa confiable.",
+      "action": {
+        "type": "suggestion_submitted"
+      },
+      "rate_limited": false,
+      "pending_kind": null,
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S2",
+      "turn": 1,
+      "message": "quiero recomendar un lugar nuevo que no está en el mapa",
+      "http": 200,
+      "reply": "Perfecto. ¿Cuál es el nombre del lugar y dónde queda (ciudad o dirección)?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": null,
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S2",
+      "turn": 2,
+      "message": "es Panadería Zzqx Cocina en Rosario",
+      "http": 200,
+      "reply": "Entendido. Para poder anotar tu sugerencia, necesito la dirección o una referencia de ubicación de la Panadería Zzqx Cocina en Rosario. ¿Me pasás dónde queda exactamente?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S2",
+      "turn": 3,
+      "message": "Calle Inventada 1234, Rosario, Argentina",
+      "http": 200,
+      "reply": "Perfecto: Panadería Zzqx Cocina, Calle Inventada 1234, Rosario, Argentina. ¿Lo envío así para que el equipo lo revise?",
+      "action": null,
+      "rate_limited": false,
+      "pending_kind": "suggestion",
+      "pending_kitchen": {},
+      "flags": []
+    },
+    {
+      "scenario": "S2",
+      "turn": 4,
+      "message": "dale",
+      "http": 200,
+      "reply": "Listo, lo envié. Gracias por la sugerencia — ayuda a mantener el mapa confiable. El equipo va a revisar Panadería Zzqx Cocina antes de que aparezca en el mapa.",
+      "action": {
+        "type": "suggestion_submitted"
+      },
+      "rate_limited": false,
+      "pending_kind": null,
+      "pending_kitchen": {},
+      "flags": []
+    }
+  ]
+}
