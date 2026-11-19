@@ -3,6 +3,7 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
   applyKitchenStep,
+  decideDraftAmendment,
   hasKitchenFacts,
   kitchenFactsFromRouter,
   mergeKitchenFacts,
@@ -489,4 +490,37 @@ Deno.test("handleRequest sets no kitchen question flag of its own", async () => 
   const handler = src.slice(src.indexOf("export async function handleRequest"));
   assertEquals(/preguntar_cocina:\s*true/.test(handler), false);
   assertEquals(/invitar_cocina:\s*true/.test(handler), false);
+});
+
+// ---- decideDraftAmendment (live finding, chat v26 S1, 2026-11-19) ------------------------------------------
+// With a complete suggestion draft open, "es todo sin gluten" started a NEW draft and dropped the address.
+// A volunteered kitchen fact about the same place now amends the open draft instead.
+
+function amendRouter(over: Record<string, unknown> = {}) {
+  return {
+    modulo: "reportar", confirma_envio: false, lugar_nombre: null,
+    cocina_exclusiva: "si", preparacion_celiaca: null, ...over,
+  } as Parameters<typeof decideDraftAmendment>[0];
+}
+
+Deno.test("decideDraftAmendment - a volunteered fact on a complete suggestion draft amends it", () => {
+  assertEquals(decideDraftAmendment(amendRouter(), suggestion()), suggestion());
+  assertEquals(decideDraftAmendment(amendRouter({ lugar_nombre: "pan justo" }), suggestion()), suggestion());
+  assertEquals(decideDraftAmendment(amendRouter({ lugar_nombre: "Panadería Pan Justo" }), suggestion()), suggestion());
+  assertEquals(decideDraftAmendment(amendRouter({ modulo: "confirmar" }), suggestion()), suggestion());
+  const step = applyKitchenStep(suggestion(), amendRouter(), { complete: true });
+  assertEquals([step.pending.address, step.pending.kitchen_exclusive], ["Corrientes 100, Rosario", true]);
+});
+
+Deno.test("decideDraftAmendment - never amends: no fact, a confirmation, another place, out of scope, an incomplete draft, a report", () => {
+  assertEquals(decideDraftAmendment(amendRouter({ cocina_exclusiva: null }), suggestion()), null);
+  assertEquals(decideDraftAmendment(amendRouter({ confirma_envio: true }), suggestion()), null);
+  assertEquals(decideDraftAmendment(amendRouter({ lugar_nombre: "La Espiga" }), suggestion()), null);
+  assertEquals(decideDraftAmendment(amendRouter({ modulo: "fuera_de_alcance" }), suggestion()), null);
+  assertEquals(decideDraftAmendment(amendRouter({ modulo: "cortesia" }), suggestion()), null);
+  assertEquals(decideDraftAmendment(amendRouter({ modulo: "buscar" }), suggestion()), null);
+  assertEquals(decideDraftAmendment(amendRouter(), suggestion({ address: null })), null);
+  assertEquals(decideDraftAmendment(amendRouter(), suggestion({ country: null })), null);
+  assertEquals(decideDraftAmendment(amendRouter(), report()), null);
+  assertEquals(decideDraftAmendment(amendRouter(), null), null);
 });
