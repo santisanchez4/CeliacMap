@@ -1,259 +1,316 @@
-# CeliacMap — Cómo funciona y con qué criterios
+# CeliacMap — Metodología y criterios de evaluación
 
-**Documento de metodología · Versión 1.0 · 30 de septiembre de 2026**
+**Versión 2.0 · 20 de noviembre de 2026 · para la Comisión Directiva de la Asociación Celíaca Argentina**
 
-Preparado para la Asociación Celíaca Argentina. Este documento explica, sin tecnicismos, cómo CeliacMap encuentra
-lugares, cómo decide qué mostrar en el mapa y qué límites tiene. Todo lo que se describe acá es lo que el sistema hace
-hoy; lo que todavía está en desarrollo figura como tal.
+Reemplaza a la versión 1.0 del 30 de septiembre de 2026.
 
 ---
 
-## 1. Qué es CeliacMap y qué no es
+## 1. En una página
 
-CeliacMap es un mapa de lugares con opciones sin gluten / sin TACC en Uruguay y Argentina: restaurantes, cafés,
-panaderías y comercios. Reúne información pública y aportes de la comunidad, la ordena con ayuda de inteligencia
-artificial y la somete a criterios conservadores antes de mostrarla. Incluye además un asistente de conversación para
-buscar lugares, recomendar o reportar uno, y consultar información general sobre la celiaquía.
+- CeliacMap es un mapa de lugares de Uruguay y Argentina que **informan** tener oferta sin gluten. Reúne información
+  pública y aportes de personas, y la ordena con criterios conservadores.
+- **CeliacMap no inspecciona, no audita y no certifica.** Nadie de CeliacMap visita las cocinas. No verificamos las
+  condiciones de elaboración, las medidas contra la contaminación cruzada ni el cumplimiento de los requisitos
+  sanitarios de ningún establecimiento. Tampoco analizamos alimentos.
+- Lo que sí hacemos es **leer lo que está escrito** sobre cada lugar (lo que publica el propio comercio, lo que cuentan
+  sus clientes, lo que figura en registros públicos), decidir si eso alcanza para mostrarlo y con qué etiqueta, y
+  dejar afuera lo que no alcanza.
+- Por eso cada etiqueta es **una descripción de lo que el lugar declara o de lo que se dice de él, no una garantía de
+  seguridad**. La recomendación al usuario es siempre la misma: confirmar en el lugar antes de consumir.
+- La Asociación tiene razón en el punto central de su mensaje: que un comercio declare elaborar solo sin gluten no
+  prueba que lo haga en condiciones seguras. Nuestro sistema no puede probarlo. Este documento explica qué hace y
+  qué no, para que puedan evaluarlo con ese límite a la vista.
 
-**Lo que CeliacMap no es:**
+## 2. Qué evaluamos y qué no
 
-- **No certifica ni inspecciona.** Nadie de CeliacMap visita las cocinas ni audita procesos. No reemplaza a ningún
-  registro oficial, sello ni certificación.
-- **Sus etiquetas son una estimación**, hecha a partir de la evidencia disponible, y no una garantía médica. El sitio lo
-  dice junto al mapa: *"Los niveles son una estimación de la comunidad y del sistema, no una garantía médica. Confirmá con
-  el local."*
-- **La recomendación es siempre confirmar en el lugar** antes de consumir: preguntar cómo preparan los alimentos, si
-  cocinan también con gluten y cómo evitan la contaminación cruzada.
+| | ¿Lo hacemos? | Cómo |
+|---|---|---|
+| Comprobar que el comercio existe y dónde queda | Sí | Ficha de Google Maps o dirección geocodificada. Si solo hay dirección, la evidencia se considera más débil. |
+| Leer qué dice el comercio de sí mismo | Sí | Su sitio web o su cuenta oficial en redes, con el enlace guardado. |
+| Leer qué dicen sus clientes | Sí, como apoyo | Fragmentos de reseñas públicas. No se publican y se borran a los 30 días. |
+| Consultar registros oficiales | Parcialmente | En Montevideo se usa el listado de locales habilitados de la Intendencia como un dato más. En Argentina no usamos ningún registro oficial hoy. |
+| Preguntarle al comercio | En pocos casos | Un correo breve a comercios en revisión. Su respuesta es un dato más: nunca aprueba por sí sola. |
+| Visitar el local | **No** | — |
+| Inspeccionar la cocina, los procesos o los proveedores | **No** | — |
+| Verificar medidas contra la contaminación cruzada | **No** | Solo registramos si el comercio o sus clientes las mencionan. |
+| Verificar habilitaciones o requisitos sanitarios | **No** | — |
+| Analizar alimentos en laboratorio | **No** | — |
+| Certificar o avalar un establecimiento | **No** | — |
 
-Que un lugar esté publicado en el mapa no significa que haya sido verificado.
+Cuando el sistema dice que hay «evidencia» de un protocolo o de una preparación aparte, quiere decir que **alguien lo
+escribió**, no que alguien lo comprobó.
 
-## 2. Las dos etiquetas del mapa
+## 3. Las dos categorías del mapa
 
-Cada lugar publicado lleva una de dos etiquetas:
+Cada lugar publicado lleva una de dos etiquetas.
 
-| Etiqueta | Qué significa |
-|---|---|
-| **Espacio 100% sin gluten** | Un establecimiento donde se cocinan y se venden **únicamente** productos aptos para celíacos (cocina exclusiva). |
-| **Tiene opciones sin TACC** | Ofrece opciones sin gluten, pero **no** es un espacio exclusivo: en el mismo lugar se elabora o se vende también con gluten. |
+### «Tiene opciones sin gluten»
 
-Un local que cocina con gluten y ofrece un menú para celíacos, preparación aparte o incluso una cocina separada **no**
-es "100% sin gluten": lleva la etiqueta "Tiene opciones sin TACC".
+- **Qué significa:** hay información escrita de que el lugar ofrece productos o platos sin gluten. El lugar también
+  elabora o vende con gluten, o no sabemos si lo hace.
+- **Qué no garantiza:** que esas opciones se preparen sin contaminación cruzada, que haya un sector, horno o utensilios
+  separados, ni que el personal esté capacitado. Cómo las preparan varía de un lugar a otro y CeliacMap no lo comprueba.
+- Internamente distinguimos a los lugares que dicen atender específicamente a celíacos de los que solo mencionan
+  alguna opción, pero en el mapa los dos llevan esta misma etiqueta, para no sugerir más de lo que sabemos.
 
-**Ante la duda, siempre la etiqueta más baja.** Si la información no alcanza para distinguir, el lugar queda como
-"Tiene opciones sin TACC". Internamente el sistema diferencia a los lugares que atienden explícitamente a celíacos de
-los que solo tienen alguna opción, pero en el mapa ambos se muestran con la misma etiqueta, justamente para no sugerir
-más seguridad de la que hay.
+### «Espacio 100% sin gluten» (nombre en revisión)
 
-Hay además un aviso que puede aparecer sobre cualquier lugar: **"Reportado por la comunidad: consultá antes de ir"**
-(ver sección 9).
+- **Qué significa:** el propio comercio afirma por escrito y de forma explícita que en ese lugar se elabora y se vende
+  **únicamente** sin gluten («todo es sin gluten», «100% libre de gluten», «cocina exclusiva»), y una persona lo revisó
+  (sección 6). Un local que cocina con gluten y ofrece un menú para celíacos, preparación aparte o incluso una cocina
+  separada no lleva esta etiqueta.
+- **Qué no garantiza:** que la afirmación sea cierta hoy, que las materias primas sean aptas, que no haya
+  contaminación en origen o en el traslado, ni que el lugar cumpla ningún requisito sanitario. **No es una
+  certificación ni una validación del establecimiento.**
+- Coincidimos con la observación de la Asociación: el nombre actual puede leerse como una garantía. Estamos evaluando
+  cambiarlo por uno que diga de quién es la afirmación (por ejemplo, **«Se declara 100% sin gluten»**) y nos
+  interesa su opinión antes de decidir (ver sección 11).
 
-## 3. Los agentes de inteligencia artificial
+Además, cualquier lugar puede mostrar el aviso **«Reportado por la comunidad: consultá antes de ir»** (sección 8).
 
-CeliacMap funciona con varios programas automáticos ("agentes"), cada uno con una tarea acotada. Ninguno publica un
-lugar por su cuenta: todos alimentan a un único evaluador, que es la puerta de entrada al mapa.
+**Ante la duda, siempre la etiqueta más baja.** Y si la información no alcanza ni para esa, el lugar no se publica.
 
-- **Búsqueda en Google Maps.** Busca comercios con términos como "sin TACC", "sin gluten" o "apto celíacos" en una
-  lista definida de ciudades de Uruguay y Argentina. Cada lugar encontrado entra como *candidato*, no como publicado.
-  El país y la ciudad se toman de la dirección real del comercio, y lo que queda fuera de Uruguay y Argentina se descarta.
-- **Búsqueda en redes sociales.** Busca páginas públicas de Instagram y Facebook de comercios que se presentan como sin
-  TACC y las ubica en el mapa a partir de su nombre y dirección.
-- **Búsqueda en la web.** Existe una búsqueda web general, pero **hoy está desactivada**.
-- **Sugerencias de la comunidad.** Cualquier persona puede sugerir un lugar desde el sitio o desde el asistente. La
-  sugerencia se ubica en el mapa; si no puede ubicarse en una dirección real no entra como candidato y queda para que la
-  revise el administrador, y si el lugar ya existe no se duplica. Una sugerencia es un candidato más, que pasa por el mismo evaluador.
-- **Evaluador.** Es el corazón del sistema: analiza cada candidato con los criterios de la sección 5 y decide si se
-  publica, si queda para revisión humana o si se descarta.
-- **Actualizador.** Revisa periódicamente los lugares ya publicados que vienen de Google Maps. Si un comercio figura
-  como cerrado definitivamente, lo retira del mapa; si cambió su nombre, dirección o rubro, lo corrige; si deja de
-  encontrarse, lo marca para que lo revise una persona, sin retirarlo por un error que puede ser pasajero.
-- **Consultas a comercios.** Escribe por correo a algunos comercios que quedaron en revisión, para preguntarles
-  directamente por sus opciones sin TACC (ver sección 7).
-- **Reportes.** Cuando alguien informa un problema con un lugar publicado, un agente lo vuelve a evaluar teniendo en
-  cuenta el reporte (ver sección 9).
+## 4. De dónde sale la información
 
-La búsqueda y la evaluación se ejecutan una vez por mes, con una ronda adicional de evaluación a mitad de mes; las
-sugerencias de la comunidad se procesan cada semana y los reportes, apenas llegan.
+- **Google Maps:** nombre, dirección, ubicación y rubro del comercio, y fragmentos de reseñas públicas que mencionan
+  «sin gluten», «celíaco» y términos similares.
+- **Redes sociales y sitios web de los comercios:** textos públicos, con su enlace. Una publicación de Instagram o
+  Facebook solo cuenta cuando el administrador abrió la cuenta y confirmó que es la del propio comercio. Una
+  publicación de un tercero que nombra a un lugar no cuenta.
+- **Aportes de personas:** sugerencias, recomendaciones y reportes enviados desde el sitio o el asistente. Se tratan
+  siempre como información no verificada. El volumen es todavía muy bajo.
+- **Respuestas de los comercios** a nuestras consultas por correo.
+- **Registros oficiales**, donde existen y son públicos (hoy, la Intendencia de Montevideo).
+- **Lo que no usamos:** guías o directorios de terceros como única fuente; sitios que prohíben el acceso
+  automatizado; el nombre del local como prueba («Sin Gluten» en el cartel no demuestra nada); lo que la
+  inteligencia artificial «crea saber» de un comercio.
+- **Lo que no pedimos ni guardamos:** datos de salud de ninguna persona. No se pregunta si quien escribe o el dueño
+  de un comercio es celíaco.
 
-## 4. Fuentes de información
+## 5. Cómo se decide: evaluador automático y revisión de una persona
 
-El evaluador trabaja solo con la información que el sistema reúne sobre cada lugar:
-
-- **Datos del comercio en Google Maps:** nombre, dirección, ubicación y rubro.
-- **Fragmentos de reseñas públicas de Google** que mencionan términos como "sin gluten" o "celíaco". Se usan como
-  evidencia de apoyo, **nunca se publican** en CeliacMap y se borran a los 30 días.
-- **Textos públicos de redes sociales y páginas web** de los comercios, con el enlace de dónde salen.
-- **Aportes de la comunidad:** sugerencias, recomendaciones y reportes enviados desde el sitio o el asistente, incluidas
-  las respuestas opcionales sobre la cocina de un lugar (si es exclusivamente sin gluten, cómo preparan lo apto para
-  celíacos). Se tratan siempre como **información no verificada**.
-- **Respuestas de los comercios** a las consultas por correo.
-- **Evidencia que aporta el administrador**, siempre con una nota que explica de dónde viene.
-
-**Qué no se pide ni se guarda.** CeliacMap no pide datos de salud de nadie: ni de quien escribe ni de terceros (por
-ejemplo, ya no se pregunta si el dueño de un comercio es celíaco). Las conversaciones con el asistente se borran a los
-30 días; las sugerencias y los reportes que no se publican, a los 2 años.
-
-## 5. Los criterios del evaluador
-
-El evaluador es un modelo de inteligencia artificial que recibe, para cada candidato, toda la información reunida y
-responde con un resultado, una etiqueta y una **puntuación de confianza** entre 0 y 1 que expresa qué tan sólida es la
-evidencia. Sus instrucciones le piden, en primer lugar, **no sobreestimar nunca la seguridad**: *"La salud de personas
-celíacas depende de tu criterio. Ante la duda, siempre escala a revisión humana."*
-
-**Qué cuenta como evidencia fuerte.** Una mención explícita y clara de "sin TACC", de un "sin gluten" certificado o la
-descripción de un protocolo para evitar la contaminación cruzada.
-
-**Señales de alerta** (cada una baja la confianza):
-
-- Dice "sin gluten" pero no "sin TACC" (puede ser un término de marketing y no una práctica real; ver sección 11).
-- No menciona cómo evita la contaminación cruzada.
-- Solo ofrece opciones vegetarianas o veganas, sin mención explícita de sin TACC.
-- La información tiene más de 12 meses.
-- Hay reseñas negativas de personas celíacas.
-- La descripción es ambigua ("apto para dietas especiales").
-
-**Solo la evidencia recibida.** El evaluador debe basarse únicamente en la información que se le entrega sobre ese
-lugar. No puede usar lo que "cree saber" de un comercio por su cuenta, ni tomar el nombre como prueba: que un local se
-llame "Sin Gluten" no demuestra que su cocina sea exclusiva, y que no lo diga no demuestra lo contrario. Las reseñas
-entusiastas pesan como apoyo, pero nunca por encima de la evidencia. Los aportes de la comunidad orientan la revisión,
-pero por sí solos no alcanzan para publicar un lugar ni para darle la etiqueta 100%. Si un lugar solo pudo ubicarse por
-su dirección (sin una ficha de Google Maps que confirme que el comercio existe y funciona ahí), la evidencia se
-considera más débil.
-
-**Los tres resultados posibles:**
+Cada candidato pasa por un **evaluador automático** (un modelo de inteligencia artificial con instrucciones fijas).
+Recibe solo la información reunida sobre ese lugar y devuelve un resultado, una etiqueta propuesta y una
+**puntuación de confianza** de 0 a 1 sobre qué tan sólida es la evidencia escrita. Su primera instrucción es no
+sobreestimar nunca la seguridad y, ante la duda, derivar a una persona.
 
 | Resultado | Cuándo | Qué pasa |
 |---|---|---|
-| **Aprobado** | Evidencia explícita y clara, con una confianza de **0,85 o más** (85 sobre 100). | Se publica en el mapa. |
-| **Revisión humana** | Evidencia parcial o ambigua: confianza entre **0,5 y 0,85**. | No se publica; queda en espera de que una persona lo revise. |
-| **Descartado** | Evidencia insuficiente, contradictoria o con señales de riesgo: confianza **menor a 0,5**. | No se publica. |
+| Aprobado | Confianza de **0,85 o más** | Se publica. |
+| Revisión humana | Confianza entre **0,5 y 0,85** | **No se publica.** Espera a que una persona lo revise. |
+| Descartado | Confianza menor a 0,5, información contradictoria o señales de riesgo | No se publica. |
 
-Estos umbrales no dependen solo de lo que "diga" el modelo: el propio programa los aplica siempre. Aunque el modelo
-proponga aprobar un lugar, si su confianza no llega a 0,85 el lugar va a revisión humana; y si está por debajo de 0,5 se
-descarta. Es decir: **para aparecer en el mapa sin intervención humana hace falta evidencia fuerte; todo lo intermedio
-lo decide una persona.**
+Estos umbrales los aplica el programa, no el modelo: aunque el modelo proponga aprobar, si la confianza no llega a
+0,85 el lugar no se publica.
 
-## 6. La regla del 100%
+**Señales que bajan la confianza:** dice «bajo en gluten» o «reducido en gluten» (eso tiene gluten: si es lo único
+que ofrece, se descarta); no menciona cómo evita la contaminación cruzada; solo ofrece opciones veganas o
+vegetarianas; la información tiene más de 12 meses; hay reseñas negativas de personas celíacas; la descripción es
+ambigua («apto para dietas especiales»).
 
-La etiqueta "Espacio 100% sin gluten" es la que más confianza transmite, y por eso tiene controles propios, aplicados
-por el programa además de las instrucciones al modelo:
+**«Sin gluten» y «sin TACC» valen lo mismo.** Desde el 18 de noviembre de 2026 el sistema trata igual a «sin
+gluten», «libre de gluten» y «sin TACC», en los dos países. Ninguno de esos términos, por sí solo, dice que la
+cocina sea exclusiva ni que el lugar sea seguro.
 
-- **Exige evidencia explícita de elaboración exclusiva.** El sistema solo mantiene la etiqueta 100% si en los textos
-  recibidos (reseñas, redes, páginas web) hay una afirmación expresa como "100% sin TACC", "todo es sin gluten" o
-  "cocina exclusiva". El nombre del local no cuenta, ni lo que el modelo crea saber. Sin esa frase, el lugar queda como
-  **"Tiene opciones sin TACC"** y pasa a una lista de espera para que el administrador confirme o no el 100%.
-- **Si alguien declara que la cocina no es exclusiva**, el lugar no puede quedar como 100%.
-- **Un lugar sugerido por la comunidad nunca recibe el 100% de forma automática:** solo el administrador puede darle esa
-  etiqueta.
-- **El caso inverso también se revisa:** si la evidencia sí afirma exclusividad pero el evaluador eligió una etiqueta
-  más baja, el sistema no la sube solo; el lugar entra en la misma lista para que decida una persona.
+## 6. Qué evidencia exige hoy cada categoría
 
-En resumen: el 100% se muestra solo con evidencia escrita y explícita de elaboración exclusiva, o con la confirmación
-del administrador. Mientras tanto, el lugar se muestra como "Tiene opciones sin TACC".
+**«Tiene opciones sin gluten».** Hay dos caminos, y conviene distinguirlos:
 
-## 7. Consultas a comercios
+- **El evaluador automático** solo lo publica con una mención directa de oferta sin gluten **acompañada** de al menos
+  uno de estos elementos, por escrito: una certificación, una preparación dedicada (sector, horno o utensilios propios)
+  o un protocolo contra la contaminación cruzada. Para el evaluador, una mención suelta («hay algunas cosas sin gluten»)
+  no alcanza: el lugar queda en revisión.
+- **El administrador** puede aprobarlo como «Tiene opciones sin gluten» con una mención explícita **del propio
+  comercio** en su sitio o su cuenta oficial («opciones sin gluten», «productos sin gluten»), aunque no describa un
+  protocolo ni una preparación dedicada. Por eso esta etiqueta no dice nada sobre cómo se preparan esas opciones: hay
+  que preguntarlo en el lugar.
 
-Para los lugares que quedaron en revisión humana por falta de evidencia, CeliacMap puede escribir un correo breve al
-comercio preguntándole por sus opciones sin TACC.
+**«Espacio 100% sin gluten».** Desde el 20 de noviembre de 2026 **solo la asigna una persona**: el administrador, con
+una cita del propio comercio (su sitio o su cuenta oficial) guardada textualmente, con su enlace y la fecha en que la
+leyó. **El evaluador automático nunca la asigna**: si propone 100%, el lugar se publica como «Tiene opciones sin
+gluten» y queda marcado para que el administrador lo revise. Las reseñas de clientes, una guía de terceros o el nombre
+del local nunca alcanzan para el 100%. Si alguien declara que el local también cocina con gluten, no puede quedar como
+100%. Cuando el administrador la asigna por conocimiento directo del lugar, además le pide al comercio una
+confirmación por escrito.
 
-- **La respuesta es evidencia, nunca una aprobación automática.** El comercio tiene un interés legítimo en aparecer en
-  el mapa, y eso no garantiza que su respuesta sea precisa o que conozca los protocolos de contaminación cruzada. Por
-  eso su respuesta vuelve al mismo evaluador junto con el resto de la información. Aun con una respuesta favorable, el
-  lugar queda esperando la **aprobación final de una persona**: ninguna consulta lleva por sí sola a un lugar al mapa.
-- **Opción de no ser contactado.** Cada correo incluye una línea fija explicando cómo pedir no recibir más mensajes. Si
-  un comercio lo pide, queda excluido de forma permanente. Si el sistema no logra clasificar una respuesta, no la toma
-  como pedido de baja, para no dejar de lado por error a un comercio que quiso responder.
-- **Volumen acotado.** Está en una etapa inicial y el envío está limitado a un máximo de tres comercios por mes, para
-  observar las respuestas antes de ampliarlo. Solo se escribe a comercios que tienen datos de contacto públicos.
+**Casos que la Asociación preguntó en particular:**
 
-## 8. Revisión humana
+| Lo único que hay es… | Qué hace el sistema hoy |
+|---|---|
+| Publicaciones del propio comercio en redes, aunque digan «100% sin gluten» | El evaluador **no le da el 100%**: lo deja en revisión humana o, si lo publica, como «Tiene opciones». El administrador abre la cuenta, confirma que es la del comercio, guarda la frase textual con su enlace y fecha, y decide. |
+| El sitio web del comercio, que describe sector u horno separado y un protocolo, más alguna reseña | Puede publicarse automáticamente como «Tiene opciones sin gluten». Nadie comprobó que el protocolo exista. |
+| Solo reseñas de clientes, aunque sean de personas celíacas y muy favorables | Desde el 18/11/2026 **no se publica**: va a revisión humana. Y nunca dan el 100%. (Antes, un caso así podía aprobarse en el límite.) |
+| Una línea en una guía o un directorio de terceros | No alcanza para publicar, ni siquiera como «opciones». Es solo una pista para revisar. |
+| La respuesta del comercio a nuestro correo | Es un dato más, con el mismo cuidado que cualquier fuente interesada. Nunca aprueba por sí sola. |
 
-Hoy la revisión humana la hace el administrador de CeliacMap, que recibe un resumen diario por correo con todo lo
-pendiente y avisos inmediatos cuando algo es urgente (un reporte negativo, un lugar retirado del mapa, la respuesta de un
-comercio). Revisa:
+En todos los casos la evidencia es **documental y declarativa**. No reemplaza a una inspección.
 
-- los lugares que el evaluador dejó en **revisión humana**;
-- los lugares en espera de **confirmación del 100%**;
-- los **reportes de la comunidad** y los lugares con aviso;
-- las **recomendaciones de la comunidad** antes de publicarlas;
-- las sugerencias que no pudieron ubicarse en el mapa.
+**Un error que corregimos.** Hasta el 20 de noviembre de 2026, 24 de los 90 lugares con la etiqueta del 100% la
+habían recibido del evaluador automático, a partir de reseñas de clientes que decían que todo era sin gluten o del
+nombre del local, sin que una persona lo revisara. Otros 7 la tenían por una decisión del administrador apoyada en
+guías o blogs de terceros, o en una frase del comercio que no afirmaba que todo fuera sin gluten («cocina apta para
+celíacos»). Ninguno de esos respaldos alcanza para la etiqueta más fuerte: los 31 pasaron a «Tiene opciones sin
+gluten» hasta que el administrador guarde una fuente del propio comercio, y el programa ya no permite que el
+evaluador deje un 100%. Además, la Asociación Celíaca del Uruguay figuraba como un lugar del mapa. Salió: una
+asociación de pacientes es una organización de referencia, no un lugar donde comer o comprar.
 
-Cada decisión manual queda registrada con una nota que dice quién decidió, con qué conocimiento directo y qué había
-concluido el evaluador. Una decisión manual nunca es silenciosa ni modifica la puntuación de confianza del evaluador.
+Ese mismo día re-evaluamos con el criterio actual los 59 lugares que seguían publicados con una puntuación menor a
+0,85 sin decisión de una persona (casi todos dietéticas y almacenes aprobados con el criterio anterior a junio de
+2026). Solo uno siguió publicado; los otros 58 pasaron a revisión humana, porque no había ninguna mención escrita de
+oferta sin gluten. No descartamos ninguno: un descarte es definitivo, y la falta de evidencia no es un motivo para
+descartar, solo para no publicar.
 
-Hay una **revisión en curso** de los lugares en espera de confirmación del 100%. Para agilizarla se usa una
-herramienta que busca en fuentes públicas y **propone** una etiqueta citando textualmente lo que encontró, después de
-comprobar que la cita está realmente en la página. La herramienta no escribe nada ni cambia ningún lugar: cada
-propuesta la acepta o la rechaza el administrador.
+## 7. La revisión humana en la práctica
 
-## 9. Reportes de la comunidad
+Hoy la hace una sola persona: el administrador de CeliacMap. No es un profesional de la salud ni un inspector, y
+revisa **documentos, no cocinas**. Recibe un resumen diario de lo pendiente y avisos cuando algo es urgente.
 
-Cualquier persona puede reportar un problema con un lugar publicado, desde el sitio o desde el asistente. Un reporte es
-evidencia, no una orden: nunca cambia por sí solo el estado de un lugar, salvo por las reglas fijas que siguen.
+**Qué revisa:** los lugares que el evaluador dejó en revisión; los que esperan confirmación del 100%; los reportes de
+la comunidad; las recomendaciones antes de publicarlas.
 
-- **Aviso en el mapa.** Con uno o dos reportes negativos distintos en 30 días, el lugar sigue publicado pero muestra el
-  aviso **"Reportado por la comunidad: consultá antes de ir"**.
-- **Retiro del mapa.** Con **tres** reportes distintos en 30 días, o con **un solo** reporte que el evaluador considere
-  creíble sobre contaminación con gluten o síntomas después de comer en el lugar, el lugar sale del mapa hasta que el
-  administrador lo revise.
-- Un reporte **nunca sube** la etiqueta de un lugar. Si el administrador aprobó un lugar manualmente, un reporte no
-  cambia la etiqueta que definió ni borra el registro de su decisión, aunque sí puede retirar el lugar del mapa hasta que
-  lo revise.
-- **Los reportes negativos nunca se publican.** Publicar una acusación sin verificar sobre un comercio sería un riesgo
-  para el comercio y para la comunidad. Las **recomendaciones positivas** pueden publicarse en el sitio, pero solo
-  después de que el administrador las aprueba, con el nombre que la persona haya elegido o como "Anónimo". Una
-  recomendación publicada no cambia la etiqueta ni la posición del lugar.
+**Cómo queda registrado:** cada decisión manual lleva una nota con la fecha, quién decidió, en qué se basó y qué
+había dicho el evaluador. **Desde el 13 de octubre de 2026** además se guarda aparte la cita textual de la fuente,
+con su enlace y la fecha en que se leyó. Las decisiones anteriores no siempre la tenían. El 20 de noviembre
+guardamos las 15 citas que ya estaban transcriptas en las notas y bajamos a «Tiene opciones» los que no tenían una
+fuente del propio comercio. Hoy, 16 de los 58 lugares con la etiqueta del 100% todavía no tienen la cita guardada: en
+8 el administrador revisó la cuenta oficial del comercio y estamos transcribiendo la frase; en los otros 8 los conoce
+personalmente, y les estamos pidiendo a los comercios una confirmación por escrito. Una decisión manual nunca modifica la puntuación de confianza del evaluador. Ningún lugar está marcado como
+«verificado» en la base, porque nadie lo verificó en persona.
 
-## 10. El asistente de conversación
+**Ejemplos reales:**
 
-El sitio incluye un asistente que responde solo sobre cuatro temas: buscar lugares del mapa, recomendar o reportar un
-lugar, ayudar a confirmar un lugar en revisión e información general sobre la celiaquía. Sus límites:
+- **Uruguay, 5 de noviembre de 2026.** 34 lugares figuraban como 100% sin confirmación. El administrador revisó la
+  cuenta oficial o el sitio de cada uno: 15 quedaron en 100%, 16 bajaron a «Tiene opciones» (no tenían un canal
+  propio que dijera que todo es sin gluten, o eran tiendas de varias dietas), 2 se descartaron (uno cerrado, una
+  fábrica sin venta al público) y 1 salió del mapa (su ficha de Google ya no existía).
+- **Uruguay, 6 de noviembre de 2026.** Al cerrar la cola de lugares en revisión, se aprobaron 20 (7 en 100%, 13 en
+  opciones), se descartaron 10 y **184 quedaron fuera del mapa** marcados «revisado sin evidencia», porque no había ninguna fuente
+  pública atribuible al propio local.
+- **Argentina, 6 de noviembre de 2026.** 199 lugares que el evaluador había dejado en 100% casi siempre por el
+  nombre del local bajaron a «Tiene opciones sin gluten» hasta que aparezca evidencia de cada uno.
+- **Una cuenta que no era.** Una cuenta de Instagram con el mismo nombre que un local, pero con otra dirección y sin
+  publicaciones desde 2021, se descartó como evidencia: era de otro negocio.
+- **Una cita que no decía lo que parecía.** Un lugar quedó sin publicar porque la frase «sin gluten» de su cuenta
+  hablaba de una cerveza de otra marca, no de la oferta del local.
+- **Conocimiento directo.** En pocos casos el administrador aprobó un lugar porque lo conoce personalmente. Queda
+  anotado como tal, sin subir la puntuación de confianza. Para la etiqueta del 100% eso ya no alcanza solo: hace
+  falta además una confirmación escrita del propio comercio.
 
-- **Solo nombra lugares que están en el mapa.** No usa conocimiento propio sobre restaurantes o cadenas.
-- **No da consejos médicos:** ni diagnósticos, ni interpretación de síntomas, ni tratamientos, ni juicios sobre la
-  gravedad o la urgencia de lo que cuenta una persona.
-- **No da cifras de gluten** (ni miligramos, ni cantidades "tolerables"). Si le preguntan, explica que no hay una
-  cantidad que pueda asegurarse como segura para toda persona celíaca, que la indicación médica es evitarlo por
-  completo, y que los límites legales de rotulado son una concentración máxima en el alimento y no una dosis diaria.
-  Además de las instrucciones, un control automático revisa sus respuestas sobre celiaquía.
-- **Deriva a profesionales y asociaciones.** Ante preguntas sobre síntomas propios o diagnóstico, deriva a un
-  profesional de la salud y a las asociaciones: en Argentina, ACELA y la Asociación Celíaca Argentina; en Uruguay, ACELU.
-- **Nunca afirma que un lugar es "seguro"** en términos absolutos, y aclara que las etiquetas son una estimación.
-- Lo que una persona recomienda o reporta por el asistente sigue el mismo camino que un formulario: pasa por revisión.
+**Límites de esta revisión:** depende de una sola persona; se apoya en lo que el comercio publica; no tiene una
+frecuencia fija de re-chequeo; y hoy hay 584 lugares esperando revisión, que mientras tanto no se muestran.
 
-## 11. Límites conocidos y mejoras en curso
+## 8. Reportes de la comunidad
 
-**Límites que conocemos:**
+Cualquier persona puede reportar un problema con un lugar publicado. Un reporte es un dato, no una orden.
 
-- **La evidencia es texto público y puede estar desactualizada.** Un comercio puede cambiar su cocina, su menú o sus
-  proveedores sin que eso aparezca en internet.
-- **La inteligencia artificial puede equivocarse.** Por eso existen los umbrales, los controles del 100% y la revisión
-  humana, y por eso cada etiqueta es una estimación.
-- **Hay una cola de lugares esperando revisión humana**, en particular los que no tienen datos de contacto públicos, que
-  por eso no pueden recibir una consulta. Mientras tanto, esos lugares no se muestran.
-- **Los aportes son anónimos.** No hay cuentas de usuario, así que no se puede saber si varios reportes vienen de la
-  misma persona; por eso los reportes activan avisos y revisiones, no decisiones definitivas.
-- **El actualizador solo revisa automáticamente los lugares que vienen de Google Maps.** Un comercio que solo existe en
-  redes sociales no se controla de la misma forma.
-- **Cobertura:** Uruguay y Argentina, en una lista definida de ciudades. La búsqueda web general está desactivada.
+- Con uno o dos reportes negativos distintos en 30 días, el lugar sigue publicado con el aviso «Reportado por la
+  comunidad: consultá antes de ir».
+- Con tres reportes distintos en 30 días, o con uno solo que el evaluador considere creíble sobre contaminación con
+  gluten o síntomas después de comer ahí, el lugar sale del mapa hasta que el administrador lo revise.
+- Un reporte nunca sube la etiqueta de un lugar. Los reportes negativos no se publican.
 
-**Mejoras en curso:**
+## 9. El asistente de conversación
 
-- **Actualización de criterios por la Resolución Conjunta 32/2023.** Hoy el evaluador baja la confianza cuando un lugar
-  dice "sin gluten" y no "sin TACC", porque "sin gluten" podía ser un término de marketing. Según la Resolución Conjunta
-  32/2023, un alimento es libre de gluten que no supera los 10 mg/kg de gluten, y "sin gluten" pasa a ser el término de uso en
-  Argentina. Entendemos además que admite avena libre de gluten certificada; nos gustaría validarlo con ustedes antes de
-  actualizar los criterios. Estamos actualizando los criterios para reflejarlo: la idea es dejar de penalizar "sin gluten" en Argentina y seguir
-  distinguiendo un uso publicitario de la expresión de un sello o una práctica real. El cambio se va a probar antes de
-  aplicarse. Por ahora, las etiquetas del mapa se mantienen como están.
-- **Revisión de la lista de espera del 100%** con la herramienta de propuestas citadas descrita en la sección 8.
-- **Consultas a comercios:** ampliar el volumen de forma gradual, a medida que se observen las respuestas.
+Responde solo sobre cuatro temas: buscar lugares del mapa, dejar una recomendación o un reporte, aportar datos de un
+lugar en revisión e información general sobre la celiaquía. Solo nombra lugares que están en el mapa. No da consejos
+médicos, diagnósticos ni cifras de gluten, y no dice que un lugar es «seguro». Ante una consulta clínica deriva a un
+profesional de la salud y a las asociaciones de pacientes.
 
-## 12. Contacto
+Cada respuesta que nombra lugares lleva debajo una frase fija, que no depende del modelo: «Las etiquetas salen de lo
+que declara cada local o cuentan sus clientes. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en
+el lugar.» Reconocemos un pendiente: las instrucciones del asistente todavía usan «verificado» en algunas respuestas
+(por ejemplo, «solo paso lugares ya verificados»). Lo vamos a corregir junto con el cambio de nombre de la etiqueta
+del 100%, porque cada cambio en esas instrucciones se prueba antes contra un conjunto de preguntas de ataque.
 
-Para consultas, correcciones, pedidos de baja de un comercio o cualquier comentario sobre esta metodología:
+## 10. Cómo le comunicamos el alcance al usuario
+
+**Lo que estaba mal y corregimos.** Hasta noviembre de 2026 varias frases del sitio prometían más de lo que hacemos
+(«lugares seguros», «lugares verificados», «100% validado por la comunidad»), y la ficha de un lugar con la etiqueta
+del 100% afirmaba como un hecho que ahí solo se elabora sin gluten, cuando es lo que el lugar declara. Lo corregimos:
+
+1. quitamos «seguro», «verificado» y «validado» del texto público, en castellano y en inglés, y una prueba automática
+   impide que vuelvan a aparecer (igual que «sin TACC»);
+2. la ficha atribuye la frase y no usa «apto», que suena a garantía: «Según lo que declara el propio local, acá se
+   cocinan y venden solo productos sin gluten. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en
+   el lugar.»;
+3. junto a cada etiqueta (leyenda del mapa, ventana del marcador, ficha y ranking) hay una frase fija de alcance:
+   «Según lo que declara el local» para el 100% y «Según el local o sus clientes» para las opciones, seguida de
+   «CeliacMap no inspecciona ni certifica»; el asistente agrega la frase de la sección 9.
+
+**Lo que sigue pendiente:** mostrar en la ficha de dónde sale la etiqueta y con qué fecha. Los Términos de uso ya
+decían que las etiquetas son una estimación y que no inspeccionamos los lugares ni verificamos sus procesos de cocina.
+
+## 11. Lo que estamos evaluando, y en qué nos sirve su mirada
+
+- **El nombre de la etiqueta del 100%**, para que no se lea como una garantía.
+- **Una evidencia más exigente para esa etiqueta.** Hoy hace falta la declaración escrita del propio comercio, guardada
+  y revisada por el administrador. Nos gustaría saber qué respaldo consideran suficiente y verificable sin una
+  inspección propia: por ejemplo, una habilitación oficial, una capacitación del personal que pueda confirmarse, o un
+  análisis.
+- **Usar la Guía de la ANMAT como vocabulario común.** La «Guía de Recomendaciones para un Menú Libre de Gluten
+  Seguro» (2.ª edición, 2023) distingue tres formas de organizarse: comprar el menú ya elaborado a proveedores
+  autorizados, elaborar de forma propia y exclusiva, o elaborar en una cocina mixta, que según la Guía tiene mayor
+  riesgo. Podríamos preguntarle a cada comercio cuál de las tres aplica y mostrar su respuesta como lo que es: una
+  declaración. ¿Les parece útil?
+- **Un re-chequeo periódico** de los lugares con la etiqueta más fuerte.
+- **La avena.** Algunos locales usan avena que se ofrece como sin gluten o certificada. La normativa le da un
+  tratamiento propio: el artículo 1383 del Código Alimentario Argentino (texto de la Resolución Conjunta 32/2023)
+  define el alimento libre de gluten como el que no contiene prolaminas ni glutelinas de trigo, centeno, cebada ni
+  avena, y no hace una excepción para la avena certificada. La Guía de la ANMAT agrega que alrededor del 95% de las
+  personas celíacas serían tolerantes a las proteínas de la avena, pero que estas dañan al porcentaje restante, y que
+  en el país la avena suele compartir cultivo, almacenamiento, molienda y transporte con el trigo. Por eso recomienda
+  evitarla en el menú sin gluten o, si se usa, verificar que figure en el Listado Integrado de Alimentos Libres de
+  Gluten e indicar «Plato elaborado con avena» a continuación del nombre del plato, para que la persona celíaca pueda
+  tenerlo en cuenta al pedir. Hoy ningún criterio de CeliacMap toma la avena como evidencia para una etiqueta, y
+  tampoco preguntamos si un lugar la usa. Les preguntamos: ¿un lugar que usa avena certificada puede llevar la
+  etiqueta del 100%? Y si puede, ¿cómo debería avisarlo en el mapa?
+- **Capacitación.** Vimos que la Asociación dictó el taller «Menú Sin Gluten seguro» para el sector gastronómico.
+  Nos interesa saber si tendría sentido derivar ahí a los comercios que nos escriben.
+
+## 12. El estado actual, en números (20 de noviembre de 2026)
+
+| | Lugares |
+|---|---|
+| Publicados en el mapa | 376 (268 en Argentina, 108 en Uruguay) |
+| · con «Tiene opciones sin gluten» | 318 |
+| · con la etiqueta del 100% (todos decididos por el administrador) | 58 (45 en Uruguay, 13 en Argentina) |
+| · de esos 58, con la cita del comercio guardada | 42 |
+| Publicados con una decisión registrada del administrador | 111 |
+| Publicados por el evaluador automático, sin decisión de una persona (todos como «Tiene opciones») | 265 |
+| En revisión humana, sin publicar | 584 |
+| Verificados en persona por CeliacMap | 0 |
+
+## 13. Marco normativo que tomamos como referencia
+
+- **Argentina.** El Código Alimentario Argentino (artículos 1383 y 1383 bis, según la Resolución Conjunta 32/2023,
+  publicada el 1/12/2023) define el alimento «libre de gluten», fija un máximo de 10 mg/kg y establece el símbolo
+  con la leyenda «SIN GLUTEN» para los productos envasados, con tres años para adecuarse. Por eso CeliacMap dejó de
+  usar «sin TACC» en su texto público. Esa norma regula **alimentos y su rotulado**; las etiquetas de CeliacMap no
+  son esa categoría legal ni la reemplazan, y CeliacMap no mide gluten. Por la misma razón usamos «sin gluten» y no
+  «libre de gluten»: esta última es la denominación legal de un alimento con un límite medido, y en un local sonaría a
+  una categoría oficial.
+- **Argentina, gastronomía.** La Ley 26.588 (modificada por la Ley 27.196) y su Decreto 218/2023 obligan a ciertas
+  instituciones y establecimientos a ofrecer al menos una opción sin gluten, siguiendo la «Guía de Recomendaciones
+  para un Menú Libre de Gluten Seguro» de la ANMAT (2.ª edición, octubre de 2023). La Guía describe prácticas
+  (capacitación del personal, compra de ingredientes autorizados, almacenamiento, utensilios y equipos exclusivos,
+  servicio, limpieza). CeliacMap no verifica ninguna de ellas; las usamos como referencia para saber qué preguntar.
+- **Uruguay.** La Ley 16.096 y el Decreto 76/994 prevén la leyenda «producto libre de gluten» y el control del
+  Ministerio de Salud Pública; el Decreto 149/018 exige habilitación a las plantas elaboradoras, con excepción de
+  las que elaboran y venden solo en su propio local.
+
+## 14. La mención de la Asociación (texto a confirmar con ustedes)
+
+Proponemos nombrar a la Asociación solo como organización de referencia para consultas generales sobre celiaquía,
+siempre con esta aclaración al lado:
+
+> *Para información general sobre la celiaquía podés consultar a la Asociación Celíaca Argentina
+> (asociacionceliaca.org.ar). La Asociación no avala, no certifica ni revisa los lugares publicados en CeliacMap.*
+
+No la vamos a publicar hasta que ustedes aprueben el texto.
+
+## 15. Contacto
 
 - **Correo:** hola@celiacmap.org
 - **Sitio:** https://celiacmap.org
-- **Responsable:** Santiago Sánchez, creador y administrador de CeliacMap.
-
-Nos interesa especialmente la mirada de las asociaciones de pacientes sobre estos criterios.
+- **Responsable:** Santiago Sánchez, creador y administrador de CeliacMap (santiagosanchez@celiacmap.org).

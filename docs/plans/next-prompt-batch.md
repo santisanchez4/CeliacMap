@@ -67,7 +67,9 @@ so the "sin gluten" change reaches the Validator and the chat (item 5) together.
 `RUBRIC`. **Not changed yet.**
 
 9. **[Done 2026-11-18]** **The "sin gluten without sin TACC" flag is out of date for Argentina** (Joint Resolution 32/2023: "sin gluten" is
-   now the official term in Argentina; certified gluten-free oats can be suitable. Checked 2026-09-30: the 10 mg/kg limit is in the
+   now the official term in Argentina. **Corrected 2026-11-20:** the official text of art. 1383 does *not* make certified oats
+   suitable — it excludes oat prolamins and glutelins with no exception for certified oats; see the DECISIONS entry «El 100%
+   sin respaldo propio baja, ACELU sale del mapa y metodología v2». Checked 2026-09-30: the 10 mg/kg limit is in the
    official text; certified oats and the new symbol are **not** verified, and the methodology document asks the
    Asociación Celíaca Argentina to validate oats before the criteria change: do not write oats into the `RUBRIC` until
    then). Today the `RUBRIC`

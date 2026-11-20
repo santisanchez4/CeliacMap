@@ -5190,6 +5190,50 @@ desde el 2026-09-30, cuando el chat dejó de preguntar por la cocina; con v26 qu
   test (`test_all_our_products_falls_under_the_product_rule_and_does_not_flag_the_100_queue`) documenta el comportamiento;
   si se decide cambiarlo, ese test es el que se invierte.
 
+### El 100% sin respaldo propio baja, ACELU sale del mapa y metodología v2 (2026-11-20)
+
+Decisiones del administrador antes de responderle a la Asociación Celíaca Argentina. Siete scripts en `db/fixes/2026-11-20-*`,
+cada uno ensayado con ROLLBACK, aplicado con COMMIT tras el «dale» y verificado en solo lectura.
+
+- **El 100% sin una afirmación del propio local baja a «Tiene opciones sin gluten»** con la bandera `100% pendiente de
+  confirmación del administrador` y un encabezado `CORRECCIÓN MANUAL … sin evidencia explícita de 100` (frase de datos: no
+  protege). Son 31: los 23 que había dejado el evaluador automático por reseñas o por el nombre, Marce Cakes (solo el nombre)
+  y 7 manuales que se apoyaban en guías o blogs de terceros (Café Ramona ×2, La Panadería de Ramona, La Commedia, Un Lugar Sin
+  Gluten) o en una frase que no afirma 100% (Rikuras ×2, «cocina apta para celíacos»). Esos 7 conservan su `OVERRIDE` /
+  `APROBACIÓN MANUAL` anterior como historial y siguen protegidos: `review_queue` no los sube; cada subida va por SQL con «dale».
+- **Re-validación de los 59 aprobados con confianza < 0,85 sin decisión manual** (dry-run de `revalidate_low_confidence`, 59
+  llamadas, US$0,29, aplicado como SQL literal sin volver a llamar al modelo): 1 sigue aprobado y 58 pasan a `needs_review`.
+  Los 8 que el gate descartaba quedan en revisión: ninguno tenía un motivo concreto (cerrado, no es un comercio, evidencia en
+  contra, duplicado o fuera de alcance) y un descarte es definitivo en la deduplicación; «sin evidencia» no es motivo. Lo
+  registra una línea `REVISIÓN HUMANA EN LUGAR DE DESCARTE`, que a propósito no es un encabezado manual (si protegiera,
+  `review_queue` rechazaría después su evidencia). En 7 de los 8, la nota original citaba reseñas con opciones sin gluten
+  que la purga a 30 días ya borró. El script había quedado roto en `main` desde el veredicto estructurado: el cliente que mide
+  el costo no reenviaba `schema` (arreglado en el PR #60).
+- **ACELU sale del mapa** (`no aplica al mapa: asociación de pacientes; se menciona como organización de referencia, no como
+  lugar del mapa`), venda o no en su sede: mezclaba la organización de referencia con los lugares publicados.
+- **Datos de salud:** la nota de override de La Commedia nombraba la condición de salud de una persona; se quitó. No queda
+  ninguna nota con ese dato.
+- **Citas guardadas:** las 15 citas del propio local que ya estaban transcriptas en las notas (Goût ×11, TACCOFF,
+  NutriCiencia, ChocAra, RecoBeco) pasan a filas `admin` de `place_evidence`, con URL y fecha de la revisión. Quedan 16 en 100%
+  sin cita guardada: 8 por la cuenta oficial (el administrador pasa cada cita) y 8 por conocimiento directo (se pide al
+  comercio una confirmación por escrito).
+- **Auditoría de líneas `CORRECCIÓN MANUAL` que protegen** (365 notas, 12 líneas): solo una corregía datos y era la única
+  protección de su lugar (Marce Cakes, «city reetiquetada»); se reescribió como «ciudad corregida» y deja de protegerlo. No se
+  suma «reetiquetada» a `DATA_CORRECTION_PHRASES`: una línea de seguridad («reetiquetada a 100%») quedaría liberada. Las otras
+  11 son decisiones de seguridad o descartes por identidad («No re-evaluar») y protegen con razón.
+- **Resultado (20/11, solo lectura):** 376 publicados (318 opciones, 58 en 100%, todos con decisión del administrador, 42 con
+  cita guardada), 111 con una decisión registrada del administrador, 265 del evaluador automático, 584 en revisión, 0
+  verificados.
+- **`chat` v28** desplegado desde `main` (`319253d`, PR #61): `verify_jwt=false`; `index.ts`, `prompts.ts` y `regions.ts`
+  descargados idénticos a `main`; un turno real de búsqueda devolvió 8 lugares y el `scope_note`.
+  Registro: `db/checks/2026-11-20-chat-v28-deploy.md`.
+- **Metodología v2.0** (`docs/metodologia/`, `.md` + `.pdf`) reemplaza a la v1.0 con estos números y las reglas del 100% y del
+  texto público. **Avena, verificada en el texto oficial:** el art. 1383 del CAA (Resolución Conjunta 32/2023, B.O. 01/12/2023)
+  define el alimento libre de gluten sin prolaminas ni glutelinas de trigo, centeno, cebada ni avena, sin excepción para la
+  avena certificada; la Guía de ANMAT (2023) dice que alrededor del 95% de las personas celíacas serían tolerantes a la avena
+  pero que daña al resto, recomienda evitarla o, si se usa, verificarla en el Listado Integrado e indicar «Plato elaborado con
+  avena». El documento le pregunta a la Asociación si un lugar con avena certificada puede llevar el 100% y cómo avisarlo.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
