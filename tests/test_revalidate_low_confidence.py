@@ -107,3 +107,23 @@ def test_protected_marker_is_its_own_matcher_and_is_unchanged_by_the_data_correc
     data_only = "CORRECCIÓN MANUAL 2026-09-25: país/ciudad corregidos según la dirección.\n\nTexto del Validator."
     assert protected_marker({"validation_notes": data_only}) == "correccion manual"
     assert protected_marker({"validation_notes": "RE-VALIDACIÓN RETROACTIVA (2026-09-06): fila re-evaluada."}) == "validacion retroactiva"
+
+
+def test_metered_client_passes_the_verdict_schema_through():
+    """Since 2026-11-18 the Validator asks for VERDICT_SCHEMA. The metered client must forward it: the
+    override without the argument broke every call of this script with a TypeError (found 2026-11-20)."""
+    from unittest.mock import MagicMock
+
+    from agents.validator_agent import VERDICT_SCHEMA
+
+    client = MeteredLLMClient("test-key", "claude-sonnet-4-6")
+    resp = MagicMock()
+    resp.content = [MagicMock(type="text", text='{"verdict": "needs_review"}')]
+    resp.usage = MagicMock(input_tokens=10, output_tokens=5, cache_read_input_tokens=0, cache_creation_input_tokens=0)
+    client._client = MagicMock()
+    client._client.messages.create.return_value = resp
+
+    assert client.complete_json("sys", "user", schema=VERDICT_SCHEMA) == {"verdict": "needs_review"}
+    kwargs = client._client.messages.create.call_args.kwargs
+    assert kwargs["output_config"] == {"format": {"type": "json_schema", "schema": VERDICT_SCHEMA}}
+    assert client.calls == 1

@@ -131,8 +131,8 @@ class MeteredLLMClient(LLMClient):
             "cache_creation_input_tokens": 0,
         }
 
-    def _create(self, system: str, user: str, model, max_tokens: int):
-        resp = super()._create(system, user, model, max_tokens)
+    def _create(self, system: str, user: str, model, max_tokens: int, schema: dict | None = None):
+        resp = super()._create(system, user, model, max_tokens, schema)
         u = getattr(resp, "usage", None)
         if u is not None:
             self.calls += 1

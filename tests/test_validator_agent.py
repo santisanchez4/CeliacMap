@@ -82,8 +82,11 @@ def test_invalid_safety_with_no_place_value_uses_default_floor():
 
 def test_valid_safety_passes_through():
     agent = make_agent()
+    for level in ("celiac_friendly", "options_available"):
+        assert agent._normalize({"safety_level": level}, {})["safety_level"] == level
+    # "gluten_free_100" is a valid level for the model to propose, but the Validator never leaves it (Tope C).
     out = agent._normalize({"safety_level": "gluten_free_100"}, {}, evidence=EXCLUSIVE_EVIDENCE)
-    assert out["safety_level"] == "gluten_free_100"
+    assert out["safety_level"] == "celiac_friendly"
 
 
 # --- Confidence gates → DB status (defense in depth) ----------------------
@@ -454,10 +457,11 @@ def test_tope_a_a_community_place_never_leaves_the_validator_as_100():
     assert PENDING_ADMIN_FLAG in out["flags"]
 
 
-def test_tope_a_does_not_touch_other_sources():
+def test_no_source_leaves_the_validator_as_100():
+    """Since 2026-11-20 the cap of Tope A holds for every source: only a person assigns the 100%."""
     out = _norm(place={"source": "google_places"})
-    assert out["safety_level"] == "gluten_free_100"
-    assert PENDING_ADMIN_FLAG not in out["flags"]
+    assert out["safety_level"] == "celiac_friendly"
+    assert PENDING_ADMIN_FLAG in out["flags"]
 
 
 def test_tope_b_a_not_exclusive_claim_caps_any_source():
@@ -467,7 +471,7 @@ def test_tope_b_a_not_exclusive_claim_caps_any_source():
 
 def test_tope_b_ignores_claims_that_do_not_say_no():
     out = _norm(place={"source": "google_places"}, claims=[OWNER_CLAIM])
-    assert out["safety_level"] == "gluten_free_100"
+    assert out == _norm(place={"source": "google_places"})
 
 
 def test_owner_celiac_alone_changes_nothing_in_code():
@@ -592,8 +596,9 @@ def test_run_feeds_place_evidence_into_prompt():
 
     db.fetch_place_evidence.assert_called_once_with("p1")
     assert "blog: todo sin gluten" in llm.complete_json.call_args.args[1]
-    # the phrase is explicit, so the 100% survives Tope C
-    assert db.update_place_validation.call_args.kwargs["safety_level"] == "gluten_free_100"
+    # even with an explicit phrase the Validator never writes a 100%: it goes to the admin's queue
+    assert db.update_place_validation.call_args.kwargs["safety_level"] == "celiac_friendly"
+    assert PENDING_ADMIN_FLAG in db.update_place_validation.call_args.kwargs["flags"]
 
 
 def test_run_survives_evidence_fetch_failure():
@@ -651,6 +656,68 @@ def test_exclusive_signal_not_detected(text):
     assert not ValidatorAgent.has_exclusive_signal([text])
 
 
+# Found by probing the check on 2026-11-20: every one of these read as "the place says it is exclusive".
+@pytest.mark.parametrize(
+    "text",
+    [
+        # negated
+        "No tienen cocina exclusiva",
+        "no cuentan con cocina exclusiva",
+        "No hay cocina dedicada",
+        "ni es todo sin gluten",
+        "nada es 100% sin gluten acá",
+        "no todo es sin gluten",
+        "tampoco es 100% libre de gluten",
+        "nunca fue 100% sin gluten",
+        "No somos 100% sin gluten",
+        "No es un local libre de gluten",
+        "sin cocina exclusiva",
+        "ya no es 100% sin TACC",
+        # hedged or in the past
+        "casi todo es sin gluten",
+        "Antes era todo sin gluten, ahora también venden pan común",
+        "dejó de ser 100% sin gluten",
+        # about a product, a menu or an order, not about the place
+        "La pizza de muzzarella es 100% sin gluten, pero comparten horno",
+        "Tienen un menú solo sin TACC para celíacos, el resto de la carta es común",
+        "pedí solo sin gluten y me trajeron pan común",
+        "tienen opciones 100% sin gluten",
+        "Las empanadas son 100% sin TACC",
+        # the same text says the kitchen is shared
+        "Dicen que es 100% sin gluten pero comparten la cocina con la pizzería",
+        "Todo es sin gluten. También venden facturas comunes.",
+    ],
+)
+def test_exclusive_signal_ignores_negated_hedged_and_product_level_phrases(text):
+    assert not ValidatorAgent.has_exclusive_signal([text])
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "No te preocupes: todo es sin gluten",
+        "No dudes, es 100% sin gluten",
+        "No hay nada con gluten, todo es sin gluten",
+        "La cocina no es compartida: cocina exclusiva",
+        "Nuestra cocina es 100% libre de gluten",
+        "El local es 100% sin TACC",
+        "Local 100% apto celíacos",
+        "cocina dedicada",
+        "Todo es sin gluten. No compartimos cocina con productos con gluten.",
+        "No usamos harina de trigo: todo es sin gluten",
+        "No es un restaurante con opciones. Es un espacio libre de gluten",
+    ],
+)
+def test_exclusive_signal_survives_a_negation_about_something_else(text):
+    assert ValidatorAgent.has_exclusive_signal([text])
+
+
+def test_a_negated_phrase_does_not_flag_a_place_as_pending_100():
+    out = _norm({"safety_level": "celiac_friendly"}, place={"source": "google_places"}, evidence=None,
+                reviews=[{"text": "Ojo: no tienen cocina exclusiva, comparten horno"}])
+    assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
 def test_tope_c_drops_a_100_without_evidence_and_flags_it_for_the_admin():
     out = _norm(place={"name": "Sin Gluten Palermo", "source": "google_places"}, evidence=None)
     assert out["safety_level"] == "celiac_friendly"
@@ -664,10 +731,50 @@ def test_tope_c_the_name_never_counts():
     assert out["safety_level"] == "celiac_friendly"
 
 
-def test_tope_c_a_review_with_the_phrase_keeps_the_100():
-    out = _norm(place={"source": "google_places"}, evidence=None, reviews=[{"text": "todo es sin gluten, genial"}])
-    assert out["safety_level"] == "gluten_free_100"
-    assert PENDING_ADMIN_FLAG not in out["flags"]
+# --- 2026-11-20: only a person assigns the 100%. The Validator never leaves one, whatever the evidence says ---
+
+
+@pytest.mark.parametrize("source", ["google_places", "social", "web", "manual", "user", None])
+@pytest.mark.parametrize(
+    "reviews, evidence",
+    [
+        ([{"text": "todo es sin gluten, genial"}], None),
+        (None, [{"source": "social", "text": "Somos una panadería 100% sin TACC, cocina exclusiva"}]),
+        (None, [{"source": "admin", "text": "«Local 100% libre de gluten», sitio propio, visto el 2026-11-05"}]),
+        ([{"text": "Cocina dedicada, todo es sin gluten"}], [{"source": "web", "text": "Establecimiento 100% libre de gluten"}]),
+        (None, None),
+    ],
+)
+def test_the_validator_never_leaves_a_100(source, reviews, evidence):
+    out = _norm(place={"source": source}, reviews=reviews, evidence=evidence)
+    assert out["safety_level"] == "celiac_friendly"
+    assert PENDING_ADMIN_FLAG in out["flags"]
+    assert out["flags"].count(PENDING_ADMIN_FLAG) == 1
+    assert out["status"] == "approved"  # the level is lowered; the verdict and the gates are untouched
+
+
+def test_a_place_already_stored_as_100_does_not_keep_it_through_a_malformed_level():
+    """The fallback to the row's own level cannot smuggle a 100 back in."""
+    out = _norm({"safety_level": "no-such-level"}, place={"source": "google_places", "safety_level": "gluten_free_100"})
+    assert out["safety_level"] == "celiac_friendly"
+    assert PENDING_ADMIN_FLAG in out["flags"]
+
+
+def test_evaluate_never_returns_a_100_for_any_confidence():
+    for confidence in (0.99, 0.86, 0.72, 0.4):
+        llm = MagicMock()
+        llm.complete_json.return_value = {"verdict": "approved", "confidence_score": confidence, "category": "cafe",
+                                          "safety_level": "gluten_free_100", "reasoning": "x", "flags": [], "recommendation": "y"}
+        out = ValidatorAgent(MagicMock(), llm).evaluate(
+            {"name": "Panadería Sol", "source": "google_places"}, reviews=[{"text": "todo es sin gluten"}])
+        assert out["safety_level"] != "gluten_free_100"
+
+
+def test_the_rule_is_code_only_the_rubric_text_did_not_change():
+    from agents.validator_agent import RUBRIC
+
+    assert "100% pendiente" not in RUBRIC
+    assert '"gluten_free_100": establecimiento donde se cocinan y venden ÚNICAMENTE productos aptos para celíacos' in RUBRIC
 
 
 def test_tope_c_never_raises_a_level():
@@ -729,7 +836,8 @@ def test_an_unattributed_social_row_cannot_sustain_a_100_nor_raise_the_pending_f
     assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], marked) == ("celiac_friendly", [PENDING_ADMIN_FLAG])
     assert ValidatorAgent._apply_exclusive_signal_cap("celiac_friendly", [], marked) == ("celiac_friendly", [])
     plain = [{"source": "social", "text": "Todo es 100% libre de gluten", "url": None}]
-    assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], plain) == ("gluten_free_100", [])
+    assert ValidatorAgent._apply_exclusive_signal_cap("gluten_free_100", [], plain) == ("celiac_friendly", [PENDING_ADMIN_FLAG])
+    assert ValidatorAgent._apply_exclusive_signal_cap("celiac_friendly", [], plain) == ("celiac_friendly", [PENDING_ADMIN_FLAG])
 
 
 # --- Map scope rules (2026-10-13): "no aplica al mapa" is never amber and never needs_review ---

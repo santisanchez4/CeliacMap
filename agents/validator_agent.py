@@ -100,7 +100,33 @@ _EXCLUSIVE_SIGNAL_RE = re.compile(
     r"|cocina (?:exclusiva|dedicada|100\s*%)"
     rf"|(?:espacio|local|lugar|panaderia|restaurante|cafe) (?:100\s*% )?libre de (?:gluten|{_TACC})"
 )
-_NEGATION_RE = re.compile(r"\bno\s+(?:es\s+|son\s+|tiene\s+)?$")
+# The phrase only counts when it is said of the PLACE and affirmed (2026-11-20). Each check reads the clause right before
+# the phrase (back to the last punctuation mark or " y " / " pero "), on the same lower-cased, accent-free text.
+_CLAUSE_BREAK_RE = re.compile(r"[.,;:!?()\n]|\s(?:y|pero|aunque)\s")
+# Negated ("no tienen cocina exclusiva", "ni es todo sin gluten", "sin cocina exclusiva"), hedged ("casi todo") or in the
+# past ("antes era todo sin gluten", "dejó de ser 100%").
+_NEGATION_RE = re.compile(
+    r"(?:\b(?:no|ni|nunca|tampoco|jamas|nada)\b(?:\s+\w+){0,3}"
+    r"|\b(?:sin|casi)(?:\s+(?:un|una|el|la))?"
+    r"|\b(?:era|eran|fue|fueron|dejo de ser|dejaron de ser))\s+$"
+)
+# Said of a product, a menu or an order, not of the place: "opciones 100% sin gluten", "un menú solo sin TACC",
+# "la pizza es 100% sin gluten", "pedí solo sin gluten". A subject that IS the place (local, cocina, carta...) still counts.
+_PLACE_NOUN = (r"local|lugar|espacio|cocina|restaurante|resto|panaderia|pasteleria|cafe|cafeteria|negocio|comercio|tienda|"
+               r"fabrica|establecimiento|planta|elaboracion|produccion|carta|todo|toda")
+_PRODUCT_SCOPE_RE = re.compile(
+    r"\b(?:opcion(?:es)?|menu|linea|sector|gondola|estante|alternativas?|variedad(?:es)?|platos?)\s+(?:\w+\s+){0,2}$"
+    r"|\b(?:pedi|pedimos|comi|comimos|compre|compramos|lleve|llevamos)\s+$"
+    rf"|\b(?:el|la|los|las|nuestr[oa]s?|est[ea]s?|un|una)\s+(?!(?:{_PLACE_NOUN})\b)\w+(?:\s+de\s+\w+)?\s+(?:es|son|viene|vienen)\s+$"
+)
+# The same text says the kitchen is shared or that food with gluten is sold: its exclusivity phrase is not a signal.
+_MIXED_KITCHEN_RE = re.compile(
+    r"compart\w+ (?:el |la |un |una )?(?:horno|cocina|freidora|plancha|mesada|utensilios)"
+    r"|tambien (?:venden?|cocinan?|hacen|elaboran|tienen|ofrecen)\b[^.;!?\n]{0,40}\b(?:con gluten|con tacc|comun(?:es)?|tradicional(?:es)?)"
+    r"|el resto (?:de (?:la|el|los|las) \w+ )?(?:es|son|tiene|tienen) (?:comun(?:es)?|con gluten)"
+    r"|\b(?:pan|panes|harinas?|pizzas?|facturas|productos|comida) (?:comun(?:es)?|con gluten|con tacc|de trigo)"
+    r"|puede contener (?:gluten|trazas)"
+)
 
 # One wording for the model (2026-11-18). Resolución Conjunta 32/2023 replaces the «sin TACC» label with «sin gluten», and
 # CeliacMap treats both the same in Uruguay and Argentina. Measured against the real model (db/checks/validator_wording_ab.py,
@@ -499,35 +525,48 @@ class ValidatorAgent(BaseAgent):
     @staticmethod
     def has_exclusive_signal(texts) -> bool:
         """True if any text states the place is exclusively gluten free ("100% sin TACC",
-        "todo es sin gluten", "cocina exclusiva"...), and the phrase is not negated."""
+        "todo es sin gluten", "cocina exclusiva"...).
+
+        The phrase must be affirmed and said of the place: a negated, hedged or past phrase, one about a
+        product, a menu or an order, and any phrase in a text that also says the kitchen is shared or that
+        food with gluten is sold, do not count. It decides which places are flagged for the admin's 100%
+        review; it never assigns a 100% (only a person does)."""
+
+        def clause_before(text: str, start: int) -> str:
+            return _CLAUSE_BREAK_RE.split(text[max(0, start - 60): start])[-1]
+
+        def affirmed(text: str, start: int) -> bool:
+            return not _NEGATION_RE.search(clause_before(text, start))
+
         for raw in texts or []:
             text = unicodedata.normalize("NFKD", str(raw or ""))
             text = "".join(c for c in text if not unicodedata.combining(c)).lower()
+            if any(affirmed(text, m.start()) for m in _MIXED_KITCHEN_RE.finditer(text)):
+                continue
             for m in _EXCLUSIVE_SIGNAL_RE.finditer(text):
-                if not _NEGATION_RE.search(text[max(0, m.start() - 20): m.start()]):
+                if affirmed(text, m.start()) and not _PRODUCT_SCOPE_RE.search(clause_before(text, m.start())):
                     return True
         return False
 
     @classmethod
     def _apply_exclusive_signal_cap(cls, safety: str, reviews, evidence) -> tuple[str, list[str]]:
-        """Tope C: "gluten_free_100" only survives with an explicit exclusivity phrase in the
-        evidence the model saw (reviews + place_evidence) — never from the name, never from the
-        model's own knowledge. Without it the level drops to "celiac_friendly" (public label
-        "Tiene opciones sin gluten") and the place is flagged for the admin, who confirms 100%.
+        """Tope C: the Validator never leaves a "gluten_free_100" (admin decision, 2026-11-20). Only a
+        person assigns the 100%, with a dated quote from the business itself stored in place_evidence.
+        Whatever the evidence says, a 100% proposed by the model becomes "celiac_friendly" (public label
+        "Tiene opciones sin gluten") with the flag that puts the place in the admin's 100% queue.
 
-        The reverse case is flagged too: the evidence DOES state exclusivity but the model kept a
-        lower level (measured 2026-09-25: a Los Leños-like place with "todo es sin gluten" on its
-        Instagram stays "celiac_friendly" 4/4 — the rubric says "the lowest level when in doubt").
-        The level is not raised here; the flag puts the place in the admin's 100% queue with its
-        evidence, so the 100% comes from a person, as the labeling rule requires."""
+        Until 2026-11-20 a 100% survived when the reviews or the evidence carried an explicit exclusivity
+        phrase; 23 places were published as 100% that way, from customer reviews, with no person involved.
+
+        The exclusivity phrase still decides who else is flagged: when the evidence DOES state exclusivity
+        but the model kept a lower level (measured 2026-09-25: a Los Leños-like place with "todo es sin
+        gluten" on its Instagram stays "celiac_friendly" 4/4), the place goes to the same queue. The level
+        is never raised here."""
+        if safety == "gluten_free_100":
+            return "celiac_friendly", [PENDING_ADMIN_FLAG]
         texts = [r.get("text") for r in list(reviews or []) if isinstance(r, dict)]
         texts += [e.get("text") for e in cls._attributable(evidence) if isinstance(e, dict)]
-        signal = cls.has_exclusive_signal(texts)
-        if safety != "gluten_free_100":
-            return safety, ([PENDING_ADMIN_FLAG] if signal else [])
-        if signal:
-            return safety, []
-        return "celiac_friendly", [PENDING_ADMIN_FLAG]
+        return safety, ([PENDING_ADMIN_FLAG] if cls.has_exclusive_signal(texts) else [])
 
     @staticmethod
     def _scrub_owner_health(text: str) -> str:
