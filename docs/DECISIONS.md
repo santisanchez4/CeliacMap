@@ -5143,6 +5143,36 @@ desde el 2026-09-30, cuando el chat dejó de preguntar por la cocina; con v26 qu
   `tests/frontend_explorer.test.js` cubre la nota de la leyenda, la ficha atribuida, el popup, cada fila del ranking y que
   la nota del chat no vuelve en el historial; `index.test.ts`, el campo `scope_note`. Frontend 175 → 184, funciones 273 → 275.
 
+### El 100% lo asigna solo una persona, y el chequeo de exclusividad ignora frases negadas (2026-11-20)
+
+- **Contexto.** La revisión del 20/11 encontró 23 lugares publicados como «Espacio 100% sin gluten» sin ninguna decisión
+  humana: el Validator los había dejado en 100% porque una reseña de Google o una evidencia traía una frase de exclusividad
+  (Tope C la aceptaba). Ninguno tenía una fila en `place_evidence` y 16 ya no tenían ni las reseñas (purga a 30 días). Además,
+  `has_exclusive_signal` daba positivo con frases que no afirman exclusividad: «No tienen cocina exclusiva», «casi todo es sin
+  gluten», «La pizza es 100% sin gluten, pero comparten horno», «menú solo sin TACC», «Antes era todo sin gluten».
+- **Decisión del administrador.** El evaluador automático **nunca** deja publicado un 100%. Si el modelo propone 100, el
+  nivel queda en `celiac_friendly` («Tiene opciones sin gluten») con la bandera `100% pendiente de confirmación del
+  administrador`, sea cual sea la fuente y diga lo que diga la evidencia. El 100% lo asigna solo una persona, con una cita
+  del propio local guardada y fechada (`review_queue --approve --level 100 --evidence…`, que ya escribe la fila `admin`).
+- **El RUBRIC no cambia.** Es una regla de código en `_apply_exclusive_signal_cap` (Tope C), como los topes A y B: solo baja
+  el nivel y nunca toca el `status` ni los umbrales. Un test fija que el texto del RUBRIC sigue siendo el medido.
+- **El chequeo de exclusividad sigue decidiendo quién queda marcado como pendiente**, así que se corrigió: la frase tiene que
+  estar afirmada y referirse al lugar. No cuentan: una negación en la misma cláusula («no / ni / nunca / tampoco / nada»,
+  hasta tres palabras antes, y «sin cocina exclusiva»), «casi», el pasado («era», «fue», «dejó de ser»), un producto, un
+  menú, una opción o un pedido («las empanadas son 100%…», «opciones 100%…», «pedí solo sin gluten»), ni ninguna frase en un
+  texto que también dice que comparten horno o cocina o que venden productos con gluten. Una negación sobre otra cosa no
+  anula la frase («No te preocupes: todo es sin gluten»; «No compartimos cocina con productos con gluten»).
+- **Callers.** `outreach_reply_handler`: la respuesta de un comercio que dice «somos 100% sin gluten» ya no deja un 100%,
+  lo marca como pendiente. `review_handler` no cambia (nunca sube un nivel y respeta el 100% manual). El MCP `validate_place`
+  tampoco devuelve un 100. `cap_unsupported_100`, `import_imm_source`, `moderate_opinions` y el buscador de evidencia usan
+  el chequeo corregido.
+- **No es retroactivo.** Los 23 lugares automáticos se bajan con un SQL aparte (ensayo con rollback y «dale»).
+- **`skills/validator-rubric/SKILL.md`:** documenta el Tope C nuevo y deja de nombrar a ACELA como certificadora («certificación
+  que el propio establecimiento declara»).
+- **Tests.** `test_validator_agent.py`: el Validator nunca deja un 100 (5 evidencias × 6 fuentes, cualquier confianza, un
+  nivel malformado), 22 frases que no deben contar y 11 que sí; `test_outreach_reply_handler.py`: la respuesta «100%» se
+  marca como pendiente. Python 1318 → 1385.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

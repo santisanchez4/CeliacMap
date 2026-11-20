@@ -165,8 +165,9 @@ class OutreachReplyHandler(BaseAgent):
 
         try:
             raw_verdict = self.llm.complete_json(RUBRIC, prompt)
-            # The business's own reply is text the model saw: it counts for Tope C (an
-            # explicit "somos 100% sin gluten" keeps a 100%), still capped by every gate.
+            # The business's own reply is text the model saw: it counts for Tope C. An explicit
+            # "somos 100% sin gluten" never becomes a 100% here (only a person assigns it): the
+            # level stays "celiac_friendly" and the place is flagged for the admin's 100% queue.
             v = self.validator._normalize(
                 raw_verdict,
                 place,

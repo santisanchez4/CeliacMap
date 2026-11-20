@@ -55,7 +55,8 @@ seguridad de lugares que sí aplican.
 Para llegar a este umbral, la evidencia debe incluir una **mención directa de "sin gluten", "libre de gluten" o
 "sin TACC" acompañada de** al menos uno de:
 
-- ✅ Certificación reconocida por ACELA u organismo equivalente
+- ✅ Certificación que el propio establecimiento declara (cuál es y quién la otorgó). CeliacMap no la comprueba, y las
+  asociaciones de celíacos no certifican ni avalan los lugares del mapa
 - ✅ Preparación dedicada (sector, horno o utensilios propios para lo apto)
 - ✅ Descripción de protocolo anti-contaminación cruzada
 
@@ -108,7 +109,7 @@ revisión, pero por sí solas no justifican `approved` ni `gluten_free_100`. El 
 "el dueño es celíaco" **nunca llega al modelo**: es un dato de salud de una persona
 concreta y lo que el modelo ve puede terminar en columnas públicas.
 
-Dos topes en código (`ValidatorAgent._apply_kitchen_caps`, defensa en
+Tres topes en código (`_apply_kitchen_caps` y `_apply_exclusive_signal_cap`, defensa en
 profundidad como los umbrales de confianza) solo **bajan** el nivel y nunca
 tocan el `status`:
 
@@ -117,9 +118,17 @@ tocan el `status`:
 - **Tope B:** si alguna declaración dice que la cocina **no** es exclusiva, el
   nivel queda como máximo en `celiac_friendly`, sea cual sea la fuente.
 
-Cuando un lugar de la comunidad queda esperando el 100%, el Validator agrega la
-bandera `100% pendiente de confirmación del administrador`. El veredicto final
-del 100% es del administrador.
+- **Tope C (2026-11-20): el Validator nunca deja un `gluten_free_100`,** sea cual sea
+  la fuente y diga lo que diga la evidencia. Si el modelo propone 100%, el nivel
+  queda en `celiac_friendly` (etiqueta pública "Tiene opciones sin gluten") con la
+  bandera `100% pendiente de confirmación del administrador`. La misma bandera se
+  agrega cuando el modelo propuso menos pero la evidencia afirma exclusividad
+  (`has_exclusive_signal`: la frase tiene que estar afirmada y referirse al lugar;
+  una frase negada, "casi todo", un producto o un menú, o un texto que también
+  dice que comparten cocina no cuentan).
+
+El 100% lo asigna solo una persona: el administrador, con una cita del propio
+local guardada y fechada en `place_evidence`.
 
 ---
 

@@ -283,3 +283,19 @@ def test_opt_out_persist_failure_is_skipped():
 
     assert result == {"skipped": "opt-out persist failed"}
     db.update_place_validation.assert_not_called()
+
+
+def test_a_reply_that_says_100_never_writes_a_100_it_flags_the_place_for_the_admin():
+    """2026-11-20: only a person assigns the 100%. The business's own "somos 100% sin gluten" is a lead for the admin."""
+    from agents.validator_agent import PENDING_ADMIN_FLAG
+
+    handler, db, llm = make_handler()
+    db.fetch_latest_received_message.return_value = make_message("Somos 100% sin gluten, cocina exclusiva.")
+    llm.complete_json.return_value = {**llm.complete_json.return_value, "safety_level": "gluten_free_100"}
+
+    handler.handle("place-1")
+
+    kwargs = db.update_place_validation.call_args.kwargs
+    assert kwargs["safety_level"] == "celiac_friendly"
+    assert PENDING_ADMIN_FLAG in kwargs["flags"]
+    assert kwargs["status"] == "outreach_confirmed"
