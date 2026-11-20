@@ -60,7 +60,7 @@
       placeholder: "Preguntá por un lugar sin gluten…",
       send: "Enviar mensaje",
       intro: "Hola. Te ayudo a encontrar lugares sin gluten en Argentina y Uruguay, a dejar un comentario sobre un lugar o a sumar uno que conozcas. También respondo dudas generales sobre la celiaquía.",
-      disclaimer: "El nivel de seguridad es una estimación de la comunidad y del sistema, no una garantía médica.",
+      disclaimer: "La etiqueta de cada lugar es una estimación de la comunidad y del sistema, no una garantía médica.",
       logNotice: "Las conversaciones marcadas como fuera de lo esperado pueden guardarse temporalmente (hasta 30 días) para mejorar la seguridad del servicio.",
       privacyPre: "Al escribir aceptás la",
       privacyLink: "política de privacidad",
@@ -86,7 +86,7 @@
       placeholder: "Ask about a gluten-free place…",
       send: "Send message",
       intro: "Hi. I can help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or add one you know. I also answer general questions about celiac disease.",
-      disclaimer: "The safety level is an estimate from the community and the system, not a medical guarantee.",
+      disclaimer: "Each place's label is an estimate from the community and the system, not a medical guarantee.",
       logNotice: "Conversations flagged as unexpected may be stored temporarily (up to 30 days) to improve the safety of the service.",
       privacyPre: "By writing, you accept the",
       privacyLink: "privacy policy (in Spanish)",
@@ -212,6 +212,17 @@
       list.appendChild(button);
     });
     if (list.childNodes.length) parent.appendChild(list);
+    scrollToEnd();
+  }
+
+  // Fixed scope sentence the server sends with a turn that lists places. It is not part of the reply
+  // text, so it never enters the conversation history sent back to the model.
+  function addScopeNote(parent, note) {
+    if (!parent || typeof note !== "string" || !note.trim()) return;
+    var p = document.createElement("p");
+    p.className = "chat-scope-note";
+    p.textContent = note;
+    parent.appendChild(p);
     scrollToEnd();
   }
 
@@ -405,7 +416,10 @@
       mods.push("sent");
     }
     var replyEl = addMessage(kind, data.reply, mods);
-    if (!data.rate_limited) addPlaceReferences(replyEl, data.places);
+    if (!data.rate_limited) {
+      addPlaceReferences(replyEl, data.places);
+      addScopeNote(replyEl, data.scope_note);
+    }
     turns.push({ role: "assistant", content: clamp(data.reply) });
   }
 

@@ -33,7 +33,7 @@
       voted: "✓ Votado",
       one: "voto",
       many: "votos",
-      empty: "Todavía no hay votos de la comunidad. Cuando la gente empiece a recomendar sus lugares seguros, el ranking aparece acá.",
+      empty: "Todavía no hay votos de la comunidad. Cuando la gente empiece a recomendar sus lugares sin gluten, el ranking aparece acá.",
       top3Empty: "Todavía no hay votos en este país.",
       country: "País del ranking",
       loadError: "No se pudo cargar el ranking.",
@@ -45,7 +45,7 @@
       voted: "✓ Voted",
       one: "vote",
       many: "votes",
-      empty: "No community votes yet. Once people start recommending their safe places, the ranking shows up here.",
+      empty: "No community votes yet. Once people start recommending their gluten-free places, the ranking shows up here.",
       top3Empty: "No votes in this country yet.",
       country: "Ranking country",
       loadError: "Couldn't load the ranking.",
@@ -63,8 +63,17 @@
     return document.documentElement.getAttribute("lang") === "en" ? "en" : "es";
   }
   function t(k) { return MSG[lang()][k]; }
+  // The scope of the label, next to it (same sentences as js/map.js): an unknown level reads as options.
+  var SCOPE = {
+    es: { gluten_free_100: "Según lo que declara el local. CeliacMap no inspecciona ni certifica.", dflt: "Según el local o sus clientes. CeliacMap no inspecciona ni certifica." },
+    en: { gluten_free_100: "As stated by the venue. CeliacMap does not inspect or certify.", dflt: "Per the venue or its customers. CeliacMap does not inspect or certify." }
+  };
   function safeLabel(level) {
     var d = SAFE[lang()];
+    return d[level] || d.dflt;
+  }
+  function scopeText(level) {
+    var d = SCOPE[lang()];
     return d[level] || d.dflt;
   }
   function badgeClass(level) {
@@ -192,6 +201,7 @@
           (p.city ? '<span class="rk-city">' + esc(p.city) + "</span>" : "") +
           '<span class="pp-badge ' + badgeClass(p.safety_level) + '">' +
             esc(safeLabel(p.safety_level)) + "</span>" +
+          '<span class="rk-scope">' + esc(scopeText(p.safety_level)) + "</span>" +
         "</div>" +
         '<div class="rk-actions">' +
           '<span class="rk-count" data-place-id="' + esc(p.id) + '">' +

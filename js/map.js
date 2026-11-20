@@ -290,14 +290,30 @@
     );
   }
 
-  // One line under the badge that says what the label means (same definitions as the
-  // chatbot's glossary), so the difference between the two levels is explicit.
+  // The scope of a label goes next to every label: whose statement it is and what CeliacMap
+  // does not do (no inspection, no certification). The short form is for the popup.
+  var SCOPE = {
+    gluten_free_100: {
+      es: "Según lo que declara el local. CeliacMap no inspecciona ni certifica.",
+      en: "As stated by the venue. CeliacMap does not inspect or certify."
+    },
+    options_available: {
+      es: "Según el local o sus clientes. CeliacMap no inspecciona ni certifica.",
+      en: "Per the venue or its customers. CeliacMap does not inspect or certify."
+    }
+  };
+  function scopeText(level) {
+    return SCOPE[safetyGroup(level)][lang()];
+  }
+
+  // Under the badge: what the label means, attributed to its source (never stated as a fact
+  // CeliacMap checked), and the scope sentence.
   function levelNoteHtml(p) {
     var text = safetyGroup(p.safety_level) === "gluten_free_100"
-      ? tr("En este lugar se cocinan y venden solo productos aptos para celíacos.",
-        "Only celiac-safe products are cooked and sold here.")
-      : tr("Tiene opciones para celíacos, pero puede que también cocine con gluten: preguntá en el lugar cómo las preparan.",
-        "It has options for celiacs, but it may also cook with gluten: ask the venue how they prepare them.");
+      ? tr("Según lo que declara el propio local, acá se cocinan y venden solo productos aptos para celíacos. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar.",
+        "According to the venue itself, only products suitable for celiacs are cooked and sold here. CeliacMap does not inspect or certify places: always confirm at the venue.")
+      : tr("Según lo que publica el local o cuentan sus clientes, tiene opciones para celíacos, pero puede que también cocine con gluten: preguntá en el lugar cómo las preparan. CeliacMap no inspecciona ni certifica los lugares.",
+        "According to the venue or its customers, it has options for celiacs, but it may also cook with gluten: ask the venue how they prepare them. CeliacMap does not inspect or certify places.");
     return '<p class="pp-level-note">' + esc(text) + "</p>";
   }
 
@@ -324,6 +340,7 @@
       '<div class="cm-popup-title">' + esc(p.name) + "</div>" +
       '<div class="cm-popup-meta">' + meta + "</div>" +
       '<span class="pp-badge ' + safetyBadgeClass(p.safety_level) + '">' + esc(saf) + "</span>" +
+      '<div class="cm-popup-scope">' + esc(scopeText(p.safety_level)) + "</div>" +
       warningHtml(p) +
       addr +
       "</div>"

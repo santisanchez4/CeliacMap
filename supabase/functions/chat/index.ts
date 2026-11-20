@@ -133,6 +133,7 @@ export interface ChatResponseBody {
   action: ChatAction | null;
   rate_limited: boolean;
   places: ChatPlaceReference[];
+  scope_note: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1510,6 +1511,21 @@ export const SCOPE_DECLINE_REPLIES: Record<Idioma, string> = {
     "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease. If it's a personal health question, talk to a health professional; you can also get guidance from ACELA (acela.org.ar) or ACA (celiaco.org.ar) in Argentina and ACELU (acelu.org) in Uruguay.",
 };
 
+// Fixed scope sentence sent with every turn that lists places. It travels in its own field
+// (`scope_note`), never inside `reply`: the widget shows it under the place links and it does not
+// enter the history the client sends back, so the model's input is unchanged. It is code, not a
+// prompt: what a label is based on and what CeliacMap does not do never depends on the model.
+export const PLACES_SCOPE_NOTES: Record<Idioma, string> = {
+  es:
+    "Las etiquetas salen de lo que declara cada local o cuentan sus clientes. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar.",
+  en:
+    "Labels come from what each venue states or its customers report. CeliacMap does not inspect or certify places: always confirm at the venue.",
+};
+
+export function scopeNoteFor(places: ChatPlaceReference[], idioma: Idioma): string | null {
+  return places.length ? getReply(PLACES_SCOPE_NOTES, idioma) : null;
+}
+
 // Deterministic ack for an explicit cancel-intent mid-suggestion-collection
 // (decideSuggestionTurn) — no redactor call needed, same reasoning as the two
 // dicts above: the outcome is fully known in code, so paying for an LLM call
@@ -1895,7 +1911,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     // destroy a report the person already described (action stays null —
     // nothing was submitted).
     return jsonResponse(
-      { reply, pending_submission: pendingIn, action: null, rate_limited: true, places: [] },
+      { reply, pending_submission: pendingIn, action: null, rate_limited: true, places: [], scope_note: null },
       200,
       cors,
     );
@@ -2264,7 +2280,14 @@ export async function handleRequest(req: Request): Promise<Response> {
   });
 
   return jsonResponse(
-    { reply, pending_submission: responsePending, action: responseAction, rate_limited: false, places: responsePlaces },
+    {
+      reply,
+      pending_submission: responsePending,
+      action: responseAction,
+      rate_limited: false,
+      places: responsePlaces,
+      scope_note: scopeNoteFor(responsePlaces, router.idioma),
+    },
     200,
     cors,
   );

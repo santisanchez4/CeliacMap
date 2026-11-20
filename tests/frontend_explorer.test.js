@@ -59,11 +59,13 @@ async function fixture(mobile = false, reducedMotion = false) {
   let now = 10000;
   const navigator = {};
   const requests = [];
+  const bodies = [];
   const context = {
     window: browser, document, L, navigator, CustomEvent: window.CustomEvent,
     Date: { now: () => (now += 3000), parse: Date.parse },
-    fetch: async url => { requests.push(String(url)); return { ok: true, json: async () => String(url).includes("functions/v1/chat")
-      ? { reply: "Found a place", places: [rows[0]], pending_submission: null } : rows }; },
+    fetch: async (url, init) => { requests.push(String(url)); if (init && init.body) bodies.push(String(init.body));
+      return { ok: true, json: async () => String(url).includes("functions/v1/chat")
+      ? { reply: "Found a place", places: [rows[0]], pending_submission: null, scope_note: "Fixed scope sentence." } : rows }; },
     setTimeout, clearTimeout,
   };
   vm.runInNewContext(source, context);
@@ -74,7 +76,7 @@ async function fixture(mobile = false, reducedMotion = false) {
     el.dispatchEvent(new window.Event("click", { bubbles: true }));
     return el;
   }
-  return { document, window, browser, map, navigator, requests, viewportListeners, click, markers, layers, mutations: () => mutations,
+  return { document, window, browser, map, navigator, requests, bodies, viewportListeners, click, markers, layers, mutations: () => mutations,
     loadChat: async () => vm.runInNewContext(await Deno.readTextFile("js/chat.js"), context),
     loadOpinions: async rows => {
       context.fetch = async () => ({ ok: true, json: async () => rows });
@@ -151,14 +153,18 @@ Deno.test("safety filters and legend expose two levels", async () => {
   assert.equal(f.document.querySelector('[data-safety="options_available"]').textContent, "Tiene opciones sin gluten");
 });
 
-Deno.test("the map legend is followed by the 'levels are an estimate' note, in both languages", async () => {
+Deno.test("the map legend is followed by the scope of each label, in both languages", async () => {
   const f = await fixture();
   const legend = f.document.querySelector(".map-legend");
   const note = legend.nextElementSibling;
   assert.ok(note && note.classList.contains("map-disclaimer"));
-  assert.match(note.textContent, /estimación .* no una garantía médica/);
+  const text = note.textContent.replace(/\s+/g, " ");
+  assert.match(text, /«Espacio 100% sin gluten»: según lo que declara el propio local\./);
+  assert.match(text, /«Tiene opciones sin gluten»: según lo que publica el local o cuentan sus clientes\./);
+  assert.match(text, /CeliacMap no inspecciona ni certifica los lugares .* no son una garantía médica: confirmá siempre en el lugar\./);
   assert.equal(note.getAttribute("data-i18n"), "map.disclaimer");
-  assert.match(await Deno.readTextFile("js/main.js"), /"map\.disclaimer": "Levels are an estimate .* not a medical guarantee/);
+  assert.match(await Deno.readTextFile("js/main.js"),
+    /"map\.disclaimer": ".*as stated by the venue itself.*CeliacMap does not inspect or certify places and labels are not a medical guarantee/);
 });
 
 Deno.test("the options filter also shows celiac_friendly places; the 100% filter shows only dedicated ones", async () => {
@@ -260,6 +266,27 @@ Deno.test("opening a place scrolls the map itself into view, not the section hea
   f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-3" } }));
   assert.ok(targets.includes("map-wrap"), "scrolled: " + targets.join(", "));
   assert.equal(targets.includes("map"), false, "must not scroll to the section heading");
+});
+
+// The scope sentence comes from the server in its own field: shown under the place links, and never
+// sent back as conversation history (the model's input must not change).
+Deno.test("chat shows the server's scope note under the place links and keeps it out of the history", async () => {
+  const f = await fixture();
+  await f.loadChat();
+  f.click("#chat-fab");
+  const ask = async text => {
+    f.document.getElementById("chat-input").value = text;
+    f.document.getElementById("chat-form").dispatchEvent(new f.window.Event("submit", { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+  };
+  await ask("Find cafés");
+  const note = f.document.querySelector(".chat-msg--bot .chat-scope-note");
+  assert.equal(note.textContent, "Fixed scope sentence.");
+  assert.ok(note.previousElementSibling.classList.contains("chat-place-links"));
+  await ask("And restaurants?");
+  const second = f.bodies[f.bodies.length - 1];
+  assert.ok(second.includes("Found a place"), "the reply is part of the history");
+  assert.equal(second.includes("Fixed scope sentence."), false);
 });
 
 Deno.test("chat keeps intro in the log and exposes five local actions separately", async () => {
@@ -416,6 +443,62 @@ Deno.test("the place detail explains the level label", async () => {
   assert.match(body.textContent, /se cocinan y venden solo productos aptos para celíacos/);
   f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-1" } }));
   assert.match(body.textContent, /puede que también cocine con gluten/);
+});
+
+// The 100% sentence is the venue's statement, never a fact CeliacMap checked, and both labels
+// carry the scope (no inspection, no certification) right under the badge.
+Deno.test("the place detail attributes the label and states the scope, in both languages", async () => {
+  const f = await fixture();
+  const note = () => f.document.querySelector("#place-panel-body .pp-level-note").textContent;
+  const open = id => f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id } }));
+  open("place-0");
+  assert.match(note(), /^Según lo que declara el propio local, acá se cocinan y venden solo productos aptos para celíacos\./);
+  assert.match(note(), /CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar\.$/);
+  assert.ok(f.document.querySelector("#place-panel-body .pp-badges").nextElementSibling.classList.contains("pp-level-note"));
+  open("place-1");
+  assert.match(note(), /^Según lo que publica el local o cuentan sus clientes, tiene opciones para celíacos/);
+  assert.match(note(), /CeliacMap no inspecciona ni certifica los lugares\.$/);
+  f.document.documentElement.setAttribute("lang", "en");
+  open("place-0");
+  assert.match(note(), /^According to the venue itself, .*CeliacMap does not inspect or certify places: always confirm at the venue\.$/);
+  open("place-2");
+  assert.match(note(), /^According to the venue or its customers, .*CeliacMap does not inspect or certify places\.$/);
+});
+
+Deno.test("the map popup carries the scope under the label", async () => {
+  const map = await Deno.readTextFile("js/map.js");
+  assert.match(map, /esc\(saf\) \+ "<\/span>" \+\s+'<div class="cm-popup-scope">' \+ esc\(scopeText\(p\.safety_level\)\)/);
+  assert.match(map, /es: "Según lo que declara el local\. CeliacMap no inspecciona ni certifica\."/);
+  assert.match(map, /es: "Según el local o sus clientes\. CeliacMap no inspecciona ni certifica\."/);
+  assert.match(await Deno.readTextFile("css/styles.css"), /\.cm-popup-scope \{/);
+});
+
+Deno.test("every ranking row carries the scope next to its label, in both languages", async () => {
+  const rows = [
+    { id: "a", name: "A", city: "X", safety_level: "gluten_free_100", vote_count: 3 },
+    { id: "b", name: "B", city: "X", safety_level: "celiac_friendly", vote_count: 2 },
+    { id: "c", name: "C", city: "X", safety_level: "something_new", vote_count: 1 },
+  ];
+  const f = await rankingFixture({ votes: { Argentina: rows } });
+  const scopes = () => Array.from(f.document.querySelectorAll("#ranking-list .ranking-item")).map(li => {
+    const scope = li.querySelector(".rk-scope");
+    assert.ok(scope.previousElementSibling.classList.contains("pp-badge"), "the scope follows the badge");
+    return scope.textContent;
+  });
+  assert.deepEqual(scopes(), [
+    "Según lo que declara el local. CeliacMap no inspecciona ni certifica.",
+    "Según el local o sus clientes. CeliacMap no inspecciona ni certifica.",
+    "Según el local o sus clientes. CeliacMap no inspecciona ni certifica.",
+  ]);
+  f.document.documentElement.setAttribute("lang", "en");
+  f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:lang"));
+  assert.deepEqual(scopes(), [
+    "As stated by the venue. CeliacMap does not inspect or certify.",
+    "Per the venue or its customers. CeliacMap does not inspect or certify.",
+    "Per the venue or its customers. CeliacMap does not inspect or certify.",
+  ]);
+  const note = f.document.querySelector(".ranking-note").textContent.replace(/\s+/g, " ");
+  assert.match(note, /Solo lugares publicados en el mapa\..*CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar\./);
 });
 
 Deno.test("expanded map isolates background, handles Escape and restores scroll and focus", async () => {

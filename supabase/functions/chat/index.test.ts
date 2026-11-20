@@ -53,6 +53,8 @@ import {
   sha256Hex,
   hmacSha256Hex,
   ipBucketHash,
+  PLACES_SCOPE_NOTES,
+  scopeNoteFor,
   trimHistory,
   toChatPlaceReferences,
   toRedactorPlace,
@@ -240,6 +242,36 @@ Deno.test("toChatPlaceReferences exposes only the small approved-place map contr
     { id: "a", name: "Pan Sin TACC", city: "Montevideo", category: "shop", safety_level: "gluten_free_100", contact_email: "private@example.com" },
     { id: 3, name: "Ignored" },
   ]), [{ id: "a", name: "Pan Sin TACC", city: "Montevideo", category: "shop", safety_level: "gluten_free_100" }]);
+});
+
+// The scope sentence is code, not a prompt: fixed text, its own response field, only with places.
+Deno.test("scopeNoteFor - a turn that lists places carries the fixed scope sentence, in the reply's language", () => {
+  const places = [{ id: "a", name: "Pan", city: "Montevideo", category: "shop", safety_level: "gluten_free_100" }];
+  assertEquals(
+    scopeNoteFor(places, "es"),
+    "Las etiquetas salen de lo que declara cada local o cuentan sus clientes. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar.",
+  );
+  assertEquals(
+    scopeNoteFor(places, "en"),
+    "Labels come from what each venue states or its customers report. CeliacMap does not inspect or certify places: always confirm at the venue.",
+  );
+  assertEquals(scopeNoteFor([], "es"), null);
+  assertEquals(scopeNoteFor([], "en"), null);
+});
+
+Deno.test("the scope sentence never says safe / verified / sin TACC, and never travels inside the reply", async () => {
+  for (const idioma of ["es", "en"] as const) {
+    const note = PLACES_SCOPE_NOTES[idioma];
+    assertEquals(/segur[oa]|verificad|validad|sin tacc|\bsafe\b|verified|validated/i.test(note), false, note);
+  }
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const handler = src.slice(src.indexOf("export async function handleRequest"));
+  assertMatch(handler, /scope_note: scopeNoteFor\(responsePlaces, router\.idioma\)/);
+  assertMatch(handler, /rate_limited: true, places: \[\], scope_note: null/);
+  assertEquals(/reply\s*(\+=|=\s*reply\s*\+)[^;]*SCOPE/.test(handler), false, "the note must not be appended to reply");
+  // The prompts are untouched by this: no prompt mentions the field or the constant.
+  const prompts = await Deno.readTextFile(new URL("./prompts.ts", import.meta.url));
+  assertEquals(/scope_note|PLACES_SCOPE_NOTES/.test(prompts), false);
 });
 
 Deno.test("buildPlacesSearchUrl filters by city, status=approved, and orders/limits per ADR-006", () => {
