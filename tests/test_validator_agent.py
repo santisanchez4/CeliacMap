@@ -718,6 +718,24 @@ def test_a_negated_phrase_does_not_flag_a_place_as_pending_100():
     assert PENDING_ADMIN_FLAG not in out["flags"]
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Todos nuestros productos son 100% sin gluten",
+        "Todos los productos son 100% sin gluten",
+        "Nuestros productos son 100% sin TACC",
+    ],
+)
+def test_all_our_products_falls_under_the_product_rule_and_does_not_flag_the_100_queue(text):
+    # Documents a known side of the product rule (2026-11-20, to review): «todos nuestros productos son 100% sin
+    # gluten» is read as a statement about products, so it does not put the place in the admin's 100% queue. That is
+    # the safe side (a person still assigns every 100%); the cost is a lead the queue does not surface on its own.
+    assert not ValidatorAgent.has_exclusive_signal([text])
+    out = _norm({"safety_level": "celiac_friendly"}, place={"source": "google_places"}, evidence=None,
+                reviews=[{"text": text}])
+    assert PENDING_ADMIN_FLAG not in out["flags"]
+
+
 def test_tope_c_drops_a_100_without_evidence_and_flags_it_for_the_admin():
     out = _norm(place={"name": "Sin Gluten Palermo", "source": "google_places"}, evidence=None)
     assert out["safety_level"] == "celiac_friendly"

@@ -1506,9 +1506,9 @@ export const RATE_LIMIT_REPLIES: Record<Idioma, string> = {
 // cannot misfire; it is the same referral the redactor's instruction 4 and CELIAQUIA_GUARD_REPLIES give.
 export const SCOPE_DECLINE_REPLIES: Record<Idioma, string> = {
   es:
-    "Solo puedo ayudarte a buscar lugares sin gluten en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía. Si es una consulta de salud personal, consultala con un profesional de la salud; también podés orientarte con ACELA (acela.org.ar) o ACA (celiaco.org.ar) en Argentina y ACELU (acelu.org) en Uruguay.",
+    "Solo puedo ayudarte a buscar lugares sin gluten en Argentina y Uruguay, dejar un comentario sobre un lugar, o responder dudas generales sobre la celiaquía. Si es una consulta de salud personal, consultala con un profesional de la salud; también podés orientarte con ACELA (acela.org.ar) o ACA (asociacionceliaca.org.ar) en Argentina y ACELU (acelu.org) en Uruguay.",
   en:
-    "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease. If it's a personal health question, talk to a health professional; you can also get guidance from ACELA (acela.org.ar) or ACA (celiaco.org.ar) in Argentina and ACELU (acelu.org) in Uruguay.",
+    "I can only help you find gluten-free places in Argentina and Uruguay, leave a comment about a place, or answer general questions about celiac disease. If it's a personal health question, talk to a health professional; you can also get guidance from ACELA (acela.org.ar) or ACA (asociacionceliaca.org.ar) in Argentina and ACELU (acelu.org) in Uruguay.",
 };
 
 // Fixed scope sentence sent with every turn that lists places. It travels in its own field
@@ -1613,9 +1613,9 @@ export function detectCeliaquiaGuard(reply: string): CeliaquiaGuardReason[] {
 
 export const CELIAQUIA_GUARD_REPLIES: Record<Idioma, string> = {
   es:
-    "Prefiero no darte cifras ni valorar síntomas por este medio: eso tiene que evaluarlo un profesional de la salud que conozca tu caso. Para orientarte, podés consultar a tu médico y a las asociaciones: en Argentina, ACELA (acela.org.ar) o ACA (celiaco.org.ar); en Uruguay, ACELU (acelu.org).",
+    "Prefiero no darte cifras ni valorar síntomas por este medio: eso tiene que evaluarlo un profesional de la salud que conozca tu caso. Para orientarte, podés consultar a tu médico y a las asociaciones: en Argentina, ACELA (acela.org.ar) o ACA (asociacionceliaca.org.ar); en Uruguay, ACELU (acelu.org).",
   en:
-    "I'd rather not give figures or assess symptoms here: that needs a health professional who knows your case. For guidance, you can talk to your doctor and to the patient associations: in Argentina, ACELA (acela.org.ar) or ACA (celiaco.org.ar); in Uruguay, ACELU (acelu.org).",
+    "I'd rather not give figures or assess symptoms here: that needs a health professional who knows your case. For guidance, you can talk to your doctor and to the patient associations: in Argentina, ACELA (acela.org.ar) or ACA (asociacionceliaca.org.ar); in Uruguay, ACELU (acelu.org).",
 };
 
 export interface CeliaquiaGuardTrip {

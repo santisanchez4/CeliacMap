@@ -440,7 +440,7 @@ Deno.test("the place detail explains the level label", async () => {
   const f = await fixture();
   const body = f.document.getElementById("place-panel-body");
   f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-0" } }));
-  assert.match(body.textContent, /se cocinan y venden solo productos aptos para celíacos/);
+  assert.match(body.textContent, /se cocinan y venden solo productos sin gluten\./);
   f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id: "place-1" } }));
   assert.match(body.textContent, /puede que también cocine con gluten/);
 });
@@ -452,17 +452,41 @@ Deno.test("the place detail attributes the label and states the scope, in both l
   const note = () => f.document.querySelector("#place-panel-body .pp-level-note").textContent;
   const open = id => f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id } }));
   open("place-0");
-  assert.match(note(), /^Según lo que declara el propio local, acá se cocinan y venden solo productos aptos para celíacos\./);
+  assert.match(note(), /^Según lo que declara el propio local, acá se cocinan y venden solo productos sin gluten\./);
   assert.match(note(), /CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar\.$/);
   assert.ok(f.document.querySelector("#place-panel-body .pp-badges").nextElementSibling.classList.contains("pp-level-note"));
   open("place-1");
-  assert.match(note(), /^Según lo que publica el local o cuentan sus clientes, tiene opciones para celíacos/);
+  assert.match(note(), /^Según lo que publica el local o cuentan sus clientes, tiene opciones sin gluten,/);
   assert.match(note(), /CeliacMap no inspecciona ni certifica los lugares\.$/);
   f.document.documentElement.setAttribute("lang", "en");
   open("place-0");
   assert.match(note(), /^According to the venue itself, .*CeliacMap does not inspect or certify places: always confirm at the venue\.$/);
   open("place-2");
   assert.match(note(), /^According to the venue or its customers, .*CeliacMap does not inspect or certify places\.$/);
+});
+
+// «apto para celíacos» reads as a safety promise: the detail says what the venue states it sells (2026-11-20).
+Deno.test("the place detail says «sin gluten», never «apto» / «suitable», in both languages", async () => {
+  const f = await fixture();
+  const note = () => f.document.querySelector("#place-panel-body .pp-level-note").textContent;
+  const open = id => f.document.dispatchEvent(new f.window.CustomEvent("celiacmap:open-place", { detail: { id } }));
+  for (const lang of ["es", "en"]) {
+    f.document.documentElement.setAttribute("lang", lang);
+    for (const id of ["place-0", "place-1", "place-2"]) {
+      open(id);
+      assert.doesNotMatch(note(), /\bapt[oa]s?\b|suitable|para celíacos|for celiacs/i);
+    }
+  }
+  f.document.documentElement.setAttribute("lang", "es");
+  open("place-0");
+  assert.match(note(), /solo productos sin gluten\./);
+  open("place-1");
+  assert.match(note(), /tiene opciones sin gluten,/);
+  f.document.documentElement.setAttribute("lang", "en");
+  open("place-0");
+  assert.match(note(), /only gluten-free products are cooked and sold here\./);
+  open("place-2");
+  assert.match(note(), /it has gluten-free options,/);
 });
 
 Deno.test("the map popup carries the scope under the label", async () => {
