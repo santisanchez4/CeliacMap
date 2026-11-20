@@ -2057,6 +2057,9 @@ h1, h2, h3 {
 }
 .pp-warning strong { display: block; margin-bottom: 2px; }
 .pp-level-note { margin: 8px 0 0; font-size: .82rem; line-height: 1.45; color: var(--color-text-muted); }
+.cm-popup-scope { margin-top: 6px; font-size: .72rem; line-height: 1.4; color: var(--color-text-muted); }
+.rk-scope { flex-basis: 100%; font-size: .72rem; line-height: 1.4; color: var(--color-text-muted); }
+.chat-scope-note { margin: 8px 0 0; font-size: .72rem; line-height: 1.4; color: var(--color-text-muted); }
 .pp-badge--options::before { background: var(--color-options); }
 
 .pp-badge.pp-badge--dedicated,

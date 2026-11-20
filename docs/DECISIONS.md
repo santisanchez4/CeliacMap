@@ -5105,6 +5105,44 @@ desde el 2026-09-30, cuando el chat dejó de preguntar por la cocina; con v26 qu
   y dirección y `notes` null. Observación anotada para la próxima tanda de prompts: el redactor sumó el aviso «Anónimo» a una
   sugerencia de lugar nuevo, cuyo texto no se publica como opinión. Las filas de prueba se borraron con el SQL aprobado.
 
+### Texto público sin «seguro» ni «verificado», y el alcance junto a cada etiqueta (2026-11-20)
+
+- **Contexto.** La Comisión Directiva de la Asociación Celíaca Argentina (ACA) preguntó cómo se evalúan las condiciones de
+  elaboración y la contaminación cruzada, y observó que «Espacio 100% sin gluten» puede leerse como una garantía. La revisión
+  del 20/11 encontró que el sitio prometía más de lo que el proyecto hace: «lugares seguros», «lugares verificados»,
+  «100% validado por la comunidad», y la ficha de un 100% afirmaba como hecho «En este lugar se cocinan y venden solo
+  productos aptos para celíacos». En producción hay 0 lugares con `verified = true`; CeliacMap no visita, no inspecciona y
+  no certifica (Términos de uso §2).
+- **Decisión del administrador (2026-11-20).** (1) El texto público no llama a un lugar «seguro», «verificado» ni «validado»
+  (en inglés: «safe», «verified», «validated»), y no vuelve a decir «sin TACC». (2) La frase de la ficha del 100% se atribuye:
+  «Según lo que declara el propio local…». (3) Junto a cada etiqueta va su alcance: en qué se basa y que CeliacMap no
+  inspecciona ni certifica. Está en la nota bajo la leyenda del mapa, en el popup del pin, en la ficha, en cada fila del
+  ranking y en la nota del ranking. (4) El chat lo dice con un pie fijo en código, sin tocar los prompts.
+- **El nombre de la etiqueta no cambia en este PR.** «Espacio 100% sin gluten» sigue igual: al documento para la ACA va la
+  propuesta «Se declara 100% sin gluten» y el cambio se hace una sola vez, después de su respuesta, junto con la tanda de
+  prompts del chat. Se sigue con «sin gluten» y no «libre de gluten»: «libre de gluten» es la denominación legal de un
+  alimento con un límite medido (CAA art. 1383) y en un local sonaría a categoría oficial.
+- **Qué cambió.** `index.html` y el diccionario inglés de `js/main.js` (título, descripción, hero, mapa, solución,
+  funcionalidades, ranking, sugerencias, IA, acerca, CTA, pie); el dato «100% validado por la comunidad» del hero pasó a
+  «2 países: Argentina y Uruguay»; pie de `privacidad.html` y `terminos.html`; `manifest.webmanifest`; `js/map.js`
+  (`levelNoteHtml` atribuido, `SCOPE` y `.cm-popup-scope` en el popup); `js/ranking.js` (`.rk-scope` en cada fila);
+  `js/chat.js` (aviso y `addScopeNote`).
+- **Pie fijo del chat, en código.** `supabase/functions/chat/index.ts` devuelve un campo nuevo `scope_note`
+  (`PLACES_SCOPE_NOTES`, `scopeNoteFor`): la frase fija, en el idioma del turno, solo cuando la respuesta trae lugares. Viaja
+  aparte de `reply` a propósito: el widget la muestra bajo los enlaces de los lugares y **no** entra en el historial que el
+  cliente reenvía, así que la entrada del modelo no cambia. `prompts.ts` no se tocó: no hay batería ni reinicio del conteo
+  del soft-launch. El despliegue de `chat` es aparte y con «dale».
+- **Lo que queda para la tanda de prompts del cambio de nombre** (con batería): `prompts.ts` todavía dice «pasó por
+  evidencia real», «la comunidad tiene confirmados», «solo paso lugares ya verificados» y «base verificada», y define
+  «Espacio 100% sin gluten» como un hecho.
+- **Fuera de este PR.** El cuerpo de los textos legales (`docs/legal/*.md`, v1.1) no cambia: usa «no verificado» y
+  «“seguras”» en negativo, y «todavía está verificando» en Términos §4, que conviene pasar a «revisando» en la próxima
+  versión. Tampoco cambian «+500 lugares en la visión» ni «24/7 información actualizada» del hero.
+- **Tests.** `tests/frontend_public_copy.test.js` (nuevo) falla si `index.html`, el manifiesto, el pie de las páginas legales
+  o cualquier texto de `js/*.js` dice «sin TACC», «seguro/a», «verificado/a», «validado/a», «safe», «verified» o «validated».
+  `tests/frontend_explorer.test.js` cubre la nota de la leyenda, la ficha atribuida, el popup, cada fila del ranking y que
+  la nota del chat no vuelve en el historial; `index.test.ts`, el campo `scope_note`. Frontend 175 → 184, funciones 273 → 275.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
