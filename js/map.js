@@ -310,10 +310,10 @@
   // CeliacMap checked), and the scope sentence.
   function levelNoteHtml(p) {
     var text = safetyGroup(p.safety_level) === "gluten_free_100"
-      ? tr("Según lo que declara el propio local, acá se cocinan y venden solo productos aptos para celíacos. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar.",
-        "According to the venue itself, only products suitable for celiacs are cooked and sold here. CeliacMap does not inspect or certify places: always confirm at the venue.")
-      : tr("Según lo que publica el local o cuentan sus clientes, tiene opciones para celíacos, pero puede que también cocine con gluten: preguntá en el lugar cómo las preparan. CeliacMap no inspecciona ni certifica los lugares.",
-        "According to the venue or its customers, it has options for celiacs, but it may also cook with gluten: ask the venue how they prepare them. CeliacMap does not inspect or certify places.");
+      ? tr("Según lo que declara el propio local, acá se cocinan y venden solo productos sin gluten. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar.",
+        "According to the venue itself, only gluten-free products are cooked and sold here. CeliacMap does not inspect or certify places: always confirm at the venue.")
+      : tr("Según lo que publica el local o cuentan sus clientes, tiene opciones sin gluten, pero puede que también cocine con gluten: preguntá en el lugar cómo las preparan. CeliacMap no inspecciona ni certifica los lugares.",
+        "According to the venue or its customers, it has gluten-free options, but it may also cook with gluten: ask the venue how they prepare them. CeliacMap does not inspect or certify places.");
     return '<p class="pp-level-note">' + esc(text) + "</p>";
   }
 

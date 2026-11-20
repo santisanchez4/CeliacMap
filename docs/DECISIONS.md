@@ -5173,6 +5173,23 @@ desde el 2026-09-30, cuando el chat dejó de preguntar por la cocina; con v26 qu
   nivel malformado), 22 frases que no deben contar y 11 que sí; `test_outreach_reply_handler.py`: la respuesta «100%» se
   marca como pendiente. Python 1318 → 1385.
 
+### Ficha sin «apto para celíacos» y el chat manda a la ACA a asociacionceliaca.org.ar (2026-11-20)
+
+- **Ficha del lugar.** «apto para celíacos» suena a una promesa de seguridad. La nota bajo la etiqueta dice ahora lo que el
+  local declara que vende: «acá se cocinan y venden solo productos sin gluten» (100%) y «tiene opciones sin gluten»
+  (opciones); en inglés, «only gluten-free products are cooked and sold here» / «it has gluten-free options». Un test fija
+  que la nota no dice «apto», «suitable», «para celíacos» ni «for celiacs» en ningún idioma. Las preguntas del formulario de
+  sugerencias no cambian (no son una etiqueta).
+- **Respuestas fijas del chat.** `SCOPE_DECLINE_REPLIES` y `CELIAQUIA_GUARD_REPLIES` (`index.ts`) mandan a la ACA a
+  `asociacionceliaca.org.ar` en lugar de `celiaco.org.ar`. Es código, no prompt: los `<fuentes>` de `prompts.ts` se cambian
+  en la próxima tanda de prompts, con la batería. `acela.org.ar` queda igual hasta confirmar que el sitio está caído. Un test
+  fija los dos dominios. Requiere desplegar `chat`.
+- **Para revisar: «todos nuestros productos son 100% sin gluten».** Por la regla de producto de `has_exclusive_signal`, esa
+  frase no marca el lugar para la cola del 100% (`100% pendiente de confirmación del administrador`). Es el lado seguro,
+  porque una persona asigna igual cada 100%, pero la cola pierde una pista que hoy tiene que encontrar el administrador. Un
+  test (`test_all_our_products_falls_under_the_product_rule_and_does_not_flag_the_100_queue`) documenta el comportamiento;
+  si se decide cambiarlo, ese test es el que se invierte.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.

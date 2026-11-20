@@ -1838,8 +1838,21 @@ Deno.test("SCOPE_DECLINE_REPLIES - the fixed decline always carries the health r
   assertStringIncludes(es, "Si es una consulta de salud personal, consultala con un profesional de la salud");
   assertStringIncludes(en, "If it's a personal health question, talk to a health professional");
   for (const reply of [es, en]) {
-    for (const association of ["ACELA (acela.org.ar)", "ACA (celiaco.org.ar)", "ACELU (acelu.org)"]) {
+    for (const association of ["ACELA (acela.org.ar)", "ACA (asociacionceliaca.org.ar)", "ACELU (acelu.org)"]) {
       assertStringIncludes(reply, association);
+    }
+  }
+});
+
+Deno.test("fixed replies point the ACA to asociacionceliaca.org.ar, never to the old celiaco.org.ar (2026-11-20)", () => {
+  // Code, not a prompt: the redactor's <fuentes> keeps its list until the next measured prompt batch.
+  for (const replies of [SCOPE_DECLINE_REPLIES, CELIAQUIA_GUARD_REPLIES]) {
+    for (const idioma of ["es", "en"] as const) {
+      const reply = getReply(replies, idioma);
+      assertStringIncludes(reply, "ACA (asociacionceliaca.org.ar)");
+      assertEquals(reply.includes("celiaco.org.ar"), false);
+      // acela.org.ar stays until it is confirmed down.
+      assertStringIncludes(reply, "ACELA (acela.org.ar)");
     }
   }
 });
