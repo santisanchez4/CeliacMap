@@ -19,5 +19,6 @@ promete más que lo que hacemos, igual que «verificado»: va con el cambio de n
 
 Línea base (22:28:00 UTC): 0 filas `chatbot` en `agent_log`, `chat_usage` vacía, 2 `suggestions`, 2 `place_reports`. El turno
 escribió 1 fila `agent_log` (`chat_turn`) y 3 contadores `chat_usage` (sesión, `ip:…`, `global`, cada uno en 1); 0 lugares
-tocados. Limpieza: `2026-11-20-chat-v28-test-cleanup.sql` (guardas de conteo exacto y vuelta a la línea base), **pendiente
-del «dale»**.
+tocados. Limpieza: `2026-11-20-chat-v28-test-cleanup.sql` (guardas de conteo exacto y vuelta a la línea base), con el «dale»:
+ensayo con ROLLBACK (cada borrado, exactamente 1 fila), después COMMIT. Lectura posterior: 0 filas `chatbot` en `agent_log`,
+`chat_usage` vacía, 2 `suggestions`, 2 `place_reports`: la línea base.

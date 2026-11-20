@@ -59,7 +59,8 @@ Cada lugar publicado lleva una de dos etiquetas.
 - **Qué significa:** el propio comercio afirma por escrito y de forma explícita que en ese lugar se elabora y se vende
   **únicamente** sin gluten («todo es sin gluten», «100% libre de gluten», «cocina exclusiva»), y una persona lo revisó
   (sección 6). Un local que cocina con gluten y ofrece un menú para celíacos, preparación aparte o incluso una cocina
-  separada no lleva esta etiqueta.
+  separada no lleva esta etiqueta. Hoy 16 de los 58 lugares con esta etiqueta todavía no tienen esa afirmación guardada
+  textualmente; la estamos completando (sección 7).
 - **Qué no garantiza:** que la afirmación sea cierta hoy, que las materias primas sean aptas, que no haya
   contaminación en origen o en el traslado, ni que el lugar cumpla ningún requisito sanitario. **No es una
   certificación ni una validación del establecimiento.**
@@ -157,9 +158,11 @@ asociación de pacientes es una organización de referencia, no un lugar donde c
 
 Ese mismo día re-evaluamos con el criterio actual los 59 lugares que seguían publicados con una puntuación menor a
 0,85 sin decisión de una persona (casi todos dietéticas y almacenes aprobados con el criterio anterior a junio de
-2026). Solo uno siguió publicado; los otros 58 pasaron a revisión humana, porque no había ninguna mención escrita de
-oferta sin gluten. No descartamos ninguno: un descarte es definitivo, y la falta de evidencia no es un motivo para
-descartar, solo para no publicar.
+2026). Solo uno siguió publicado; los otros 58 pasaron a revisión humana, porque ya no quedaba guardada ninguna
+mención escrita de oferta sin gluten. En 25 de ellos, la aprobación anterior se había apoyado en reseñas de clientes,
+que por nuestra regla de conservación se borran a los 30 días; en los otros 33, solo en el rubro del comercio (por
+ejemplo, que una dietética suele vender productos sin gluten), algo que el criterio actual no acepta. No descartamos
+ninguno: un descarte es definitivo, y la falta de evidencia no es un motivo para descartar, solo para no publicar.
 
 ## 7. La revisión humana en la práctica
 
@@ -229,8 +232,9 @@ del 100%, porque cada cambio en esas instrucciones se prueba antes contra un con
 («lugares seguros», «lugares verificados», «100% validado por la comunidad»), y la ficha de un lugar con la etiqueta
 del 100% afirmaba como un hecho que ahí solo se elabora sin gluten, cuando es lo que el lugar declara. Lo corregimos:
 
-1. quitamos «seguro», «verificado» y «validado» del texto público, en castellano y en inglés, y una prueba automática
-   impide que vuelvan a aparecer (igual que «sin TACC»);
+1. quitamos «seguro», «verificado» y «validado» del texto del sitio, en castellano y en inglés, y una prueba
+   automática impide que vuelvan a aparecer en el texto del sitio (igual que «sin TACC»); el asistente se corrige aparte
+   (sección 9);
 2. la ficha atribuye la frase y no usa «apto», que suena a garantía: «Según lo que declara el propio local, acá se
    cocinan y venden solo productos sin gluten. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en
    el lugar.»;
@@ -290,11 +294,18 @@ decían que las etiquetas son una estimación y que no inspeccionamos los lugare
   son esa categoría legal ni la reemplazan, y CeliacMap no mide gluten. Por la misma razón usamos «sin gluten» y no
   «libre de gluten»: esta última es la denominación legal de un alimento con un límite medido, y en un local sonaría a
   una categoría oficial.
-- **Argentina, gastronomía.** La Ley 26.588 (modificada por la Ley 27.196) y su Decreto 218/2023 obligan a ciertas
-  instituciones y establecimientos a ofrecer al menos una opción sin gluten, siguiendo la «Guía de Recomendaciones
-  para un Menú Libre de Gluten Seguro» de la ANMAT (2.ª edición, octubre de 2023). La Guía describe prácticas
+- **Argentina, gastronomía.** El artículo 4° bis de la Ley 26.588, incorporado por la Ley 27.196 (2015), obliga a
+  ofrecer «al menos una opción de alimentos o un menú libre de gluten (sin TACC)» a una lista de instituciones y
+  establecimientos que incluye, entre otros, los establecimientos sanitarios con internación, los comedores y kioscos
+  de instituciones de enseñanza, las empresas de transporte con servicio de comida a bordo, los restaurantes y bares,
+  los kioscos de terminales de transporte y los locales de comida rápida. Su reglamentación, el Decreto 218/2023,
+  exige que esa opción provenga de elaboradores habilitados y que los obligados apliquen buenas prácticas de
+  manipulación que eviten la contaminación cruzada, que el personal que manipula alimentos tenga el Carnet de
+  Manipulación de Alimentos y una capacitación específica, y que implementen la «Guía de Recomendaciones para un Menú Libre de Gluten
+  Seguro», que la ANMAT elabora a través del INAL (2.ª edición, octubre de 2023). La Guía describe prácticas
   (capacitación del personal, compra de ingredientes autorizados, almacenamiento, utensilios y equipos exclusivos,
-  servicio, limpieza). CeliacMap no verifica ninguna de ellas; las usamos como referencia para saber qué preguntar.
+  servicio, limpieza). CeliacMap no verifica si un lugar cumple ninguna de estas obligaciones; las usamos como
+  referencia para saber qué preguntar.
 - **Uruguay.** La Ley 16.096 y el Decreto 76/994 prevén la leyenda «producto libre de gluten» y el control del
   Ministerio de Salud Pública; el Decreto 149/018 exige habilitación a las plantas elaboradoras, con excepción de
   las que elaboran y venden solo en su propio local.

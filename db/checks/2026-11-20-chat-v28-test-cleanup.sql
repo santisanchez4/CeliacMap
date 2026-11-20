@@ -1,3 +1,5 @@
+-- APLICADO en producción el 2026-11-20 (ensayo con ROLLBACK primero, después esta versión con COMMIT y verificación de solo lectura): línea base recuperada.
+-- Registro de auditoría: no se vuelve a correr (sus guardas fallarían con el estado actual).
 -- Limpieza del turno de prueba de chat v28 (2026-11-20 22:28:40–22:28:48 UTC: una búsqueda «¿Dónde puedo comer sin
 -- gluten en Montevideo?», sesión celiac-test-deploy-v28-20261120). Línea base antes del turno (22:28:00 UTC): 0 filas
 -- chatbot en agent_log, chat_usage vacía, 2 suggestions, 2 place_reports. Cada delete tiene guarda: si el conteo no es
@@ -35,4 +37,4 @@ begin
   end if;
 end $$;
 
-rollback;
+commit;

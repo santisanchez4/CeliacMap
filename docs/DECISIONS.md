@@ -5226,13 +5226,22 @@ cada uno ensayado con ROLLBACK, aplicado con COMMIT tras el «dale» y verificad
   verificados.
 - **`chat` v28** desplegado desde `main` (`319253d`, PR #61): `verify_jwt=false`; `index.ts`, `prompts.ts` y `regions.ts`
   descargados idénticos a `main`; un turno real de búsqueda devolvió 8 lugares y el `scope_note`.
-  Registro: `db/checks/2026-11-20-chat-v28-deploy.md`.
+  Registro: `db/checks/2026-11-20-chat-v28-deploy.md`. El turno de prueba se limpió con «dale» (vuelta a la línea base).
 - **Metodología v2.0** (`docs/metodologia/`, `.md` + `.pdf`) reemplaza a la v1.0 con estos números y las reglas del 100% y del
   texto público. **Avena, verificada en el texto oficial:** el art. 1383 del CAA (Resolución Conjunta 32/2023, B.O. 01/12/2023)
   define el alimento libre de gluten sin prolaminas ni glutelinas de trigo, centeno, cebada ni avena, sin excepción para la
   avena certificada; la Guía de ANMAT (2023) dice que alrededor del 95% de las personas celíacas serían tolerantes a la avena
   pero que daña al resto, recomienda evitarla o, si se usa, verificarla en el Listado Integrado e indicar «Plato elaborado con
   avena». El documento le pregunta a la Asociación si un lugar con avena certificada puede llevar el 100% y cómo avisarlo.
+- **Correcciones a la v2.0 antes de enviarla** (mismo día, después del merge del #62):
+  - Sección 13: las normas de gastronomía se verificaron en el texto oficial (argentina.gob.ar / Boletín Oficial). El art. 4°
+    bis de la Ley 26.588, incorporado por la Ley 27.196, enumera a quiénes obliga, entre ellos restaurantes y bares y
+    comida rápida. El Decreto 218/2023 exige elaboradores habilitados, buenas prácticas de manipulación, Carnet de
+    Manipulación de Alimentos, capacitación y la Guía, que elabora la ANMAT por el INAL.
+  - Sección 6: los 58 re-validados salieron porque ya no quedaba guardada una mención escrita. 25 se habían apoyado en
+    reseñas que se borran a los 30 días y 33 solo en el rubro.
+  - Sección 3: 16 de los 58 en 100% todavía sin cita guardada.
+  - Sección 10: la prueba automática cubre el texto del sitio, no el del asistente.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
