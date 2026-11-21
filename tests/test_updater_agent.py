@@ -227,27 +227,91 @@ def test_patch_skips_unchanged_rich_fields():
 # --- No-op when nothing changed -------------------------------------------
 
 
-# --- places.region follows the address in the same patch -------------------------
+# --- city / country / region are never rewritten (2026-11-20): a difference is logged ---------
 
 MELO_ADDRESS = "Dr. Luis Alberto de Herrera 859, 37000 Melo, Departamento de Cerro Largo, Uruguay"
 
 
-def test_patch_recomputes_the_region_when_the_address_moves_to_another_department():
+def test_a_move_to_another_department_updates_the_address_but_never_the_region():
     agent, _, _ = make_agent()
     place = {"name": "Same", "address": "Av. Italia 1, Montevideo, Departamento de Montevideo, Uruguay",
              "region": "Montevideo", "category": "restaurant"}
     result = {"name": "Same", "formatted_address": "Av. Giannattasio 1, 15800 Ciudad de la Costa, Departamento de Canelones, Uruguay",
               "types": ["restaurant"]}
     patch = agent._build_patch(place, result)
-    assert patch["address"] == result["formatted_address"]
-    assert patch["region"] == "Canelones"
+    assert patch == {"address": result["formatted_address"]}
+    assert agent._location_differences(place, result) == {"region": {"fila": "Montevideo", "google": "Canelones"}}
 
 
-def test_patch_fills_a_missing_region_even_when_nothing_else_changed():
+def test_a_region_google_names_differently_is_reported_not_written():
     agent, _, _ = make_agent()
     place = {"name": "Same", "address": MELO_ADDRESS, "region": None, "category": "restaurant"}
     result = {"name": "Same", "formatted_address": MELO_ADDRESS, "types": ["restaurant"]}
-    assert agent._build_patch(place, result) == {"region": "Cerro Largo"}
+    assert agent._build_patch(place, result) == {}
+    assert agent._location_differences(place, result) == {"region": {"fila": None, "google": "Cerro Largo"}}
+
+
+SAN_ISIDRO = {
+    "id": "3efed1b0-2161-4a0a-89a2-c5440ff94dc9", "name": "La Union Bakery Gluten Free San Isidro",
+    "source": "google_places", "external_id": "ChIJseuPewCxvJUR1quRu6i4gII", "category": "cafe",
+    "address": "25 de Mayo 12, B1642 Buenos Aires, Provincia de Buenos Aires, Argentina",
+    "city": "San Isidro", "region": "Buenos Aires", "country": "Argentina",
+}
+SAN_ISIDRO_GOOGLE = {
+    "name": SAN_ISIDRO["name"], "formatted_address": SAN_ISIDRO["address"], "types": ["cafe"],
+    "address_components": [
+        {"long_name": "Buenos Aires", "types": ["locality", "political"]},
+        {"long_name": "Provincia de Buenos Aires", "types": ["administrative_area_level_1", "political"]},
+        {"long_name": "Argentina", "types": ["country", "political"]},
+    ],
+}
+
+
+def test_san_isidro_keeps_its_city_when_google_says_buenos_aires_and_the_difference_is_logged():
+    # The Updater wrote 'Buenos Aires' back over the 2026-09-27 correction on 2026-10-01 (agent_log changes.city).
+    agent, db, places = make_agent()
+    db.fetch_places_by_status.return_value = [dict(SAN_ISIDRO)]
+    places.place_details.return_value = {"status": "OK", "result": SAN_ISIDRO_GOOGLE}
+
+    summary = agent.run()
+
+    db.update_place.assert_not_called()
+    assert summary["location_mismatches"] == 1 and summary["updated"] == 0
+    logged = [c for c in db.insert_agent_log.call_args_list if "location_mismatch" in c.args + tuple(c.kwargs.values())]
+    assert len(logged) == 1
+    payload = next(a for a in logged[0].args + tuple(logged[0].kwargs.values()) if isinstance(a, dict))
+    assert payload["differences"] == {"city": {"fila": "San Isidro", "google": "Buenos Aires"}}
+    assert payload["name"] == SAN_ISIDRO["name"]
+
+
+def test_other_changes_still_apply_while_the_location_difference_is_only_logged():
+    agent, db, places = make_agent()
+    db.fetch_places_by_status.return_value = [dict(SAN_ISIDRO)]
+    places.place_details.return_value = {"status": "OK", "result": {**SAN_ISIDRO_GOOGLE, "formatted_phone_number": "011 1234"}}
+    agent.run()
+    place_id, patch = db.update_place.call_args.args
+    assert place_id == SAN_ISIDRO["id"] and patch == {"phone": "011 1234"}
+
+
+@pytest.mark.parametrize("google_city", ["Buenos Aires", "Ciudad Autónoma de Buenos Aires", "CABA"])
+def test_cabas_other_names_in_google_are_not_a_difference(google_city):
+    agent, _, _ = make_agent()
+    place = {"name": "X", "address": "Arenales 3770, C1425 Cdad. Autónoma de Buenos Aires, Argentina", "category": "cafe",
+             "city": "Buenos Aires", "region": "Ciudad Autónoma de Buenos Aires", "country": "Argentina"}
+    result = {"name": "X", "formatted_address": place["address"], "types": ["cafe"],
+              "address_components": [{"long_name": google_city, "types": ["locality"]},
+                                     {"long_name": "Argentina", "types": ["country"]}]}
+    assert agent._build_patch(place, result) == {}
+    assert agent._location_differences(place, result) == {}
+
+
+def test_accents_and_case_are_not_a_difference():
+    agent, _, _ = make_agent()
+    place = {"name": "X", "address": "A 1", "category": "cafe", "city": "paysandu", "country": "uruguay"}
+    result = {"name": "X", "formatted_address": "A 1", "types": ["cafe"],
+              "address_components": [{"long_name": "Paysandú", "types": ["locality"]},
+                                     {"long_name": "Uruguay", "types": ["country"]}]}
+    assert agent._location_differences(place, result) == {}
 
 
 def test_patch_keeps_the_stored_region_when_the_new_address_names_none():
