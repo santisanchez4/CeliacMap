@@ -5391,8 +5391,8 @@ Cambios en `RESPONDER_PROMPT` (y en `index.ts` / `barrios.ts` para lo que necesi
 - El detector de cercanos tenía un error (una línea en blanco antes de la lista) que lo hacía dar 2/16; se corrigió y lo
   fija un test.
 
-Pendiente: deploy con «dale» y la batería de jailbreak contra la función desplegada. Este cambio de prompt reinicia el
-conteo del soft-launch. Quedan para cuando responda la ACA: el nombre de la etiqueta del 100% y la mención de la ACA.
+**Desplegado el 2026-11-21 como `chat` v30** (`db/checks/2026-11-21-chat-v30-deploy.md`): la batería de jailbreak dio 37/37,
+0 rupturas, y la limpieza volvió a la línea base. Este cambio de prompt reinicia el conteo del soft-launch. Quedan para cuando responda la ACA: el nombre de la etiqueta del 100% y la mención de la ACA.
 
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
