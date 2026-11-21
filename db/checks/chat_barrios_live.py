@@ -30,8 +30,8 @@ TURNS = [
 ]
 
 
-def chat(message: str) -> dict:
-    body = {"messages": [{"role": "user", "content": message}], "session_token": SESSION, "pending_submission": None}
+def chat(message: str, session: str = SESSION) -> dict:
+    body = {"messages": [{"role": "user", "content": message}], "session_token": session, "pending_submission": None}
     req = urllib.request.Request(BASE + "/functions/v1/chat", data=json.dumps(body).encode(), headers={
         "apikey": KEY, "Authorization": "Bearer " + KEY, "Content-Type": "application/json", "Origin": "https://celiacmap.org"})
     with urllib.request.urlopen(req, timeout=90) as response:
@@ -41,13 +41,15 @@ def chat(message: str) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out")
+    ap.add_argument("--session", default=SESSION, help="fixed session token (the cleanup targets it)")
+    ap.add_argument("--message", action="append", help="send these messages instead of the default five")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     started = datetime.now(timezone.utc).isoformat()
     results = []
-    for message in TURNS:
+    for message in args.message or TURNS:
         try:
-            response = chat(message)
+            response = chat(message, args.session)
         except Exception as exc:  # noqa: BLE001 — report, never retry
             response = {"error": str(exc)}
         results.append({"message": message, "response": response})
@@ -56,7 +58,7 @@ def main() -> int:
     finished = datetime.now(timezone.utc).isoformat()
     print(f"\nwindow: {started} .. {finished}")
     if args.out:
-        Path(args.out).write_text(json.dumps({"session": SESSION, "started": started, "finished": finished,
+        Path(args.out).write_text(json.dumps({"session": args.session, "started": started, "finished": finished,
                                               "results": results}, ensure_ascii=False, indent=2), encoding="utf-8")
     return 0
 

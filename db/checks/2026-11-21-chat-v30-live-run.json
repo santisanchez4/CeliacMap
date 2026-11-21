@@ -1,0 +1,58 @@
+{
+  "session": "celiac-test-tanda-v30-20261121",
+  "started": "2026-11-21T20:49:47.247213+00:00",
+  "finished": "2026-11-21T20:49:57.832793+00:00",
+  "results": [
+    {
+      "message": "dime un lugar para cenar en Ciudad Vieja Montevideo",
+      "response": {
+        "reply": "En Ciudad Vieja encontré en el mapa:\n\n• Dalbertt — restaurante, Espacio 100% sin gluten\n\nCerca, en otros barrios de Montevideo:\n• Los Leños — restaurante, Espacio 100% sin gluten (Centro)\n• Mi Cocina Sin Gluten — restaurante, Espacio 100% sin gluten (Centro)\n• Me Gusta — restaurante, Espacio 100% sin gluten (Cordón)\n\n¿Querés más detalles de alguno o que busque en otra zona?",
+        "pending_submission": null,
+        "action": null,
+        "rate_limited": false,
+        "places": [
+          {
+            "id": "c6f1620c-8d9f-4c78-b187-4a6ad0b99e04",
+            "name": "Dalbertt",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "1079510f-a973-49a8-8efa-185d511dc647",
+            "name": "Los Leños",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "b9c3ca7a-d5c1-446b-8aa3-7950b06cbfac",
+            "name": "Mi Cocina Sin Gluten",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "dbc2db5e-3078-44a3-9e03-f0cbcf19d07d",
+            "name": "Me Gusta",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          }
+        ],
+        "scope_note": "Las etiquetas salen de lo que declara cada local o cuentan sus clientes. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar."
+      }
+    },
+    {
+      "message": "algo sin gluten en Malvín Alto",
+      "response": {
+        "reply": "No puedo filtrar por Malvín Alto porque no tengo sus límites. En Montevideo hay 51 lugares en el mapa: ¿querés que te muestre algunos, o preferís otro barrio que conozca mejor?",
+        "pending_submission": null,
+        "action": null,
+        "rate_limited": false,
+        "places": [],
+        "scope_note": null
+      }
+    }
+  ]
+}
