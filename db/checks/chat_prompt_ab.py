@@ -152,8 +152,13 @@ def nearby_misattributed(reply: str, rows: list[dict]) -> tuple[int, int]:
         idx = next((i for i, ln in enumerate(lines) if row["name"].lower() in ln.lower()), None)
         if idx is None:
             continue
-        header = next((lines[j] for j in range(idx, -1, -1) if not lines[j].lstrip().startswith("•") or j == idx and
-                       re.search(r"cerca|" + re.escape(row["barrio"]), lines[j], re.I)), "")
+        # The nearest line above that introduces the list: blank lines and other bullets are skipped (a blank line
+        # between the header and the list hid «Cerca, en Palermo:» from the first version of this detector).
+        if re.search(r"cerca|" + re.escape(row["barrio"]), lines[idx], re.I):
+            header = lines[idx]
+        else:
+            header = next((lines[j] for j in range(idx - 1, -1, -1)
+                           if lines[j].strip() and not lines[j].lstrip().startswith("•")), "")
         scope = lines[idx] + " " + header
         if re.search(r"cerca|" + re.escape(row["barrio"]), scope, re.I):
             ok += 1
@@ -201,12 +206,14 @@ def main() -> None:
     ap.add_argument("--only-new", action="store_true", help="skip the OLD prompt (cheaper)")
     ap.add_argument("--max-calls", type=int, required=True, help="hard cap on paid calls (the run aborts before exceeding it)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and the estimated cost; make no call")
+    ap.add_argument("--only-cells", nargs="+", help="tanda: run only these cells (e.g. solo_cerca)")
+    ap.add_argument("--out", help="tanda: write every raw reply to this JSON file, to read the cases")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     arms = 1 if args.only_new else 2
     plan = {"f4": len(F4_MESSAGES) * arms * args.n, "legit": len(LEGIT_QUESTIONS) * args.legit_n,
             "labels": len(LABEL_MESSAGES) * arms * args.n, "router": len(ROUTER_THANKS) * arms * args.n,
-            "tanda": len(TANDA_CELLS) * arms * args.n}
+            "tanda": sum(1 for c in TANDA_CELLS if not args.only_cells or c[0] in args.only_cells) * arms * args.n}
     planned = sum(plan[s] for s in args.suite)
     print(f"PLAN: {', '.join(f'{s} {plan[s]}' for s in args.suite)} = {planned} call(s) to {MODEL}, "
           f"~US${planned * 0.005:.2f}; hard cap {args.max_calls}")
@@ -319,7 +326,10 @@ def main() -> None:
 
     if "tanda" in args.suite:
         print(f"\n=== tanda: 2026-11-21 batch, N={args.n} per cell ===")
+        raw: dict[str, dict[str, list[str]]] = {}
         for key, text, extra, rows, cercanos, modulo in TANDA_CELLS:
+            if args.only_cells and key not in args.only_cells:
+                continue
             parts = [f"modulo: {modulo}", *extra]
             if rows is not None:
                 parts.append("<datos>" + json.dumps(rows, ensure_ascii=False) + "</datos>")
@@ -330,6 +340,7 @@ def main() -> None:
             names = [r["name"] for r in rows or []]
             for tag, P in variants:
                 outs = many(lambda: call(P["RESPONDER_PROMPT"], msg, 700), args.n)
+                raw.setdefault(key, {})[tag] = outs
                 c = collections.Counter()
                 example = None
                 for o in outs:
@@ -352,6 +363,9 @@ def main() -> None:
                 print(f"[{key:11s} {tag}] " + " | ".join(f"{k} {v}/{args.n}" for k, v in c.items()))
                 if tag == "NEW" and example:
                     print("     e.g.:", example)
+        if args.out:
+            Path(args.out).write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"raw replies: {args.out}")
 
     if "router" in args.suite:
         n = args.n

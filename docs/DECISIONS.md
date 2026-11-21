@@ -5354,6 +5354,40 @@ localidad de Google no siempre es el pueblo:
 **Tests:** San Isidro se mantiene aunque Google diga «Buenos Aires», la diferencia queda registrada y los otros cambios se
 aplican igual; los nombres de CABA no son diferencia; el resumen lista cada diferencia.
 
+### Chat: tanda de prompts sin «confirmados», con el barrio de cada lugar cercano (2026-11-21)
+
+Cambios en `RESPONDER_PROMPT` (y en `index.ts` / `barrios.ts` para lo que necesita datos):
+
+1. «Confirmados», «verificados» y «base verificada» salen de los ejemplos y las instrucciones. Una regla nueva prohíbe
+   decir que un lugar está «confirmado», «verificado», «validado» o «garantizado»: está en el mapa de CeliacMap.
+2. Al listar, nunca «sin gluten» a secas: cada lugar lleva una de las dos etiquetas.
+3. Lugares cercanos:
+   - Con menos de 3 lugares dentro del barrio (`FEW_INSIDE`), siguen en `<datos>` los más cercanos a ≤ 1,5 km, cada uno
+     con su propio `barrio`. El mensaje trae `barrio_pedido`.
+   - Línea nueva: «si el barrio de un lugar es otro, decí que está cerca, en su barrio, y nunca que está en el barrio
+     pedido».
+   - Reemplaza el conteo por barrio en `<datos_cercanos>`, que dejaba sin respuesta el «¿cuáles?».
+4. Zona sin polígono que no encontró nada:
+   - El mensaje trae `zona_sin_limites`, con el texto de la persona entre comillas JSON y hasta 60 caracteres, para que
+     no pueda leerse como una línea de control.
+   - El redactor dice que no puede filtrar por esa zona y ofrece los lugares de la ciudad, o pregunta la ciudad.
+5. ACA: `asociacionceliaca.org.ar` en `<fuentes>` y en los dos ejemplos.
+6. El ejemplo de Bienestar ya se había reemplazado el 2026-11-18 («Horno del Sur»): no quedaba nada.
+
+**Medición** (`db/checks/2026-11-21-chat-tanda-ab.md`, 272 llamadas, ~US$1,36, sin escrituras en producción):
+
+- Respecto de `main`, «confirmado/verificado» baja de 7–8/8 a 0/8 y «sin gluten» a secas de 5/8 a 0.
+- Cercanos con su barrio: 16/16 en las dos celdas, y 0 presentados como si estuvieran adentro.
+- Zona sin polígono: «no puedo filtrar» 8/8 en las dos celdas, contra 0/8 en `main` (que decía «no hay» 8/8). Con ciudad
+  ofrece Montevideo 8/8; sin ciudad pregunta la ciudad 8/8.
+- ACA con el dominio nuevo: 8/8.
+- labels, f4, router y legit, sin regresiones.
+- El detector de cercanos tenía un error (una línea en blanco antes de la lista) que lo hacía dar 2/16; se corrigió y lo
+  fija un test.
+
+Pendiente: deploy con «dale» y la batería de jailbreak contra la función desplegada. Este cambio de prompt reinicia el
+conteo del soft-launch. Quedan para cuando responda la ACA: el nombre de la etiqueta del 100% y la mención de la ACA.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
