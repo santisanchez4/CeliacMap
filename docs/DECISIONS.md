@@ -5316,6 +5316,12 @@ Gluten Free Belgrano» y «La Unión Belgrano» (Av. Lacroze) están en el Paler
   `CORRECCIÓN MANUAL … ciudad corregida`, `manual_override_marker` → None). El Updater la puede volver a pisar el 1 de
   diciembre mientras no se arregle lo anterior.
 
+**Hecho el 2026-11-21:**
+
+- Ciudad corregida en 10 filas, después del PR #65: Kanu → «Vicente López»; 6 de CABA → «Buenos Aires»; 3 de Montevideo
+  con «Uruguay» → «Montevideo» (`db/fixes/2026-11-20-ciudades-pisadas-por-updater.sql`; marcadores sin cambios).
+- `chat` v29 desplegado, con 5 turnos en vivo y la limpieza de vuelta a la línea base (`db/checks/2026-11-21-chat-v29-deploy.md`).
+
 **Tanda de prompts pendiente** (después de este PR, sin esperar a la ACA; A/B contra el modelo real, batería de jailbreak y
 cada deploy con «dale»):
 
