@@ -1,3 +1,6 @@
+-- APLICADO en producción el 2026-11-21 (ensayo con ROLLBACK dos veces, después esta versión con COMMIT y verificación de
+-- solo lectura): 10 filas; manual_override_marker de cada una igual antes y después; quedan 0 filas con esas ciudades.
+-- Registro de auditoría: no se vuelve a correr (su guarda de entrada fallaría con el estado actual).
 -- 2026-11-20 · city de 10 lugares (7 aprobados + 3 no publicados) con la localidad de Google en vez del pueblo.
 -- Decisión del administrador (2026-11-20), después del PR que impide que el Updater vuelva a escribir city / country /
 -- region (docs/DECISIONS.md, «El Updater no reescribe ciudad, país ni región»):
@@ -51,7 +54,7 @@ begin
   update public.places p
      set city = f.new_city,
          validation_notes = concat_ws(E'\n\n',
-           'CORRECCIÓN MANUAL 2026-11-20: ciudad corregida de «' || f.old_city || '» a «' || f.new_city
+           'CORRECCIÓN MANUAL 2026-11-21: ciudad corregida de «' || f.old_city || '» a «' || f.new_city
              || '» (la había escrito el Updater desde la localidad de Google)',
            nullif(p.validation_notes, ''))
     from _fix f
@@ -88,4 +91,4 @@ end $$;
 select p.id, p.name, s.city as antes, p.city as despues, s.validation_notes as notas_antes, p.validation_notes as notas_despues
   from public.places p join _snap s using (id) join _fix f using (id) order by p.name;
 
-rollback;
+commit;
