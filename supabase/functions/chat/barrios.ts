@@ -307,16 +307,20 @@ export function kmToBarrio(target: BarrioTarget, lat: unknown, lng: unknown): nu
 
 // "Sumar los más cercanos": a place outside the barrio counts as nearby within this distance of its edge.
 export const NEARBY_KM = 1.5;
+// Fewer places than this inside the barrio: the nearest ones are listed after them, each with its own barrio.
+export const FEW_INSIDE = 3;
 
 export interface BarrioSplit<T> {
   inside: T[]; // in the barrio, in the order given, each with `barrio`
-  nearby: { barrio: string; count: number }[]; // the others within NEARBY_KM, grouped by their own barrio
+  nearbyRows: T[]; // the others within NEARBY_KM, nearest first, each with its OWN `barrio`
+  nearby: { barrio: string; count: number }[]; // the same, grouped by their own barrio
   nearbyTotal: number;
 }
 
 /** Split a city's rows (already filtered by category / level, in database order) by the target barrio. */
 export function splitByBarrio<T extends Record<string, unknown>>(rows: T[], target: BarrioTarget): BarrioSplit<T & { barrio: string | null }> {
   const inside: (T & { barrio: string | null })[] = [];
+  const nearRows: { row: T & { barrio: string | null }; km: number }[] = [];
   const near = new Map<string, { count: number; km: number }>();
   let nearbyTotal = 0;
   for (const row of rows) {
@@ -329,6 +333,7 @@ export function splitByBarrio<T extends Record<string, unknown>>(rows: T[], targ
     const km = kmToBarrio(target, row.lat, row.lng);
     if (barrio && km <= NEARBY_KM) {
       nearbyTotal++;
+      nearRows.push({ row: { ...row, barrio }, km });
       const prev = near.get(barrio);
       near.set(barrio, { count: (prev?.count ?? 0) + 1, km: Math.min(prev?.km ?? Infinity, km) });
     }
@@ -336,5 +341,6 @@ export function splitByBarrio<T extends Record<string, unknown>>(rows: T[], targ
   const nearby = [...near.entries()]
     .sort((a, b) => b[1].count - a[1].count || a[1].km - b[1].km)
     .map(([barrio, v]) => ({ barrio, count: v.count }));
-  return { inside, nearby, nearbyTotal };
+  const nearbyRows = nearRows.sort((a, b) => a.km - b.km).map((n) => n.row);
+  return { inside, nearbyRows, nearby, nearbyTotal };
 }

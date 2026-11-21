@@ -24,6 +24,10 @@ Suites
           "Tiene opciones sin TACC" for celiac_friendly and options_available), or does it label
           celiac_friendly more permissively / with its own words?
 
+  tanda   the 2026-11-21 batch (buscar + one celiaquia cell): «confirmado/verificado» words, «sin gluten» a secas
+          outside the two labels, places near a barrio named with their own barrio (never as inside it), a zona with
+          no polygon («no puedo filtrar», never «no hay lugares»), and the ACA domain.
+
 Gate for a prompt edit (Fase E, Option 1): NEW must beat OLD on figure AND urgency with N >= 16,
 and `legit` must show no new false positives.
 
@@ -91,6 +95,72 @@ LABEL_RE = {
 }
 
 
+# --- suite "tanda" (2026-11-21). Fictional places, shaped like <datos> rows (+ the computed `barrio`).
+def _row(name, category, level, barrio=None, city="Buenos Aires", country="Argentina"):
+    row = {"name": name, "address": f"{name.split()[0]} 1000", "city": city, "country": country, "category": category,
+           "safety_level": level, "rating": 4.5, "user_ratings_total": 80, "opening_hours": None, "website": None,
+           "phone": None, "lat": -34.58, "lng": -58.43, "vote_count": 2}
+    if barrio:
+        row["barrio"] = barrio
+    return row
+
+
+TANDA_CELLS = [
+    # (key, user message, extra lines, datos rows or None, datos_cercanos or None, modulo)
+    ("lista", "lugares sin gluten en Palermo", [], [
+        _row("Casa Aromo", "restaurant", "gluten_free_100", "Palermo"),
+        _row("Café Plaza Serrano", "cafe", "celiac_friendly", "Palermo"),
+        _row("Almacén Gorriti", "shop", "options_available", "Palermo")], None, "buscar"),
+    ("mezcla", "un lugar para comer en Belgrano", ["barrio_pedido: Belgrano"], [
+        _row("Pastelería Juramento", "cafe", "options_available", "Belgrano"),
+        _row("Cantina Lacroze", "restaurant", "gluten_free_100", "Palermo"),
+        _row("Bodegón Federico", "restaurant", "options_available", "Colegiales")], None, "buscar"),
+    ("solo_cerca", "un restaurante en Belgrano", ["barrio_pedido: Belgrano"], [
+        _row("Cantina Lacroze", "restaurant", "gluten_free_100", "Palermo"),
+        _row("Parrilla Báez", "restaurant", "options_available", "Palermo")], None, "buscar"),
+    ("sin_limites", "algo sin gluten en Malvín Alto, Montevideo", ['zona_sin_limites: "Malvín Alto"'], [],
+     {"city": "Montevideo", "count": 9}, "buscar"),
+    ("sin_ciudad", "algo sin gluten en Las Cañitas", ['zona_sin_limites: "Las Cañitas"'], [], None, "buscar"),
+    ("aca", "¿qué asociaciones de celíacos hay en Argentina?", [], None, None, "celiaquia"),
+]
+TANDA_PEDIDO = "belgrano"
+TANDA_RE = {
+    "confirm": r"confirmad|verificad|validad|garantizad",
+    "cant_filter": r"no (puedo|podr[ée]|tengo c[oó]mo) (filtrar|buscar por|delimitar)|no tengo (los |sus )?l[ií]mites",
+    "claims_none": r"no (hay|encontr\w+|tengo) (ning[uú]n |lugares|coincidencias|nada)",
+    "asks_city": r"(qu[eé]|cu[aá]l) ciudad|ciudad[^.?!]*\?",
+}
+LABEL_STRINGS = r"espacio 100\s*% sin gluten|tiene opciones sin gluten|100\s*% sin gluten"
+
+
+def bare_sin_gluten(reply: str, names: list[str]) -> bool:
+    """«sin gluten» describing places outside the two labels (an invitation to contribute does not count)."""
+    text = re.sub(LABEL_STRINGS, "", reply, flags=re.I)
+    for n in names:
+        text = text.replace(n, "")
+    sentences = [s for s in re.split(r"(?<=[.!?:])\s+|\n+", text) if not re.search(r"conoc|cont[aá]me|sum", s, re.I)]
+    return any(re.search(r"sin gluten", s, re.I) for s in sentences)
+
+
+def nearby_misattributed(reply: str, rows: list[dict]) -> tuple[int, int]:
+    """(near places named with their own barrio or «cerca», near places presented as inside the barrio asked for)."""
+    lines = reply.split("\n")
+    ok = bad = 0
+    for row in rows:
+        if row.get("barrio", "").lower() == TANDA_PEDIDO:
+            continue
+        idx = next((i for i, ln in enumerate(lines) if row["name"].lower() in ln.lower()), None)
+        if idx is None:
+            continue
+        header = next((lines[j] for j in range(idx, -1, -1) if not lines[j].lstrip().startswith("•") or j == idx and
+                       re.search(r"cerca|" + re.escape(row["barrio"]), lines[j], re.I)), "")
+        scope = lines[idx] + " " + header
+        if re.search(r"cerca|" + re.escape(row["barrio"]), scope, re.I):
+            ok += 1
+        elif re.search(TANDA_PEDIDO, header, re.I):
+            bad += 1
+    return ok, bad
+
 def load_prompts(rev: str) -> dict[str, str]:
     if rev == "WORKTREE":
         src = (ROOT / PROMPTS_TS).read_text(encoding="utf-8")
@@ -123,7 +193,7 @@ def sentence_with(text: str, pattern: str) -> str | None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--suite", nargs="+", choices=["f4", "legit", "router", "labels"], default=["f4"])
+    ap.add_argument("--suite", nargs="+", choices=["f4", "legit", "router", "labels", "tanda"], default=["f4"])
     ap.add_argument("--old-rev", default="HEAD", help="baseline prompts (a git rev). Default: HEAD (= what is deployed)")
     ap.add_argument("--new-rev", default="WORKTREE", help="candidate prompts: a git rev or WORKTREE (file on disk)")
     ap.add_argument("--n", type=int, default=16, help="samples per cell for f4/router (default 16)")
@@ -135,7 +205,8 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     arms = 1 if args.only_new else 2
     plan = {"f4": len(F4_MESSAGES) * arms * args.n, "legit": len(LEGIT_QUESTIONS) * args.legit_n,
-            "labels": len(LABEL_MESSAGES) * arms * args.n, "router": len(ROUTER_THANKS) * arms * args.n}
+            "labels": len(LABEL_MESSAGES) * arms * args.n, "router": len(ROUTER_THANKS) * arms * args.n,
+            "tanda": len(TANDA_CELLS) * arms * args.n}
     planned = sum(plan[s] for s in args.suite)
     print(f"PLAN: {', '.join(f'{s} {plan[s]}' for s in args.suite)} = {planned} call(s) to {MODEL}, "
           f"~US${planned * 0.005:.2f}; hard cap {args.max_calls}")
@@ -245,6 +316,42 @@ def main() -> None:
                           f"not listed: {c['not listed']} | ES label in EN reply: {c['es label in en']} | old label: {c['old label']}")
                     if level in wrong and tag == "NEW":
                         print("     wrong:", wrong[level])
+
+    if "tanda" in args.suite:
+        print(f"\n=== tanda: 2026-11-21 batch, N={args.n} per cell ===")
+        for key, text, extra, rows, cercanos, modulo in TANDA_CELLS:
+            parts = [f"modulo: {modulo}", *extra]
+            if rows is not None:
+                parts.append("<datos>" + json.dumps(rows, ensure_ascii=False) + "</datos>")
+            if cercanos:
+                parts.append("<datos_cercanos>" + json.dumps(cercanos, ensure_ascii=False) + "</datos_cercanos>")
+            parts.append(f"Mensaje del usuario: {text}")
+            msg = "\n".join(parts)
+            names = [r["name"] for r in rows or []]
+            for tag, P in variants:
+                outs = many(lambda: call(P["RESPONDER_PROMPT"], msg, 700), args.n)
+                c = collections.Counter()
+                example = None
+                for o in outs:
+                    c["confirm"] += bool(re.search(TANDA_RE["confirm"], o, re.I))
+                    c["bare sin gluten"] += bool(rows) and bare_sin_gluten(o, names)
+                    if key in ("mezcla", "solo_cerca"):
+                        good, bad = nearby_misattributed(o, rows)
+                        c["near ok"] += good
+                        c["near as inside"] += bad
+                    if key.startswith("sin_"):
+                        c["cant filter"] += bool(re.search(TANDA_RE["cant_filter"], o, re.I))
+                        c["claims none"] += bool(re.search(TANDA_RE["claims_none"], o, re.I))
+                        c["offers Montevideo"] += bool(re.search(r"montevideo", o, re.I))
+                        c["asks city"] += bool(re.search(TANDA_RE["asks_city"], o, re.I))
+                    if key == "aca":
+                        c["new domain"] += "asociacionceliaca.org.ar" in o
+                        c["old domain"] += bool(re.search(r"(?<!asociacion)celiaco\.org\.ar", o))
+                    if example is None and (c["confirm"] or c["near as inside"] or c["claims none"]):
+                        example = o.replace("\n", " / ")[:220]
+                print(f"[{key:11s} {tag}] " + " | ".join(f"{k} {v}/{args.n}" for k, v in c.items()))
+                if tag == "NEW" and example:
+                    print("     e.g.:", example)
 
     if "router" in args.suite:
         n = args.n
