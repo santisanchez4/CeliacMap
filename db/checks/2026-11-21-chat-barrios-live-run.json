@@ -1,0 +1,177 @@
+{
+  "session": "celiac-test-barrios-v29-20261121",
+  "started": "2026-11-21T20:01:32.310260+00:00",
+  "finished": "2026-11-21T20:01:55.475411+00:00",
+  "results": [
+    {
+      "message": "dime un lugar para cenar en Ciudad Vieja Montevideo",
+      "response": {
+        "reply": "En Ciudad Vieja, Montevideo, tengo confirmado:\n\n• Dalbertt — Mercedes 799, restaurante, Espacio 100% sin gluten\n\n¿Te interesa o querés que busque en otra zona?",
+        "pending_submission": null,
+        "action": null,
+        "rate_limited": false,
+        "places": [
+          {
+            "id": "c6f1620c-8d9f-4c78-b187-4a6ad0b99e04",
+            "name": "Dalbertt",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          }
+        ],
+        "scope_note": "Las etiquetas salen de lo que declara cada local o cuentan sus clientes. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar."
+      }
+    },
+    {
+      "message": "lugares sin gluten en Pocitos",
+      "response": {
+        "reply": "En Pocitos la comunidad tiene confirmados:\n\n• Bicoque Gluten free — restaurante, Espacio 100% sin gluten\n• Delirio Sin Gluten — restaurante, Espacio 100% sin gluten\n• Mi cocina sin gluten — restaurante, Espacio 100% sin gluten\n• Pecorino - apto Celiacos — restaurante, Tiene opciones sin gluten\n• La Commedia — restaurante, Tiene opciones sin gluten\n• Local Celíacos — comercio, Espacio 100% sin gluten\n• HARTA CAFÉ — café, Tiene opciones sin gluten\n• La Cabrona MVD — restaurante, Tiene opciones sin gluten\n\n¿Querés que filtre por tipo de lugar?",
+        "pending_submission": null,
+        "action": null,
+        "rate_limited": false,
+        "places": [
+          {
+            "id": "b0964424-1ffe-42b5-9bff-291243f63d34",
+            "name": "Bicoque Gluten free",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "7af0d1a1-5603-454a-a578-7b7bc05c8423",
+            "name": "Delirio Sin Gluten",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "3209554b-892d-4a25-b3f6-f411c35ac1fe",
+            "name": "Pecorino - apto Celiacos",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "celiac_friendly"
+          },
+          {
+            "id": "7363c257-9596-4aa1-a329-29d994d2eb65",
+            "name": "La Commedia",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "celiac_friendly"
+          },
+          {
+            "id": "35a06724-56e8-4dc1-a879-3c388eb79fdb",
+            "name": "Mi cocina sin gluten",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "540a4b24-6c3e-482a-b35e-f32a7cb5f050",
+            "name": "Local Celíacos",
+            "city": "Montevideo",
+            "category": "shop",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "53f8304a-537b-40e6-999b-ac6e4da0fb2c",
+            "name": "HARTA CAFÉ",
+            "city": "Montevideo",
+            "category": "cafe",
+            "safety_level": "options_available"
+          },
+          {
+            "id": "f704a851-fb69-4628-8167-77be84103c20",
+            "name": "La Cabrona MVD",
+            "city": "Montevideo",
+            "category": "restaurant",
+            "safety_level": "options_available"
+          }
+        ],
+        "scope_note": "Las etiquetas salen de lo que declara cada local o cuentan sus clientes. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar."
+      }
+    },
+    {
+      "message": "dónde comer en Palermo, Buenos Aires",
+      "response": {
+        "reply": "En Palermo tenés varias opciones confirmadas:\n\n• GOUT GLUTEN FREE BELGRANO — restaurante, Espacio 100% sin gluten (Av. Federico Lacroze 2117)\n• Alfin Pizzas Sin Gluten — restaurante, Tiene opciones sin gluten (Gorriti 4015)\n• Donato (sin tacc) — restaurante, Tiene opciones sin gluten (Arévalo 1538)\n• Il Mandorla Smokehouse Restaurante 100% Gluten Free — restaurante, Tiene opciones sin gluten (Gascón 1172)\n• Zero Gluten — restaurante, Tiene opciones sin gluten (Arenales 3770)\n• Celigourmet — restaurante, Tiene opciones sin gluten (Thames 1633)\n• TACCOUT — restaurante, Tiene opciones sin gluten (Baez 283)\n\n¿Querés que filtre por tipo de comida o que busque en otra zona?",
+        "pending_submission": null,
+        "action": null,
+        "rate_limited": false,
+        "places": [
+          {
+            "id": "4e944968-e0e5-49a7-9ca3-efef2de22971",
+            "name": "Alfin Pizzas Sin Gluten",
+            "city": "Buenos Aires",
+            "category": "restaurant",
+            "safety_level": "options_available"
+          },
+          {
+            "id": "7222df03-c6ab-4c7c-8b87-a86750ce92cd",
+            "name": "Donato (sin tacc)",
+            "city": "Buenos Aires",
+            "category": "restaurant",
+            "safety_level": "options_available"
+          },
+          {
+            "id": "db1ee747-427c-48e2-af89-78b4d8cd101f",
+            "name": "Il Mandorla Smokehouse Restaurante 100% Gluten Free",
+            "city": "Buenos Aires",
+            "category": "restaurant",
+            "safety_level": "options_available"
+          },
+          {
+            "id": "e4f4f299-05e3-4ee2-82df-78e18e228fc9",
+            "name": "GOUT GLUTEN FREE BELGRANO",
+            "city": "Buenos Aires",
+            "category": "restaurant",
+            "safety_level": "gluten_free_100"
+          },
+          {
+            "id": "8a0e3a83-9b9b-46bc-87a5-f4ecdaa05a86",
+            "name": "Zero Gluten",
+            "city": "Buenos Aires",
+            "category": "restaurant",
+            "safety_level": "options_available"
+          },
+          {
+            "id": "dea7bffe-dbcd-4e73-a1b1-5725e684f483",
+            "name": "Celigourmet",
+            "city": "Buenos Aires",
+            "category": "restaurant",
+            "safety_level": "options_available"
+          },
+          {
+            "id": "dd24c171-07ed-4e5e-9c5e-1de6eca5ceb1",
+            "name": "TACCOUT",
+            "city": "Buenos Aires",
+            "category": "restaurant",
+            "safety_level": "options_available"
+          }
+        ],
+        "scope_note": "Las etiquetas salen de lo que declara cada local o cuentan sus clientes. CeliacMap no inspecciona ni certifica los lugares: confirmá siempre en el lugar."
+      }
+    },
+    {
+      "message": "un restaurante en Belgrano",
+      "response": {
+        "reply": "No encontré lugares para esa búsqueda en Belgrano. En Palermo hay 2 confirmados, por si te sirven. \n\n¿Querés que te muestre cuáles son o si conocés un restaurante sin gluten en Belgrano, contame y lo sumamos para revisión.",
+        "pending_submission": null,
+        "action": null,
+        "rate_limited": false,
+        "places": [],
+        "scope_note": null
+      }
+    },
+    {
+      "message": "algo sin gluten en Malvín Alto",
+      "response": {
+        "reply": "No encontré lugares para esa búsqueda en Malvín Alto. Si conocés un lugar sin gluten ahí, contame y lo sumamos para revisión.",
+        "pending_submission": null,
+        "action": null,
+        "rate_limited": false,
+        "places": [],
+        "scope_note": null
+      }
+    }
+  ]
+}
