@@ -43,7 +43,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { RESPONDER_PROMPT, ROUTER_PROMPT } from "./prompts.ts";
 import { orderRegionRows, planRegionSearch, type RegionTarget, widenedLabel } from "./regions.ts";
-import { type BarrioTarget, resolveBarrio, splitByBarrio } from "./barrios.ts";
+import { type BarrioTarget, FEW_INSIDE, resolveBarrio, splitByBarrio } from "./barrios.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -530,6 +530,9 @@ export interface ChatSearchResult {
   // null = no nearby lookup ran (logged as nearby_count: null); a number = it ran and counted this many.
   nearbyCount: number | null;
   queryLog: Record<string, unknown>;
+  // For the redactor: the barrio asked for (barrio search), or a zona with no polygon that found nothing by address.
+  barrioPedido?: string;
+  zonaSinLimites?: string;
 }
 
 /**
@@ -595,7 +598,13 @@ export async function searchPlacesForChat(
       // Best-effort — a failed nearby lookup must not fail the whole turn.
     }
   }
-  return { rows, datosCercanos, nearbyCount, queryLog };
+  // A zona that is not a region (those were planned above) and has no polygon: the redactor says it cannot filter by it.
+  const zonaIsRegion = plan.kind === "fallback" || (plan.kind === "region" && plan.dropZona);
+  const zonaSinLimites = rows.length === 0 && router.zona && !zonaIsRegion && requestedNames(router).length === 0
+    ? router.zona
+    : undefined;
+  if (zonaSinLimites) queryLog.zona_sin_limites = true;
+  return { rows, datosCercanos, nearbyCount, queryLog, zonaSinLimites };
 }
 
 /**
@@ -632,15 +641,20 @@ async function searchBarrioForChat(
       // Best-effort — telemetry must not fail the turn.
     }
   }
-  if (split.inside.length) {
-    return { rows: split.inside.slice(0, PLACES_SEARCH_LIMIT), datosCercanos: null, nearbyCount: null, queryLog };
+  const barrioPedido = target.label;
+  if (split.inside.length >= FEW_INSIDE) {
+    return { rows: split.inside.slice(0, PLACES_SEARCH_LIMIT), datosCercanos: null, nearbyCount: null, queryLog, barrioPedido };
   }
-  if (split.nearby.length) return { rows: [], datosCercanos: split.nearby, nearbyCount: split.nearbyTotal, queryLog };
+  // Few or none inside: the nearest places follow, each with its OWN barrio (RESPONDER_PROMPT: «decí que está cerca»).
+  const rows = [...split.inside, ...split.nearbyRows].slice(0, PLACES_SEARCH_LIMIT);
+  queryLog.barrio_nearby_listed = rows.length - split.inside.length;
+  if (rows.length) return { rows, datosCercanos: null, nearbyCount: split.nearbyTotal, queryLog, barrioPedido };
   return {
     rows: [],
     datosCercanos: cityRows.length ? { city: target.city.city, count: cityRows.length } : null,
     nearbyCount: cityRows.length,
     queryLog,
+    barrioPedido,
   };
 }
 
@@ -1459,9 +1473,14 @@ export function buildResponderUserMessage(args: {
   datosCercanos?: DatosCercanos | null;
   envio?: EnvioContext;
   filtroNivel?: string | null;
+  barrioPedido?: string;
+  zonaSinLimites?: string;
 }): string {
   const parts = [`modulo: ${args.modulo}`];
   if (args.filtroNivel === "100") parts.push("filtro_nivel: 100");
+  if (args.barrioPedido) parts.push(`barrio_pedido: ${args.barrioPedido}`);
+  // The person's own words: quoted (JSON) and capped, so they can never read as a control line.
+  if (args.zonaSinLimites) parts.push(`zona_sin_limites: ${JSON.stringify(args.zonaSinLimites.slice(0, 60))}`);
   if (args.datos) parts.push(`<datos>${JSON.stringify(args.datos)}</datos>`);
   if (args.datosCercanos) parts.push(`<datos_cercanos>${JSON.stringify(args.datosCercanos)}</datos_cercanos>`);
   if (args.envio) parts.push(`<envio>${JSON.stringify(args.envio)}</envio>`);
@@ -2283,6 +2302,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         RESPONDER_PROMPT,
         buildResponderUserMessage({
           modulo: router.modulo, userMessage: lastUserMessage, datos, datosCercanos, filtroNivel: router.nivel,
+          barrioPedido: search.barrioPedido, zonaSinLimites: search.zonaSinLimites,
         }),
         600,
       );

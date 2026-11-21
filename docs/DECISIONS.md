@@ -5360,6 +5360,40 @@ localidad de Google no siempre es el pueblo:
 **Tests:** San Isidro se mantiene aunque Google diga «Buenos Aires», la diferencia queda registrada y los otros cambios se
 aplican igual; los nombres de CABA no son diferencia; el resumen lista cada diferencia.
 
+### Chat: tanda de prompts sin «confirmados», con el barrio de cada lugar cercano (2026-11-21)
+
+Cambios en `RESPONDER_PROMPT` (y en `index.ts` / `barrios.ts` para lo que necesita datos):
+
+1. «Confirmados», «verificados» y «base verificada» salen de los ejemplos y las instrucciones. Una regla nueva prohíbe
+   decir que un lugar está «confirmado», «verificado», «validado» o «garantizado»: está en el mapa de CeliacMap.
+2. Al listar, nunca «sin gluten» a secas: cada lugar lleva una de las dos etiquetas.
+3. Lugares cercanos:
+   - Con menos de 3 lugares dentro del barrio (`FEW_INSIDE`), siguen en `<datos>` los más cercanos a ≤ 1,5 km, cada uno
+     con su propio `barrio`. El mensaje trae `barrio_pedido`.
+   - Línea nueva: «si el barrio de un lugar es otro, decí que está cerca, en su barrio, y nunca que está en el barrio
+     pedido».
+   - Reemplaza el conteo por barrio en `<datos_cercanos>`, que dejaba sin respuesta el «¿cuáles?».
+4. Zona sin polígono que no encontró nada:
+   - El mensaje trae `zona_sin_limites`, con el texto de la persona entre comillas JSON y hasta 60 caracteres, para que
+     no pueda leerse como una línea de control.
+   - El redactor dice que no puede filtrar por esa zona y ofrece los lugares de la ciudad, o pregunta la ciudad.
+5. ACA: `asociacionceliaca.org.ar` en `<fuentes>` y en los dos ejemplos.
+6. El ejemplo de Bienestar ya se había reemplazado el 2026-11-18 («Horno del Sur»): no quedaba nada.
+
+**Medición** (`db/checks/2026-11-21-chat-tanda-ab.md`, 272 llamadas, ~US$1,36, sin escrituras en producción):
+
+- Respecto de `main`, «confirmado/verificado» baja de 7–8/8 a 0/8 y «sin gluten» a secas de 5/8 a 0.
+- Cercanos con su barrio: 16/16 en las dos celdas, y 0 presentados como si estuvieran adentro.
+- Zona sin polígono: «no puedo filtrar» 8/8 en las dos celdas, contra 0/8 en `main` (que decía «no hay» 8/8). Con ciudad
+  ofrece Montevideo 8/8; sin ciudad pregunta la ciudad 8/8.
+- ACA con el dominio nuevo: 8/8.
+- labels, f4, router y legit, sin regresiones.
+- El detector de cercanos tenía un error (una línea en blanco antes de la lista) que lo hacía dar 2/16; se corrigió y lo
+  fija un test.
+
+Pendiente: deploy con «dale» y la batería de jailbreak contra la función desplegada. Este cambio de prompt reinicia el
+conteo del soft-launch. Quedan para cuando responda la ACA: el nombre de la etiqueta del 100% y la mención de la ACA.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
@@ -6002,6 +6036,7 @@ every link, and its one-line-per-phase list of the finished phases. CLAUDE.md ke
 
 ### Themes
 
+- **Validator, evidence and overrides (2026-09-01 → 10-13)** — overrides never silent, the 100% labeling rule, `place_evidence`, the evidence finder, contact frozen only by the registry; two audit signals and the `needs_review` queue stay open. [overrides](#manual-validator-overrides--allowed-but-never-silent) · [audit](#audit-2026-09-24--evidence-for-the-validator--100-only-with-explicit-evidence) · [evidence finder](#evidence-finder-for-the-admin-pending-100-queue-2026-09-27) · [re-validation](#retroactive-re-validation-of-pre-three-tier-rubric-approvals-2026-09-06) · [own knowledge](#validator--parametric-knowledge-vs-provided-evidence-2026-09-06) · [name substring](#validator--interpretación-heurística-de-un-substring-del-nombre-sin-verificar-su-significado-real-2026-09-07) · [queue](#cola-de-needs_review-sin-salida-automática--71-lugares-huérfanos-de-contacto-2026-09-06) · [Updater + Google risk](#updater-manual-contact-protection-and-google-risk-2026-10-02) · [contact registry](#contact-data-frozen-only-by-the-registry-2026-10-06) · [social author](#evidence-finder--a-social-quote-needs-a-verified-author-2026-10-13) · [post ≠ profile](#social-agent--a-post-is-not-a-profile-2026-10-13) · [map scope](#map-scope-rules-2026-10-13) · [official account](#cuenta-oficial-confirmada-es-una-corrección-de-datos-2026-11-05) · [needs_review evidence](#evidencia-para-la-cola-needs_review-y-cierre-de-la-cola-de-uruguay-2026-11-05) · [findmeglutenfree out](#findmeglutenfreecom-fuera-de-las-fuentes-automáticas-2026-11-06) · [100 sin evidencia](#una-etiqueta-100-que-baja-por-falta-de-evidencia-no-protege-el-lugar-2026-11-06) · [UY needs_review closed](#cierre-de-la-cola-needs_review-de-uruguay-2026-11-06) · [sin gluten = sin TACC](#validator-sin-gluten-y-sin-tacc-pesan-igual--rubric-a3-una-sola-palabra-para-el-modelo-y-veredicto-estructurado-2026-11-18) · [100% solo por una persona](#el-100-lo-asigna-solo-una-persona-y-el-chequeo-de-exclusividad-ignora-frases-negadas-2026-11-20) · [100% sin respaldo baja, metodología v2](#el-100-sin-respaldo-propio-baja-acelu-sale-del-mapa-y-metodología-v2-2026-11-20)
 - **Forms, kitchen and community (Jun 2026 → 09-24)** — anon INSERT-only suggestions, unverified kitchen questions (ADR-007), reports as evidence, opinions through a public view (ADR-008). [suggest form](#suggest-a-place-public-form-design-decisions) · [kitchen](#kitchen-information-as-review-evidence-2026-09-24) · [Form B](#form-b-collects-reviews-not-kitchen-data-2026-09-24) · [opinions](#community-opinions-on-the-public-site-2026-09-24) · [reports](#community-reports-place_reports-design-decisions)
 - **Chatbot (2026-09-19 → 11-18)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [C](#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía) · [by name](#chatbot--named-place-retrieval-2026-09-23) · [battery](#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25) · [region](#department--province-search--placesregion-2026-09-26) · [`category_zero`](#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27) · [sin gluten](#chatbot-sin-gluten-sin-preguntas-de-salud-ni-de-cocina--tanda-de-prompts-2026-11-18) · [draft amend](#chatbot-un-dato-contado-después-del-borrador-lo-completa-y-un-lugar-nuevo-puede-ir-sin-comentario-2026-11-19) · [barrios](#barrios-del-chat-por-coordenadas-2026-11-20)
 - **Public site and design (s/f → 2026-09-28)** — green-first editorial redesign, Top 3 explorer with two safety labels, roadmap removed, one cookieless analytics beacon, partners labeled and separate from safety (ADR-009). [redesign](#editorial-redesign-visual--content) · [base landing](#chatbot--named-place-retrieval-2026-09-23) · [design audit](#frontend-design-audit-frontend-design--web-design-guidelines--ui-ux-pro-max) · [cursor](#map-drag-cursor-cm-mapleaflet-grab) · [explorer](#map-explorer--results-list-and-chat-prompts-removed-2026-09-20) · [roadmap](#public-site--roadmap-section--github-links-removed-2026-09-01) · [`#suggest` copy](#suggest-section--card-titles-and-copy-2026-09-24) · [analytics](#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28) · [sponsorships](#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)
