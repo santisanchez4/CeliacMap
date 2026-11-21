@@ -158,3 +158,22 @@ def test_pending_100_reads_past_the_old_cap_of_50():
 
     build_digest(DB(pending_100=_pending(1, 0)))
     assert seen["limit"] > 50
+
+
+def test_the_digest_lists_each_location_difference_the_updater_left_untouched():
+    log = [{"agent": "updater", "action": "location_mismatch", "status": "success", "place_id": "3efed1b0",
+            "result": {"name": "La Union Bakery Gluten Free San Isidro",
+                       "differences": {"city": {"fila": "San Isidro", "google": "Buenos Aires"}}}}]
+    subject, text = build_digest(DigestDB(log=log))
+    assert "1 ubicaciones distintas en Google" in subject
+    assert "UBICACIÓN DISTINTA EN GOOGLE (1) — el Updater no cambió nada" in text
+    assert "La Union Bakery Gluten Free San Isidro: city: «San Isidro» en la fila, «Buenos Aires» en Google · id 3efed1b0" in text
+    assert "ERRORES DE LOS AGENTES" not in text  # a difference is not an agent error
+
+
+def test_a_long_list_of_location_differences_is_cut_with_a_pointer_to_agent_log():
+    log = [{"agent": "updater", "action": "location_mismatch", "status": "success", "place_id": f"p{i}",
+            "result": {"name": f"Lugar {i}", "differences": {"city": {"fila": "A", "google": "B"}}}} for i in range(35)]
+    _, text = build_digest(DigestDB(log=log))
+    assert "Lugar 29:" in text and "Lugar 30:" not in text
+    assert "(y 5 más en agent_log, action 'location_mismatch')" in text

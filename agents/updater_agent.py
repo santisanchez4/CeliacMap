@@ -6,6 +6,10 @@ Re-checks every ``approved`` place that came from Google Places (by its
 - **Closed** (``CLOSED_PERMANENTLY`` / ``permanently_closed``) -> discarded, so it
   drops off the public map immediately (closed places are not safe to surface).
 - **Name / address / category change** -> the row is patched in place.
+- **City / country / region are never rewritten** (2026-11-20): Google's locality is not always the town (it said
+  «Buenos Aires» for San Isidro and «Ciudad Autónoma de Buenos Aires» for CABA, against our labels), and it undid manual
+  corrections. When Google's value differs from the row, nothing changes and a ``location_mismatch`` row goes to
+  ``agent_log``, which the admin's daily digest lists.
 - **Gone** (``NOT_FOUND``) or a details error -> flagged for human review via
   ``agent_log``; the row is left untouched (could be transient).
 
@@ -19,6 +23,7 @@ the API budget. Every check — and a run summary — is written to ``agent_log`
 from __future__ import annotations
 
 import logging
+import unicodedata
 
 from agents.base import BaseAgent
 from agents.clients.google_places import GooglePlacesClient
@@ -29,6 +34,23 @@ from agents.manual_overrides import protected_contact_fields
 logger = logging.getLogger("celiacmap.agent")
 
 ALLOWED_CATEGORIES = {"restaurant", "cafe", "shop"}
+
+# Never patched: a difference is logged as ``location_mismatch`` for the admin instead.
+LOCATION_FIELDS = ("city", "country", "region")
+# CABA is filed as city «Buenos Aires» (CLAUDE.md); Google's other names for it are not a difference.
+_CABA_CITY_NAMES = {"buenos aires", "ciudad autonoma de buenos aires", "caba", "capital federal"}
+
+
+def _norm(value) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "")).lower()
+    return " ".join("".join(c for c in text if not unicodedata.combining(c)).replace(".", " ").split())
+
+
+def _same_location(field: str, ours, google) -> bool:
+    a, b = _norm(ours), _norm(google)
+    if field == "city" and a in _CABA_CITY_NAMES and b in _CABA_CITY_NAMES:
+        return True
+    return a == b
 
 # Narrow Haiku rubric: used only when Google types map to no category of ours.
 CATEGORY_RUBRIC = """\
@@ -121,7 +143,7 @@ class UpdaterAgent(BaseAgent):
         # `social_url` (a social profile Google lists as the website) only fills an empty column.
         protected = protected_contact_fields(place)
         for key, value in GooglePlacesClient.extract_rich_fields(result).items():
-            if key in protected:
+            if key in protected or key in LOCATION_FIELDS:
                 continue
             if key == "social_url" and place.get("social_url"):
                 continue
@@ -129,6 +151,16 @@ class UpdaterAgent(BaseAgent):
                 patch[key] = value
 
         return patch
+
+    @staticmethod
+    def _location_differences(place: dict, result: dict) -> dict:
+        """{field: {"fila": ours, "google": theirs}} for each location field Google names differently. Never applied."""
+        google = GooglePlacesClient.extract_rich_fields(result)
+        return {
+            field: {"fila": place.get(field), "google": google[field]}
+            for field in LOCATION_FIELDS
+            if google.get(field) and not _same_location(field, place.get(field), google[field])
+        }
 
     def run(self) -> dict:
         approved = self.db.fetch_places_by_status(
@@ -140,6 +172,7 @@ class UpdaterAgent(BaseAgent):
         unchanged = 0
         flagged = 0
         errors = 0
+        location_mismatches = 0
 
         for place in approved:
             place_id = place.get("id")
@@ -193,6 +226,16 @@ class UpdaterAgent(BaseAgent):
                     )
                     continue
 
+                differences = self._location_differences(place, result)
+                if differences:
+                    location_mismatches += 1
+                    self.log(
+                        "location_mismatch",
+                        {"name": place.get("name"), "differences": differences},
+                        status="success",
+                        place_id=place_id,
+                    )
+
                 patch = self._build_patch(place, result)
                 if patch:
                     self.db.update_place(place_id, patch)
@@ -229,6 +272,7 @@ class UpdaterAgent(BaseAgent):
             "unchanged": unchanged,
             "flagged": flagged,
             "errors": errors,
+            "location_mismatches": location_mismatches,
         }
         self.log(
             "updater_run_complete",

@@ -28,6 +28,7 @@ WINDOW_HOURS = 24
 PENDING_100_FETCH_LIMIT = 2000
 PENDING_100_LISTED = 10
 FIRST_COUNTRY = "Uruguay"
+MAX_LOCATION_LINES = 30
 _TRI = {True: "sí", False: "no", None: "sin dato"}
 
 
@@ -206,6 +207,20 @@ def build_digest(db, since: str | None = None, today: date | None = None) -> tup
             f" · descartados {validated.get('discarded', 0)}",
             "  python -m scripts.review_queue --needs-review",
         ])
+    moved = [r for r in log if r.get("agent") == "updater" and r.get("action") == "location_mismatch"]
+    if moved:
+        counts["ubicaciones distintas en Google"] = len(moved)
+        lines = [f"UBICACIÓN DISTINTA EN GOOGLE ({len(moved)}) — el Updater no cambió nada; corregí la fila solo si está mal"]
+        for r in moved[:MAX_LOCATION_LINES]:
+            res = r.get("result") or {}
+            diffs = " · ".join(
+                f"{field}: «{d.get('fila')}» en la fila, «{d.get('google')}» en Google"
+                for field, d in (res.get("differences") or {}).items()
+            )
+            lines.append(f"- {res.get('name')}: {diffs} · id {r.get('place_id')}")
+        if len(moved) > MAX_LOCATION_LINES:
+            lines.append(f"  (y {len(moved) - MAX_LOCATION_LINES} más en agent_log, action 'location_mismatch')")
+        sections.append(lines)
     errors = [r for r in log if r.get("status") == "error" and r.get("agent") != "chatbot"]
     if errors:
         counts["errores"] = len(errors)

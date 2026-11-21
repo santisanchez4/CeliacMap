@@ -5330,6 +5330,30 @@ cada deploy con «dale»):
 
 Quedan para cuando responda la ACA: el nombre de la etiqueta del 100% y la mención de la ACA.
 
+### El Updater no reescribe ciudad, país ni región (2026-11-20)
+
+**Problema.** El Updater copiaba en `city` / `country` / `region` lo que daban los `address_components` de Google, y la
+localidad de Google no siempre es el pueblo:
+
+- Volvió La Union San Isidro a «Buenos Aires» (2026-10-01) y Kanu Sushi de Vicente López a «buenos aires»: deshizo dos
+  correcciones del 2026-09-27.
+- El 2026-11-01 dejó lugares de CABA como «Ciudad Autónoma de Buenos Aires», en contra de la regla «CABA es Buenos Aires».
+- Antes había escrito «Palermo» y «C1425ESA» como ciudad (2026-09-01).
+
+**Decisión.**
+
+- `agents/updater_agent.py` ya no escribe `city`, `country` ni `region` (`LOCATION_FIELDS`).
+- Si el valor de Google es distinto del de la fila (sin tildes ni mayúsculas; los nombres de CABA son equivalentes), no
+  cambia nada y escribe una fila `agent_log` `location_mismatch` con `{"fila", "google"}` por campo.
+- `scripts/admin_digest.py` las lista en la sección «UBICACIÓN DISTINTA EN GOOGLE», hasta 30. No cuentan como errores.
+- El resto del parche sigue igual: nombre, dirección, categoría y contacto. Si un local se muda de departamento, la
+  dirección se actualiza y la región queda como está, con la diferencia anotada, hasta que el administrador la corrija.
+- Hoy ningún aprobado tiene `city`, `country` ni `region` vacíos (0 de 376), así que no hace falta rellenar vacíos.
+- Reemplaza la regla anterior: «el Updater mantiene `region` al día con la dirección».
+
+**Tests:** San Isidro se mantiene aunque Google diga «Buenos Aires», la diferencia queda registrada y los otros cambios se
+aplican igual; los nombres de CABA no son diferencia; el resumen lista cada diferencia.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
