@@ -239,6 +239,8 @@ interface FakePlace {
   address?: string;
   status?: string;
   safety_level?: string;
+  lat?: number;
+  lng?: number;
 }
 
 const place = (id: string, name: string, city: string, region: string, country: string, category = "shop",
@@ -420,17 +422,28 @@ Deno.test("a named lookup inside a department scans that department, not a city 
   });
 });
 
-Deno.test("the search of today is unchanged: a barrio with no results still gets the city-level count", async () => {
+Deno.test("a zona with no polygon and no address match still gets the city-level count of the same search", async () => {
   const data = [place("g1", "Palermo GF", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina"),
-    place("g2", "Caballito GF", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina")];
+    place("g2", "Caballito GF", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina"),
+    place("g3", "Café Caballito", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina", "cafe")];
   await withFakePostgrest(data, async () => {
     const found = await searchPlacesForChat(
-      "https://x.supabase.co", "anon", router({ ciudad: "Buenos Aires", zona: "Mataderos", pais: "Argentina" }), "algo en Mataderos",
+      "https://x.supabase.co", "anon", router({ ciudad: "Buenos Aires", zona: "Microcentro", pais: "Argentina" }), "algo en Microcentro",
     );
     assertEquals(found.rows, []);
-    assertEquals(found.datosCercanos, { city: "Buenos Aires", count: 2 });
-    assertEquals(found.nearbyCount, 2);
+    assertEquals(found.datosCercanos, { city: "Buenos Aires", count: 3 });
+    assertEquals(found.nearbyCount, 3);
     assertEquals(found.queryLog.region_plan, "city");
+  });
+  // The count keeps the category (the old one counted the whole city: "hay 50" for a restaurant search).
+  await withFakePostgrest(data, async (calls) => {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon",
+      router({ ciudad: "Buenos Aires", zona: "Microcentro", pais: "Argentina", category: "cafe" }), "un café en Microcentro",
+    );
+    assertEquals(found.datosCercanos, { city: "Buenos Aires", count: 1 });
+    const count = calls.find((u) => u.searchParams.get("select") === "id" && u.searchParams.get("category") === "eq.cafe");
+    assertEquals(count?.searchParams.get("address"), null);
   });
   // No barrio, no nearby lookup: nearbyCount stays null (logged as nearby_count: null, as before).
   await withFakePostgrest(data, async () => {
@@ -533,20 +546,38 @@ Deno.test("category_zero: a department search counts by region, not by a city ca
 
 Deno.test("category_zero: the count keeps the barrio and the 100% level, and nivel is now in the log", async () => {
   const data = [
-    place("k1", "Pocitos 100", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "Benito Blanco 1, Pocitos", safety_level: "gluten_free_100" }),
-    place("k2", "Pocitos opciones", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "Benito Blanco 2, Pocitos", safety_level: "options_available" }),
+    place("k1", "Malvín Alto 100", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "Michigan 1, Malvín Alto", safety_level: "gluten_free_100" }),
+    place("k2", "Malvín Alto opciones", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "Michigan 2, Malvín Alto", safety_level: "options_available" }),
     place("k3", "Centro 100", "Montevideo", "Montevideo", "Uruguay", "cafe", { address: "18 de Julio 1, Centro", safety_level: "gluten_free_100" }),
   ];
+  // «Malvín Alto» has no polygon (barrios.ts), so it is searched by address as before.
   await withFakePostgrest(data, async (calls) => {
     const found = await searchPlacesForChat(
       "https://x.supabase.co", "anon",
-      router({ ciudad: "Montevideo", pais: "Uruguay", zona: "Pocitos", category: "shop", nivel: "100" }), "solo 100% en Pocitos",
+      router({ ciudad: "Montevideo", pais: "Uruguay", zona: "Malvín Alto", category: "shop", nivel: "100" }), "solo 100% en Malvín Alto",
     );
     assertEquals(found.queryLog.nivel, "100");
     assertEquals(found.queryLog.count_without_category, 1);
     const count = calls.filter(isCountCall)[0];
     assertEquals(count.searchParams.get("safety_level"), "eq.gluten_free_100");
-    assertEquals(count.searchParams.get("address"), "ilike.*Pocitos*");
+    assertEquals(count.searchParams.get("address"), "ilike.*Malvín Alto*");
+  });
+});
+
+Deno.test("category_zero in a barrio with a polygon: counted inside the polygon without the category", async () => {
+  const data = [
+    place("p1", "Pocitos café", "Montevideo", "Montevideo", "Uruguay", "cafe", { lat: -34.909918, lng: -56.1489334 }),
+    place("p2", "Centro café", "Montevideo", "Montevideo", "Uruguay", "cafe", { lat: -34.9071844, lng: -56.1966805 }),
+  ];
+  await withFakePostgrest(data, async () => {
+    const found = await searchPlacesForChat(
+      "https://x.supabase.co", "anon",
+      router({ ciudad: "Montevideo", pais: "Uruguay", zona: "Pocitos", category: "shop" }), "almacenes en Pocitos",
+    );
+    assertEquals(found.rows, []);
+    assertEquals(found.queryLog.region_plan, "barrio");
+    assertEquals(found.queryLog.category_zero, true);
+    assertEquals(found.queryLog.count_without_category, 1);
   });
 });
 
@@ -589,19 +620,20 @@ Deno.test("category_zero: the count runs only when a category was set, gave 0 ro
   }
 });
 
-Deno.test("category_zero: the barrio nearby count and its datos_cercanos are unchanged, and the category count runs beside them", async () => {
+Deno.test("category_zero: the city count keeps the category, and the category count runs beside it", async () => {
   const data = [place("g1", "Palermo GF", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina", "cafe"),
     place("g2", "Caballito GF", "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Argentina", "restaurant")];
   await withFakePostgrest(data, async () => {
     const found = await searchPlacesForChat(
       "https://x.supabase.co", "anon",
-      router({ ciudad: "Buenos Aires", zona: "Mataderos", pais: "Argentina", category: "cafe" }), "cafes en Mataderos",
+      router({ ciudad: "Buenos Aires", zona: "Microcentro", pais: "Argentina", category: "cafe" }), "cafes en Microcentro",
     );
     assertEquals(found.rows, []);
-    assertEquals(found.datosCercanos, { city: "Buenos Aires", count: 2 });
-    assertEquals(found.nearbyCount, 2);
+    // Only the café: the count is what a follow-up "¿cuáles?" for cafés would list (it was 2 before 2026-11-20).
+    assertEquals(found.datosCercanos, { city: "Buenos Aires", count: 1 });
+    assertEquals(found.nearbyCount, 1);
     assertEquals(found.queryLog.category_zero, true);
-    // Mataderos matches no address, with or without the category.
+    // Microcentro matches no address, with or without the category.
     assertEquals(found.queryLog.count_without_category, 0);
   });
 });
