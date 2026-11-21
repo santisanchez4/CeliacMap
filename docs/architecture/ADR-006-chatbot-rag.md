@@ -223,6 +223,12 @@ tiene lugares, la Edge Function corre una segunda query a nivel ciudad y le
 pasa al redactor un `<datos_cercanos>` con el conteo por ciudad / otras
 zonas detectables por string.
 
+> **Actualización 2026-11-20:** las direcciones de Google no traen el barrio (0 de 50 en Montevideo), así que un barrio
+> conocido de Montevideo o CABA se decide por las coordenadas del lugar contra los límites oficiales (`barrios.ts`,
+> Intendencia de Montevideo / INE y GCBA). Si no hay ninguno adentro, `<datos_cercanos>` trae los barrios de los lugares
+> a ≤ 1,5 km con su cantidad. Para una zona sin polígono sigue el filtro por dirección, y el conteo de la ciudad ahora
+> conserva la categoría y el nivel. Detalle: [DECISIONS.md](../DECISIONS.md#barrios-del-chat-por-coordenadas-2026-11-20).
+
 **Comportamiento ante "sin resultados" (crítico):**
 
 - El prompt de sistema **prohíbe inventar lugares** y **prohíbe nombrar un

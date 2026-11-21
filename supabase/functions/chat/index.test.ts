@@ -11,7 +11,6 @@ import { assertEquals, assertMatch, assertNotEquals, assertStringIncludes } from
 import {
   buildChatLogResult,
   buildCorsHeaders,
-  buildNearbyCountUrl,
   buildPlaceLookupUrl,
   buildPlaceReportInsertPayload,
   buildPlacesSearchUrl,
@@ -307,13 +306,6 @@ Deno.test("buildPlacesSearchUrl select= never includes a sensitive field", () =>
   const select = url.searchParams.get("select") ?? "";
   assertEquals(select.includes("validation_notes"), false);
   assertEquals(select.includes("contact_email"), false);
-});
-
-Deno.test("buildNearbyCountUrl scopes to the city only, no zona filter", () => {
-  const url = new URL(buildNearbyCountUrl("https://x.supabase.co", "Buenos Aires"));
-  assertEquals(url.searchParams.get("city"), "ilike.*Buenos Aires*");
-  assertEquals(url.searchParams.get("address"), null);
-  assertEquals(url.searchParams.get("status"), "eq.approved");
 });
 
 Deno.test("parseContentRange reads the total after the slash", () => {

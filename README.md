@@ -98,7 +98,8 @@ places nearby, starting in Uruguay and Argentina and scaling across Latin Americ
   Supabase Edge Function (`supabase/functions/chat/`, `claude-haiku-4-5`: a router
   call plus a redactor call per turn). It finds **approved** places in natural
   language (by city, neighborhood, **department or province** — each place carries a
-  `region` derived from its Google address), helps leave a comment or recommend a place (writing to the same
+  `region` derived from its Google address; a barrio of Montevideo or Buenos Aires is matched by the place's own
+  coordinates against the official boundaries, credited below), helps leave a comment or recommend a place (writing to the same
   `place_reports` / `suggestions` intake tables as the public forms, under the same
   RLS), and answers general celiac-disease questions, always inside a closed scope.
   It has **zero authority over `places.status`**. Hardened with a 37-turn jailbreak
@@ -307,7 +308,7 @@ serif display headings over a clean sans body, and generous spacing.
 ├── skills/                     # AI toolkit — reusable skills
 │   └── validator-rubric/SKILL.md
 ├── supabase/functions/         # Deno/TypeScript Edge Functions
-│   └── chat/                   # the chatbot: router + redactor, safety net, rate limits (ADR-006); regions.ts = department / province search
+│   └── chat/                   # the chatbot: router + redactor, safety net, rate limits (ADR-006); regions.ts = department / province search; barrios.ts + generated barrios_data.ts = barrio by coordinates
 ├── config/
 │   ├── settings.py             # env-driven config (python-dotenv)
 │   └── targets.yaml            # countries/cities + search/social terms
@@ -320,6 +321,7 @@ serif display headings over a clean sans body, and generous spacing.
 │   ├── admin_digest.py         # daily email to the admin (admin-digest.yml)
 │   ├── delete_personal_data.py # answer a deletion request: find by text/date, dry-run unless --apply (docs/legal/runbook-pedidos-de-datos.md)
 │   ├── purge_chat_logs.py      # weekly retention purge: chat logs 30 d, chat_usage 7 d, Google reviews 30 d
+│   ├── build_barrios.py        # official barrio boundaries (IM / GCBA) -> supabase/functions/chat/barrios_data.ts, simplified to 10 m
 │   └── run_agents.py           # pipeline: search → social → web → suggestion → validator → updater
 ├── db/
 │   ├── schema.sql              # tables (+ suggestions, place_reports, place_votes), RLS, triggers
@@ -332,6 +334,20 @@ serif display headings over a clean sans body, and generous spacing.
 ├── .env.example
 └── README.md  CLAUDE.md  prompts.md  .gitignore
 ```
+
+## Data Sources and Attribution
+
+- **Places:** Google Places (search, details and reviews; reviews are server-only and purged after 30 days) and public
+  pages, as described in [Architecture](#architecture) and [`docs/legal/auditoria-datos-google.md`](docs/legal/auditoria-datos-google.md).
+- **Map tiles:** © OpenStreetMap contributors, © CARTO (credited on the map).
+- **Barrio boundaries the assistant uses** (`supabase/functions/chat/barrios_data.ts`, built by
+  `scripts/build_barrios.py`, simplified to 10 m and rounded; credited in the site footer):
+  - Montevideo: «Barrios de Montevideo según INE», Servicio de Geomática, Intendencia de Montevideo, origin Instituto
+    Nacional de Estadística (Censo 2011). «De uso libre según resolución 640/10 del Intendente Municipal de Montevideo»
+    (metadata `1277c8cd-3e7a-4afd-8289-aeae893ce0db`, [geoweb.montevideo.gub.uy](https://geoweb.montevideo.gub.uy/geonetwork/srv/spa/catalog.search#/home)).
+  - Buenos Aires: «Barrios», Gobierno de la Ciudad Autónoma de Buenos Aires,
+    [data.buenosaires.gob.ar/dataset/barrios](https://data.buenosaires.gob.ar/dataset/barrios),
+    [CC BY 2.5 AR](https://creativecommons.org/licenses/by/2.5/ar/).
 
 ## How to Run
 

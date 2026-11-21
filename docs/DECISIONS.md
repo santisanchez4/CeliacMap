@@ -5243,6 +5243,93 @@ cada uno ensayado con ROLLBACK, aplicado con COMMIT tras el «dale» y verificad
   - Sección 3: 16 de los 58 en 100% todavía sin cita guardada.
   - Sección 10: la prueba automática cubre el texto del sitio, no el del asistente.
 
+### Barrios del chat por coordenadas (2026-11-20)
+
+**Problema.** «dime un lugar para cenar en Ciudad Vieja Montevideo» respondió «no encontré nada en Ciudad Vieja, pero en
+Montevideo hay 50». El chat filtraba la zona con `address ilike '%zona%'`, y las direcciones de Google no traen el barrio.
+Después contaba `city ilike '%Montevideo%'` sin categoría ni nivel: los 50 eran todos los lugares aprobados de la ciudad,
+no los restaurantes.
+
+**Medición** (producción, solo lectura). Lugares aprobados con el barrio en la dirección y dentro del barrio según sus
+coordenadas y los límites oficiales:
+
+| Barrio | En la dirección | Dentro del polígono |
+|---|---|---|
+| Ciudad Vieja (MVD) | 0 | 2 (Dalbertt, La Molienda Sarandí) |
+| Pocitos (MVD) | 0 | 8 |
+| Cordón (MVD) | 0 | 7 |
+| Palermo (CABA) | 1 | 16 |
+| Recoleta (CABA) | 0 | 6 |
+| Belgrano (CABA) | 0 | 2 |
+
+Ninguna dirección de Montevideo y solo 1 de las 52 de CABA traían el barrio. El nombre del local no es el barrio: «GOUT
+Gluten Free Belgrano» y «La Unión Belgrano» (Av. Lacroze) están en el Palermo oficial, a 300–400 m de Belgrano.
+
+**Decisión.**
+
+- `supabase/functions/chat/barrios.ts` decide el barrio por los límites oficiales. Los polígonos están en
+  `barrios_data.ts`, que genera `scripts/build_barrios.py`: Douglas-Peucker a 10 m y 5 decimales, 6.619 de 53.340 puntos,
+  139 KB. Ninguno de los 107 lugares aprobados de las dos regiones cambia de barrio respecto de los polígonos completos;
+  lo fija `barrios_places_fixture.ts`.
+- Nombres y variantes:
+  - Los nombres se comparan sin tildes ni mayúsculas («Cordón» = «Cordon»).
+  - Las partes de los barrios que el INE fusionó en un solo polígono sirven de alias («Parque Batlle», «Prado», «Colón»
+    = sus dos polígonos).
+  - No hay alias de sub-zonas («Palermo Soho»): son más chicas que el polígono y listarían lugares fuera de ellas con su
+    nombre.
+  - Solo hay polígonos de Montevideo y CABA. Sin ciudad, un nombre vale si es único entre las dos ciudades y no es
+    nombre de un pueblo en otro lado («Centro», «La Paloma», «Flores», «Colón», «Palermo» piden la ciudad).
+- **Barrio conocido:**
+  - Se traen los lugares aprobados de la región (`Montevideo` / `Ciudad Autónoma de Buenos Aires`, no `city`: 5 filas de
+    CABA tienen `city` «Ciudad Autónoma de Buenos Aires») con la misma categoría y nivel, y se quedan los que caen dentro
+    del polígono.
+  - Cada uno lleva el campo calculado `barrio`. `toRedactorPlace` lo pasa como pasa `reportado_por_la_comunidad`.
+  - Si no queda ninguno, `<datos>` va vacío y `<datos_cercanos>` lleva los barrios de los lugares a ≤ 1,5 km del borde,
+    con su cantidad (`[{"barrio": "Palermo", "count": 2}]`). Nunca se listan como si estuvieran en el barrio pedido.
+  - Si tampoco hay cercanos, va el conteo de la ciudad para la misma búsqueda.
+  - `category_zero` se cuenta dentro del polígono.
+- **Barrio desconocido:** sigue la búsqueda por dirección. Si no encuentra nada, el conteo de la ciudad conserva la
+  categoría y el nivel (reemplaza a `buildNearbyCountUrl`).
+- **Sin cambio de prompt.** `RESPONDER_PROMPT` ya pide «nombre, barrio o dirección», y `<datos_cercanos>` con varios
+  barrios es la forma del ejemplo de Mataderos.
+
+**Fuentes y licencias** (atribución en el encabezado de `barrios_data.ts`, el README y el pie del sitio):
+
+- Montevideo: «BARRIOS DE MONTEVIDEO segun INE», Servicio de Geomática de la Intendencia, origen INE (Censo 2011). La
+  ficha de metadatos `1277c8cd-3e7a-4afd-8289-aeae893ce0db` del GeoNetwork de la Intendencia dice «De uso libre según
+  resolución 640/10 del Intendente Municipal de Montevideo de fecha 22/02/2010».
+  - No figuraba en el catálogo nacional; apareció en el portal de la Intendencia, así que no hizo falta escribirle.
+  - La descarga es la WFS que da esa ficha (`zon_v_sig_barrios`), con la misma geometría que la capa `sig_barrios` del SIG.
+- CABA: «Barrios», GCBA, data.buenosaires.gob.ar, CC BY 2.5 AR. La licencia pide nombrar al autor, enlazar la licencia y
+  decir que se modificó: «simplificados».
+
+**Datos encontrados de paso** (abiertos, no se tocan en este PR):
+
+- **El Updater pisa `city` con la localidad de `address_components`.**
+  - Revirtió dos correcciones del 2026-09-27: La Union San Isidro el 2026-10-01 y Kanu Sushi (Vicente López) a «buenos aires».
+  - El 2026-11-01 dejó 3 lugares de CABA como «Ciudad Autónoma de Buenos Aires», en contra de la regla «CABA es Buenos
+    Aires»; hoy son 5 con esa etiqueta.
+  - Una fila de Montevideo tiene `city` «Uruguay».
+  - Hace falta que el Updater no reescriba `city` (o que lo normalice) antes de corregir esas filas: si no, el próximo día 1
+    las vuelve a pisar.
+- **La Union Bakery San Isidro** volvió a `city='San Isidro'` con «dale» (`db/fixes/2026-11-20-san-isidro-ciudad.sql`,
+  `CORRECCIÓN MANUAL … ciudad corregida`, `manual_override_marker` → None). El Updater la puede volver a pisar el 1 de
+  diciembre mientras no se arregle lo anterior.
+
+**Tanda de prompts pendiente** (después de este PR, sin esperar a la ACA; A/B contra el modelo real, batería de jailbreak y
+cada deploy con «dale»):
+
+1. Sacar «confirmados», «verificados» y «base verificada» de los ejemplos y las instrucciones de `RESPONDER_PROMPT` (el
+   primer ejemplo dice «la comunidad tiene confirmados»; el redactor dijo «50 lugares confirmados sin gluten»).
+2. Al listar lugares, nunca «sin gluten» a secas: siempre una de las dos etiquetas.
+3. «Si el barrio de un lugar no es el pedido, decí que está cerca», para poder mezclar lugares de adentro y cercanos en
+   `<datos>`.
+4. «No puedo filtrar por ese barrio, te ofrezco los de la ciudad» para una zona sin polígono.
+5. El dominio de la ACA: `asociacionceliaca.org.ar` en lugar de `celiaco.org.ar` en `<fuentes>`.
+6. Sacar el ejemplo de Bienestar, pendiente desde antes de la Fase 3 de aliados.
+
+Quedan para cuando responda la ACA: el nombre de la etiqueta del 100% y la mención de la ACA.
+
 ## Key risks to keep in mind — detalle completo (movido de CLAUDE.md)
 
 > The eight bullets of the original "Key risks to keep in mind" section, verbatim, one per heading.
@@ -5886,7 +5973,7 @@ every link, and its one-line-per-phase list of the finished phases. CLAUDE.md ke
 ### Themes
 
 - **Forms, kitchen and community (Jun 2026 → 09-24)** — anon INSERT-only suggestions, unverified kitchen questions (ADR-007), reports as evidence, opinions through a public view (ADR-008). [suggest form](#suggest-a-place-public-form-design-decisions) · [kitchen](#kitchen-information-as-review-evidence-2026-09-24) · [Form B](#form-b-collects-reviews-not-kitchen-data-2026-09-24) · [opinions](#community-opinions-on-the-public-site-2026-09-24) · [reports](#community-reports-place_reports-design-decisions)
-- **Chatbot (2026-09-19 → 11-18)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [C](#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía) · [by name](#chatbot--named-place-retrieval-2026-09-23) · [battery](#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25) · [region](#department--province-search--placesregion-2026-09-26) · [`category_zero`](#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27) · [sin gluten](#chatbot-sin-gluten-sin-preguntas-de-salud-ni-de-cocina--tanda-de-prompts-2026-11-18) · [draft amend](#chatbot-un-dato-contado-después-del-borrador-lo-completa-y-un-lugar-nuevo-puede-ir-sin-comentario-2026-11-19)
+- **Chatbot (2026-09-19 → 11-18)** — writes, widget, no gluten figures + guard, search by name and by region, 0 jailbreak breaks on v18; the next prompt edit carries the 2c contradiction, the Bienestar example and the "sin gluten" glossary. [C](#chatbot-fase-c--módulo-2-reportarrecomendar--módulo-4-confirmar-design-decisions) · [D](#chatbot-fase-d--widget-flotante-jschatjs-design-decisions) · [E](#chatbot-fase-e--revisión-de-prompts-f4-cifra-de-tolerancia--f3-falsos-positivos-de-cortesía) · [by name](#chatbot--named-place-retrieval-2026-09-23) · [battery](#chatbot-jailbreak-battery-re-run-on-chat-v18-2026-09-25) · [region](#department--province-search--placesregion-2026-09-26) · [`category_zero`](#category_zero-telemetry--a-category-that-finds-nothing-2026-09-27) · [sin gluten](#chatbot-sin-gluten-sin-preguntas-de-salud-ni-de-cocina--tanda-de-prompts-2026-11-18) · [draft amend](#chatbot-un-dato-contado-después-del-borrador-lo-completa-y-un-lugar-nuevo-puede-ir-sin-comentario-2026-11-19) · [barrios](#barrios-del-chat-por-coordenadas-2026-11-20)
 - **Public site and design (s/f → 2026-09-28)** — green-first editorial redesign, Top 3 explorer with two safety labels, roadmap removed, one cookieless analytics beacon, partners labeled and separate from safety (ADR-009). [redesign](#editorial-redesign-visual--content) · [base landing](#chatbot--named-place-retrieval-2026-09-23) · [design audit](#frontend-design-audit-frontend-design--web-design-guidelines--ui-ux-pro-max) · [cursor](#map-drag-cursor-cm-mapleaflet-grab) · [explorer](#map-explorer--results-list-and-chat-prompts-removed-2026-09-20) · [roadmap](#public-site--roadmap-section--github-links-removed-2026-09-01) · [`#suggest` copy](#suggest-section--card-titles-and-copy-2026-09-24) · [analytics](#cloudflare-web-analytics--the-first-third-party-measurement-script-2026-09-28) · [sponsorships](#sponsorships--visible-and-separate-from-the-safety-evaluation-2026-09-28)
 - **Agents and platform (Jan 2026 → 09-16)** — landing to product, Social and Web agents, three-tier rubric with code gates 0.85 / 0.7 / 0.5 + MCP server, outreach and its reply webhook, Pages deploy. [product](#product-evolution-landing--functional-product) · [social](#social-agent-design-decisions) · [web v3](#web-discovery-agent-v3-design-decisions) · [AI Toolkit](#ai-toolkit-prompts--skill--mcp-server-design-decisions) · [outreach](#outreach-agent-design-decisions) · [reply webhook](#outreach-reply-webhook-etapa-2-design-decisions) · [Pages](#github-pages-deploy-decision) · [build status](#build-status-phases)
 

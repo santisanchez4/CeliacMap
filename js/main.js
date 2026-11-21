@@ -261,7 +261,10 @@
     "footer.terms": "Terms",
     "privacy.notice.send": "By sending, you accept the",
     "privacy.notice.link": "privacy policy (in Spanish)",
-    "footer.credit": "Made by Santiago Sanchez"
+    "footer.credit": "Made by Santiago Sanchez",
+    "footer.sources": "Neighbourhood boundaries the assistant uses (simplified):",
+    "footer.sources.mvd": "Montevideo: Intendencia de Montevideo, from INE (free use, Res. 640/10)",
+    "footer.sources.caba": "Buenos Aires: Government of the City of Buenos Aires (GCBA)"
   };
 
   var i18nNodes = Array.prototype.slice.call(

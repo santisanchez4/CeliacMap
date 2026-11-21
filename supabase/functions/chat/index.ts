@@ -43,6 +43,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { RESPONDER_PROMPT, ROUTER_PROMPT } from "./prompts.ts";
 import { orderRegionRows, planRegionSearch, type RegionTarget, widenedLabel } from "./regions.ts";
+import { type BarrioTarget, resolveBarrio, splitByBarrio } from "./barrios.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -329,6 +330,8 @@ export function toRedactorPlace(row: Record<string, unknown>, now = Date.now()):
   const out = filterPlaceFields(row);
   const at = typeof row.community_warning_at === "string" ? Date.parse(row.community_warning_at) : NaN;
   if (!Number.isNaN(at) && now - at < COMMUNITY_WARNING_DAYS * 86_400_000) out.reportado_por_la_comunidad = true;
+  // Computed from the place's own coordinates by a barrio search (barrios.ts), never read from a column.
+  if (typeof row.barrio === "string") out.barrio = row.barrio;
   return out;
 }
 
@@ -476,16 +479,19 @@ export function toChatPlaceReferences(rows: Record<string, unknown>[]): ChatPlac
   }).slice(0, PLACES_SEARCH_LIMIT);
 }
 
-// <datos_cercanos> — deliberate simplification (TODO in PLAN-chatbot-rag.md
-// left this open for Fase B to decide): `places` has no barrio column and no
-// curated neighborhood list exists, so "otras zonas" is a single real,
-// city-level count via PostgREST `Prefer: count=exact` — never a per-
-// neighborhood breakdown grouped client-side from a `limit=50` list (the
-// PLAN's own NO NEGOCIABLE rule: never show a fabricated count).
-export function buildNearbyCountUrl(supabaseUrl: string, ciudad: string): string {
-  return `${supabaseUrl}/rest/v1/places?select=id&status=eq.approved&city=ilike.*${
-    encodeURIComponent(ciudad)
-  }*&limit=1`;
+// <datos_cercanos>: a real count, never a fabricated one (PLAN-chatbot-rag.md, NO NEGOCIABLE). For a known barrio of
+// Montevideo or CABA it is the per-barrio breakdown of the places near it (barrios.ts), counted from every place of the
+// city; for any other zona it is the city-level count of the same search (category and level kept), via PostgREST
+// `Prefer: count=exact`.
+export type DatosCercanos = { city: string; count: number } | { barrio: string; count: number }[];
+
+/** How many approved places a search finds (exact count, limit 1). Throws on a failed request: callers are best-effort. */
+async function countPlaces(supabaseUrl: string, anonKey: string, params: PlacesQueryParams): Promise<number | null> {
+  const url = new URL(buildPlacesSearchUrl(supabaseUrl, { ...params, limit: 1 }));
+  url.searchParams.set("select", "id");
+  const res = await fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Prefer: "count=exact" } });
+  if (!res.ok) throw new Error(`count failed: ${res.status}`);
+  return parseContentRange(res.headers.get("content-range"));
 }
 
 /**
@@ -512,19 +518,15 @@ export async function fetchRegionSummary(
  * A category that found nothing where this is above 0 is a category hiding places. Nothing returned or shown to the
  * redactor depends on it. Throws on a failed request: the caller treats it as best-effort.
  */
-async function countWithoutCategory(
+function countWithoutCategory(
   supabaseUrl: string, anonKey: string, params: PlacesQueryParams,
 ): Promise<number | null> {
-  const url = new URL(buildPlacesSearchUrl(supabaseUrl, { ...params, category: null, limit: 1 }));
-  url.searchParams.set("select", "id");
-  const res = await fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Prefer: "count=exact" } });
-  if (!res.ok) throw new Error(`count without category failed: ${res.status}`);
-  return parseContentRange(res.headers.get("content-range"));
+  return countPlaces(supabaseUrl, anonKey, { ...params, category: null });
 }
 
 export interface ChatSearchResult {
   rows: Record<string, unknown>[];
-  datosCercanos: { city: string; count: number } | null;
+  datosCercanos: DatosCercanos | null;
   // null = no nearby lookup ran (logged as nearby_count: null); a number = it ran and counted this many.
   nearbyCount: number | null;
   queryLog: Record<string, unknown>;
@@ -542,6 +544,9 @@ export interface ChatSearchResult {
 export async function searchPlacesForChat(
   supabaseUrl: string, anonKey: string, router: RouterOutput, message: string,
 ): Promise<ChatSearchResult> {
+  const barrio = router.zona && requestedNames(router).length === 0 ? resolveBarrio(router) : null;
+  if (barrio) return searchBarrioForChat(supabaseUrl, anonKey, router, barrio);
+
   const plan = planRegionSearch({ ciudad: router.ciudad, zona: router.zona, pais: router.pais, message });
   const queryLog: Record<string, unknown> = {
     ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category, nivel: router.nivel,
@@ -567,21 +572,23 @@ export async function searchPlacesForChat(
     }
   }
 
-  let datosCercanos: { city: string; count: number } | null = null;
+  let datosCercanos: DatosCercanos | null = null;
   let nearbyCount: number | null = null;
   if (rows.length === 0 && plan.kind === "fallback") {
     try {
-      datosCercanos = await fetchRegionSummary(supabaseUrl, anonKey, plan.target, router);
-      nearbyCount = datosCercanos?.count ?? 0;
+      const summary = await fetchRegionSummary(supabaseUrl, anonKey, plan.target, router);
+      datosCercanos = summary;
+      nearbyCount = summary?.count ?? 0;
     } catch {
       // Best-effort — a failed region lookup must not fail the whole turn.
     }
   } else if (rows.length === 0 && router.zona && router.ciudad) {
+    // A zona with no polygon found nothing by address: the city's count for the SAME search (category and level kept),
+    // so the number is what the follow-up "¿cuáles?" would list.
     try {
-      const nearbyRes = await fetch(buildNearbyCountUrl(supabaseUrl, router.ciudad), {
-        headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Prefer: "count=exact" },
+      const total = await countPlaces(supabaseUrl, anonKey, {
+        ...params, zona: null, texto_libre: null, lugar_nombre: null, regionPrefer: null,
       });
-      const total = parseContentRange(nearbyRes.headers.get("content-range"));
       nearbyCount = total ?? 0;
       if (total !== null && total > 0) datosCercanos = { city: router.ciudad, count: total };
     } catch {
@@ -589,6 +596,52 @@ export async function searchPlacesForChat(
     }
   }
   return { rows, datosCercanos, nearbyCount, queryLog };
+}
+
+/**
+ * A known barrio of Montevideo or CABA (barrios.ts): the city's approved places for the same category and level, kept
+ * when their own coordinates fall inside the barrio, each with its `barrio`. None inside: <datos> stays empty and
+ * <datos_cercanos> gets the barrios of the places within NEARBY_KM of its edge, with their counts — never listed as if
+ * they were in the barrio asked for. None near either: the city's count, as for any zona.
+ */
+async function searchBarrioForChat(
+  supabaseUrl: string, anonKey: string, router: RouterOutput, target: BarrioTarget,
+): Promise<ChatSearchResult> {
+  const queryLog: Record<string, unknown> = {
+    ciudad: router.ciudad, pais: router.pais, zona: router.zona, category: router.category, nivel: router.nivel,
+    texto_libre: router.texto_libre, lugar_nombre: router.lugar_nombre, region_plan: "barrio",
+    region: target.city.region, barrio: target.label,
+  };
+  const cityRows = await fetchSearchPlaces(supabaseUrl, anonKey, {
+    region: target.city.region, pais: target.city.country, category: router.category, nivel: router.nivel,
+    limit: REGION_FETCH_LIMIT,
+  });
+  const split = splitByBarrio(cityRows, target);
+  queryLog.barrio_inside = split.inside.length;
+  queryLog.barrio_nearby = split.nearbyTotal;
+  if (router.category && split.inside.length === 0) {
+    // The same telemetry as the address search: is the category hiding places of this barrio?
+    queryLog.category_zero = true;
+    queryLog.count_without_category = null; // stays null if the request fails
+    try {
+      const anyCategory = await fetchSearchPlaces(supabaseUrl, anonKey, {
+        region: target.city.region, pais: target.city.country, nivel: router.nivel, limit: REGION_FETCH_LIMIT,
+      });
+      queryLog.count_without_category = splitByBarrio(anyCategory, target).inside.length;
+    } catch {
+      // Best-effort — telemetry must not fail the turn.
+    }
+  }
+  if (split.inside.length) {
+    return { rows: split.inside.slice(0, PLACES_SEARCH_LIMIT), datosCercanos: null, nearbyCount: null, queryLog };
+  }
+  if (split.nearby.length) return { rows: [], datosCercanos: split.nearby, nearbyCount: split.nearbyTotal, queryLog };
+  return {
+    rows: [],
+    datosCercanos: cityRows.length ? { city: target.city.city, count: cityRows.length } : null,
+    nearbyCount: cityRows.length,
+    queryLog,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1403,7 +1456,7 @@ export function buildResponderUserMessage(args: {
   modulo: RouterOutput["modulo"];
   userMessage: string;
   datos?: Record<string, unknown>[];
-  datosCercanos?: { city: string; count: number } | null;
+  datosCercanos?: DatosCercanos | null;
   envio?: EnvioContext;
   filtroNivel?: string | null;
 }): string {
