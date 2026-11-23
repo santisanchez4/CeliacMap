@@ -732,6 +732,7 @@ SOCIAL_PROFILES = [
     "https://wa.me/59899123456",
     "https://linktr.ee/cafex",
     "https://beacons.ai/cafex",
+    "https://msha.ke/namnam_lindsay",
     "https://www.tiktok.com/@cafex",
 ]
 
