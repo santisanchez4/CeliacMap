@@ -35,6 +35,7 @@ SOCIAL_DOMAINS = (
     "whatsapp.com",
     "beacons.ai",
     "linktr.ee",
+    "msha.ke",
     "tiktok.com",
 )
 
